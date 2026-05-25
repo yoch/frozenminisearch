@@ -8,7 +8,11 @@ Node.js–focused beta release (`@yoch/minisearch` on npm). Adds a read-only fro
 binary serialization; packaging no longer ships a browser UMD bundle.
 
   - Add `FrozenMiniSearch`, a read-only index with compact TypedArray postings,
-    built via `MiniSearch#freeze()` or `FrozenMiniSearch.loadBinary()`
+    built via `MiniSearch#freeze()`, `FrozenMiniSearch.fromDocuments()` (one-shot,
+    no mutable index), or `FrozenMiniSearch.loadBinary()`
+  - Add `FrozenMiniSearch.fromDocuments(documents, options)` to build a frozen
+    index directly (lower peak heap at build vs `addAll` + `freeze()` on large corpora)
+  - Export `buildFrozenFromDocuments` and `assembleFrozen` for advanced pipelines
   - Add `saveBinary()` / `FrozenMiniSearch.loadBinary()` for smaller on-disk
     snapshots and faster loads than `JSON.stringify` / `loadJSON` (`MSv2` flat
     postings on write; `MSv1` still readable on load; same `fields`, `tokenize`,

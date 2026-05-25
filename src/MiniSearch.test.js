@@ -173,6 +173,15 @@ describe('MiniSearch', () => {
 
       expect(ms.search('bar')).toHaveLength(1)
     })
+
+    it('keeps empty-string entries returned inside processTerm arrays', () => {
+      const processTerm = (string) => string === 'foobar' ? ['', 'foo'] : string
+      const ms = new MiniSearch({ fields: ['text'], processTerm })
+      ms.add({ id: 123, text: 'foobar' })
+
+      expect(ms._index.has('')).toBe(true)
+      expect(ms.search('foo')).toHaveLength(1)
+    })
   })
 
   describe('remove', () => {

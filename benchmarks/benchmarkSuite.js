@@ -76,6 +76,7 @@ function aggregateScenarioRuns (runs) {
   const indexing = {
     addAllMs: medianRound(runs.map((r) => r.indexing.addAllMs), 2),
     freezeMs: medianRound(runs.map((r) => r.indexing.freezeMs), 2),
+    fromDocumentsMs: medianRound(runs.map((r) => r.indexing.fromDocumentsMs), 2),
     jsonSerializeMs: medianRound(runs.map((r) => r.indexing.jsonSerializeMs), 2),
     saveBinaryMs: medianRound(runs.map((r) => r.indexing.saveBinaryMs), 2),
     binaryMagic: base.indexing.binaryMagic
@@ -83,10 +84,15 @@ function aggregateScenarioRuns (runs) {
 
   const heapMutable = medianRound(runs.map((r) => r.heapMb.mutable), 3)
   const heapFrozen = medianRound(runs.map((r) => r.heapMb.frozen), 3)
+  const heapBuildMutableFreeze = medianRound(runs.map((r) => r.heapMb.buildMutableFreeze), 3)
+  const heapBuildFromDocuments = medianRound(runs.map((r) => r.heapMb.buildFromDocuments), 3)
   const heapLoadJson = medianRound(runs.map((r) => r.heapMb.loadJson), 3)
   const heapLoadBinary = medianRound(runs.map((r) => r.heapMb.loadBinary), 3)
   const heapSavingPct = heapMutable > 0
     ? Number((100 * (1 - heapFrozen / heapMutable)).toFixed(1))
+    : 0
+  const buildHeapSavingPct = heapBuildMutableFreeze > 0
+    ? Number((100 * (1 - heapBuildFromDocuments / heapBuildMutableFreeze)).toFixed(1))
     : 0
 
   const diskJson = medianRound(runs.map((r) => r.diskMb.json), 3)
@@ -146,6 +152,9 @@ function aggregateScenarioRuns (runs) {
     heapMb: {
       mutable: heapMutable,
       frozen: heapFrozen,
+      buildMutableFreeze: heapBuildMutableFreeze,
+      buildFromDocuments: heapBuildFromDocuments,
+      buildFromDocumentsVsMutableFreezeSavingPct: buildHeapSavingPct,
       loadJson: heapLoadJson,
       loadBinary: heapLoadBinary,
       frozenVsMutableSavingPct: heapSavingPct
@@ -292,6 +301,7 @@ export function runScenario (scenario) {
   let binaryBuf
   let indexMs
   let freezeMs
+  let fromDocumentsMs
   let jsonSerializeMs
   let binarySerializeMs
 
@@ -310,6 +320,8 @@ export function runScenario (scenario) {
     const bin = timedMs(() => fr.result.saveBinary())
     binaryBuf = bin.result
     binarySerializeMs = bin.ms
+    const direct = timedMs(() => FrozenMiniSearch.fromDocuments(corpus, options))
+    fromDocumentsMs = direct.ms
   }
 
   const jsonMb = mbRound(json.length)
@@ -327,6 +339,16 @@ export function runScenario (scenario) {
     const ms = new MiniSearch(options)
     ms.addAll(corpus)
     return ms.freeze()
+  })
+
+  const heapBuildMutableFreeze = measureHeap(() => {
+    const ms = new MiniSearch(options)
+    ms.addAll(corpus)
+    return ms.freeze()
+  })
+
+  const heapBuildFromDocuments = measureHeap(() => {
+    return FrozenMiniSearch.fromDocuments(corpus, options)
   })
 
   const breakdown = frozenMemoryBreakdown(heapFrozen.value)
@@ -401,6 +423,7 @@ export function runScenario (scenario) {
     indexing: {
       addAllMs: Number(indexMs.toFixed(2)),
       freezeMs: Number(freezeMs.toFixed(2)),
+      fromDocumentsMs: Number(fromDocumentsMs.toFixed(2)),
       jsonSerializeMs: Number(jsonSerializeMs.toFixed(2)),
       saveBinaryMs: Number(binarySerializeMs.toFixed(2)),
       binaryMagic
@@ -408,6 +431,11 @@ export function runScenario (scenario) {
     heapMb: {
       mutable: heapMutable.heapMb,
       frozen: heapFrozen.heapMb,
+      buildMutableFreeze: heapBuildMutableFreeze.heapMb,
+      buildFromDocuments: heapBuildFromDocuments.heapMb,
+      buildFromDocumentsVsMutableFreezeSavingPct: heapBuildMutableFreeze.heapMb > 0
+        ? Number((100 * (1 - heapBuildFromDocuments.heapMb / heapBuildMutableFreeze.heapMb)).toFixed(1))
+        : 0,
       loadJson: heapJsonLoaded.heapMb,
       loadBinary: heapBinaryLoaded.heapMb,
       frozenVsMutableSavingPct: heapSavingPct

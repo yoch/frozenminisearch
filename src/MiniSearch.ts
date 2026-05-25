@@ -21,6 +21,10 @@ import {
   defaultSearchOptions,
   defaultAutoSuggestOptions
 } from './searchDefaults'
+import {
+  collectFieldTermFreqs,
+  saveStoredFieldsForDocument
+} from './indexingCore'
 
 export type { BM25Params } from './scoring'
 export type LowercaseCombinationOperator = 'or' | 'and' | 'and_not'
@@ -750,7 +754,8 @@ export default class MiniSearch<T = any> {
     }
 
     const shortDocumentId = this.addDocumentId(id)
-    this.saveStoredFields(shortDocumentId, document)
+    const stored = saveStoredFieldsForDocument(this._options.storeFields, extractField, document)
+    if (stored != null) this._storedFields.set(shortDocumentId, stored)
 
     for (const field of fields) {
       const fieldValue = extractField(document, field)
@@ -758,18 +763,15 @@ export default class MiniSearch<T = any> {
 
       const tokens = tokenize(stringifyField(fieldValue, field), field)
       const fieldId = this._fieldIds[field]
-
       const uniqueTerms = new Set(tokens).size
+      const localFreqs = collectFieldTermFreqs(tokens, field, processTerm)
+
       this.addFieldLength(shortDocumentId, fieldId, this._documentCount - 1, uniqueTerms)
 
-      for (const term of tokens) {
-        const processedTerm = processTerm(term, field)
-        if (Array.isArray(processedTerm)) {
-          for (const t of processedTerm) {
-            this.addTerm(fieldId, shortDocumentId, t)
-          }
-        } else if (processedTerm) {
-          this.addTerm(fieldId, shortDocumentId, processedTerm)
+      for (const [term] of localFreqs) {
+        const freq = localFreqs.get(term)!
+        for (let i = 0; i < freq; i++) {
+          this.addTerm(fieldId, shortDocumentId, term)
         }
       }
     }
@@ -1976,22 +1978,6 @@ export default class MiniSearch<T = any> {
     }
     const totalFieldLength = (this._avgFieldLength[fieldId] * count) - length
     this._avgFieldLength[fieldId] = totalFieldLength / (count - 1)
-  }
-
-  /**
-   * @ignore
-   */
-  private saveStoredFields (documentId: number, doc: T): void {
-    const { storeFields, extractField } = this._options
-    if (storeFields == null || storeFields.length === 0) { return }
-
-    let documentFields = this._storedFields.get(documentId)
-    if (documentFields == null) this._storedFields.set(documentId, documentFields = {})
-
-    for (const fieldName of storeFields) {
-      const fieldValue = extractField(doc, fieldName)
-      if (fieldValue !== undefined) documentFields[fieldName] = fieldValue
-    }
   }
 }
 

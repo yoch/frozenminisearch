@@ -23,6 +23,7 @@ import {
   deserializeTermIndexTree,
   serializeTermIndexTree
 } from './binaryFormat'
+import { buildFrozenParamsFromDocuments } from './frozenBuild'
 import type {
   Options,
   Query,
@@ -130,6 +131,30 @@ export interface FrozenMemoryBreakdown {
 
 export function frozenMemoryBreakdown (frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
   return frozen.memoryBreakdown()
+}
+
+export interface FrozenAssembleParams<T = any> {
+  options: OptionsWithDefaults<T>
+  documentCount: number
+  nextId: number
+  fieldIds: { [field: string]: number }
+  fieldCount: number
+  externalIds: unknown[]
+  idToShortId: Map<unknown, number>
+  storedFields: (Record<string, unknown> | undefined)[]
+  fieldLengthMatrix: Uint32Array
+  avgFieldLength: Float32Array
+  index: SearchableMap<number>
+  terms: string[]
+  postingsOffsets: Uint32Array
+  postingsLengths: Uint32Array
+  allDocIds: Uint32Array
+  allFreqs: Uint8Array
+}
+
+/** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts. */
+export function assembleFrozen<T> (params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
+  return new FrozenMiniSearch(params)
 }
 
 function buildFlatPostingsFromSource<T> (
@@ -244,7 +269,7 @@ export function freezeFromMiniSearch<T> (source: FreezeSource<T>): FrozenMiniSea
   const flat = buildFlatPostingsFromSource(source, fieldCount, shortIdRemap)
   const frozenIndex = new SearchableMap<number>(flat.tree)
 
-  return new FrozenMiniSearch({
+  return assembleFrozen({
     options: source._options,
     documentCount: _documentCount,
     nextId: useDense ? _documentCount : _nextId,
@@ -262,6 +287,10 @@ export function freezeFromMiniSearch<T> (source: FreezeSource<T>): FrozenMiniSea
     allDocIds: flat.allDocIds,
     allFreqs: flat.allFreqs
   })
+}
+
+export function buildFrozenFromDocuments<T> (documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
+  return assembleFrozen(buildFrozenParamsFromDocuments(documents, options))
 }
 
 export default class FrozenMiniSearch<T = any> {
@@ -482,7 +511,7 @@ export default class FrozenMiniSearch<T = any> {
       }
     }
 
-    return new FrozenMiniSearch({
+    return assembleFrozen({
       options: opts,
       documentCount: snap.documentCount,
       nextId: snap.nextId,
@@ -500,6 +529,16 @@ export default class FrozenMiniSearch<T = any> {
       allDocIds: snap.allDocIds,
       allFreqs: snap.allFreqs
     })
+  }
+
+  /**
+   * Build a read-only index in one pass from documents (no mutable MiniSearch step).
+   *
+   * Use {@link MiniSearch} + {@link MiniSearch#freeze} when you need remove, discard, or
+   * incremental updates before freezing.
+   */
+  static fromDocuments<T> (documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
+    return buildFrozenFromDocuments(documents, options)
   }
 
   private getFieldLength (docId: number, fieldId: number): number {

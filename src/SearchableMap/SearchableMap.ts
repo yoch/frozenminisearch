@@ -12,8 +12,7 @@ import type { RadixTree, Entry, Path } from './types'
  * (compressed prefix tree).
  *
  * Since this class can be of general utility beyond _MiniSearch_, it is
- * exported by the `minisearch` package and can be imported (or required) as
- * `minisearch/SearchableMap`.
+ * internal to `@yoch/minisearch` (not a separate public entry point).
  *
  * @typeParam T  The type of the values stored in the map.
  */

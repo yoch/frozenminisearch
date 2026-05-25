@@ -2,17 +2,18 @@ import typescript from '@rollup/plugin-typescript'
 import dts from 'rollup-plugin-dts'
 import terser from '@rollup/plugin-terser'
 
-const config = ({ format, input, output, name, dir, extension = 'js', exports = undefined }) => {
+const production = process.env.NODE_ENV === 'production'
+
+const config = ({ format, input, output, dir, extension = 'js', exports = undefined }) => {
   const shouldMinify = process.env.MINIFY === 'true' && output !== 'dts'
 
   return {
     input,
     output: {
-      sourcemap: output !== 'dts',
+      sourcemap: !production,
       dir: `dist/${dir || format}`,
       exports,
       format,
-      name,
       entryFileNames: shouldMinify ? `[name].min.${extension}` : `[name].${extension}`,
       plugins: shouldMinify
         ? [terser({
@@ -42,17 +43,7 @@ const benchmarks = {
 }
 
 export default process.env.BENCHMARKS === 'true' ? [benchmarks] : [
-  // Main (MiniSearch) — Node.js: ESM + CJS only
-  config({ format: 'es', input: 'src/index.ts', output: 'es6' }),
+  config({ format: 'es', input: 'src/index.ts', output: 'es6', dir: 'es' }),
   config({ format: 'cjs', input: 'src/index.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),
-
-  // SearchableMap
-  config({ format: 'es', input: 'src/SearchableMap/SearchableMap.ts', output: 'es6' }),
-  config({ format: 'cjs', input: 'src/SearchableMap/SearchableMap.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'default' }),
-
-  // Type declarations
-  config({ format: 'es', input: 'src/index.ts', output: 'dts', extension: 'd.ts' }),
-  config({ format: 'es', input: 'src/SearchableMap/SearchableMap.ts', output: 'dts', extension: 'd.ts' }),
-  config({ format: 'cjs', input: 'src/index.ts', output: 'dts', extension: 'd.cts' }),
-  config({ format: 'cjs', input: 'src/SearchableMap/SearchableMap.ts', output: 'dts', extension: 'd.cts' })
+  config({ format: 'es', input: 'src/index.ts', output: 'dts', dir: 'es', extension: 'd.ts' })
 ]

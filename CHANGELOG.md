@@ -2,9 +2,9 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v8.0.0-beta.0
 
-Node.js–focused release (version bump pending). Adds a read-only frozen index and
+Node.js–focused beta release (`@yoch/minisearch` on npm). Adds a read-only frozen index and
 binary serialization; packaging no longer ships a browser UMD bundle.
 
   - Add `FrozenMiniSearch`, a read-only index with compact TypedArray postings,
@@ -27,7 +27,7 @@ binary serialization; packaging no longer ships a browser UMD bundle.
   - Add `benchmarks/loadDivinaLines.js` and extreme synthetic scenarios
   - [breaking change] Drop UMD / browser build targets from Rollup; package
     ships ESM and CJS for Node only (`exports.require` points at a CJS wrapper
-    so `require('minisearch')` works without `.default`)
+    so `require('@yoch/minisearch')` works without `.default`)
   - Centralize default search, autoSuggest, and `loadBinary` options in
     `searchDefaults.ts`
 

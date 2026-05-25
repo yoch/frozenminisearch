@@ -1,30 +1,28 @@
 {
-  "name": "minisearch",
-  "version": "7.2.0",
-  "description": "Tiny but powerful full-text search engine for Node.js",
+  "name": "@yoch/minisearch",
+  "version": "8.0.0-beta.0",
+  "description": "Node.js full-text search with FrozenMiniSearch and binary index snapshots",
   "main": "dist/cjs/index.cjs",
   "module": "dist/es/index.js",
-  "es2015": "dist/es/index.js",
   "type": "module",
   "exports": {
     ".": {
+      "types": "./dist/es/index.d.ts",
       "require": "./dist/cjs/index.require.cjs",
       "import": "./dist/es/index.js",
       "default": "./dist/es/index.js"
-    },
-    "./SearchableMap": {
-      "require": "./dist/cjs/SearchableMap.cjs",
-      "import": "./dist/es/SearchableMap.js",
-      "default": "./dist/es/SearchableMap.js"
     }
   },
   "types": "./dist/es/index.d.ts",
-  "author": "Luca Ongaro",
-  "homepage": "https://lucaong.github.io/minisearch/",
-  "bugs": "https://github.com/lucaong/minisearch/issues",
+  "author": "Yoch",
+  "contributors": [
+    "Luca Ongaro <https://github.com/lucaong> (MiniSearch original)"
+  ],
+  "homepage": "https://github.com/yoch/minisearch#readme",
+  "bugs": "https://github.com/yoch/minisearch/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lucaong/minisearch.git"
+    "url": "https://github.com/yoch/minisearch.git"
   },
   "keywords": [
     "search",
@@ -32,8 +30,10 @@
     "fuzzy",
     "prefix",
     "auto suggest",
-    "auto complete",
-    "index"
+    "index",
+    "frozen",
+    "binary",
+    "node"
   ],
   "license": "MIT",
   "dependencies": {},
@@ -65,8 +65,10 @@
     "typescript": "^5.2.2"
   },
   "files": [
-    "/dist/**/*",
-    "/src/**/*"
+    "dist",
+    "README.md",
+    "LICENSE.txt",
+    "CHANGELOG.md"
   ],
   "jest": {
     "testEnvironmentOptions": {

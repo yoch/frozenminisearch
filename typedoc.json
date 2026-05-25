@@ -1,6 +1,6 @@
 {
-  "name": "MiniSearch",
-  "entryPoints": ["src/MiniSearch.ts", "src/SearchableMap/SearchableMap.ts"],
+  "name": "@yoch/minisearch",
+  "entryPoints": ["src/index.ts"],
   "out": "docs",
   "excludePrivate": true,
   "excludeProtected": true,

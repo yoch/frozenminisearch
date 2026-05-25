@@ -1,14 +1,14 @@
 {
   "name": "minisearch",
   "version": "7.2.0",
-  "description": "Tiny but powerful full-text search engine for browser and Node",
-  "main": "dist/umd/index.js",
+  "description": "Tiny but powerful full-text search engine for Node.js",
+  "main": "dist/cjs/index.cjs",
   "module": "dist/es/index.js",
   "es2015": "dist/es/index.js",
   "type": "module",
   "exports": {
     ".": {
-      "require": "./dist/cjs/index.cjs",
+      "require": "./dist/cjs/index.require.cjs",
       "import": "./dist/es/index.js",
       "default": "./dist/es/index.js"
     },
@@ -18,8 +18,6 @@
       "default": "./dist/es/SearchableMap.js"
     }
   },
-  "unpkg": "./dist/umd/index.js",
-  "jsdelivr": "./dist/umd/index.js",
   "types": "./dist/es/index.d.ts",
   "author": "Luca Ongaro",
   "homepage": "https://lucaong.github.io/minisearch/",
@@ -91,8 +89,10 @@
     "test-watch": "jest --watch",
     "coverage": "jest --coverage",
     "benchmark": "yarn build-benchmark && NODE_ENV=production node --expose-gc benchmarks/dist/index.cjs",
+    "benchmark:baseline": "yarn build && node --expose-gc benchmarks/baseline.js",
+    "benchmark:compare": "yarn build && node --expose-gc benchmarks/compare.js",
     "build-benchmark": "BENCHMARKS=true yarn build",
-    "build": "yarn clean-build && NODE_ENV=production rollup -c",
+    "build": "yarn clean-build && NODE_ENV=production rollup -c && node scripts/postbuild-cjs.cjs",
     "clean-build": "rm -rf dist",
     "build-minified": "MINIFY=true yarn build",
     "build-docs": "typedoc --options typedoc.json && yarn build-demo",

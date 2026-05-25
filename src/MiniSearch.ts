@@ -1,11 +1,32 @@
 import SearchableMap from './SearchableMap/SearchableMap'
+import {
+  OR,
+  AND,
+  AND_NOT,
+  aggregateTerm,
+  mapFieldTermData,
+  combineResults,
+  finalizeSearchResults,
+  termToQuerySpec,
+  getOwnProperty,
+  type BM25Params,
+  type RawResult,
+  type QuerySpec,
+  byScore
+} from './scoring'
+import { freezeFromMiniSearch } from './FrozenMiniSearch'
+import { WILDCARD_QUERY } from './symbols'
+import {
+  SPACE_OR_PUNCTUATION,
+  defaultSearchOptions,
+  defaultAutoSuggestOptions
+} from './searchDefaults'
 
+export type { BM25Params } from './scoring'
 export type LowercaseCombinationOperator = 'or' | 'and' | 'and_not'
 export type CombinationOperator = LowercaseCombinationOperator | Uppercase<LowercaseCombinationOperator> | Capitalize<LowercaseCombinationOperator>
 
-const OR: LowercaseCombinationOperator = 'or'
-const AND: LowercaseCombinationOperator = 'and'
-const AND_NOT: LowercaseCombinationOperator = 'and_not'
+export { OR, AND, AND_NOT }
 
 /**
  * Search options to customize the search behavior.
@@ -523,34 +544,8 @@ export type VacuumConditions = {
  */
 export type AutoVacuumOptions = VacuumOptions & VacuumConditions
 
-type QuerySpec = {
-  prefix: boolean,
-  fuzzy: number | boolean,
-  term: string,
-  termBoost: number
-}
-
 type DocumentTermFreqs = Map<number, number>
 type FieldTermData = Map<number, DocumentTermFreqs>
-
-interface RawResultValue {
-  // Intermediate score, before applying the final score based on number of
-  // matched terms.
-  score: number,
-
-  // Set of all query terms that were matched. They may not be present in the
-  // text exactly in the case of prefix/fuzzy matches. We must check for
-  // uniqueness before adding a new term. This is much faster than using a set,
-  // because the number of elements is relatively small.
-  terms: string[],
-
-  // All terms that were found in the content, including the fields in which
-  // they were present. This object will be provided as part of the final search
-  // results.
-  match: MatchInfo,
-}
-
-type RawResult = Map<number, RawResultValue>
 
 /**
  * {@link MiniSearch} is the main entrypoint class, implementing a full-text
@@ -628,7 +623,7 @@ export default class MiniSearch<T = any> {
    * The special wildcard symbol that can be passed to {@link MiniSearch#search}
    * to match all documents
    */
-  static readonly wildcard: unique symbol = Symbol('*')
+  static readonly wildcard: typeof WILDCARD_QUERY = WILDCARD_QUERY
 
   /**
    * @param options  Configuration options
@@ -1360,39 +1355,15 @@ export default class MiniSearch<T = any> {
   search (query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     const { searchOptions: globalSearchOptions } = this._options
     const searchOptionsWithDefaults: SearchOptionsWithDefaults = { ...globalSearchOptions, ...searchOptions }
-
     const rawResults = this.executeQuery(query, searchOptions)
-    const results = []
-
-    for (const [docId, { score, terms, match }] of rawResults) {
-      // terms are the matched query terms, which will be returned to the user
-      // as queryTerms. The quality is calculated based on them, as opposed to
-      // the matched terms in the document (which can be different due to
-      // prefix and fuzzy match)
-      const quality = terms.length || 1
-
-      const result = {
-        id: this._documentIds.get(docId),
-        score: score * quality,
-        terms: Object.keys(match),
-        queryTerms: terms,
-        match
-      }
-
-      Object.assign(result, this._storedFields.get(docId))
-      if (searchOptionsWithDefaults.filter == null || searchOptionsWithDefaults.filter(result)) {
-        results.push(result)
-      }
-    }
-
-    // If it's a wildcard query, and no document boost is applied, skip sorting
-    // the results, as all results have the same score of 1
-    if (query === MiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null) {
-      return results
-    }
-
-    results.sort(byScore)
-    return results
+    const skipSort = query === MiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null
+    return finalizeSearchResults({
+      rawResults,
+      getExternalId: (docId) => this._documentIds.get(docId),
+      getStoredFields: (docId) => this._storedFields.get(docId),
+      filter: searchOptionsWithDefaults.filter,
+      skipSort
+    })
   }
 
   /**
@@ -1805,15 +1776,14 @@ export default class MiniSearch<T = any> {
    * @ignore
    */
   private combineResults (results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
-    if (results.length === 0) { return new Map() }
-    const operator = combineWith.toLowerCase()
-    const combinator = (combinators as Record<string, CombinatorFunction>)[operator]
+    return combineResults(results, combineWith)
+  }
 
-    if (!combinator) {
-      throw new Error(`Invalid combination operator: ${combineWith}`)
-    }
-
-    return results.reduce(combinator) || new Map()
+  /**
+   * Build a read-only {@link FrozenMiniSearch} snapshot optimized for RAM and search CPU.
+   */
+  freeze (): import('./FrozenMiniSearch').default {
+    return freezeFromMiniSearch(this as unknown as import('./FrozenMiniSearch').FreezeSource<T>)
   }
 
   /**
@@ -1881,61 +1851,27 @@ export default class MiniSearch<T = any> {
     bm25params: BM25Params,
     results: RawResult = new Map()
   ): RawResult {
-    if (fieldTermData == null) return results
-
-    for (const field of Object.keys(fieldBoosts)) {
-      const fieldBoost = fieldBoosts[field]
-      const fieldId = this._fieldIds[field]
-
-      const fieldTermFreqs = fieldTermData.get(fieldId)
-      if (fieldTermFreqs == null) continue
-
-      let matchingFields = fieldTermFreqs.size
-      const avgFieldLength = this._avgFieldLength[fieldId]
-
-      for (const docId of fieldTermFreqs.keys()) {
-        if (!this._documentIds.has(docId)) {
-          this.removeTerm(fieldId, docId, derivedTerm)
-          matchingFields -= 1
-          continue
-        }
-
-        const docBoost = boostDocumentFn ? boostDocumentFn(this._documentIds.get(docId), derivedTerm, this._storedFields.get(docId)) : 1
-        if (!docBoost) continue
-
-        const termFreq = fieldTermFreqs.get(docId)!
-        const fieldLength = this._fieldLength.get(docId)![fieldId]
-
-        // NOTE: The total number of fields is set to the number of documents
-        // `this._documentCount`. It could also make sense to use the number of
-        // documents where the current field is non-blank as a normalization
-        // factor. This will make a difference in scoring if the field is rarely
-        // present. This is currently not supported, and may require further
-        // analysis to see if it is a valid use case.
-        const rawScore = calcBM25Score(termFreq, matchingFields, this._documentCount, fieldLength, avgFieldLength, bm25params)
-        const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
-
-        const result = results.get(docId)
-        if (result) {
-          result.score += weightedScore
-          assignUniqueTerm(result.terms, sourceTerm)
-          const match = getOwnProperty(result.match, derivedTerm)
-          if (match) {
-            match.push(field)
-          } else {
-            result.match[derivedTerm] = [field]
-          }
-        } else {
-          results.set(docId, {
-            score: weightedScore,
-            terms: [sourceTerm],
-            match: { [derivedTerm]: [field] }
-          })
-        }
-      }
-    }
-
-    return results
+    return aggregateTerm(
+      sourceTerm,
+      derivedTerm,
+      termWeight,
+      termBoost,
+      fieldTermData == null ? undefined : mapFieldTermData(fieldTermData),
+      fieldBoosts,
+      {
+        documentCount: this._documentCount,
+        avgFieldLength: this._avgFieldLength,
+        fieldIds: this._fieldIds,
+        getFieldLength: (docId, fieldId) => this._fieldLength.get(docId)![fieldId],
+        getExternalId: (docId) => this._documentIds.get(docId),
+        getStoredFields: (docId) => this._storedFields.get(docId),
+        isDocActive: (docId) => this._documentIds.has(docId),
+        onInactiveDoc: (docId, fieldId, term) => this.removeTerm(fieldId, docId, term)
+      },
+      boostDocumentFn,
+      bm25params,
+      results
+    )
   }
 
   /**
@@ -2059,120 +1995,6 @@ export default class MiniSearch<T = any> {
   }
 }
 
-const getOwnProperty = (object: any, property: string) =>
-  Object.prototype.hasOwnProperty.call(object, property) ? object[property] : undefined
-
-type CombinatorFunction = (a: RawResult, b: RawResult) => RawResult
-
-const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
-  [OR]: (a: RawResult, b: RawResult) => {
-    for (const docId of b.keys()) {
-      const existing = a.get(docId)
-      if (existing == null) {
-        a.set(docId, b.get(docId)!)
-      } else {
-        const { score, terms, match } = b.get(docId)!
-        existing.score = existing.score + score
-        existing.match = Object.assign(existing.match, match)
-        assignUniqueTerms(existing.terms, terms)
-      }
-    }
-
-    return a
-  },
-  [AND]: (a: RawResult, b: RawResult) => {
-    const combined = new Map()
-
-    for (const docId of b.keys()) {
-      const existing = a.get(docId)
-      if (existing == null) continue
-
-      const { score, terms, match } = b.get(docId)!
-      assignUniqueTerms(existing.terms, terms)
-      combined.set(docId, {
-        score: existing.score + score,
-        terms: existing.terms,
-        match: Object.assign(existing.match, match)
-      })
-    }
-
-    return combined
-  },
-  [AND_NOT]: (a: RawResult, b: RawResult) => {
-    for (const docId of b.keys()) a.delete(docId)
-    return a
-  }
-}
-
-/**
- * Parameters of the BM25+ scoring algorithm. Customizing these is almost never
- * necessary, and finetuning them requires an understanding of the BM25 scoring
- * model.
- *
- * Some information about BM25 (and BM25+) can be found at these links:
- *
- *   - https://en.wikipedia.org/wiki/Okapi_BM25
- *   - https://opensourceconnections.com/blog/2015/10/16/bm25-the-next-generation-of-lucene-relevation/
- */
-export type BM25Params = {
-  /** Term frequency saturation point.
-   *
-   * Recommended values are between `1.2` and `2`. Higher values increase the
-   * difference in score between documents with higher and lower term
-   * frequencies. Setting this to `0` or a negative value is invalid. Defaults
-   * to `1.2`
-   */
-  k: number,
-
-  /**
-   * Length normalization impact.
-   *
-   * Recommended values are around `0.75`. Higher values increase the weight
-   * that field length has on scoring. Setting this to `0` (not recommended)
-   * means that the field length has no effect on scoring. Negative values are
-   * invalid. Defaults to `0.7`.
-   */
-  b: number,
-
-  /**
-   * BM25+ frequency normalization lower bound (usually called δ).
-   *
-   * Recommended values are between `0.5` and `1`. Increasing this parameter
-   * increases the minimum relevance of one occurrence of a search term
-   * regardless of its (possibly very long) field length. Negative values are
-   * invalid. Defaults to `0.5`.
-   */
-  d: number
-}
-
-const defaultBM25params: BM25Params = { k: 1.2, b: 0.7, d: 0.5 }
-
-const calcBM25Score = (
-  termFreq: number,
-  matchingCount: number,
-  totalCount: number,
-  fieldLength: number,
-  avgFieldLength: number,
-  bm25params: BM25Params
-): number => {
-  const { k, b, d } = bm25params
-  const invDocFreq = Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
-  return invDocFreq * (d + termFreq * (k + 1) / (termFreq + k * (1 - b + b * fieldLength / avgFieldLength)))
-}
-
-const termToQuerySpec = (options: SearchOptions) => (term: string, i: number, terms: string[]): QuerySpec => {
-  const fuzzy = (typeof options.fuzzy === 'function')
-    ? options.fuzzy(term, i, terms)
-    : (options.fuzzy || false)
-  const prefix = (typeof options.prefix === 'function')
-    ? options.prefix(term, i, terms)
-    : (options.prefix === true)
-  const termBoost = (typeof options.boostTerm === 'function')
-    ? options.boostTerm(term, i, terms)
-    : 1
-  return { term, fuzzy, prefix, termBoost }
-}
-
 const defaultOptions = {
   idField: 'id',
   extractField: (document: any, fieldName: string) => document[fieldName],
@@ -2188,41 +2010,10 @@ const defaultOptions = {
   autoVacuum: true
 }
 
-const defaultSearchOptions = {
-  combineWith: OR,
-  prefix: false,
-  fuzzy: false,
-  maxFuzzy: 6,
-  boost: {},
-  weights: { fuzzy: 0.45, prefix: 0.375 },
-  bm25: defaultBM25params
-}
-
-const defaultAutoSuggestOptions = {
-  combineWith: AND,
-  prefix: (term: string, i: number, terms: string[]): boolean =>
-    i === terms.length - 1
-}
-
 const defaultVacuumOptions = { batchSize: 1000, batchWait: 10 }
 const defaultVacuumConditions = { minDirtFactor: 0.1, minDirtCount: 20 }
 
 const defaultAutoVacuumOptions = { ...defaultVacuumOptions, ...defaultVacuumConditions }
-
-const assignUniqueTerm = (target: string[], term: string): void => {
-  // Avoid adding duplicate terms.
-  if (!target.includes(term)) target.push(term)
-}
-
-const assignUniqueTerms = (target: string[], source: readonly string[]): void => {
-  for (const term of source) {
-    // Avoid adding duplicate terms.
-    if (!target.includes(term)) target.push(term)
-  }
-}
-
-type Scored = { score: number }
-const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
 const createMap = () => new Map()
 
@@ -2255,7 +2046,3 @@ const objectToNumericMapAsync = async <T>(object: { [key: string]: T }): Promise
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-// This regular expression matches any Unicode space, newline, or punctuation
-// character
-const SPACE_OR_PUNCTUATION = /[\n\r\p{Z}\p{P}]+/u

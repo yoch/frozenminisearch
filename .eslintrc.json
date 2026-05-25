@@ -20,5 +20,11 @@
       "error",
       { "functions": false, "classes": false, "variables": false }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.js", "**/*.test.ts"],
+      "env": { "jest": true }
+    }
+  ]
 }

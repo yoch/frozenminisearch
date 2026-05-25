@@ -45,6 +45,14 @@ export default class SearchableMap<T = any> {
   }
 
   /**
+   * Root radix tree backing this map. Used when cloning or serializing the full
+   * index so {@link Map} key insertion order (prefix / fuzzy / autoSuggest) is preserved.
+   */
+  get radixTree (): RadixTree<T> {
+    return this._tree
+  }
+
+  /**
    * Creates and returns a mutable view of this {@link SearchableMap},
    * containing only entries that share the given prefix.
    *

@@ -2,6 +2,16 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.0.0-beta.2
+
+Consolidated beta on npm. Supersedes `8.0.0-beta.0` and `8.0.0-beta.1` (unpublished).
+Includes frozen index, binary format, `fromDocuments`, English docs, and `publishConfig.tag: "beta"`.
+
+  - Documentation: README and benchmarks README in English
+  - Fix `FrozenMiniSearch.fromDocuments` wiring (no side-effect import required)
+  - Fix `processTerm` array semantics to match mutable `MiniSearch#add`
+  - `publishConfig.tag: "beta"` on publish; align `latest` and `beta` dist-tags to this version
+
 ## v8.0.0-beta.1
 
 Second beta (`@yoch/minisearch@beta`). Adds one-shot frozen index construction.

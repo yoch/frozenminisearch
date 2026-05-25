@@ -8,19 +8,21 @@ import {
   termToQuerySpec,
   getOwnProperty,
   type RawResult,
-  type QuerySpec
+  type QuerySpec,
+  type FieldTermDataLike
 } from './scoring'
+import { clampFreq, flatFieldTermData } from './compactPostings'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
   defaultFrozenLoadOptions
 } from './searchDefaults'
 import {
-  compactPostingFromMap,
-  compactFieldTermDataAdapter,
-  type CompactFieldTermData
-} from './compactPostings'
-import { decodeFrozenSnapshot, encodeFrozenSnapshot, type TreeShape } from './binaryFormat'
+  decodeFrozenSnapshot,
+  encodeFrozenSnapshot,
+  deserializeTermIndexTree,
+  serializeTermIndexTree
+} from './binaryFormat'
 import type {
   Options,
   Query,
@@ -54,71 +56,37 @@ type OptionsWithDefaults<T> = Options<T> & {
 
 const READ_ONLY_MSG = 'FrozenMiniSearch is read-only. Rebuild from a mutable MiniSearch instance.'
 
-function toCompactFieldData (
-  fieldIndex: Map<number, Map<number, number>>,
-  fieldCount: number
-): CompactFieldTermData {
-  const byField: (ReturnType<typeof compactPostingFromMap> | undefined)[] = new Array(fieldCount)
-  const matchingFieldsByField = new Uint32Array(fieldCount)
-  for (const [fieldId, freqs] of fieldIndex) {
-    byField[fieldId] = compactPostingFromMap(freqs)
-    matchingFieldsByField[fieldId] = freqs.size
-  }
-  return { byField, matchingFieldsByField }
+const MAP_NODE_ESTIMATE_BYTES = 120
+
+function throwReadOnly (): never {
+  throw new Error(READ_ONLY_MSG)
 }
 
-/** Clone radix tree preserving Map key insertion order (required for prefix/fuzzy parity). */
-function cloneRadixTreeWithCompact (
+function cloneRadixTreeWithTermIndex (
   tree: RadixTree<Map<number, Map<number, number>>>,
-  fieldCount: number
-): RadixTree<CompactFieldTermData> {
-  const out = new Map() as RadixTree<CompactFieldTermData>
+  termIndexByLeaf: WeakMap<Map<number, Map<number, number>>, number>
+): RadixTree<number> {
+  const out = new Map() as RadixTree<number>
   for (const [key, val] of tree) {
     if (key === LEAF) {
-      out.set(LEAF, toCompactFieldData(val as Map<number, Map<number, number>>, fieldCount))
+      const idx = termIndexByLeaf.get(val as Map<number, Map<number, number>>)
+      if (idx == null) {
+        throw new Error('FrozenMiniSearch: missing term index while cloning tree')
+      }
+      out.set(LEAF, idx)
     } else {
-      out.set(key, cloneRadixTreeWithCompact(val as RadixTree<Map<number, Map<number, number>>>, fieldCount))
+      out.set(key, cloneRadixTreeWithTermIndex(val as RadixTree<Map<number, Map<number, number>>>, termIndexByLeaf))
     }
   }
   return out
 }
 
-function serializeCompactTree (
-  tree: RadixTree<CompactFieldTermData>,
-  postingIndexes: WeakMap<CompactFieldTermData, number>
-): TreeShape {
-  const shape: TreeShape = []
+function countRadixMapNodes (tree: RadixTree<unknown>): number {
+  let n = 1
   for (const [key, val] of tree) {
-    if (key === LEAF) {
-      const postingIndex = postingIndexes.get(val as CompactFieldTermData)
-      if (postingIndex == null) {
-        throw new Error('FrozenMiniSearch: missing posting index while serializing tree')
-      }
-      shape.push([key, postingIndex])
-    } else {
-      shape.push([key, serializeCompactTree(val as RadixTree<CompactFieldTermData>, postingIndexes)])
-    }
+    if (key !== LEAF) n += countRadixMapNodes(val as RadixTree<unknown>)
   }
-  return shape
-}
-
-function deserializeCompactTree (
-  shape: TreeShape,
-  postingsByTerm: CompactFieldTermData[]
-): RadixTree<CompactFieldTermData> {
-  const tree = new Map() as RadixTree<CompactFieldTermData>
-  for (const [key, value] of shape) {
-    if (key === LEAF) {
-      tree.set(LEAF, postingsByTerm[value as number])
-    } else {
-      tree.set(key, deserializeCompactTree(value as TreeShape, postingsByTerm))
-    }
-  }
-  return tree
-}
-
-function throwReadOnly (): never {
-  throw new Error(READ_ONLY_MSG)
+  return n
 }
 
 export interface FreezeSource<T = any> {
@@ -133,23 +101,138 @@ export interface FreezeSource<T = any> {
   _storedFields: Map<number, Record<string, unknown>>
 }
 
-export function freezeFromMiniSearch<T> (source: FreezeSource<T>): FrozenMiniSearch<T> {
-  const fieldCount = source._options.fields.length
-  const { _nextId, _documentCount } = source
+export interface FrozenMemoryBreakdown {
+  termCount: number
+  documentCount: number
+  nextId: number
+  postings: {
+    slotCount: number
+    allDocIdsBytes: number
+    allFreqsBytes: number
+    offsetsBytes: number
+    lengthsBytes: number
+    totalTypedBytes: number
+  }
+  radixTree: {
+    mapNodeCount: number
+    estimatedBytes: number
+  }
+  documents: {
+    externalIdsSlots: number
+    storedFieldsSlots: number
+    idToShortIdEntries: number
+    fieldLengthMatrixBytes: number
+    avgFieldLengthBytes: number
+    storedFieldsJsonBytes: number
+  }
+  estimatedStructuredBytes: number
+}
 
-  const externalIds: unknown[] = new Array(_nextId)
-  const idToShortId = new Map<unknown, number>()
-  const storedFields: (Record<string, unknown> | undefined)[] = new Array(_nextId)
-  for (const [shortId, id] of source._documentIds) {
-    externalIds[shortId] = id
-    idToShortId.set(id, shortId)
-    storedFields[shortId] = source._storedFields.get(shortId)
+export function frozenMemoryBreakdown (frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
+  return frozen.memoryBreakdown()
+}
+
+function buildFlatPostingsFromSource<T> (
+  source: FreezeSource<T>,
+  fieldCount: number,
+  shortIdRemap: Uint32Array | null
+): {
+  terms: string[]
+  tree: RadixTree<number>
+  postingsOffsets: Uint32Array
+  postingsLengths: Uint32Array
+  allDocIds: Uint32Array
+  allFreqs: Uint8Array
+} {
+  const terms: string[] = []
+  const leafToIndex = new WeakMap<Map<number, Map<number, number>>, number>()
+
+  for (const [term, fieldIndex] of source._index) {
+    const ti = terms.length
+    terms.push(term)
+    leafToIndex.set(fieldIndex, ti)
   }
 
-  const fieldLengthMatrix = new Uint32Array(_nextId * fieldCount)
-  for (const [shortId, lengths] of source._fieldLength) {
+  const termCount = terms.length
+  const slotCount = termCount * fieldCount
+  const postingsOffsets = new Uint32Array(slotCount)
+  const postingsLengths = new Uint32Array(slotCount)
+  const docScratch: number[] = []
+  const freqScratch: number[] = []
+
+  for (const [, fieldIndex] of source._index) {
+    const ti = leafToIndex.get(fieldIndex)!
+    const base = ti * fieldCount
+
     for (let f = 0; f < fieldCount; f++) {
-      fieldLengthMatrix[shortId * fieldCount + f] = lengths[f] ?? 0
+      const offset = docScratch.length
+      const freqs = fieldIndex.get(f)
+      if (freqs == null || freqs.size === 0) {
+        postingsOffsets[base + f] = offset
+        postingsLengths[base + f] = 0
+        continue
+      }
+      let count = 0
+      for (const [shortId, freq] of freqs) {
+        const docId = shortIdRemap != null ? shortIdRemap[shortId] : shortId
+        // Skip discarded docs when dense remapping is enabled. This prevents
+        // invalid docIds (no externalId) from leaking into frozen search results.
+        if (docId === 0xffffffff) continue
+        docScratch.push(docId)
+        freqScratch.push(clampFreq(freq))
+        count++
+      }
+      postingsOffsets[base + f] = offset
+      postingsLengths[base + f] = count
+    }
+  }
+
+  const allDocIds = new Uint32Array(docScratch)
+  const allFreqs = new Uint8Array(freqScratch)
+  const tree = cloneRadixTreeWithTermIndex(
+    source._index.radixTree as RadixTree<Map<number, Map<number, number>>>,
+    leafToIndex
+  )
+
+  return { terms, tree, postingsOffsets, postingsLengths, allDocIds, allFreqs }
+}
+
+export function freezeFromMiniSearch<T> (source: FreezeSource<T>): FrozenMiniSearch<T> {
+  const fieldCount = source._options.fields.length
+  const { _documentCount, _nextId } = source
+
+  const useDense = _documentCount < _nextId
+  let shortIdRemap: Uint32Array | null = null
+  const externalIds: unknown[] = new Array(useDense ? _documentCount : _nextId)
+  const storedFields: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
+  const idToShortId = new Map<unknown, number>()
+
+  if (useDense) {
+    shortIdRemap = new Uint32Array(_nextId)
+    shortIdRemap.fill(0xffffffff)
+    let dense = 0
+    for (const [shortId, id] of source._documentIds) {
+      shortIdRemap[shortId] = dense
+      externalIds[dense] = id
+      idToShortId.set(id, dense)
+      storedFields[dense] = source._storedFields.get(shortId)
+      dense++
+    }
+  } else {
+    for (const [shortId, id] of source._documentIds) {
+      externalIds[shortId] = id
+      idToShortId.set(id, shortId)
+      storedFields[shortId] = source._storedFields.get(shortId)
+    }
+  }
+
+  const matrixRows = useDense ? _documentCount : _nextId
+  const fieldLengthMatrix = new Uint32Array(matrixRows * fieldCount)
+  for (const [shortId, lengths] of source._fieldLength) {
+    const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
+    if (row === 0xffffffff) continue
+    for (let f = 0; f < fieldCount; f++) {
+      fieldLengthMatrix[row * fieldCount + f] = lengths[f] ?? 0
     }
   }
 
@@ -158,23 +241,13 @@ export function freezeFromMiniSearch<T> (source: FreezeSource<T>): FrozenMiniSea
     avgFieldLength[i] = source._avgFieldLength[i]
   }
 
-  const frozenTree = cloneRadixTreeWithCompact(
-    source._index.radixTree as RadixTree<Map<number, Map<number, number>>>,
-    fieldCount
-  )
-  const frozenIndex = new SearchableMap<CompactFieldTermData>(frozenTree)
-
-  const terms: string[] = []
-  const postingsByTerm: CompactFieldTermData[] = []
-  for (const [term, compact] of frozenIndex) {
-    terms.push(term)
-    postingsByTerm.push(compact)
-  }
+  const flat = buildFlatPostingsFromSource(source, fieldCount, shortIdRemap)
+  const frozenIndex = new SearchableMap<number>(flat.tree)
 
   return new FrozenMiniSearch({
     options: source._options,
     documentCount: _documentCount,
-    nextId: _nextId,
+    nextId: useDense ? _documentCount : _nextId,
     fieldIds: source._fieldIds,
     fieldCount,
     externalIds,
@@ -183,40 +256,49 @@ export function freezeFromMiniSearch<T> (source: FreezeSource<T>): FrozenMiniSea
     fieldLengthMatrix,
     avgFieldLength,
     index: frozenIndex,
-    terms,
-    postingsByTerm
+    terms: flat.terms,
+    postingsOffsets: flat.postingsOffsets,
+    postingsLengths: flat.postingsLengths,
+    allDocIds: flat.allDocIds,
+    allFreqs: flat.allFreqs
   })
 }
 
 export default class FrozenMiniSearch<T = any> {
   private readonly _options: OptionsWithDefaults<T>
-  private readonly _index: SearchableMap<CompactFieldTermData>
+  private readonly _index: SearchableMap<number>
   private readonly _documentCount: number
   private readonly _nextId: number
   private readonly _externalIds: unknown[]
   private readonly _idToShortId: Map<unknown, number>
-  private readonly _fieldIds: { [key: string]: number }
+  private readonly _fieldIds: { [field: string]: number }
   private readonly _fieldCount: number
   private readonly _fieldLengthMatrix: Uint32Array
   private readonly _avgFieldLength: Float32Array
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
   private readonly _terms: string[]
-  private readonly _postingsByTerm: CompactFieldTermData[]
+  private readonly _postingsOffsets: Uint32Array
+  private readonly _postingsLengths: Uint32Array
+  private readonly _allDocIds: Uint32Array
+  private readonly _allFreqs: Uint8Array
 
   constructor (params: {
     options: OptionsWithDefaults<T>
     documentCount: number
     nextId: number
-    fieldIds: { [key: string]: number }
+    fieldIds: { [field: string]: number }
     fieldCount: number
     externalIds: unknown[]
     idToShortId: Map<unknown, number>
     storedFields: (Record<string, unknown> | undefined)[]
     fieldLengthMatrix: Uint32Array
     avgFieldLength: Float32Array
-    index: SearchableMap<CompactFieldTermData>
+    index: SearchableMap<number>
     terms: string[]
-    postingsByTerm: CompactFieldTermData[]
+    postingsOffsets: Uint32Array
+    postingsLengths: Uint32Array
+    allDocIds: Uint32Array
+    allFreqs: Uint8Array
   }) {
     this._options = params.options
     this._documentCount = params.documentCount
@@ -230,13 +312,68 @@ export default class FrozenMiniSearch<T = any> {
     this._storedFields = params.storedFields
     this._index = params.index
     this._terms = params.terms
-    this._postingsByTerm = params.postingsByTerm
+    this._postingsOffsets = params.postingsOffsets
+    this._postingsLengths = params.postingsLengths
+    this._allDocIds = params.allDocIds
+    this._allFreqs = params.allFreqs
   }
 
   static readonly wildcard: typeof WILDCARD_QUERY = WILDCARD_QUERY
 
   get documentCount (): number { return this._documentCount }
   get termCount (): number { return this._index.size }
+
+  memoryBreakdown (): FrozenMemoryBreakdown {
+    const termCount = this.termCount
+    const slotCount = termCount * this._fieldCount
+
+    const postingsTyped =
+      this._allDocIds.byteLength + this._allFreqs.byteLength +
+      this._postingsOffsets.byteLength + this._postingsLengths.byteLength
+
+    let storedJson = 0
+    for (const row of this._storedFields) {
+      if (row != null) storedJson += JSON.stringify(row).length
+    }
+
+    const mapNodeCount = countRadixMapNodes(this._index.radixTree)
+    const radixEst = mapNodeCount * MAP_NODE_ESTIMATE_BYTES
+
+    const estimatedStructuredBytes =
+      postingsTyped +
+      this._fieldLengthMatrix.byteLength +
+      this._avgFieldLength.byteLength +
+      radixEst +
+      storedJson +
+      this._idToShortId.size * 32
+
+    return {
+      termCount,
+      documentCount: this._documentCount,
+      nextId: this._nextId,
+      postings: {
+        slotCount,
+        allDocIdsBytes: this._allDocIds.byteLength,
+        allFreqsBytes: this._allFreqs.byteLength,
+        offsetsBytes: this._postingsOffsets.byteLength,
+        lengthsBytes: this._postingsLengths.byteLength,
+        totalTypedBytes: postingsTyped
+      },
+      radixTree: {
+        mapNodeCount,
+        estimatedBytes: radixEst
+      },
+      documents: {
+        externalIdsSlots: this._externalIds.length,
+        storedFieldsSlots: this._storedFields.length,
+        idToShortIdEntries: this._idToShortId.size,
+        fieldLengthMatrixBytes: this._fieldLengthMatrix.byteLength,
+        avgFieldLengthBytes: this._avgFieldLength.byteLength,
+        storedFieldsJsonBytes: storedJson
+      },
+      estimatedStructuredBytes
+    }
+  }
 
   has (id: unknown): boolean {
     return this._idToShortId.has(id)
@@ -295,15 +432,7 @@ export default class FrozenMiniSearch<T = any> {
       .sort((a, b) => b.score - a.score)
   }
 
-  /**
-   * Serialize this frozen index to a compact binary buffer ({@link FrozenMiniSearch.loadBinary}).
-   */
   saveBinary (): Buffer {
-    const postingIndexes = new WeakMap<CompactFieldTermData, number>()
-    for (let i = 0; i < this._postingsByTerm.length; i++) {
-      postingIndexes.set(this._postingsByTerm[i], i)
-    }
-
     return encodeFrozenSnapshot({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -314,15 +443,14 @@ export default class FrozenMiniSearch<T = any> {
       storedFields: this._storedFields,
       fieldLengthMatrix: this._fieldLengthMatrix,
       terms: this._terms,
-      postingsByTerm: this._postingsByTerm,
-      treeShape: serializeCompactTree(this._index.radixTree, postingIndexes)
+      treeShape: serializeTermIndexTree(this._index.radixTree),
+      postingsOffsets: this._postingsOffsets,
+      postingsLengths: this._postingsLengths,
+      allDocIds: this._allDocIds,
+      allFreqs: this._allFreqs
     })
   }
 
-  /**
-   * Load a frozen index from {@link saveBinary}. Pass the same `fields` (and ideally
-   * the same `tokenize` / `processTerm`) used when the index was built.
-   */
   static loadBinary<T> (buffer: Buffer, options: Options<T>): FrozenMiniSearch<T> {
     if (options?.fields == null) {
       throw new Error('FrozenMiniSearch: option "fields" must be provided')
@@ -345,9 +473,7 @@ export default class FrozenMiniSearch<T = any> {
       autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) }
     } as OptionsWithDefaults<T>
 
-    const index = new SearchableMap<CompactFieldTermData>(
-      deserializeCompactTree(snap.treeShape, snap.postingsByTerm)
-    )
+    const index = new SearchableMap<number>(deserializeTermIndexTree(snap.treeShape))
 
     const idToShortId = new Map<unknown, number>()
     for (let i = 0; i < snap.externalIds.length; i++) {
@@ -369,12 +495,26 @@ export default class FrozenMiniSearch<T = any> {
       avgFieldLength: snap.avgFieldLength,
       index,
       terms: snap.terms,
-      postingsByTerm: snap.postingsByTerm
+      postingsOffsets: snap.postingsOffsets,
+      postingsLengths: snap.postingsLengths,
+      allDocIds: snap.allDocIds,
+      allFreqs: snap.allFreqs
     })
   }
 
   private getFieldLength (docId: number, fieldId: number): number {
     return this._fieldLengthMatrix[docId * this._fieldCount + fieldId] ?? 0
+  }
+
+  private fieldTermDataFor (termIndex: number): FieldTermDataLike {
+    return flatFieldTermData(
+      termIndex,
+      this._fieldCount,
+      this._postingsOffsets,
+      this._postingsLengths,
+      this._allDocIds,
+      this._allFreqs
+    )
   }
 
   private aggregateContext () {
@@ -393,18 +533,19 @@ export default class FrozenMiniSearch<T = any> {
     derivedTerm: string,
     termWeight: number,
     termBoost: number,
-    fieldTermData: CompactFieldTermData | undefined,
+    termIndex: number | undefined,
     fieldBoosts: { [field: string]: number },
     boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
     bm25params: BM25Params,
     results: RawResult = new Map()
   ): RawResult {
+    if (termIndex == null) return results
     return aggregateTerm(
       sourceTerm,
       derivedTerm,
       termWeight,
       termBoost,
-      fieldTermData == null ? undefined : compactFieldTermDataAdapter(fieldTermData),
+      this.fieldTermDataFor(termIndex),
       fieldBoosts,
       this.aggregateContext(),
       boostDocumentFn,
@@ -445,11 +586,11 @@ export default class FrozenMiniSearch<T = any> {
     const fuzzyWeight = weights?.fuzzy ?? 0.45
     const prefixWeight = weights?.prefix ?? 0.375
 
-    const data = this._index.get(query.term)
-    const results = this.termResults(query.term, query.term, 1, query.termBoost, data, boosts, boostDocument, bm25params)
+    const termIndex = this._index.get(query.term)
+    const results = this.termResults(query.term, query.term, 1, query.termBoost, termIndex, boosts, boostDocument, bm25params)
 
-    let prefixMatches
-    let fuzzyMatches
+    let prefixMatches: SearchableMap<number> | undefined
+    let fuzzyMatches: ReturnType<SearchableMap<number>['fuzzyGet']> | undefined
 
     if (query.prefix) {
       prefixMatches = this._index.atPrefix(query.term)
@@ -464,21 +605,21 @@ export default class FrozenMiniSearch<T = any> {
     }
 
     if (prefixMatches) {
-      for (const [term, pdata] of prefixMatches) {
+      for (const [term, ti] of prefixMatches) {
         const distance = term.length - query.term.length
         if (!distance) continue
         fuzzyMatches?.delete(term)
         const weight = prefixWeight * term.length / (term.length + 0.3 * distance)
-        this.termResults(query.term, term, weight, query.termBoost, pdata, boosts, boostDocument, bm25params, results)
+        this.termResults(query.term, term, weight, query.termBoost, ti, boosts, boostDocument, bm25params, results)
       }
     }
 
     if (fuzzyMatches) {
       for (const term of fuzzyMatches.keys()) {
-        const [pdata, distance] = fuzzyMatches.get(term)!
+        const [ti, distance] = fuzzyMatches.get(term)!
         if (!distance) continue
         const weight = fuzzyWeight * term.length / (term.length + distance)
-        this.termResults(query.term, term, weight, query.termBoost, pdata, boosts, boostDocument, bm25params, results)
+        this.termResults(query.term, term, weight, query.termBoost, ti, boosts, boostDocument, bm25params, results)
       }
     }
 

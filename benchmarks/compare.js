@@ -1,29 +1,12 @@
 /**
- * Compare MiniSearch (mutable) vs FrozenMiniSearch in realistic scenarios.
- * Each measurement runs in isolation (GC between runs) so heap reflects one index only.
+ * Compare MiniSearch (mutable) vs FrozenMiniSearch — human-readable report.
+ * JSON metrics: yarn benchmark:record | yarn benchmark:diff
  *
  * Run: yarn benchmark:compare
  * Requires: yarn build && node --expose-gc
  */
-import MiniSearch, { FrozenMiniSearch } from '../dist/es/index.js'
-import { loadDivinaLines } from './loadDivinaLines.js'
-
-const lines = loadDivinaLines()
-
-const profiles = [
-  {
-    name: 'With storeFields (full documents in index)',
-    options: { fields: ['txt'], storeFields: ['txt'] }
-  },
-  {
-    name: 'Index only (no storeFields — isolates inverted-index RAM)',
-    options: { fields: ['txt'], storeFields: [] }
-  }
-]
-
-const gc = () => { if (global.gc) global.gc() }
-
-const heapBytes = () => process.memoryUsage().heapUsed
+import { buildScenarioList, runBenchmarkSuite } from './benchmarkSuite.js'
+import { parseRunsArg } from './benchmarkUtils.js'
 
 const mb = (bytes) => (bytes / 1024 / 1024).toFixed(2)
 
@@ -32,38 +15,6 @@ const pct = (base, value) => {
   const delta = ((value - base) / base) * 100
   const sign = delta <= 0 ? '' : '+'
   return `${sign}${delta.toFixed(1)}%`
-}
-
-/** Measure heap delta for a single index kept alive (fn must return the index). */
-function measureHeap (label, fn) {
-  gc()
-  const before = heapBytes()
-  const value = fn()
-  gc()
-  const after = heapBytes()
-  const delta = Math.max(0, after - before)
-  return { label, value, heapMb: parseFloat(mb(delta)), heapBytes: delta }
-}
-
-function benchSearch (index, query, searchOptions = {}, iterations = 80) {
-  // warmup
-  index.search(query, searchOptions)
-  const times = []
-  for (let i = 0; i < iterations; i++) {
-    const t0 = performance.now()
-    index.search(query, searchOptions)
-    times.push(performance.now() - t0)
-  }
-  times.sort((a, b) => a - b)
-  const p50 = times[Math.floor(times.length * 0.5)]
-  const p95 = times[Math.floor(times.length * 0.95)]
-  return { p50, p95 }
-}
-
-function timedMs (fn) {
-  const t0 = performance.now()
-  const result = fn()
-  return { result, ms: performance.now() - t0 }
 }
 
 function printTable (rows) {
@@ -82,161 +33,96 @@ function printTable (rows) {
   }
 }
 
+function printMemoryBreakdown (b) {
+  console.log('\nMemory breakdown (FrozenMiniSearch, estimated structured bytes):')
+  console.log(`  terms: ${b.termCount}, docs: ${b.documentCount}, nextId slots: ${b.nextId}`)
+  console.log(`  postings typed arrays: ${mb(b.postings.totalTypedBytes)} MB  (docIds ${mb(b.postings.allDocIdsBytes)}, freqs ${mb(b.postings.allFreqsBytes)})`)
+  console.log(`  radix tree (~${b.radixTree.mapNodeCount} Map nodes): ~${mb(b.radixTree.estimatedBytes)} MB`)
+  console.log(`  stored fields (JSON est.): ${mb(b.documents.storedFieldsJsonBytes)} MB`)
+  console.log(`  field length matrix: ${mb(b.documents.fieldLengthMatrixBytes)} MB`)
+  console.log(`  idToShortId entries: ${b.documents.idToShortIdEntries}`)
+  console.log(`  total structured estimate: ${mb(b.estimatedStructuredBytes)} MB`)
+}
+
+function printScenario (data) {
+  console.log(`\n${'='.repeat(72)}`)
+  console.log(`Profile: ${data.name}`)
+  console.log(`  documents: ${data.documentCount}, fields: [${data.fields.join(', ')}], storeFields: [${data.storeFields.join(', ') || '(none)'}]`)
+  console.log('='.repeat(72))
+
+  printMemoryBreakdown(data.memoryBreakdown)
+
+  console.log('\nIndexing:')
+  console.log(`  addAll:         ${data.indexing.addAllMs.toFixed(1)} ms`)
+  console.log(`  freeze:         ${data.indexing.freezeMs.toFixed(1)} ms  (offline, once)`)
+  console.log(`  JSON.stringify: ${data.indexing.jsonSerializeMs.toFixed(1)} ms`)
+  console.log(`  saveBinary:     ${data.indexing.saveBinaryMs.toFixed(1)} ms  (format ${data.indexing.binaryMagic})`)
+
+  const baseHeap = data.heapMb.mutable
+  printTable([
+    { label: 'Mutable MiniSearch', heapMb: data.heapMb.mutable.toFixed(2), diskMb: data.diskMb.json.toFixed(2), loadMs: data.loadMs.json, vsMutable: 'baseline' },
+    { label: 'FrozenMiniSearch', heapMb: data.heapMb.frozen.toFixed(2), diskMb: data.diskMb.binary.toFixed(2), loadMs: null, vsMutable: pct(baseHeap, data.heapMb.frozen) },
+    { label: 'loadJSON → MiniSearch', heapMb: data.heapMb.loadJson.toFixed(2), diskMb: data.diskMb.json.toFixed(2), loadMs: data.loadMs.json, vsMutable: pct(baseHeap, data.heapMb.loadJson) },
+    { label: 'loadBinary → Frozen', heapMb: data.heapMb.loadBinary.toFixed(2), diskMb: data.diskMb.binary.toFixed(2), loadMs: data.loadMs.binary, vsMutable: pct(baseHeap, data.heapMb.loadBinary) }
+  ])
+
+  console.log('\nCold load:')
+  console.log(`  loadJSON:   ${data.loadMs.json.toFixed(1)} ms`)
+  console.log(`  loadBinary: ${data.loadMs.binary.toFixed(1)} ms  (${pct(data.loadMs.json, data.loadMs.binary)} vs loadJSON)`)
+
+  console.log('\nSearch p50 / p95 (ms):\n')
+  console.log('Query'.padEnd(12) + 'Mutable p50'.padEnd(14) + 'Frozen p50'.padEnd(14) + 'Δ p50'.padEnd(10) + 'Mutable p95'.padEnd(14) + 'Frozen p95')
+  console.log('-'.repeat(68))
+  for (const row of data.search) {
+    console.log(
+      row.label.padEnd(12) +
+      row.mutableP50.toFixed(3).padEnd(14) +
+      row.frozenP50.toFixed(3).padEnd(14) +
+      pct(row.mutableP50, row.frozenP50).padEnd(10) +
+      row.mutableP95.toFixed(3).padEnd(14) +
+      row.frozenP95.toFixed(3)
+    )
+  }
+
+  console.log('\nProfile summary:')
+  console.log(`  RAM frozen vs mutable (isolated):  ${data.summary.heapFrozenVsMutableSavingPct.toFixed(1)}% smaller`)
+  console.log(`  Disk binary vs JSON:               ${data.summary.diskBinaryVsJsonSavingPct.toFixed(1)}% smaller`)
+  console.log(`  Cold load binary vs JSON:          ${data.summary.loadBinaryVsJsonSavingPct.toFixed(1)}% faster`)
+  console.log(`  Search p50 (avg across queries):   ${data.summary.searchFrozenP50AvgGainPct.toFixed(1)}% faster on frozen`)
+
+  if (data.scoreDrift && data.scoreDrift.length > 0) {
+    console.log('\nScore drift (mutable vs frozen):')
+    for (const row of data.scoreDrift) {
+      console.log(`  ${row.query}: max Δ=${row.maxAbsScoreDelta} (rel ${row.maxRelScoreDeltaPct}%), missing topK=${row.missingInFrozenTopK}, orderChanged=${row.topKOrderChanged}`)
+    }
+  }
+}
+
+const runs = parseRunsArg()
+
 console.log('=== MiniSearch vs FrozenMiniSearch (isolated measurements) ===\n')
-console.log(`Corpus: ${lines.length} documents\n`)
+if (runs > 1) {
+  console.log(`Using ${runs} runs per scenario (median aggregation)\n`)
+}
 
 if (!global.gc) {
   console.log('Tip: run with --expose-gc for accurate heap numbers.\n')
 }
 
-function runProfile ({ name, options }) {
-  console.log(`\n${'='.repeat(72)}`)
-  console.log(`Profile: ${name}`)
-  console.log(`  fields: [${options.fields.join(', ')}], storeFields: [${(options.storeFields || []).join(', ') || '(none)'}]`)
-  console.log('='.repeat(72))
-
-  let json
-  let binaryBuf
-  let indexMs
-  let freezeMs
-  let jsonSerializeMs
-  let binarySerializeMs
-
-  {
-    const ms = timedMs(() => {
-      const m = new MiniSearch(options)
-      m.addAll(lines)
-      return m
-    })
-    indexMs = ms.ms
-    const ser = timedMs(() => JSON.stringify(ms.result))
-    json = ser.result
-    jsonSerializeMs = ser.ms
-    const fr = timedMs(() => ms.result.freeze())
-    freezeMs = fr.ms
-    const bin = timedMs(() => fr.result.saveBinary())
-    binaryBuf = bin.result
-    binarySerializeMs = bin.ms
-  }
-
-  const jsonMb = parseFloat(mb(json.length))
-  const binaryMb = parseFloat(mb(binaryBuf.length))
-  gc()
-
-  const heapMutable = measureHeap('Mutable MiniSearch', () => {
-    const ms = new MiniSearch(options)
-    ms.addAll(lines)
-    return ms
-  })
-
-  const heapFrozen = measureHeap('FrozenMiniSearch (freeze only)', () => {
-    const ms = new MiniSearch(options)
-    ms.addAll(lines)
-    return ms.freeze()
-  })
-
-  const heapJsonLoaded = measureHeap('Reloaded via loadJSON', () => {
-    return MiniSearch.loadJSON(json, options)
-  })
-
-  const heapBinaryLoaded = measureHeap('Reloaded via loadBinary', () => {
-    return FrozenMiniSearch.loadBinary(binaryBuf, options)
-  })
-
-  gc()
-  const loadJson = timedMs(() => MiniSearch.loadJSON(json, options))
-  gc()
-  const loadBinary = timedMs(() => FrozenMiniSearch.loadBinary(binaryBuf, options))
-  gc()
-
-  const queries = [
-    { label: 'exact', q: 'inferno', opts: {} },
-    { label: 'AND', q: 'inferno paradiso', opts: { combineWith: 'AND' } },
-    { label: 'prefix', q: 'infe', opts: { prefix: true } },
-    { label: 'fuzzy', q: 'infern', opts: { fuzzy: 0.2 } }
-  ]
-
-  function withIndex (factory, fn) {
-    gc()
-    let out
-    {
-      const index = factory()
-      out = fn(index)
-    }
-    gc()
-    return out
-  }
-
-  const searchRows = []
-  for (const { label, q, opts } of queries) {
-    const mutable = withIndex(() => {
-      const ms = new MiniSearch(options)
-      ms.addAll(lines)
-      return ms
-    }, (idx) => benchSearch(idx, q, opts))
-
-    const frozen = withIndex(() => {
-      const ms = new MiniSearch(options)
-      ms.addAll(lines)
-      return ms.freeze()
-    }, (idx) => benchSearch(idx, q, opts))
-
-    searchRows.push({ label, mutable, frozen })
-  }
-
-  console.log('\nIndexing:')
-  console.log(`  addAll:         ${indexMs.toFixed(1)} ms`)
-  console.log(`  freeze:         ${freezeMs.toFixed(1)} ms  (offline, once)`)
-  console.log(`  JSON.stringify: ${jsonSerializeMs.toFixed(1)} ms`)
-  console.log(`  saveBinary:     ${binarySerializeMs.toFixed(1)} ms`)
-
-  const baseHeap = heapMutable.heapMb
-  const summary = [
-    { label: 'Mutable MiniSearch', heapMb: heapMutable.heapMb.toFixed(2), diskMb: jsonMb.toFixed(2), loadMs: loadJson.ms, vsMutable: 'baseline' },
-    { label: 'FrozenMiniSearch', heapMb: heapFrozen.heapMb.toFixed(2), diskMb: binaryMb.toFixed(2), loadMs: null, vsMutable: pct(baseHeap, heapFrozen.heapMb) },
-    { label: 'loadJSON → MiniSearch', heapMb: heapJsonLoaded.heapMb.toFixed(2), diskMb: jsonMb.toFixed(2), loadMs: loadJson.ms, vsMutable: pct(baseHeap, heapJsonLoaded.heapMb) },
-    { label: 'loadBinary → Frozen', heapMb: heapBinaryLoaded.heapMb.toFixed(2), diskMb: binaryMb.toFixed(2), loadMs: loadBinary.ms, vsMutable: pct(baseHeap, heapBinaryLoaded.heapMb) }
-  ]
-
-  console.log('\nMemory & persistence (one index in RAM after GC):\n')
-  printTable(summary)
-
-  console.log('\nCold load:')
-  console.log(`  loadJSON:   ${loadJson.ms.toFixed(1)} ms`)
-  console.log(`  loadBinary: ${loadBinary.ms.toFixed(1)} ms  (${pct(loadJson.ms, loadBinary.ms)} vs loadJSON)`)
-
-  console.log('\nSearch p50 / p95 (ms):\n')
-  console.log('Query'.padEnd(12) + 'Mutable p50'.padEnd(14) + 'Frozen p50'.padEnd(14) + 'Δ p50'.padEnd(10) + 'Mutable p95'.padEnd(14) + 'Frozen p95')
-  console.log('-'.repeat(68))
-  for (const { label, mutable, frozen } of searchRows) {
-    console.log(
-      label.padEnd(12) +
-      mutable.p50.toFixed(3).padEnd(14) +
-      frozen.p50.toFixed(3).padEnd(14) +
-      pct(mutable.p50, frozen.p50).padEnd(10) +
-      mutable.p95.toFixed(3).padEnd(14) +
-      frozen.p95.toFixed(3)
-    )
-  }
-
-  const heapSaving = (1 - heapFrozen.heapMb / baseHeap) * 100
-  const diskSaving = (1 - binaryMb / jsonMb) * 100
-  const loadSaving = (1 - loadBinary.ms / loadJson.ms) * 100
-  console.log('\nProfile summary:')
-  console.log(`  RAM frozen vs mutable (isolated):  ${heapSaving.toFixed(1)}% smaller`)
-  console.log(`  Disk binary vs JSON:               ${diskSaving.toFixed(1)}% smaller`)
-  console.log(`  Cold load binary vs JSON:          ${loadSaving.toFixed(1)}% faster`)
-  const avgP50Gain = searchRows.reduce((s, r) => s + (1 - r.frozen.p50 / r.mutable.p50), 0) / searchRows.length * 100
-  console.log(`  Search p50 (avg across queries):   ${avgP50Gain.toFixed(1)}% faster on frozen`)
-}
-
-for (const profile of profiles) {
-  runProfile(profile)
+for (const result of runBenchmarkSuite(buildScenarioList(), runs)) {
+  printScenario(result)
 }
 
 console.log('\n' + '='.repeat(72))
-console.log('Why the old benchmark was misleading')
+console.log('JSON baselines')
 console.log('='.repeat(72))
-console.log('• Keeping MiniSearch + FrozenMiniSearch together doubles RAM after freeze().')
-console.log('• storeFields duplicates document text — dominates heap; use "index only" profile to see structural gains.')
+console.log('• yarn benchmark:record          → benchmarks/baselines/latest.json')
+console.log('• yarn benchmark:diff          → compare run vs reference.json')
+console.log('• yarn benchmark:baseline:update → promote latest to reference')
+console.log('='.repeat(72))
+console.log('Notes')
+console.log('='.repeat(72))
+console.log('• Heap is measured with one index alive; use --expose-gc for stable numbers.')
+console.log('• Memory breakdown estimates structured data; V8 object overhead is additional.')
+console.log('• saveBinary writes MSv2 (flat postings); loadBinary reads MSv1 and MSv2.')
 console.log('• Production: build mutable → freeze() → release mutable → serve frozen (or loadBinary).\n')

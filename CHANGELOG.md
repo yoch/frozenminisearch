@@ -2,6 +2,35 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+Node.js–focused release (version bump pending). Adds a read-only frozen index and
+binary serialization; packaging no longer ships a browser UMD bundle.
+
+  - Add `FrozenMiniSearch`, a read-only index with compact TypedArray postings,
+    built via `MiniSearch#freeze()` or `FrozenMiniSearch.loadBinary()`
+  - Add `saveBinary()` / `FrozenMiniSearch.loadBinary()` for smaller on-disk
+    snapshots and faster loads than `JSON.stringify` / `loadJSON` (`MSv2` flat
+    postings on write; `MSv1` still readable on load; same `fields`, `tokenize`,
+    and `processTerm` as at index build time are still required in `options`)
+  - Flat in-memory postings (`allDocIds` / `allFreqs` buffers) reduce JS object
+    overhead; `frozenMemoryBreakdown()` for benchmark profiling
+  - Frozen postings clamp per-doc term frequency to 255 (Uint8). This can
+    slightly affect scores for very large term frequencies; benchmark scenario
+    \"overflow frequencies\" reports score drift vs mutable.
+  - Extract shared search scoring into `scoring.ts` (BM25, AND/OR/AND_NOT,
+    result finalization) used by both `MiniSearch` and `FrozenMiniSearch`
+  - Add `SearchableMap#radixTree` for index snapshots that preserve radix tree
+    key order (prefix, fuzzy, and autoSuggest parity)
+  - Add `yarn benchmark:compare`, `benchmark:record`, `benchmark:diff`, and
+    versioned `benchmarks/baselines/reference.json` for regression tracking
+  - Add `benchmarks/loadDivinaLines.js` and extreme synthetic scenarios
+  - [breaking change] Drop UMD / browser build targets from Rollup; package
+    ships ESM and CJS for Node only (`exports.require` points at a CJS wrapper
+    so `require('minisearch')` works without `.default`)
+  - Centralize default search, autoSuggest, and `loadBinary` options in
+    `searchDefaults.ts`
+
 ## v7.2.0
 
   - [fix] Relax the return type of `extractField` to allow non-string values

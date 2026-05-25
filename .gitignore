@@ -8,3 +8,5 @@
 /benchmarks/dist
 /coverage
 yarn-error.log
+FORK_NOTES.md
+benchmarks/baselines/latest.json

@@ -1,5 +1,5 @@
 import MiniSearch from './MiniSearch'
-import FrozenMiniSearch from './FrozenMiniSearch'
+import FrozenMiniSearch, { frozenMemoryBreakdown } from './FrozenMiniSearch'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea', category: 'fiction' },
@@ -134,5 +134,26 @@ describe('FrozenMiniSearch binary round-trip', () => {
     const buf = mutable.freeze().saveBinary()
     expect(() => FrozenMiniSearch.loadBinary(buf, { fields: ['title', 'missing'] }))
       .toThrow(/field "missing" not found/)
+  })
+
+  test('saveBinary writes MSv2 format', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const buf = mutable.freeze().saveBinary()
+    expect(buf.toString('ascii', 0, 4)).toBe('MSv2')
+    expect(buf.readUInt16LE(4)).toBe(2)
+  })
+})
+
+describe('frozenMemoryBreakdown', () => {
+  test('returns sensible structure sizes', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    const b = frozenMemoryBreakdown(frozen)
+    expect(b.termCount).toBeGreaterThan(0)
+    expect(b.postings.totalTypedBytes).toBeGreaterThan(0)
+    expect(b.radixTree.mapNodeCount).toBeGreaterThan(0)
+    expect(b.estimatedStructuredBytes).toBeGreaterThan(0)
   })
 })

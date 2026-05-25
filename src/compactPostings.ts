@@ -1,73 +1,57 @@
 import type { FieldTermDataLike, PostingListLike } from './scoring'
 
-/** Compact posting list: parallel sorted docIds and freqs */
-export class CompactPostingList implements PostingListLike {
-  readonly docIds: Uint32Array
-  readonly freqs: Uint8Array | Uint16Array | Uint32Array
+const MAX_FREQ_UINT8 = 255
 
-  constructor (docIds: Uint32Array, freqs: Uint8Array | Uint16Array | Uint32Array) {
-    this.docIds = docIds
-    this.freqs = freqs
+/** View into global flat posting buffers (no per-list allocation). */
+export class SegmentPostingList implements PostingListLike {
+  private readonly _docIds: Uint32Array
+  private readonly _freqs: Uint8Array
+  private readonly _offset: number
+  private readonly _length: number
+
+  constructor (docIds: Uint32Array, freqs: Uint8Array, offset: number, length: number) {
+    this._docIds = docIds
+    this._freqs = freqs
+    this._offset = offset
+    this._length = length
   }
 
   get size (): number {
-    return this.docIds.length
+    return this._length
   }
 
   forEachDoc (callback: (docId: number, termFreq: number) => void): void {
-    const { docIds, freqs } = this
-    for (let i = 0; i < docIds.length; i++) {
-      callback(docIds[i], freqs[i])
+    const { _docIds, _freqs, _offset, _length } = this
+    for (let i = 0; i < _length; i++) {
+      callback(_docIds[_offset + i], _freqs[_offset + i])
     }
   }
 }
 
-export type CompactFieldTermData = {
-  /** Per fieldId: compact list or undefined */
-  byField: (CompactPostingList | undefined)[]
-  /** fieldId -> matching document count (= posting list size) */
-  matchingFieldsByField: Uint32Array
+/**
+ * Clamp term frequency to Uint8 for flat storage.
+ * This intentionally caps tf at 255 in frozen indexes; see benchmark scenario
+ * \"overflow frequencies\" to quantify the score drift for very large tf values.
+ */
+export function clampFreq (freq: number): number {
+  return freq > MAX_FREQ_UINT8 ? MAX_FREQ_UINT8 : freq
 }
 
-export function compactFieldTermDataAdapter (data: CompactFieldTermData): FieldTermDataLike {
+export function flatFieldTermData (
+  termIndex: number,
+  fieldCount: number,
+  postingsOffsets: Uint32Array,
+  postingsLengths: Uint32Array,
+  allDocIds: Uint32Array,
+  allFreqs: Uint8Array
+): FieldTermDataLike {
+  const base = termIndex * fieldCount
   return {
-    get (fieldId) {
-      return data.byField[fieldId]
+    get (fieldId: number) {
+      const len = postingsLengths[base + fieldId]
+      if (len === 0) return undefined
+      const off = postingsOffsets[base + fieldId]
+      return new SegmentPostingList(allDocIds, allFreqs, off, len)
     }
   }
-}
-
-/** Pick smallest TypedArray type that fits all frequencies */
-export function freqsTypedArray (values: number[]): Uint8Array | Uint16Array | Uint32Array {
-  let max = 0
-  for (const v of values) {
-    if (v > max) max = v
-  }
-  if (max <= 255) {
-    const arr = new Uint8Array(values.length)
-    for (let i = 0; i < values.length; i++) arr[i] = values[i]
-    return arr
-  }
-  if (max <= 65535) {
-    const arr = new Uint16Array(values.length)
-    for (let i = 0; i < values.length; i++) arr[i] = values[i]
-    return arr
-  }
-  const arr = new Uint32Array(values.length)
-  for (let i = 0; i < values.length; i++) arr[i] = values[i]
-  return arr
-}
-
-/** Build compact posting from Map<shortId, freq> (keys should be sorted ascending) */
-export function compactPostingFromMap (freqs: Map<number, number>): CompactPostingList {
-  const n = freqs.size
-  const docIds = new Uint32Array(n)
-  const freqValues: number[] = new Array(n)
-  let i = 0
-  for (const [docId, freq] of freqs) {
-    docIds[i] = docId
-    freqValues[i] = freq
-    i++
-  }
-  return new CompactPostingList(docIds, freqsTypedArray(freqValues))
 }

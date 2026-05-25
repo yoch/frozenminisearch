@@ -2,17 +2,25 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.0.0-beta.1
+
+Second beta (`@yoch/minisearch@beta`). Adds one-shot frozen index construction.
+
+  - Add `FrozenMiniSearch.fromDocuments(documents, options)` to build a read-only
+    index in a single pass without a mutable `MiniSearch` step (same search results
+    as `addAll` + `freeze()` on the same corpus and options)
+  - Export `buildFrozenFromDocuments` and `assembleFrozen` for custom build pipelines
+  - Add `indexingCore.ts` and `frozenBuild.ts`; share tokenization / `processTerm`
+    logic with `MiniSearch#add`
+  - Benchmark suite: `heapMb.buildMutableFreeze` vs `heapMb.buildFromDocuments`
+
 ## v8.0.0-beta.0
 
 Node.js–focused beta release (`@yoch/minisearch` on npm). Adds a read-only frozen index and
 binary serialization; packaging no longer ships a browser UMD bundle.
 
   - Add `FrozenMiniSearch`, a read-only index with compact TypedArray postings,
-    built via `MiniSearch#freeze()`, `FrozenMiniSearch.fromDocuments()` (one-shot,
-    no mutable index), or `FrozenMiniSearch.loadBinary()`
-  - Add `FrozenMiniSearch.fromDocuments(documents, options)` to build a frozen
-    index directly (lower peak heap at build vs `addAll` + `freeze()` on large corpora)
-  - Export `buildFrozenFromDocuments` and `assembleFrozen` for advanced pipelines
+    built via `MiniSearch#freeze()` or `FrozenMiniSearch.loadBinary()`
   - Add `saveBinary()` / `FrozenMiniSearch.loadBinary()` for smaller on-disk
     snapshots and faster loads than `JSON.stringify` / `loadJSON` (`MSv2` flat
     postings on write; `MSv1` still readable on load; same `fields`, `tokenize`,

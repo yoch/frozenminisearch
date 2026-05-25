@@ -36,6 +36,10 @@
     "node"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "tag": "beta"
+  },
   "dependencies": {},
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",

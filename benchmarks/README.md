@@ -1,28 +1,28 @@
-# Benchmarks FrozenMiniSearch
+# FrozenMiniSearch benchmarks
 
-Mesures reproductibles pour suivre les optimisations mémoire/CPU.
+Reproducible memory and CPU measurements for regression tracking.
 
-## Commandes
+## Commands
 
-| Commande | Description |
-|----------|-------------|
-| `yarn benchmark:compare` | Rapport lisible dans le terminal (6 scénarios) |
-| `yarn benchmark:record` | Exécute la suite → `baselines/latest.json` |
-| `yarn benchmark:diff` | Run actuel vs `baselines/reference.json` (seuils warn/fail) |
-| `yarn benchmark:diff --latest` | `latest.json` vs `reference.json` (sans re-run) |
-| `yarn benchmark:baseline:update` | `record` + copie vers `reference.json` |
+| Command | Description |
+|---------|-------------|
+| `yarn benchmark:compare` | Human-readable terminal report (7 scenarios) |
+| `yarn benchmark:record` | Run suite → `baselines/latest.json` |
+| `yarn benchmark:diff` | Current run vs `baselines/reference.json` (warn/fail thresholds) |
+| `yarn benchmark:diff --latest` | `latest.json` vs `reference.json` (no re-run) |
+| `yarn benchmark:baseline:update` | `record` + copy to `reference.json` |
 
-Toujours avec GC exposé :
+Always run with GC exposed:
 
 ```bash
 NODE_ENV=production node --expose-gc benchmarks/compare.js
 ```
 
-Les scripts `yarn benchmark:*` lancent `yarn build` puis `node --expose-gc` automatiquement.
+`yarn benchmark:*` scripts run `yarn build` then `node --expose-gc` automatically.
 
-## Multi-run (optionnel)
+## Multi-run (optional)
 
-Pour réduire la variabilité, ajoute `--runs N` :
+Reduce variance with `--runs N`:
 
 ```bash
 yarn benchmark:compare --runs 3
@@ -30,40 +30,40 @@ yarn benchmark:record --runs 3
 yarn benchmark:diff --runs 3
 ```
 
-Les métriques sont agrégées via **médiane** par scénario.
-`--runs` est ignoré avec `benchmark:diff --latest` (pas de re-run).
+Metrics are aggregated with the **median** per scenario.
+`--runs` is ignored for `benchmark:diff --latest` (no re-run).
 
-## Fichiers
+## Files
 
-- `benchmarkSuite.js` — logique commune (métriques JSON)
-- `benchmarkScenarios.js` — corpus synthétiques extrêmes
-- `baselines/reference.json` — **référence versionnée** (golden)
-- `baselines/latest.json` — dernier run local (gitignored)
+- `benchmarkSuite.js` — shared metrics JSON
+- `benchmarkScenarios.js` — extreme synthetic corpora
+- `baselines/reference.json` — **versioned golden** baseline
+- `baselines/latest.json` — last local run (gitignored)
 
-## Workflow optimisation
+## Optimization workflow
 
-1. Modifier le code
-2. `yarn benchmark:diff` — détecter régressions vs référence
-3. Si gains intentionnels : `yarn benchmark:baseline:update` et committer `reference.json`
+1. Change code
+2. `yarn benchmark:diff` — catch regressions vs reference
+3. If gains are intentional: `yarn benchmark:baseline:update` and commit `reference.json`
 
-## Métriques enregistrées (par scénario)
+## Recorded metrics (per scenario)
 
-- Heap isolé : mutable, frozen, loadJSON, loadBinary
-- Indexing : addAll, freeze, saveBinary
-- Disque : JSON vs binaire MSv2
-- `memoryBreakdown` : postings typés, radix tree, stored fields
-- Search : p50/p95 par requête
-- `scoreDrift` : écart de score mutable vs frozen pour le scénario
-  **overflow frequencies** (>255 occurrences du même terme)
+- Isolated heap: mutable, frozen, loadJSON, loadBinary
+- Build heap: `addAll` + `freeze` vs `fromDocuments`
+- Indexing time: addAll, freeze, fromDocuments, saveBinary
+- Disk size: JSON vs MSv2 binary
+- `memoryBreakdown`: typed postings, radix tree, stored fields
+- Search: p50/p95 per query
+- `scoreDrift`: mutable vs frozen score delta on **overflow frequencies** (>255 occurrences of the same term)
 
-## Seuils `benchmark:diff` (régression)
+## `benchmark:diff` thresholds (regression)
 
-**Échec (exit code 1)** — métriques structurelles :
+**Fail (exit code 1)** — structural metrics:
 
-- Heap frozen : +10 %
-- Gain % heap vs mutable : −10 points
-- loadBinary : +20 %
+- Frozen heap: +10%
+- Heap saving % vs mutable: −10 points
+- loadBinary: +20%
 
-**Avertissement seulement** — search p50 (bruit de mesure entre runs). Ajouter `--strict` pour inclure la recherche dans les échecs.
+**Warning only** — search p50 (noisy across runs). Add `--strict` to treat search regressions as failures.
 
-Comparer deux runs locaux (`latest` vs `reference` capturés à des moments différents) peut afficher des warns search sans régression réelle.
+Comparing two local captures (`latest` vs `reference` from different moments) may show search warns without a real regression.

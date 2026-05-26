@@ -200,6 +200,12 @@ npm run build
 
 Use `npm run` for scripts (Yarn 1.x on Node 22 prints `url.parse` deprecation noise when invoking `yarn test` / `yarn build`).
 
+**Publish a beta** (`publishConfig.tag` is `beta`, so use the release script to also move `latest`):
+
+```bash
+npm run release:beta
+```
+
 **Requirements:** Node.js **ES2018+**. No browser UMD/CDN build in this fork (Node-only ESM + CJS).
 
 ---

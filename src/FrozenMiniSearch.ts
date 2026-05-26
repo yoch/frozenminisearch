@@ -23,7 +23,7 @@ import {
   deserializeTermIndexTree,
   serializeTermIndexTree
 } from './binaryFormat'
-import { buildFrozenParamsFromDocuments } from './frozenBuild'
+import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
 import type {
   Options,
   Query,
@@ -293,6 +293,11 @@ export function buildFrozenFromDocuments<T> (documents: readonly T[], options: O
   return assembleFrozen(buildFrozenParamsFromDocuments(documents, options))
 }
 
+/** Finalize a {@link FrozenIndexBuilder} into a read-only index. */
+export function freezeFrozenIndexBuilder<T> (builder: FrozenIndexBuilder<T>): FrozenMiniSearch<T> {
+  return assembleFrozen(builder.freezeParams())
+}
+
 export default class FrozenMiniSearch<T = any> {
   private readonly _options: OptionsWithDefaults<T>
   private readonly _index: SearchableMap<number>
@@ -539,6 +544,21 @@ export default class FrozenMiniSearch<T = any> {
    */
   static fromDocuments<T> (documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
     return buildFrozenFromDocuments(documents, options)
+  }
+
+  /**
+   * Build a read-only index from an async stream of documents (e.g. CSV parser).
+   * For sync iterables, use {@link createFrozenIndexBuilder} with `for...of` instead.
+   */
+  static async fromAsyncIterable<T> (
+    iterable: AsyncIterable<T>,
+    options: Options<T>
+  ): Promise<FrozenMiniSearch<T>> {
+    const builder = createFrozenIndexBuilder<T>(options)
+    for await (const document of iterable) {
+      builder.add(document)
+    }
+    return freezeFrozenIndexBuilder(builder)
   }
 
   private getFieldLength (docId: number, fieldId: number): number {

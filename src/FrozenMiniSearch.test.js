@@ -1,5 +1,7 @@
 import MiniSearch from './MiniSearch'
 import FrozenMiniSearch, { frozenMemoryBreakdown } from './FrozenMiniSearch'
+import { createFrozenIndexBuilder } from './frozenBuild'
+import { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { overflowFrequencies } from '../benchmarks/benchmarkScenarios.js'
 
 const docs = [
@@ -254,6 +256,96 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const direct = FrozenMiniSearch.fromDocuments([], options)
     expect(direct.documentCount).toBe(0)
     expect(direct.search('zen')).toEqual([])
+  })
+})
+
+function buildFrozenViaBuilder (corpus = docs, opts = options, hints) {
+  const builder = createFrozenIndexBuilder(opts, hints)
+  for (let i = 0; i < corpus.length; i++) {
+    builder.add(corpus[i])
+  }
+  return freezeFrozenIndexBuilder(builder)
+}
+
+describe('FrozenIndexBuilder', () => {
+  test('parity with fromDocuments on standard corpus', () => {
+    const fromDocs = buildFrozenDirect()
+    const fromBuilder = buildFrozenViaBuilder()
+    expect(fromBuilder.documentCount).toBe(fromDocs.documentCount)
+    expect(fromBuilder.termCount).toBe(fromDocs.termCount)
+    expectSameResults(fromDocs, fromBuilder, 'zen')
+    expectSameResults(fromDocs, fromBuilder, 'zen whale', { combineWith: 'OR' })
+    expect(fromBuilder.autoSuggest('zen ar')).toEqual(fromDocs.autoSuggest('zen ar'))
+  })
+
+  test('parity without estimatedDocumentCount hint', () => {
+    const fromDocs = buildFrozenDirect()
+    const fromBuilder = buildFrozenViaBuilder(docs, options, undefined)
+    expectSameResults(fromDocs, fromBuilder, 'zen')
+  })
+
+  test('parity with underestimated estimatedDocumentCount', () => {
+    const fromDocs = buildFrozenDirect()
+    const fromBuilder = buildFrozenViaBuilder(docs, options, { estimatedDocumentCount: 1 })
+    expectSameResults(fromDocs, fromBuilder, 'neur', { prefix: true })
+  })
+
+  test('parity and correct sizes with overestimated estimatedDocumentCount', () => {
+    const fromDocs = buildFrozenDirect()
+    const fromBuilder = buildFrozenViaBuilder(docs, options, { estimatedDocumentCount: docs.length + 100 })
+    expect(fromBuilder.documentCount).toBe(fromDocs.documentCount)
+    expectSameResults(fromDocs, fromBuilder, 'zen')
+    // Internal arrays must not be padded to the overestimate
+    const breakdown = fromBuilder.memoryBreakdown()
+    const directBreakdown = fromDocs.memoryBreakdown()
+    expect(breakdown.documentCount).toBe(directBreakdown.documentCount)
+    expect(breakdown.storedFieldsJsonBytes).toBe(directBreakdown.storedFieldsJsonBytes)
+  })
+
+  test('binary round-trip after builder freeze', () => {
+    const built = buildFrozenViaBuilder()
+    const loaded = FrozenMiniSearch.loadBinary(built.saveBinary(), options)
+    const fromDocs = buildFrozenDirect()
+    expect(loaded.search('zen')).toEqual(fromDocs.search('zen'))
+  })
+
+  test('empty index via freeze without add', () => {
+    const empty = freezeFrozenIndexBuilder(createFrozenIndexBuilder(options))
+    expect(empty.documentCount).toBe(0)
+    expect(empty.search('zen')).toEqual([])
+  })
+
+  test('cannot add after freeze', () => {
+    const builder = createFrozenIndexBuilder(options)
+    builder.add(docs[0])
+    freezeFrozenIndexBuilder(builder)
+    expect(() => builder.add(docs[1])).toThrow(/cannot add after freezeParams/i)
+  })
+
+  test('cannot freeze twice', () => {
+    const builder = createFrozenIndexBuilder(options)
+    builder.add(docs[0])
+    freezeFrozenIndexBuilder(builder)
+    expect(() => builder.freezeParams()).toThrow(/freezeParams\(\) already called/i)
+  })
+
+  test('rejects duplicate ID like fromDocuments', () => {
+    const builder = createFrozenIndexBuilder({ fields: ['text'] })
+    builder.add({ id: 1, text: 'a' })
+    expect(() => builder.add({ id: 1, text: 'b' })).toThrow(/duplicate ID/)
+  })
+})
+
+describe('FrozenMiniSearch.fromAsyncIterable', () => {
+  test('parity with fromDocuments', async () => {
+    async function * docStream () {
+      for (const doc of docs) yield doc
+    }
+    const fromDocs = buildFrozenDirect()
+    const fromAsync = await FrozenMiniSearch.fromAsyncIterable(docStream(), options)
+    expect(fromAsync.documentCount).toBe(fromDocs.documentCount)
+    expectSameResults(fromDocs, fromAsync, 'zen')
+    expectSameResults(fromDocs, fromAsync, 'zen art', { combineWith: 'AND' })
   })
 })
 

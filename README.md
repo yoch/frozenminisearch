@@ -74,10 +74,30 @@ const { FrozenMiniSearch } = require('@yoch/minisearch')
 |------|-----|
 | Live index that changes over time | `MiniSearch` → `freeze()` when you need read-only serving |
 | Fixed corpus, build frozen directly | **`FrozenMiniSearch.fromDocuments(documents, options)`** |
+| Build doc-by-doc (no `documents[]` buffer) | **`createFrozenIndexBuilder(options)`** → `.add(doc)` → **`freezeFrozenIndexBuilder(builder)`** |
+| Async stream of documents | **`FrozenMiniSearch.fromAsyncIterable(iterable, options)`** |
 | Load a snapshot from disk | `FrozenMiniSearch.loadBinary(buffer, options)` |
 | Custom assembly pipeline | `buildFrozenFromDocuments`, `assembleFrozen`, `freezeFromMiniSearch` |
 
 `fromDocuments` matches `new MiniSearch(opts).addAll(docs).freeze()` for search ranking on the same corpus and options (`fields`, `tokenize`, `processTerm`, …). Frozen indexes do not support `add` / `remove`.
+
+**External corpus (e.g. lookup by id after search):** keep full rows in your own store (`dataCache`, DB, etc.) and use minimal `storeFields` (often `['id']` only) so the frozen index does not duplicate payload text:
+
+```javascript
+import { createFrozenIndexBuilder, freezeFrozenIndexBuilder } from '@yoch/minisearch'
+
+function buildFrozenIndexFromRows (rows, options) {
+  const builder = createFrozenIndexBuilder(options, {
+    estimatedDocumentCount: rows.length
+  })
+  for (let i = 0; i < rows.length; i++) {
+    builder.add(buildIndexDocument(rows[i], i))
+  }
+  return freezeFrozenIndexBuilder(builder)
+}
+
+// After search: enrich from your store — frozen.getStoredFields(res.id) or dataCache[type][res.id]
+```
 
 ---
 
@@ -85,6 +105,8 @@ const { FrozenMiniSearch } = require('@yoch/minisearch')
 
 - **`freeze()`** — snapshot a mutable index into compact typed postings + a radix tree keyed by term index.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
+- **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)`.
+- **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index.
 - **`saveBinary()` / `loadBinary()`** — MSv2 on write, MSv1 still readable; pass the same `fields` (and custom `tokenize` / `processTerm` if used at build time).
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint.
@@ -94,6 +116,8 @@ Advanced exports:
 ```javascript
 import {
   FrozenMiniSearch,
+  createFrozenIndexBuilder,
+  freezeFrozenIndexBuilder,
   buildFrozenFromDocuments,
   assembleFrozen,
   freezeFromMiniSearch,

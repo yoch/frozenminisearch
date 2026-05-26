@@ -9,11 +9,11 @@ export {
   frozenMemoryBreakdown,
   assembleFrozen,
   type FrozenAssembleParams,
-  type FrozenMemoryBreakdown
+  type FrozenMemoryBreakdown,
 } from './FrozenMiniSearch'
 export {
   createFrozenIndexBuilder,
   FrozenIndexBuilder,
-  type FrozenIndexBuilderHints
+  type FrozenIndexBuilderHints,
 } from './frozenBuild'
 export default MiniSearch

@@ -10,13 +10,13 @@ export const defaultSearchOptions = {
   maxFuzzy: 6,
   boost: {},
   weights: { fuzzy: 0.45, prefix: 0.375 },
-  bm25: defaultBM25params
+  bm25: defaultBM25params,
 }
 
 export const defaultAutoSuggestOptions = {
   combineWith: AND,
   prefix: (term: string, i: number, terms: string[]): boolean =>
-    i === terms.length - 1
+    i === terms.length - 1,
 }
 
 /** Option defaults applied by {@link FrozenMiniSearch.loadBinary} before caller overrides */
@@ -28,5 +28,5 @@ export const defaultFrozenLoadOptions = {
   processTerm: (term: string) => term.toLowerCase(),
   storeFields: [] as string[],
   logger: (): void => {},
-  autoVacuum: false as const
+  autoVacuum: false as const,
 }

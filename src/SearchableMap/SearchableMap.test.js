@@ -1,5 +1,3 @@
-/* eslint-env jest */
-
 import SearchableMap from './SearchableMap'
 import * as fc from 'fast-check'
 
@@ -17,10 +15,10 @@ describe('SearchableMap', () => {
     const distance = (a.length === 1 && b.length === 1)
       ? d
       : Math.min(
-        ((a.length > 0) ? editDistance(a.slice(0, -1), b, mem) + 1 : Infinity),
-        ((b.length > 0) ? editDistance(a, b.slice(0, -1), mem) + 1 : Infinity),
-        ((a.length > 0 && b.length > 0) ? editDistance(a.slice(0, -1), b.slice(0, -1), mem) + d : Infinity)
-      )
+          ((a.length > 0) ? editDistance(a.slice(0, -1), b, mem) + 1 : Infinity),
+          ((b.length > 0) ? editDistance(a, b.slice(0, -1), mem) + 1 : Infinity),
+          ((a.length > 0 && b.length > 0) ? editDistance(a.slice(0, -1), b.slice(0, -1), mem) + d : Infinity),
+        )
     mem[a.length][b.length] = distance
     return distance
   }
@@ -253,7 +251,7 @@ describe('SearchableMap', () => {
     const map = SearchableMap.from(keyValues)
 
     it('returns all entries having the given maximum edit distance from the given key', () => {
-      [0, 1, 2, 3].forEach(distance => {
+      [0, 1, 2, 3].forEach((distance) => {
         const results = map.fuzzyGet('acqua', distance)
         const entries = Array.from(results)
         expect(entries.map(([key, [value, dist]]) => [key, dist]).sort())
@@ -301,7 +299,7 @@ describe('SearchableMap', () => {
           .toEqual(uniqueTerms.map(term => [term, editDistance(terms[0], term)])
             .filter(([, dist]) => dist <= maxDist).sort())
 
-        terms.forEach(term => {
+        terms.forEach((term) => {
           map.delete(term)
           expect(map.has(term)).toBe(false)
           expect(map.get(term)).toEqual(undefined)

@@ -12,18 +12,18 @@ import {
   type BM25Params,
   type RawResult,
   type QuerySpec,
-  byScore
+  byScore,
 } from './scoring'
 import { freezeFromMiniSearch } from './FrozenMiniSearch'
 import { WILDCARD_QUERY } from './symbols'
 import {
   SPACE_OR_PUNCTUATION,
   defaultSearchOptions,
-  defaultAutoSuggestOptions
+  defaultAutoSuggestOptions,
 } from './searchDefaults'
 import {
   collectFieldTermFreqs,
-  saveStoredFieldsForDocument
+  saveStoredFieldsForDocument,
 } from './indexingCore'
 
 export type { BM25Params } from './scoring'
@@ -39,14 +39,14 @@ export type SearchOptions = {
   /**
    * Names of the fields to search in. If omitted, all fields are searched.
    */
-  fields?: string[],
+  fields?: string[]
 
   /**
    * Function used to filter search results, for example on the basis of stored
    * fields. It takes as argument each search result and should return a boolean
    * to indicate if the result should be kept or not.
    */
-  filter?: (result: SearchResult) => boolean,
+  filter?: (result: SearchResult) => boolean
 
   /**
    * Key-value object of field names to boosting values. By default, fields are
@@ -55,7 +55,7 @@ export type SearchOptions = {
    * twice as high as a result matching the query in another field, all else
    * being equal.
    */
-  boost?: { [fieldName: string]: number },
+  boost?: { [fieldName: string]: number }
 
   /**
    * Function to calculate a boost factor for each term.
@@ -68,13 +68,13 @@ export type SearchOptions = {
    * term, a factor greater than 1 increases it. A factor of exactly 1 is
    * neutral, and does not affect the term's importance.
    */
-  boostTerm?: (term: string, i: number, terms: string[]) => number,
+  boostTerm?: (term: string, i: number, terms: string[]) => number
 
   /**
    * Relative weights to assign to prefix search results and fuzzy search
    * results. Exact matches are assigned a weight of 1.
    */
-  weights?: { fuzzy: number, prefix: number },
+  weights?: { fuzzy: number, prefix: number }
 
   /**
    * Function to calculate a boost factor for documents. It takes as arguments
@@ -84,7 +84,7 @@ export type SearchOptions = {
    * number lower than 1 decreases the score, and a falsy value skips the search
    * result completely.
    */
-  boostDocument?: (documentId: any, term: string, storedFields?: Record<string, unknown>) => number,
+  boostDocument?: (documentId: any, term: string, storedFields?: Record<string, unknown>) => number
 
   /**
    * Controls whether to perform prefix search. It can be a simple boolean, or a
@@ -97,7 +97,7 @@ export type SearchOptions = {
    * tokenized search query. The function should return a boolean to indicate
    * whether to perform prefix search for that search term.
    */
-  prefix?: boolean | ((term: string, index: number, terms: string[]) => boolean),
+  prefix?: boolean | ((term: string, index: number, terms: string[]) => boolean)
 
   /**
    * Controls whether to perform fuzzy search. It can be a simple boolean, or a
@@ -121,14 +121,14 @@ export type SearchOptions = {
    * the tokenized search query. It should return a boolean or a number, with
    * the meaning documented above.
    */
-  fuzzy?: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number),
+  fuzzy?: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
 
   /**
    * Controls the maximum fuzziness when using a fractional fuzzy value. This is
    * set to 6 by default. Very high edit distances usually don't produce
    * meaningful results, but can excessively impact search performance.
    */
-  maxFuzzy?: number,
+  maxFuzzy?: number
 
   /**
    * The operand to combine partial results for each term. By default it is
@@ -136,7 +136,7 @@ export type SearchOptions = {
    * search. If "AND" is given, only results matching _all_ the search terms are
    * returned by a search.
    */
-  combineWith?: CombinationOperator,
+  combineWith?: CombinationOperator
 
   /**
    * Function to tokenize the search query. By default, the same tokenizer used
@@ -158,7 +158,7 @@ export type SearchOptions = {
    * `text` document into parts that can be processed by the `processTerm`
    * function.
    */
-  tokenize?: (text: string) => string[],
+  tokenize?: (text: string) => string[]
 
   /**
    * Function to process or normalize terms in the search query. By default, the
@@ -197,15 +197,15 @@ export type SearchOptions = {
 }
 
 type SearchOptionsWithDefaults = SearchOptions & {
-  boost: { [fieldName: string]: number },
+  boost: { [fieldName: string]: number }
 
-  weights: { fuzzy: number, prefix: number },
+  weights: { fuzzy: number, prefix: number }
 
-  prefix: boolean | ((term: string, index: number, terms: string[]) => boolean),
+  prefix: boolean | ((term: string, index: number, terms: string[]) => boolean)
 
-  fuzzy: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number),
+  fuzzy: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
 
-  maxFuzzy: number,
+  maxFuzzy: number
 
   combineWith: CombinationOperator
 
@@ -218,23 +218,23 @@ type SearchOptionsWithDefaults = SearchOptions & {
  * @typeParam T  The type of documents being indexed.
  */
 export type Options<T = any> = {
-   /**
+  /**
     * Names of the document fields to be indexed.
     */
-  fields: string[],
+  fields: string[]
 
-   /**
+  /**
     * Name of the ID field, uniquely identifying a document.
     */
-  idField?: string,
+  idField?: string
 
-   /**
+  /**
     * Names of fields to store, so that search results would include them. By
     * default none, so results would only contain the id field.
     */
-  storeFields?: string[],
+  storeFields?: string[]
 
-   /**
+  /**
     * Function used to extract the value of each field in documents. By default,
     * the documents are assumed to be plain objects with field names as keys,
     * but by specifying a custom `extractField` function one can completely
@@ -247,7 +247,7 @@ export type Options<T = any> = {
     * The returned string is fed into the `tokenize` function to split it up
     * into tokens.
     */
-  extractField?: (document: T, fieldName: string) => any,
+  extractField?: (document: T, fieldName: string) => any
 
   /**
    * Function used to turn field values into strings for indexing
@@ -278,9 +278,9 @@ export type Options<T = any> = {
    * })
    * ```
    */
-  stringifyField?: (fieldValue: any, fieldName: string) => string,
+  stringifyField?: (fieldValue: any, fieldName: string) => string
 
-   /**
+  /**
     * Function used to split a field value into individual terms to be indexed.
     * The default tokenizer separates terms by space or punctuation, but a
     * custom tokenizer can be provided for custom logic.
@@ -305,9 +305,9 @@ export type Options<T = any> = {
     * case, the purpose of this function is to split apart the provided `text` document
     * into parts that can be processed by the `processTerm` function.
     */
-  tokenize?: (text: string, fieldName?: string) => string[],
+  tokenize?: (text: string, fieldName?: string) => string[]
 
-   /**
+  /**
     * Function used to process a term before indexing or search. This can be
     * used for normalization (such as stemming). By default, terms are
     * downcased, and otherwise no other normalization is performed.
@@ -339,7 +339,7 @@ export type Options<T = any> = {
     * at the beginning or end of a word, it will also be indexed that way, with the
     * included whitespace.*
     */
-  processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false,
+  processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
 
   /**
    * Function called to log messages. Arguments are a log level ('debug',
@@ -360,13 +360,13 @@ export type Options<T = any> = {
    */
   autoVacuum?: boolean | AutoVacuumOptions
 
-   /**
+  /**
     * Default search options (see the {@link SearchOptions} type and the {@link
     * MiniSearch#search} method for details)
     */
-  searchOptions?: SearchOptions,
+  searchOptions?: SearchOptions
 
-   /**
+  /**
     * Default auto suggest options (see the {@link SearchOptions} type and the
     * {@link MiniSearch#autoSuggest} method for details)
     */
@@ -404,12 +404,12 @@ export type Suggestion = {
   /**
    * The suggestion
    */
-  suggestion: string,
+  suggestion: string
 
   /**
    * Suggestion as an array of terms
    */
-  terms: string[],
+  terms: string[]
 
   /**
    * Score for the suggestion
@@ -435,29 +435,29 @@ export type SearchResult = {
   /**
    * The document ID
    */
-  id: any,
+  id: any
 
   /**
    * List of document terms that matched. For example, if a prefix search for
    * `"moto"` matches `"motorcycle"`, `terms` will contain `"motorcycle"`.
    */
-  terms: string[],
+  terms: string[]
 
   /**
    * List of query terms that matched. For example, if a prefix search for
    * `"moto"` matches `"motorcycle"`, `queryTerms` will contain `"moto"`.
    */
-  queryTerms: string[],
+  queryTerms: string[]
 
   /**
    * Score of the search results
    */
-  score: number,
+  score: number
 
   /**
    * Match information, see {@link MatchInfo}
    */
-  match: MatchInfo,
+  match: MatchInfo
 
   /**
    * Stored fields
@@ -469,14 +469,14 @@ export type SearchResult = {
  * @ignore
  */
 export type AsPlainObject = {
-  documentCount: number,
-  nextId: number,
+  documentCount: number
+  nextId: number
   documentIds: { [shortId: string]: any }
   fieldIds: { [fieldName: string]: number }
   fieldLength: { [shortId: string]: number[] }
-  averageFieldLength: number[],
+  averageFieldLength: number[]
   storedFields: { [shortId: string]: any }
-  dirtCount?: number,
+  dirtCount?: number
   index: [string, { [fieldId: string]: SerializedIndexEntry }][]
   serializationVersion: number
 }
@@ -510,7 +510,7 @@ export type VacuumOptions = {
    * Size of each vacuuming batch (the number of terms in the index that will be
    * traversed in each batch). Defaults to 1000.
    */
-  batchSize?: number,
+  batchSize?: number
 
   /**
    * Wait time between each vacuuming batch in milliseconds. Defaults to 10.
@@ -533,7 +533,7 @@ export type VacuumConditions = {
    * Minimum `dirtFactor` (proportion of discarded documents over the total)
    * under which auto vacuum is not triggered. It defaults to 0.1.
    */
-  minDirtFactor?: number,
+  minDirtFactor?: number
 }
 
 /**
@@ -690,7 +690,7 @@ export default class MiniSearch<T = any> {
    * })
    * ```
    */
-  constructor (options: Options<T>) {
+  constructor(options: Options<T>) {
     if (options?.fields == null) {
       throw new Error('MiniSearch: option "fields" must be provided')
     }
@@ -702,7 +702,7 @@ export default class MiniSearch<T = any> {
       ...options,
       autoVacuum,
       searchOptions: { ...defaultSearchOptions, ...(options.searchOptions || {}) },
-      autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) }
+      autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
     }
 
     this._index = new SearchableMap()
@@ -742,7 +742,7 @@ export default class MiniSearch<T = any> {
    *
    * @param document  The document to be indexed
    */
-  add (document: T): void {
+  add(document: T): void {
     const { extractField, stringifyField, tokenize, processTerm, fields, idField } = this._options
     const id = extractField(document, idField)
     if (id == null) {
@@ -782,7 +782,7 @@ export default class MiniSearch<T = any> {
    *
    * @param documents  An array of documents to be indexed
    */
-  addAll (documents: readonly T[]): void {
+  addAll(documents: readonly T[]): void {
     for (const document of documents) this.add(document)
   }
 
@@ -797,7 +797,7 @@ export default class MiniSearch<T = any> {
    * @param options  Configuration options
    * @return A promise resolving to `undefined` when the indexing is done
    */
-  addAllAsync (documents: readonly T[], options: { chunkSize?: number } = {}): Promise<void> {
+  addAllAsync(documents: readonly T[], options: { chunkSize?: number } = {}): Promise<void> {
     const { chunkSize = 10 } = options
     const acc: { chunk: T[], promise: Promise<void> } = { chunk: [], promise: Promise.resolve() }
 
@@ -808,7 +808,7 @@ export default class MiniSearch<T = any> {
           chunk: [],
           promise: promise
             .then(() => new Promise(resolve => setTimeout(resolve, 0)))
-            .then(() => this.addAll(chunk))
+            .then(() => this.addAll(chunk)),
         }
       } else {
         return { chunk, promise }
@@ -832,7 +832,7 @@ export default class MiniSearch<T = any> {
    *
    * @param document  The document to be removed
    */
-  remove (document: T): void {
+  remove(document: T): void {
     const { tokenize, processTerm, extractField, stringifyField, fields, idField } = this._options
     const id = extractField(document, idField)
 
@@ -884,7 +884,7 @@ export default class MiniSearch<T = any> {
    * more efficient to call this method with no arguments than to pass all
    * documents.
    */
-  removeAll (documents?: readonly T[]): void {
+  removeAll(documents?: readonly T[]): void {
     if (documents) {
       for (const document of documents) this.remove(document)
     } else if (arguments.length > 0) {
@@ -945,7 +945,7 @@ export default class MiniSearch<T = any> {
    *
    * @param id  The ID of the document to be discarded
    */
-  discard (id: any): void {
+  discard(id: any): void {
     const shortId = this._idToShortId.get(id)
 
     if (shortId == null) {
@@ -968,7 +968,7 @@ export default class MiniSearch<T = any> {
     this.maybeAutoVacuum()
   }
 
-  private maybeAutoVacuum (): void {
+  private maybeAutoVacuum(): void {
     if (this._options.autoVacuum === false) { return }
 
     const { minDirtFactor, minDirtCount, batchSize, batchWait } = this._options.autoVacuum
@@ -987,7 +987,7 @@ export default class MiniSearch<T = any> {
    * convenient to call {@link MiniSearch.removeAll} with no argument, instead
    * of passing all IDs to this method.
    */
-  discardAll (ids: readonly any[]): void {
+  discardAll(ids: readonly any[]): void {
     const autoVacuum = this._options.autoVacuum
 
     try {
@@ -1018,7 +1018,7 @@ export default class MiniSearch<T = any> {
    * @param updatedDocument  The updated document to replace the old version
    * with
    */
-  replace (updatedDocument: T): void {
+  replace(updatedDocument: T): void {
     const { idField, extractField } = this._options
     const id = extractField(updatedDocument, idField)
 
@@ -1065,11 +1065,11 @@ export default class MiniSearch<T = any> {
    * @param options  Configuration options for the batch size and delay. See
    * {@link VacuumOptions}.
    */
-  vacuum (options: VacuumOptions = {}): Promise<void> {
+  vacuum(options: VacuumOptions = {}): Promise<void> {
     return this.conditionalVacuum(options)
   }
 
-  private conditionalVacuum (options: VacuumOptions, conditions?: VacuumConditions): Promise<void> {
+  private conditionalVacuum(options: VacuumOptions, conditions?: VacuumConditions): Promise<void> {
     // If a vacuum is already ongoing, schedule another as soon as it finishes,
     // unless there's already one enqueued. If one was already enqueued, do not
     // enqueue another on top, but make sure that the conditions are the
@@ -1092,7 +1092,7 @@ export default class MiniSearch<T = any> {
     return this._currentVacuum
   }
 
-  private async performVacuuming (options: VacuumOptions, conditions?: VacuumConditions): Promise<void> {
+  private async performVacuuming(options: VacuumOptions, conditions?: VacuumConditions): Promise<void> {
     const initialDirtCount = this._dirtCount
 
     if (this.vacuumConditionsMet(conditions)) {
@@ -1118,7 +1118,7 @@ export default class MiniSearch<T = any> {
         }
 
         if (i % batchSize === 0) {
-          await new Promise((resolve) => setTimeout(resolve, batchWait))
+          await new Promise(resolve => setTimeout(resolve, batchWait))
         }
 
         i += 1
@@ -1134,7 +1134,7 @@ export default class MiniSearch<T = any> {
     this._enqueuedVacuum = null
   }
 
-  private vacuumConditionsMet (conditions?: VacuumConditions) {
+  private vacuumConditionsMet(conditions?: VacuumConditions) {
     if (conditions == null) { return true }
 
     let { minDirtCount, minDirtFactor } = conditions
@@ -1147,14 +1147,14 @@ export default class MiniSearch<T = any> {
   /**
    * Is `true` if a vacuuming operation is ongoing, `false` otherwise
    */
-  get isVacuuming (): boolean {
+  get isVacuuming(): boolean {
     return this._currentVacuum != null
   }
 
   /**
    * The number of documents discarded since the most recent vacuuming
    */
-  get dirtCount (): number {
+  get dirtCount(): number {
     return this._dirtCount
   }
 
@@ -1165,7 +1165,7 @@ export default class MiniSearch<T = any> {
    * value means that the index is relatively dirty, and vacuuming could release
    * memory.
    */
-  get dirtFactor (): number {
+  get dirtFactor(): number {
     return this._dirtCount / (1 + this._documentCount + this._dirtCount)
   }
 
@@ -1175,7 +1175,7 @@ export default class MiniSearch<T = any> {
    *
    * @param id  The document ID
    */
-  has (id: any): boolean {
+  has(id: any): boolean {
     return this._idToShortId.has(id)
   }
 
@@ -1186,7 +1186,7 @@ export default class MiniSearch<T = any> {
    *
    * @param id  The document ID
    */
-  getStoredFields (id: any): Record<string, unknown> | undefined {
+  getStoredFields(id: any): Record<string, unknown> | undefined {
     const shortId = this._idToShortId.get(id)
 
     if (shortId == null) { return undefined }
@@ -1354,17 +1354,17 @@ export default class MiniSearch<T = any> {
    * @param query  Search query
    * @param searchOptions  Search options. Each option, if not given, defaults to the corresponding value of `searchOptions` given to the constructor, or to the library default.
    */
-  search (query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
+  search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     const { searchOptions: globalSearchOptions } = this._options
     const searchOptionsWithDefaults: SearchOptionsWithDefaults = { ...globalSearchOptions, ...searchOptions }
     const rawResults = this.executeQuery(query, searchOptions)
     const skipSort = query === MiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null
     return finalizeSearchResults({
       rawResults,
-      getExternalId: (docId) => this._documentIds.get(docId),
-      getStoredFields: (docId) => this._storedFields.get(docId),
+      getExternalId: docId => this._documentIds.get(docId),
+      getStoredFields: docId => this._storedFields.get(docId),
       filter: searchOptionsWithDefaults.filter,
-      skipSort
+      skipSort,
     })
   }
 
@@ -1429,7 +1429,7 @@ export default class MiniSearch<T = any> {
    * are combined with `'AND'`.
    * @return  A sorted array of suggestions sorted by relevance score.
    */
-  autoSuggest (queryString: string, options: SearchOptions = {}): Suggestion[] {
+  autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
     options = { ...this._options.autoSuggestOptions, ...options }
 
     const suggestions: Map<string, Omit<Suggestion, 'suggestion'> & { count: number }> = new Map()
@@ -1457,14 +1457,14 @@ export default class MiniSearch<T = any> {
   /**
    * Total number of documents available to search
    */
-  get documentCount (): number {
+  get documentCount(): number {
     return this._documentCount
   }
 
   /**
    * Number of terms in the index
    */
-  get termCount (): number {
+  get termCount(): number {
     return this._index.size
   }
 
@@ -1489,7 +1489,7 @@ export default class MiniSearch<T = any> {
    * @param options  configuration options, same as the constructor
    * @return An instance of MiniSearch deserialized from the given JSON.
    */
-  static loadJSON<T = any> (json: string, options: Options<T>): MiniSearch<T> {
+  static loadJSON<T = any>(json: string, options: Options<T>): MiniSearch<T> {
     if (options == null) {
       throw new Error('MiniSearch: loadJSON should be given the same options used when serializing the index')
     }
@@ -1509,7 +1509,7 @@ export default class MiniSearch<T = any> {
    * @param options  configuration options, same as the constructor
    * @return A Promise that will resolve to an instance of MiniSearch deserialized from the given JSON.
    */
-  static async loadJSONAsync<T = any> (json: string, options: Options<T>): Promise<MiniSearch<T>> {
+  static async loadJSONAsync<T = any>(json: string, options: Options<T>): Promise<MiniSearch<T>> {
     if (options == null) {
       throw new Error('MiniSearch: loadJSON should be given the same options used when serializing the index')
     }
@@ -1537,7 +1537,7 @@ export default class MiniSearch<T = any> {
    * // => throws 'MiniSearch: unknown option "notExisting"'
    * ```
    */
-  static getDefault (optionName: string): any {
+  static getDefault(optionName: string): any {
     if (defaultOptions.hasOwnProperty(optionName)) {
       return getOwnProperty(defaultOptions, optionName)
     } else {
@@ -1548,13 +1548,13 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  static loadJS<T = any> (js: AsPlainObject, options: Options<T>): MiniSearch<T> {
+  static loadJS<T = any>(js: AsPlainObject, options: Options<T>): MiniSearch<T> {
     const {
       index,
       documentIds,
       fieldLength,
       storedFields,
-      serializationVersion
+      serializationVersion,
     } = js
 
     const miniSearch = this.instantiateMiniSearch(js, options)
@@ -1590,13 +1590,13 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  static async loadJSAsync<T = any> (js: AsPlainObject, options: Options<T>): Promise<MiniSearch<T>> {
+  static async loadJSAsync<T = any>(js: AsPlainObject, options: Options<T>): Promise<MiniSearch<T>> {
     const {
       index,
       documentIds,
       fieldLength,
       storedFields,
-      serializationVersion
+      serializationVersion,
     } = js
 
     const miniSearch = this.instantiateMiniSearch(js, options)
@@ -1634,14 +1634,14 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private static instantiateMiniSearch<T = any> (js: AsPlainObject, options: Options<T>): MiniSearch<T> {
+  private static instantiateMiniSearch<T = any>(js: AsPlainObject, options: Options<T>): MiniSearch<T> {
     const {
       documentCount,
       nextId,
       fieldIds,
       averageFieldLength,
       dirtCount,
-      serializationVersion
+      serializationVersion,
     } = js
 
     if (serializationVersion !== 1 && serializationVersion !== 2) {
@@ -1664,14 +1664,14 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private executeQuery (query: Query, searchOptions: SearchOptions = {}): RawResult {
+  private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
     if (query === MiniSearch.wildcard) {
       return this.executeWildcardQuery(searchOptions)
     }
 
     if (typeof query !== 'string') {
       const options = { ...searchOptions, ...query, queries: undefined }
-      const results = query.queries.map((subquery) => this.executeQuery(subquery, options))
+      const results = query.queries.map(subquery => this.executeQuery(subquery, options))
       return this.combineResults(results, options.combineWith)
     }
 
@@ -1680,7 +1680,7 @@ export default class MiniSearch<T = any> {
     const { tokenize: searchTokenize, processTerm: searchProcessTerm } = options
     const terms = searchTokenize(query)
       .flatMap((term: string) => searchProcessTerm(term))
-      .filter((term) => !!term) as string[]
+      .filter(term => !!term) as string[]
     const queries: QuerySpec[] = terms.map(termToQuerySpec(options))
     const results = queries.map(query => this.executeQuerySpec(query, options))
 
@@ -1690,7 +1690,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private executeQuerySpec (query: QuerySpec, searchOptions: SearchOptions): RawResult {
+  private executeQuerySpec(query: QuerySpec, searchOptions: SearchOptions): RawResult {
     const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }
 
     const boosts = (options.fields || this._options.fields).reduce((boosts, field) =>
@@ -1700,7 +1700,7 @@ export default class MiniSearch<T = any> {
       boostDocument,
       weights,
       maxFuzzy,
-      bm25: bm25params
+      bm25: bm25params,
     } = options
 
     const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
@@ -1758,7 +1758,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private executeWildcardQuery (searchOptions: SearchOptions): RawResult {
+  private executeWildcardQuery(searchOptions: SearchOptions): RawResult {
     const results = new Map() as RawResult
     const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }
 
@@ -1767,7 +1767,7 @@ export default class MiniSearch<T = any> {
       results.set(shortId, {
         score,
         terms: [],
-        match: {}
+        match: {},
       })
     }
 
@@ -1777,14 +1777,14 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private combineResults (results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
+  private combineResults(results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
     return combineResults(results, combineWith)
   }
 
   /**
    * Build a read-only {@link FrozenMiniSearch} snapshot optimized for RAM and search CPU.
    */
-  freeze (): import('./FrozenMiniSearch').default {
+  freeze(): import('./FrozenMiniSearch').default {
     return freezeFromMiniSearch(this as unknown as import('./FrozenMiniSearch').FreezeSource<T>)
   }
 
@@ -1812,7 +1812,7 @@ export default class MiniSearch<T = any> {
    *
    * @return A plain-object serializable representation of the search index.
    */
-  toJSON (): AsPlainObject {
+  toJSON(): AsPlainObject {
     const index: [string, { [key: string]: SerializedIndexEntry }][] = []
 
     for (const [term, fieldIndex] of this._index) {
@@ -1835,14 +1835,14 @@ export default class MiniSearch<T = any> {
       storedFields: Object.fromEntries(this._storedFields),
       dirtCount: this._dirtCount,
       index,
-      serializationVersion: 2
+      serializationVersion: 2,
     }
   }
 
   /**
    * @ignore
    */
-  private termResults (
+  private termResults(
     sourceTerm: string,
     derivedTerm: string,
     termWeight: number,
@@ -1851,7 +1851,7 @@ export default class MiniSearch<T = any> {
     fieldBoosts: { [field: string]: number },
     boostDocumentFn: ((id: any, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
     bm25params: BM25Params,
-    results: RawResult = new Map()
+    results: RawResult = new Map(),
   ): RawResult {
     return aggregateTerm(
       sourceTerm,
@@ -1865,21 +1865,21 @@ export default class MiniSearch<T = any> {
         avgFieldLength: this._avgFieldLength,
         fieldIds: this._fieldIds,
         getFieldLength: (docId, fieldId) => this._fieldLength.get(docId)![fieldId],
-        getExternalId: (docId) => this._documentIds.get(docId),
-        getStoredFields: (docId) => this._storedFields.get(docId),
-        isDocActive: (docId) => this._documentIds.has(docId),
-        onInactiveDoc: (docId, fieldId, term) => this.removeTerm(fieldId, docId, term)
+        getExternalId: docId => this._documentIds.get(docId),
+        getStoredFields: docId => this._storedFields.get(docId),
+        isDocActive: docId => this._documentIds.has(docId),
+        onInactiveDoc: (docId, fieldId, term) => this.removeTerm(fieldId, docId, term),
       },
       boostDocumentFn,
       bm25params,
-      results
+      results,
     )
   }
 
   /**
    * @ignore
    */
-  private addTerm (fieldId: number, documentId: number, term: string): void {
+  private addTerm(fieldId: number, documentId: number, term: string): void {
     const indexData = this._index.fetch(term, createMap)
 
     let fieldIndex = indexData.get(fieldId)
@@ -1896,7 +1896,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private removeTerm (fieldId: number, documentId: number, term: string): void {
+  private removeTerm(fieldId: number, documentId: number, term: string): void {
     if (!this._index.has(term)) {
       this.warnDocumentChanged(documentId, fieldId, term)
       return
@@ -1925,7 +1925,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private warnDocumentChanged (shortDocumentId: number, fieldId: number, term: string): void {
+  private warnDocumentChanged(shortDocumentId: number, fieldId: number, term: string): void {
     for (const fieldName of Object.keys(this._fieldIds)) {
       if (this._fieldIds[fieldName] === fieldId) {
         this._options.logger('warn', `MiniSearch: document with ID ${this._documentIds.get(shortDocumentId)} has changed before removal: term "${term}" was not present in field "${fieldName}". Removing a document after it has changed can corrupt the index!`, 'version_conflict')
@@ -1937,7 +1937,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private addDocumentId (documentId: any): number {
+  private addDocumentId(documentId: any): number {
     const shortDocumentId = this._nextId
     this._idToShortId.set(documentId, shortDocumentId)
     this._documentIds.set(shortDocumentId, documentId)
@@ -1949,7 +1949,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private addFields (fields: string[]): void {
+  private addFields(fields: string[]): void {
     for (let i = 0; i < fields.length; i++) {
       this._fieldIds[fields[i]] = i
     }
@@ -1958,7 +1958,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private addFieldLength (documentId: number, fieldId: number, count: number, length: number): void {
+  private addFieldLength(documentId: number, fieldId: number, count: number, length: number): void {
     let fieldLengths = this._fieldLength.get(documentId)
     if (fieldLengths == null) this._fieldLength.set(documentId, fieldLengths = [])
     fieldLengths[fieldId] = length
@@ -1971,7 +1971,7 @@ export default class MiniSearch<T = any> {
   /**
    * @ignore
    */
-  private removeFieldLength (documentId: number, fieldId: number, count: number, length: number): void {
+  private removeFieldLength(documentId: number, fieldId: number, count: number, length: number): void {
     if (count === 1) {
       this._avgFieldLength[fieldId] = 0
       return
@@ -1993,7 +1993,7 @@ const defaultOptions = {
   logger: (level: LogLevel, message: string): void => {
     if (typeof console?.[level] === 'function') console[level](message)
   },
-  autoVacuum: true
+  autoVacuum: true,
 }
 
 const defaultVacuumOptions = { batchSize: 1000, batchWait: 10 }
@@ -2031,4 +2031,4 @@ const objectToNumericMapAsync = async <T>(object: { [key: string]: T }): Promise
   return map
 }
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

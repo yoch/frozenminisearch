@@ -7,23 +7,23 @@ const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea', category: 'fiction' },
   { id: 2, title: 'Zen Motorcycle', text: 'zen art motorcycle maintenance', category: 'fiction' },
   { id: 3, title: 'Neuromancer', text: 'cyberspace matrix hacker', category: 'sci-fi' },
-  { id: 4, title: 'Zen Archery', text: 'zen archery art practice', category: 'non-fiction' }
+  { id: 4, title: 'Zen Archery', text: 'zen archery art practice', category: 'non-fiction' },
 ]
 
 const options = {
   fields: ['title', 'text'],
   storeFields: ['title', 'category'],
-  searchOptions: { prefix: true, fuzzy: 0.2 }
+  searchOptions: { prefix: true, fuzzy: 0.2 },
 }
 
-function buildEngines () {
+function buildEngines() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
   const frozen = mutable.freeze()
   return { mutable, frozen }
 }
 
-function expectSameResults (mutable, frozen, query, searchOptions = {}) {
+function expectSameResults(mutable, frozen, query, searchOptions = {}) {
   const a = mutable.search(query, searchOptions)
   const b = frozen.search(query, searchOptions)
   expect(b.length).toBe(a.length)
@@ -77,19 +77,19 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
   })
 
   test('filter', () => {
-    const filter = (r) => r.category === 'fiction'
+    const filter = r => r.category === 'fiction'
     expectSameResults(mutable, frozen, 'zen', { filter })
   })
 
   test('boostDocument', () => {
-    const boostDocument = (id) => (id === 2 ? 2 : 1)
+    const boostDocument = id => (id === 2 ? 2 : 1)
     expectSameResults(mutable, frozen, 'zen', { boostDocument })
   })
 
   test('nested query', () => {
     expectSameResults(mutable, frozen, {
       combineWith: 'AND',
-      queries: ['zen', { combineWith: 'OR', queries: ['motorcycle', 'archery'] }]
+      queries: ['zen', { combineWith: 'OR', queries: ['motorcycle', 'archery'] }],
     })
   })
 
@@ -114,21 +114,21 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
   })
 
   test.each([
-    ['add', (idx) => idx.add(docs[0])],
-    ['addAll', (idx) => idx.addAll(docs)],
-    ['addAllAsync', (idx) => idx.addAllAsync(docs)],
-    ['remove', (idx) => idx.remove(docs[0])],
-    ['removeAll', (idx) => idx.removeAll(docs)],
-    ['discard', (idx) => idx.discard(1)],
-    ['discardAll', (idx) => idx.discardAll([1, 2])],
-    ['replace', (idx) => idx.replace(docs[0])],
-    ['vacuum', (idx) => idx.vacuum()]
+    ['add', idx => idx.add(docs[0])],
+    ['addAll', idx => idx.addAll(docs)],
+    ['addAllAsync', idx => idx.addAllAsync(docs)],
+    ['remove', idx => idx.remove(docs[0])],
+    ['removeAll', idx => idx.removeAll(docs)],
+    ['discard', idx => idx.discard(1)],
+    ['discardAll', idx => idx.discardAll([1, 2])],
+    ['replace', idx => idx.replace(docs[0])],
+    ['vacuum', idx => idx.vacuum()],
   ])('read-only mutation %s throws', (_label, mutate) => {
     expect(() => mutate(frozen)).toThrow(/read-only/i)
   })
 
   test('boostTerm parity', () => {
-    const boostTerm = (term) => (term === 'zen' ? 2 : 1)
+    const boostTerm = term => (term === 'zen' ? 2 : 1)
     expectSameResults(mutable, frozen, 'zen art', { boostTerm })
   })
 
@@ -137,21 +137,21 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
   })
 
   test('search tokenize and processTerm parity', () => {
-    const tokenize = (q) => q.split(/\s+/)
-    const processTerm = (t) => t.toLowerCase()
+    const tokenize = q => q.split(/\s+/)
+    const processTerm = t => t.toLowerCase()
     expectSameResults(mutable, frozen, 'ZEN Art', { tokenize, processTerm })
   })
 
   test('explicit weights parity', () => {
     expectSameResults(mutable, frozen, 'neur', {
       prefix: true,
-      weights: { fuzzy: 0.5, prefix: 0.4 }
+      weights: { fuzzy: 0.5, prefix: 0.4 },
     })
   })
 
   test('explicit bm25 parity', () => {
     expectSameResults(mutable, frozen, 'zen', {
-      bm25: { k: 1.5, b: 0.6, d: 0.4 }
+      bm25: { k: 1.5, b: 0.6, d: 0.4 },
     })
   })
 })
@@ -160,12 +160,12 @@ describe('FrozenMiniSearch custom indexing options', () => {
   test('custom idField and extractField parity', () => {
     const customDocs = [
       { key: 'a', body: 'hello world' },
-      { key: 'b', body: 'hello again' }
+      { key: 'b', body: 'hello again' },
     ]
     const customOpts = {
       fields: ['body'],
       idField: 'key',
-      extractField: (doc, field) => doc[field]
+      extractField: (doc, field) => doc[field],
     }
     const mutable = new MiniSearch(customOpts)
     mutable.addAll(customDocs)
@@ -178,7 +178,7 @@ describe('FrozenMiniSearch custom indexing options', () => {
     const customDocs = [{ id: 1, tags: ['alpha', 'beta'] }]
     const customOpts = {
       fields: ['tags'],
-      stringifyField: (value) => value.join(' ')
+      stringifyField: value => value.join(' '),
     }
     const mutable = new MiniSearch(customOpts)
     mutable.addAll(customDocs)
@@ -280,13 +280,13 @@ describe('FrozenMiniSearch binary round-trip', () => {
   })
 })
 
-function buildFrozenViaFreeze () {
+function buildFrozenViaFreeze() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
   return mutable.freeze()
 }
 
-function buildFrozenDirect () {
+function buildFrozenDirect() {
   return FrozenMiniSearch.fromDocuments(docs, options)
 }
 
@@ -307,7 +307,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const sparseDocs = [
       { id: 1, title: 'alpha beta', text: 'one two' },
       { id: 2, title: null, text: 'three four' },
-      { id: 3, title: 'gamma', text: 'five six' }
+      { id: 3, title: 'gamma', text: 'five six' },
     ]
     const sparseOpts = { fields: ['title', 'text'] }
     const mutable = new MiniSearch(sparseOpts)
@@ -322,7 +322,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const corpus = [{ id: 1, text: 'FooBar' }]
     const opts = {
       fields: ['text'],
-      processTerm: (term) => [term.toLowerCase(), term.toUpperCase()]
+      processTerm: term => [term.toLowerCase(), term.toUpperCase()],
     }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
@@ -336,7 +336,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const corpus = [{ id: 1, text: 'FooBar' }]
     const opts = {
       fields: ['text'],
-      processTerm: () => ['', 'foo']
+      processTerm: () => ['', 'foo'],
     }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
@@ -374,7 +374,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
       .toThrow(/does not have ID/)
     expect(() => FrozenMiniSearch.fromDocuments([
       { id: 1, text: 'a' },
-      { id: 1, text: 'b' }
+      { id: 1, text: 'b' },
     ], { fields: ['text'] }))
       .toThrow(/duplicate ID/)
   })
@@ -391,7 +391,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
   })
 })
 
-function buildFrozenViaBuilder (corpus = docs, opts = options, hints) {
+function buildFrozenViaBuilder(corpus = docs, opts = options, hints) {
   const builder = createFrozenIndexBuilder(opts, hints)
   for (let i = 0; i < corpus.length; i++) {
     builder.add(corpus[i])
@@ -470,7 +470,7 @@ describe('FrozenIndexBuilder', () => {
 
 describe('FrozenMiniSearch.fromAsyncIterable', () => {
   test('parity with fromDocuments', async () => {
-    async function * docStream () {
+    async function* docStream() {
       for (const doc of docs) yield doc
     }
     const fromDocs = buildFrozenDirect()

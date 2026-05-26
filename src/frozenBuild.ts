@@ -8,7 +8,7 @@ import {
   resolveIndexingOptions,
   saveStoredFieldsForDocument,
   updateAvgFieldLength,
-  type IndexingOptions
+  type IndexingOptions,
 } from './indexingCore'
 
 export interface FrozenIndexBuilderHints {
@@ -23,7 +23,7 @@ interface PostingsBuildState {
   postingsFreqs: (number[] | undefined)[]
 }
 
-function getOrCreateTermIndex (state: PostingsBuildState, index: SearchableMap<number>, term: string): number {
+function getOrCreateTermIndex(state: PostingsBuildState, index: SearchableMap<number>, term: string): number {
   const existing = index.get(term)
   if (existing != null) return existing
   const ti = state.terms.length
@@ -32,12 +32,12 @@ function getOrCreateTermIndex (state: PostingsBuildState, index: SearchableMap<n
   return ti
 }
 
-function appendPosting (
+function appendPosting(
   state: PostingsBuildState,
   termIndex: number,
   fieldId: number,
   docId: number,
-  freq: number
+  freq: number,
 ): void {
   const slot = termIndex * state.fieldCount + fieldId
   let docIds = state.postingsDocIds[slot]
@@ -52,7 +52,7 @@ function appendPosting (
   freqs!.push(clampFreq(freq))
 }
 
-function finalizeFlatPostings (state: PostingsBuildState): {
+function finalizeFlatPostings(state: PostingsBuildState): {
   postingsOffsets: Uint32Array
   postingsLengths: Uint32Array
   allDocIds: Uint32Array
@@ -89,7 +89,7 @@ function finalizeFlatPostings (state: PostingsBuildState): {
     postingsOffsets,
     postingsLengths,
     allDocIds: new Uint32Array(docScratch),
-    allFreqs: new Uint8Array(freqScratch)
+    allFreqs: new Uint8Array(freqScratch),
   }
 }
 
@@ -111,7 +111,7 @@ export class FrozenIndexBuilder<T> {
   private _nextId: number
   private _frozen: boolean
 
-  constructor (options: Options<T>, hints?: FrozenIndexBuilderHints) {
+  constructor(options: Options<T>, hints?: FrozenIndexBuilderHints) {
     this._options = resolveIndexingOptions(options)
     this._fieldIds = buildFieldIds(this._options.fields)
     this._fieldCount = this._options.fields.length
@@ -139,16 +139,16 @@ export class FrozenIndexBuilder<T> {
       fieldCount: this._fieldCount,
       terms: this._terms,
       postingsDocIds: this._postingsDocIds,
-      postingsFreqs: this._postingsFreqs
+      postingsFreqs: this._postingsFreqs,
     }
   }
 
   /** Number of documents indexed so far (not yet frozen). */
-  get documentCount (): number {
+  get documentCount(): number {
     return this._nextId
   }
 
-  add (document: T): void {
+  add(document: T): void {
     if (this._frozen) {
       throw new Error('FrozenIndexBuilder: cannot add after freezeParams()')
     }
@@ -192,7 +192,7 @@ export class FrozenIndexBuilder<T> {
    * Finalize this builder into assembly params. Call {@link assembleFrozen} or
    * {@link freezeFrozenIndexBuilder} to obtain a {@link FrozenMiniSearch} instance.
    */
-  freezeParams (): FrozenAssembleParams<T> {
+  freezeParams(): FrozenAssembleParams<T> {
     if (this._frozen) {
       throw new Error('FrozenIndexBuilder: freezeParams() already called')
     }
@@ -233,25 +233,25 @@ export class FrozenIndexBuilder<T> {
       postingsOffsets: flat.postingsOffsets,
       postingsLengths: flat.postingsLengths,
       allDocIds: flat.allDocIds,
-      allFreqs: flat.allFreqs
+      allFreqs: flat.allFreqs,
     }
   }
 }
 
 /** Create an incremental builder for {@link FrozenMiniSearch}. */
-export function createFrozenIndexBuilder<T> (
+export function createFrozenIndexBuilder<T>(
   options: Options<T>,
-  hints?: FrozenIndexBuilderHints
+  hints?: FrozenIndexBuilderHints,
 ): FrozenIndexBuilder<T> {
   return new FrozenIndexBuilder(options, hints)
 }
 
-export function buildFrozenParamsFromDocuments<T> (
+export function buildFrozenParamsFromDocuments<T>(
   documents: readonly T[],
-  options: Options<T>
+  options: Options<T>,
 ): FrozenAssembleParams<T> {
   const builder = createFrozenIndexBuilder<T>(options, {
-    estimatedDocumentCount: documents.length
+    estimatedDocumentCount: documents.length,
   })
   for (let d = 0; d < documents.length; d++) {
     builder.add(documents[d])

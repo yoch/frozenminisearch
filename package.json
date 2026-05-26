@@ -42,23 +42,18 @@
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^1.0.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/benchmark": "^2.1.1",
-    "@eslint/eslintrc": "^3.3.0",
-    "@eslint/js": "^10.0.0",
     "benchmark": "^2.1.4",
     "core-js": "^3.1.4",
     "coveralls-next": "^6.0.1",
     "crc-32": "^1.2.2",
     "eslint": "^10.4.0",
-    "eslint-config-standard": "^17.1.0",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-n": "^18.0.0",
-    "eslint-plugin-promise": "^7.3.0",
-    "globals": "^16.0.0",
-    "typescript-eslint": "^8.60.0",
     "fast-check": "^3.0.0",
+    "globals": "^16.0.0",
     "jest": "^29.3.1",
+    "neostandard": "^0.13.0",
     "regenerator-runtime": "^0.14.0",
     "rollup": "^4.1.0",
     "rollup-plugin-dts": "^6.1.0",
@@ -87,9 +82,7 @@
       "js"
     ],
     "testRegex": "\\.test\\.(ts|js)$",
-    "setupFilesAfterEnv": [
-      "<rootDir>/src/testSetup/jest.js"
-    ]
+    "setupFilesAfterEnv": []
   },
   "scripts": {
     "test": "jest",

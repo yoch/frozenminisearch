@@ -39,17 +39,17 @@ export interface FrozenSnapshot {
   allFreqs: Uint8Array
 }
 
-function invalidFrozenIndex (detail: string): Error {
+function invalidFrozenIndex(detail: string): Error {
   return new Error(`Invalid frozen index: ${detail}`)
 }
 
-function assertBufferLength (buf: Buffer, min: number): void {
+function assertBufferLength(buf: Buffer, min: number): void {
   if (buf.length < min) {
     throw invalidFrozenIndex(`buffer too short (${buf.length} < ${min})`)
   }
 }
 
-function assertSectionOffsets (buf: Buffer, headerSize: number, offsets: number[]): void {
+function assertSectionOffsets(buf: Buffer, headerSize: number, offsets: number[]): void {
   for (let i = 0; i < offsets.length; i++) {
     if (offsets[i] < headerSize || offsets[i] > buf.length) {
       throw invalidFrozenIndex(`section offset ${i} out of bounds`)
@@ -70,7 +70,7 @@ for (let i = 0; i < 256; i++) {
 }
 
 /** CRC-32 IEEE (same polynomial as zlib / Ethernet). */
-export function crc32Buffer (buf: Buffer, start = 0, end = buf.length): number {
+export function crc32Buffer(buf: Buffer, start = 0, end = buf.length): number {
   let crc = 0xffffffff
   for (let i = start; i < end; i++) {
     crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 0xff]
@@ -78,7 +78,7 @@ export function crc32Buffer (buf: Buffer, start = 0, end = buf.length): number {
   return (crc ^ 0xffffffff) >>> 0
 }
 
-function validateTreeShape (shape: TreeShape, termCount: number): void {
+function validateTreeShape(shape: TreeShape, termCount: number): void {
   if (!Array.isArray(shape)) {
     throw invalidFrozenIndex('treeShape node must be an array')
   }
@@ -102,7 +102,7 @@ function validateTreeShape (shape: TreeShape, termCount: number): void {
  * Numeric/structural invariants shared by both the decode path (untrusted binary)
  * and the build path (trusted internal code).
  */
-export function validateFrozenSnapshotNumeric (snap: {
+export function validateFrozenSnapshotNumeric(snap: {
   fieldCount: number
   nextId: number
   documentCount: number
@@ -163,7 +163,7 @@ export function validateFrozenSnapshotNumeric (snap: {
     throw invalidFrozenIndex('fieldIds count mismatch')
   }
   for (let f = 0; f < snap.fieldCount; f++) {
-    const found = indexedFields.some((name) => snap.fieldIds[name] === f)
+    const found = indexedFields.some(name => snap.fieldIds[name] === f)
     if (!found) {
       throw invalidFrozenIndex(`missing field id ${f}`)
     }
@@ -171,18 +171,18 @@ export function validateFrozenSnapshotNumeric (snap: {
 }
 
 /** Validate structural invariants of a decoded or assembled frozen snapshot. */
-export function validateFrozenSnapshot (snap: FrozenSnapshot): void {
+export function validateFrozenSnapshot(snap: FrozenSnapshot): void {
   validateFrozenSnapshotNumeric(snap)
   validateTreeShape(snap.treeShape, snap.terms.length)
 }
 
-export function fieldNamesFromFieldIds (fieldIds: { [field: string]: number }): string[] {
+export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): string[] {
   const names = Object.keys(fieldIds)
   names.sort((a, b) => fieldIds[a] - fieldIds[b])
   return names
 }
 
-function readUint32Array (buf: Buffer, offset: number, byteLength: number): Uint32Array {
+function readUint32Array(buf: Buffer, offset: number, byteLength: number): Uint32Array {
   if (byteLength === 0) return new Uint32Array(0)
   if (byteLength % 4 !== 0) {
     throw invalidFrozenIndex('uint32 section length not aligned')
@@ -198,7 +198,7 @@ function readUint32Array (buf: Buffer, offset: number, byteLength: number): Uint
   return out
 }
 
-function readUint8Array (buf: Buffer, offset: number, byteLength: number): Uint8Array {
+function readUint8Array(buf: Buffer, offset: number, byteLength: number): Uint8Array {
   if (byteLength === 0) return new Uint8Array(0)
   if (offset + byteLength > buf.length) {
     throw invalidFrozenIndex('uint8 section read past buffer end')
@@ -206,7 +206,7 @@ function readUint8Array (buf: Buffer, offset: number, byteLength: number): Uint8
   return new Uint8Array(buf.buffer, buf.byteOffset + offset, byteLength)
 }
 
-function readFloat32Array (buf: Buffer, offset: number, byteLength: number): Float32Array {
+function readFloat32Array(buf: Buffer, offset: number, byteLength: number): Float32Array {
   if (byteLength === 0) return new Float32Array(0)
   if (byteLength % 4 !== 0) {
     throw invalidFrozenIndex('float32 section length not aligned')
@@ -222,21 +222,21 @@ function readFloat32Array (buf: Buffer, offset: number, byteLength: number): Flo
   return out
 }
 
-function writeView (buf: Buffer, offset: number, view: ArrayBufferView): void {
+function writeView(buf: Buffer, offset: number, view: ArrayBufferView): void {
   const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
   for (let i = 0; i < bytes.length; i++) {
     buf[offset + i] = bytes[i]
   }
 }
 
-function writeLengthPrefixedUtf8 (chunks: Buffer[], str: string): void {
+function writeLengthPrefixedUtf8(chunks: Buffer[], str: string): void {
   const body = Buffer.from(str, 'utf8')
   const header = Buffer.alloc(4)
   header.writeUInt32LE(body.length, 0)
   chunks.push(header, body)
 }
 
-function readLengthPrefixedUtf8 (buf: Buffer, offset: number): { value: string, next: number } {
+function readLengthPrefixedUtf8(buf: Buffer, offset: number): { value: string, next: number } {
   if (offset + 4 > buf.length) {
     throw invalidFrozenIndex('length-prefixed string header truncated')
   }
@@ -249,7 +249,7 @@ function readLengthPrefixedUtf8 (buf: Buffer, offset: number): { value: string, 
   return { value: buf.toString('utf8', start, end), next: end }
 }
 
-function writeExternalId (chunks: Buffer[], id: unknown): void {
+function writeExternalId(chunks: Buffer[], id: unknown): void {
   if (id === undefined) {
     chunks.push(Buffer.from([ID_TAG_EMPTY]))
     return
@@ -273,7 +273,7 @@ function writeExternalId (chunks: Buffer[], id: unknown): void {
   writeLengthPrefixedUtf8(chunks, json)
 }
 
-function readExternalId (buf: Buffer, offset: number): { value: unknown | undefined, next: number } {
+function readExternalId(buf: Buffer, offset: number): { value: unknown | undefined, next: number } {
   if (offset >= buf.length) {
     throw invalidFrozenIndex('external id tag truncated')
   }
@@ -298,7 +298,7 @@ function readExternalId (buf: Buffer, offset: number): { value: unknown | undefi
   throw invalidFrozenIndex(`unknown external id tag ${tag}`)
 }
 
-function buildCoreSection (snap: FrozenSnapshot): Buffer {
+function buildCoreSection(snap: FrozenSnapshot): Buffer {
   const out = Buffer.alloc(12)
   out.writeUInt32LE(snap.documentCount, 0)
   out.writeUInt32LE(snap.nextId, 4)
@@ -306,7 +306,7 @@ function buildCoreSection (snap: FrozenSnapshot): Buffer {
   return out
 }
 
-function buildFieldNamesSection (fieldNames: string[]): Buffer {
+function buildFieldNamesSection(fieldNames: string[]): Buffer {
   const chunks: Buffer[] = []
   for (const name of fieldNames) {
     writeLengthPrefixedUtf8(chunks, name)
@@ -314,7 +314,7 @@ function buildFieldNamesSection (fieldNames: string[]): Buffer {
   return Buffer.concat(chunks)
 }
 
-function buildExternalIdsSection (externalIds: unknown[], nextId: number): Buffer {
+function buildExternalIdsSection(externalIds: unknown[], nextId: number): Buffer {
   const chunks: Buffer[] = []
   for (let i = 0; i < nextId; i++) {
     writeExternalId(chunks, externalIds[i])
@@ -322,9 +322,9 @@ function buildExternalIdsSection (externalIds: unknown[], nextId: number): Buffe
   return Buffer.concat(chunks)
 }
 
-function buildStoredFieldsSection (
+function buildStoredFieldsSection(
   storedFields: (Record<string, unknown> | undefined)[],
-  nextId: number
+  nextId: number,
 ): Buffer {
   const table = Buffer.alloc(nextId * 4)
   const heapChunks: Buffer[] = []
@@ -346,7 +346,7 @@ function buildStoredFieldsSection (
   return Buffer.concat([table, ...heapChunks])
 }
 
-function writeTermTreeNode (chunks: Buffer[], tree: RadixTree<number>): void {
+function writeTermTreeNode(chunks: Buffer[], tree: RadixTree<number>): void {
   const entries: Array<[string, number | RadixTree<number>]> = []
   for (const [key, val] of tree) {
     entries.push([key, val as number | RadixTree<number>])
@@ -377,13 +377,13 @@ function writeTermTreeNode (chunks: Buffer[], tree: RadixTree<number>): void {
   }
 }
 
-function buildTermTreeSection (tree: RadixTree<number>): Buffer {
+function buildTermTreeSection(tree: RadixTree<number>): Buffer {
   const chunks: Buffer[] = []
   writeTermTreeNode(chunks, tree)
   return Buffer.concat(chunks)
 }
 
-function readTermTreeNode (buf: Buffer, offset: number, end: number): { tree: RadixTree<number>, next: number } {
+function readTermTreeNode(buf: Buffer, offset: number, end: number): { tree: RadixTree<number>, next: number } {
   if (offset + 2 > end) {
     throw invalidFrozenIndex('term tree node child count truncated')
   }
@@ -426,7 +426,7 @@ function readTermTreeNode (buf: Buffer, offset: number, end: number): { tree: Ra
   return { tree, next: o }
 }
 
-function readTermTreeSection (buf: Buffer, offset: number, end: number): RadixTree<number> {
+function readTermTreeSection(buf: Buffer, offset: number, end: number): RadixTree<number> {
   const { tree, next } = readTermTreeNode(buf, offset, end)
   if (next !== end) {
     throw invalidFrozenIndex('term tree section has trailing bytes')
@@ -434,8 +434,8 @@ function readTermTreeSection (buf: Buffer, offset: number, end: number): RadixTr
   return tree
 }
 
-function buildDictionarySection (terms: string[]): Buffer {
-  const termBufs = terms.map((term) => Buffer.from(term, 'utf8'))
+function buildDictionarySection(terms: string[]): Buffer {
+  const termBufs = terms.map(term => Buffer.from(term, 'utf8'))
   const dictHeaderLen = 4 + terms.length * 4
   const dictBodyLen = termBufs.reduce((sum, b) => sum + b.length, 0)
   const out = Buffer.alloc(dictHeaderLen + dictBodyLen)
@@ -451,7 +451,7 @@ function buildDictionarySection (terms: string[]): Buffer {
   return out
 }
 
-function readDictionarySection (buf: Buffer, offset: number, end: number): string[] {
+function readDictionarySection(buf: Buffer, offset: number, end: number): string[] {
   if (offset + 4 > end) {
     throw invalidFrozenIndex('dictionary section truncated')
   }
@@ -481,9 +481,9 @@ function readDictionarySection (buf: Buffer, offset: number, end: number): strin
   return terms
 }
 
-export function encodeFrozenSnapshot (
+export function encodeFrozenSnapshot(
   snap: FrozenSnapshot,
-  termTree?: RadixTree<number>
+  termTree?: RadixTree<number>,
 ): Buffer {
   validateFrozenSnapshotNumeric(snap)
   const tree = termTree ?? deserializeTermIndexTree(snap.treeShape)
@@ -513,7 +513,7 @@ export function encodeFrozenSnapshot (
     snap.postingsOffsets.byteLength,
     snap.postingsLengths.byteLength,
     snap.allDocIds.byteLength,
-    snap.allFreqs.byteLength
+    snap.allFreqs.byteLength,
   ]
 
   const totalSize = HEADER_SIZE_V3 + sectionSizes.reduce((a, b) => a + b, 0)
@@ -551,7 +551,7 @@ export function encodeFrozenSnapshot (
   return out
 }
 
-function validateTermTreeLeaves (tree: RadixTree<number>, termCount: number): void {
+function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {
   for (const [key, val] of tree) {
     if (key === LEAF) {
       const idx = val as number
@@ -564,7 +564,7 @@ function validateTermTreeLeaves (tree: RadixTree<number>, termCount: number): vo
   }
 }
 
-function decodeMSv3 (buf: Buffer): FrozenSnapshot {
+function decodeMSv3(buf: Buffer): FrozenSnapshot {
   assertBufferLength(buf, HEADER_SIZE_V3)
 
   const magic = buf.toString('ascii', 0, 4)
@@ -595,7 +595,7 @@ function decodeMSv3 (buf: Buffer): FrozenSnapshot {
 
   const sectionOffsets = [
     coreOff, fieldNamesOff, externalIdsOff, storedOff, treeOff,
-    avgOff, flOff, dictOff, postOffOff, postLenOff, docIdsOff, freqsOff, endOff
+    avgOff, flOff, dictOff, postOffOff, postLenOff, docIdsOff, freqsOff, endOff,
   ]
   assertSectionOffsets(buf, HEADER_SIZE_V3, sectionOffsets)
 
@@ -691,14 +691,14 @@ function decodeMSv3 (buf: Buffer): FrozenSnapshot {
     postingsOffsets,
     postingsLengths,
     allDocIds,
-    allFreqs
+    allFreqs,
   }
 
   validateFrozenSnapshot(snap)
   return snap
 }
 
-export function decodeFrozenSnapshot (buf: Buffer): FrozenSnapshot {
+export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
   assertBufferLength(buf, 8)
   const magic = buf.toString('ascii', 0, 4)
   const version = buf.readUInt16LE(4)
@@ -708,13 +708,13 @@ export function decodeFrozenSnapshot (buf: Buffer): FrozenSnapshot {
   }
   if (magic === 'MSv1' || magic === 'MSv2') {
     throw invalidFrozenIndex(
-      `${magic} is no longer supported; re-save with MSv3 (minisearch 8.0.0-beta.4+)`
+      `${magic} is no longer supported; re-save with MSv3 (minisearch 8.0.0-beta.4+)`,
     )
   }
   throw invalidFrozenIndex(`magic=${magic} version=${version}`)
 }
 
-export function deserializeTermIndexTree (shape: TreeShape): RadixTree<number> {
+export function deserializeTermIndexTree(shape: TreeShape): RadixTree<number> {
   const tree = new Map() as RadixTree<number>
   for (const [key, value] of shape) {
     if (key === LEAF) {
@@ -726,7 +726,7 @@ export function deserializeTermIndexTree (shape: TreeShape): RadixTree<number> {
   return tree
 }
 
-export function serializeTermIndexTree (tree: RadixTree<number>): TreeShape {
+export function serializeTermIndexTree(tree: RadixTree<number>): TreeShape {
   const shape: TreeShape = []
   const entries: Array<[string, number | RadixTree<number>]> = []
   for (const [key, val] of tree) {

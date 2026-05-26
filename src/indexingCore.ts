@@ -2,7 +2,7 @@ import type { Options } from './MiniSearch'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
-  defaultFrozenLoadOptions
+  defaultFrozenLoadOptions,
 } from './searchDefaults'
 
 export type IndexingOptions<T> = Options<T> & {
@@ -17,7 +17,7 @@ export type IndexingOptions<T> = Options<T> & {
   fields: string[]
 }
 
-export function resolveIndexingOptions<T> (options: Options<T>): IndexingOptions<T> {
+export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<T> {
   if (options?.fields == null) {
     throw new Error('MiniSearch: option "fields" must be provided')
   }
@@ -25,11 +25,11 @@ export function resolveIndexingOptions<T> (options: Options<T>): IndexingOptions
     ...defaultFrozenLoadOptions,
     ...options,
     searchOptions: { ...defaultSearchOptions, ...(options.searchOptions || {}) },
-    autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) }
+    autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
   } as IndexingOptions<T>
 }
 
-export function buildFieldIds (fields: string[]): { [key: string]: number } {
+export function buildFieldIds(fields: string[]): { [key: string]: number } {
   const fieldIds: { [key: string]: number } = {}
   for (let i = 0; i < fields.length; i++) {
     fieldIds[fields[i]] = i
@@ -38,10 +38,10 @@ export function buildFieldIds (fields: string[]): { [key: string]: number } {
 }
 
 /** Token frequencies for one document field (after processTerm). */
-export function collectFieldTermFreqs (
+export function collectFieldTermFreqs(
   tokens: string[],
   fieldName: string,
-  processTerm: IndexingOptions<unknown>['processTerm']
+  processTerm: IndexingOptions<unknown>['processTerm'],
 ): Map<string, number> {
   const localFreqs = new Map<string, number>()
   for (const term of tokens) {
@@ -58,21 +58,21 @@ export function collectFieldTermFreqs (
 }
 
 /** Same running average as {@link MiniSearch} private addFieldLength. */
-export function updateAvgFieldLength (
+export function updateAvgFieldLength(
   avgFieldLength: number[],
   fieldId: number,
   count: number,
-  length: number
+  length: number,
 ): void {
   const averageFieldLength = avgFieldLength[fieldId] || 0
   const totalFieldLength = (averageFieldLength * count) + length
   avgFieldLength[fieldId] = totalFieldLength / (count + 1)
 }
 
-export function saveStoredFieldsForDocument<T> (
+export function saveStoredFieldsForDocument<T>(
   storeFields: string[],
   extractField: IndexingOptions<T>['extractField'],
-  document: T
+  document: T,
 ): Record<string, unknown> | undefined {
   if (storeFields.length === 0) return undefined
   const documentFields: Record<string, unknown> = {}

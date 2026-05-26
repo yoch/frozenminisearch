@@ -52,7 +52,7 @@ export const calcBM25Score = (
   totalCount: number,
   fieldLength: number,
   avgFieldLength: number,
-  bm25params: BM25Params
+  bm25params: BM25Params,
 ): number => {
   const { k, b, d } = bm25params
   const invDocFreq = Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
@@ -76,28 +76,28 @@ export type Scored = { score: number }
 export const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
 /** Wrap Map<shortId, freq> as PostingListLike */
-export function mapPostingList (freqs: Map<number, number>): PostingListLike {
+export function mapPostingList(freqs: Map<number, number>): PostingListLike {
   return {
-    get size () { return freqs.size },
-    forEachDoc (callback) {
+    get size() { return freqs.size },
+    forEachDoc(callback) {
       for (const [docId, termFreq] of freqs) {
         callback(docId, termFreq)
       }
-    }
+    },
   }
 }
 
 /** Wrap Map<fieldId, Map<shortId, freq>> as FieldTermDataLike */
-export function mapFieldTermData (data: Map<number, Map<number, number>>): FieldTermDataLike {
+export function mapFieldTermData(data: Map<number, Map<number, number>>): FieldTermDataLike {
   return {
-    get (fieldId) {
+    get(fieldId) {
       const freqs = data.get(fieldId)
       return freqs == null ? undefined : mapPostingList(freqs)
-    }
+    },
   }
 }
 
-export function aggregateTerm (
+export function aggregateTerm(
   sourceTerm: string,
   derivedTerm: string,
   termWeight: number,
@@ -107,7 +107,7 @@ export function aggregateTerm (
   context: AggregateContext,
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25params: BM25Params,
-  results: RawResult = new Map()
+  results: RawResult = new Map(),
 ): RawResult {
   if (fieldTermData == null) return results
 
@@ -150,7 +150,7 @@ export function aggregateTerm (
         results.set(docId, {
           score: weightedScore,
           terms: [sourceTerm],
-          match: { [derivedTerm]: [field] }
+          match: { [derivedTerm]: [field] },
         })
       }
     })
@@ -186,7 +186,7 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
       combined.set(docId, {
         score: existing.score + score,
         terms: existing.terms,
-        match: Object.assign(existing.match, match)
+        match: Object.assign(existing.match, match),
       })
     }
     return combined
@@ -194,10 +194,10 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
   [AND_NOT]: (a, b) => {
     for (const docId of b.keys()) a.delete(docId)
     return a
-  }
+  },
 }
 
-export function combineResults (results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
+export function combineResults(results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
   if (results.length === 0) return new Map()
   const operator = combineWith.toLowerCase() as LowercaseCombinationOperator
   const combinator = combinators[operator]
@@ -215,7 +215,7 @@ export interface FinalizeSearchParams {
   skipSort?: boolean
 }
 
-export function finalizeSearchResults (params: FinalizeSearchParams): SearchResult[] {
+export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {
   const { rawResults, getExternalId, getStoredFields, filter, skipSort } = params
   const results: SearchResult[] = []
 
@@ -226,7 +226,7 @@ export function finalizeSearchResults (params: FinalizeSearchParams): SearchResu
       score: score * quality,
       terms: Object.keys(match),
       queryTerms: terms,
-      match
+      match,
     }
     Object.assign(result, getStoredFields(docId))
     if (filter == null || filter(result)) {

@@ -1,5 +1,3 @@
-/* eslint-env jest */
-
 import MiniSearch from './MiniSearch'
 
 describe('MiniSearch', () => {
@@ -122,14 +120,14 @@ describe('MiniSearch', () => {
         fields: ['title', 'pubDate', 'author.name'],
         storeFields: ['category'],
         extractField,
-        tokenize
+        tokenize,
       })
       const document = {
         id: 1,
         title: 'Divina Commedia',
         pubDate: new Date(1320, 0, 1),
         author: { name: 'Dante Alighieri' },
-        category: 'poetry'
+        category: 'poetry',
       }
       ms.add(document)
       expect(extractField).toHaveBeenCalledWith(document, 'title')
@@ -156,16 +154,16 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text', 'title'], processTerm })
       const document = { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita' }
       ms.add(document)
-      document.text.split(/\W+/).forEach(term => {
+      document.text.split(/\W+/).forEach((term) => {
         expect(processTerm).toHaveBeenCalledWith(term, 'text')
       })
-      document.title.split(/\W+/).forEach(term => {
+      document.title.split(/\W+/).forEach((term) => {
         expect(processTerm).toHaveBeenCalledWith(term, 'title')
       })
     })
 
     it('allows processTerm to expand a single term into several terms', () => {
-      const processTerm = (string) => string === 'foobar' ? ['foo', 'bar'] : string
+      const processTerm = string => string === 'foobar' ? ['foo', 'bar'] : string
       const ms = new MiniSearch({ fields: ['title', 'text'], processTerm })
       expect(() => {
         ms.add({ id: 123, text: 'foobar' })
@@ -175,7 +173,7 @@ describe('MiniSearch', () => {
     })
 
     it('keeps empty-string entries returned inside processTerm arrays', () => {
-      const processTerm = (string) => string === 'foobar' ? ['', 'foo'] : string
+      const processTerm = string => string === 'foobar' ? ['', 'foo'] : string
       const ms = new MiniSearch({ fields: ['text'], processTerm })
       ms.add({ id: 123, text: 'foobar' })
 
@@ -188,7 +186,7 @@ describe('MiniSearch', () => {
     const documents = [
       { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita ... cammin' },
       { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' },
-      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria ... cammin' }
+      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria ... cammin' },
     ]
 
     let ms, _warn
@@ -312,7 +310,7 @@ describe('MiniSearch', () => {
     })
 
     it('allows processTerm to expand a single term into several terms', () => {
-      const processTerm = (string) => string === 'foobar' ? ['foo', 'bar'] : string
+      const processTerm = string => string === 'foobar' ? ['foo', 'bar'] : string
       const ms = new MiniSearch({ fields: ['title', 'text'], processTerm })
       const document = { id: 123, title: 'foobar' }
       ms.add(document)
@@ -327,7 +325,7 @@ describe('MiniSearch', () => {
       const documents = [
         { id: 1, title: 'Divina Commedia', tags: ['dante', 'virgilio'], author: { name: 'Dante Alighieri' }, available: true },
         { id: 2, title: 'I Promessi Sposi', tags: ['renzo', 'lucia'], author: { name: 'Alessandro Manzoni' }, available: false },
-        { id: 3, title: 'Vita Nova', tags: ['dante'], author: { name: 'Dante Alighieri' }, available: true }
+        { id: 3, title: 'Vita Nova', tags: ['dante'], author: { name: 'Dante Alighieri' }, available: true },
       ]
       const options = {
         fields: ['title', 'tags', 'authorName', 'available'],
@@ -358,7 +356,7 @@ describe('MiniSearch', () => {
           } else {
             return term.toLowerCase()
           }
-        }
+        },
       }
 
       let ms, _warn
@@ -407,7 +405,7 @@ describe('MiniSearch', () => {
           ['cammin', 'title'],
           ['something', 'text'],
           ['has', 'text'],
-          ['changed', 'text']
+          ['changed', 'text'],
         ].forEach(([term, field], i) => {
           expect(console.warn).toHaveBeenNthCalledWith(i + 1, `MiniSearch: document with ID 1 has changed before removal: term "${term}" was not present in field "${field}". Removing a document after it has changed can corrupt the index!`)
         })
@@ -435,7 +433,7 @@ describe('MiniSearch', () => {
     const documents = [
       { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita ... cammin' },
       { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' },
-      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria ... cammin' }
+      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria ... cammin' },
     ]
 
     let ms, _warn
@@ -451,7 +449,7 @@ describe('MiniSearch', () => {
 
     it('removes all documents from the index if called with no argument', () => {
       const empty = MiniSearch.loadJSON(JSON.stringify(ms), {
-        fields: ['title', 'text']
+        fields: ['title', 'text'],
       })
 
       ms.addAll(documents)
@@ -492,17 +490,17 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Some interesting stuff' },
-        { id: 2, text: 'Some more interesting stuff' }
+        { id: 2, text: 'Some more interesting stuff' },
       ]
       ms.addAll(documents)
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([1, 2])
-      expect([1, 2].map((id) => ms.has(id))).toEqual([true, true])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([1, 2])
+      expect([1, 2].map(id => ms.has(id))).toEqual([true, true])
 
       ms.discard(1)
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([2])
-      expect([1, 2].map((id) => ms.has(id))).toEqual([false, true])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([2])
+      expect([1, 2].map(id => ms.has(id))).toEqual([false, true])
     })
 
     it('raises error if a document with the given ID does not exist', () => {
@@ -517,11 +515,11 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Some interesting stuff' },
-        { id: 2, text: 'Some more interesting stuff' }
+        { id: 2, text: 'Some more interesting stuff' },
       ]
       ms.addAll(documents)
       const clone = MiniSearch.loadJSON(JSON.stringify(ms), {
-        fields: ['text']
+        fields: ['text'],
       })
 
       ms.discard(1)
@@ -540,23 +538,23 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'], storeFields: ['text'] })
       const documents = [
         { id: 1, text: 'Some interesting stuff' },
-        { id: 2, text: 'Some more interesting stuff' }
+        { id: 2, text: 'Some more interesting stuff' },
       ]
       ms.addAll(documents)
 
       ms.discard(1)
       ms.add({ id: 1, text: 'Some new stuff' })
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([1, 2])
-      expect(ms.search('new').map((doc) => doc.id)).toEqual([1])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([1, 2])
+      expect(ms.search('new').map(doc => doc.id)).toEqual([1])
 
       ms.discard(1)
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([2])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([2])
 
       ms.add({ id: 1, text: 'Some newer stuff' })
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([1, 2])
-      expect(ms.search('new').map((doc) => doc.id)).toEqual([])
-      expect(ms.search('newer').map((doc) => doc.id)).toEqual([1])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([1, 2])
+      expect(ms.search('new').map(doc => doc.id)).toEqual([])
+      expect(ms.search('newer').map(doc => doc.id)).toEqual([1])
     })
 
     it('leaves the index in the same state as removal when all terms are searched at least once', () => {
@@ -565,7 +563,7 @@ describe('MiniSearch', () => {
       ms.add(document)
       const clone = MiniSearch.loadJSON(JSON.stringify(ms), {
         fields: ['text'],
-        storeFields: ['text']
+        storeFields: ['text'],
       })
 
       ms.discard(1)
@@ -593,12 +591,12 @@ describe('MiniSearch', () => {
     it('triggers auto vacuum when the threshold is met', () => {
       const ms = new MiniSearch({
         fields: ['text'],
-        autoVacuum: { minDirtCount: 2, minDirtFactor: 0, batchWait: 50, batchSize: 1 }
+        autoVacuum: { minDirtCount: 2, minDirtFactor: 0, batchWait: 50, batchSize: 1 },
       })
       const documents = [
         { id: 1, text: 'Some stuff' },
         { id: 2, text: 'Some additional stuff' },
-        { id: 3, text: 'Even more stuff' }
+        { id: 3, text: 'Even more stuff' },
       ]
       ms.addAll(documents)
 
@@ -615,7 +613,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'], autoVacuum: false })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
       ms.addAll(documents)
       ms._dirtCount = 1000
@@ -628,7 +626,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'], autoVacuum: true })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
       ms.addAll(documents)
       ms._dirtCount = 1000
@@ -640,11 +638,11 @@ describe('MiniSearch', () => {
     it('applies default settings if options are set to null', async () => {
       const ms = new MiniSearch({
         fields: ['text'],
-        autoVacuum: { minDirtCount: null, minDirtFactor: null, batchWait: null, batchSize: null }
+        autoVacuum: { minDirtCount: null, minDirtFactor: null, batchWait: null, batchSize: null },
       })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
       ms.addAll(documents)
       ms._dirtCount = 1000
@@ -658,7 +656,7 @@ describe('MiniSearch', () => {
       const minDirtCount = 2
       const ms = new MiniSearch({
         fields: ['text'],
-        autoVacuum: { minDirtCount, minDirtFactor: 0, batchSize: 1, batchWait: 10 }
+        autoVacuum: { minDirtCount, minDirtFactor: 0, batchSize: 1, batchWait: 10 },
       })
       const documents = []
       for (let i = 0; i < 5; i++) {
@@ -671,7 +669,7 @@ describe('MiniSearch', () => {
       // Calling discard multiple times should start an auto-vacuum and enqueue
       // another, so that the remaining dirt count afterwards is always below
       // minDirtCount
-      documents.forEach((doc) => ms.discard(doc.id))
+      documents.forEach(doc => ms.discard(doc.id))
 
       while (ms.isVacuuming) {
         await ms._currentVacuum
@@ -684,12 +682,12 @@ describe('MiniSearch', () => {
       const minDirtCount = 2
       const ms = new MiniSearch({
         fields: ['text'],
-        autoVacuum: { minDirtCount, minDirtFactor: 0, batchSize: 1, batchWait: 10 }
+        autoVacuum: { minDirtCount, minDirtFactor: 0, batchSize: 1, batchWait: 10 },
       })
       const documents = [
         { id: 1, text: 'Document one' },
         { id: 2, text: 'Document two' },
-        { id: 3, text: 'Document three' }
+        { id: 3, text: 'Document three' },
       ]
       ms.addAll(documents)
 
@@ -697,7 +695,7 @@ describe('MiniSearch', () => {
       // another, subject to minDirtCount/minDirtFactor conditions. The last one
       // should be a no-op, as the remaining dirt count after the first auto
       // vacuum would be 1, which is below minDirtCount
-      documents.forEach((doc) => ms.discard(doc.id))
+      documents.forEach(doc => ms.discard(doc.id))
 
       while (ms.isVacuuming) {
         await ms._currentVacuum
@@ -710,12 +708,12 @@ describe('MiniSearch', () => {
       const minDirtCount = 2
       const ms = new MiniSearch({
         fields: ['text'],
-        autoVacuum: { minDirtCount, minDirtFactor: 0, batchSize: 1, batchWait: 10 }
+        autoVacuum: { minDirtCount, minDirtFactor: 0, batchSize: 1, batchWait: 10 },
       })
       const documents = [
         { id: 1, text: 'Document one' },
         { id: 2, text: 'Document two' },
-        { id: 3, text: 'Document three' }
+        { id: 3, text: 'Document three' },
       ]
       ms.addAll(documents)
 
@@ -723,7 +721,7 @@ describe('MiniSearch', () => {
       // another, subject to minDirtCount/minDirtFactor conditions. The last one
       // would be a no-op, as the remaining dirt count after the first auto
       // vacuum would be 1, which is below minDirtCount
-      documents.forEach((doc) => ms.discard(doc.id))
+      documents.forEach(doc => ms.discard(doc.id))
 
       // But before the enqueued vacuum is ran, we invoke a manual vacuum with
       // no conditions, so it should run even with a dirt count below
@@ -744,17 +742,17 @@ describe('MiniSearch', () => {
       const documents = [
         { id: 1, text: 'Some interesting stuff' },
         { id: 2, text: 'Some more interesting stuff' },
-        { id: 3, text: 'Some even more interesting stuff' }
+        { id: 3, text: 'Some even more interesting stuff' },
       ]
       ms.addAll(documents)
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([1, 2, 3])
-      expect([1, 2, 3].map((id) => ms.has(id))).toEqual([true, true, true])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([1, 2, 3])
+      expect([1, 2, 3].map(id => ms.has(id))).toEqual([true, true, true])
 
       ms.discardAll([1, 3])
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([2])
-      expect([1, 2, 3].map((id) => ms.has(id))).toEqual([false, true, false])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([2])
+      expect([1, 2, 3].map(id => ms.has(id))).toEqual([false, true, false])
     })
 
     it('only triggers at most a single auto vacuum at the end', () => {
@@ -789,19 +787,19 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Some quite interesting stuff' },
-        { id: 2, text: 'Some more interesting stuff' }
+        { id: 2, text: 'Some more interesting stuff' },
       ]
       ms.addAll(documents)
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([1, 2])
-      expect(ms.search('quite').map((doc) => doc.id)).toEqual([1])
-      expect(ms.search('even').map((doc) => doc.id)).toEqual([])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([1, 2])
+      expect(ms.search('quite').map(doc => doc.id)).toEqual([1])
+      expect(ms.search('even').map(doc => doc.id)).toEqual([])
 
       ms.replace({ id: 1, text: 'Some even more interesting stuff' })
 
-      expect(ms.search('stuff').map((doc) => doc.id)).toEqual([2, 1])
-      expect(ms.search('quite').map((doc) => doc.id)).toEqual([])
-      expect(ms.search('even').map((doc) => doc.id)).toEqual([1])
+      expect(ms.search('stuff').map(doc => doc.id)).toEqual([2, 1])
+      expect(ms.search('quite').map(doc => doc.id)).toEqual([])
+      expect(ms.search('even').map(doc => doc.id)).toEqual([1])
     })
 
     it('raises error if a document with the given ID does not exist', () => {
@@ -818,12 +816,12 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'], storeFields: ['text'] })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
       ms.addAll(documents)
       const clone = MiniSearch.loadJSON(JSON.stringify(ms), {
         fields: ['text'],
-        storeFields: ['text']
+        storeFields: ['text'],
       })
 
       ms.discard(1)
@@ -842,11 +840,11 @@ describe('MiniSearch', () => {
     it('schedules a second vacuum right after the current one completes, if one is ongoing', async () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const empty = MiniSearch.loadJSON(JSON.stringify(ms), {
-        fields: ['text']
+        fields: ['text'],
       })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
       ms.addAll(documents)
 
@@ -867,7 +865,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
 
       ms.addAll(documents)
@@ -891,7 +889,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Some stuff' },
-        { id: 2, text: 'Some additional stuff' }
+        { id: 2, text: 'Some additional stuff' },
       ]
       ms.addAll(documents)
       await ms.vacuum({ batchSize: ms.termCount + 1 })
@@ -904,7 +902,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Nel mezzo del cammin di nostra vita' },
-        { id: 2, text: 'Mi ritrovai per una selva oscura' }
+        { id: 2, text: 'Mi ritrovai per una selva oscura' },
       ]
       ms.addAll(documents)
       expect(ms.documentCount).toEqual(documents.length)
@@ -927,7 +925,7 @@ describe('MiniSearch', () => {
         { id: 10, text: 'ahi quanto' },
         { id: 11, text: 'a dir' },
         { id: 12, text: 'qual era' },
-        { id: 13, text: 'è cosa dura' }
+        { id: 13, text: 'è cosa dura' },
       ]
 
       return ms.addAllAsync(documents).then(() => {
@@ -950,7 +948,7 @@ describe('MiniSearch', () => {
         { id: 10, text: 'ahi quanto' },
         { id: 11, text: 'a dir' },
         { id: 12, text: 'qual era' },
-        { id: 13, text: 'è cosa dura' }
+        { id: 13, text: 'è cosa dura' },
       ]
 
       return ms.addAllAsync(documents, { chunkSize: 3 }).then(() => {
@@ -963,7 +961,7 @@ describe('MiniSearch', () => {
     it('returns true if a document with the given ID was added to the index, false otherwise', () => {
       const documents = [
         { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita' },
-        { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' }
+        { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' },
       ]
       const ms = new MiniSearch({ fields: ['title', 'text'] })
       ms.addAll(documents)
@@ -982,7 +980,7 @@ describe('MiniSearch', () => {
     it('works well with custom ID fields', () => {
       const documents = [
         { uid: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita' },
-        { uid: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' }
+        { uid: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' },
       ]
       const ms = new MiniSearch({ fields: ['title', 'text'], idField: 'uid' })
       ms.addAll(documents)
@@ -1003,7 +1001,7 @@ describe('MiniSearch', () => {
     it('returns the stored fields for the given document ID, or undefined if the document is not in the index', () => {
       const documents = [
         { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita' },
-        { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' }
+        { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' },
       ]
       const ms = new MiniSearch({ fields: ['title', 'text'], storeFields: ['title', 'text'] })
       ms.addAll(documents)
@@ -1021,7 +1019,7 @@ describe('MiniSearch', () => {
     const documents = [
       { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita' },
       { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como', lang: 'it', category: 'fiction' },
-      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' }
+      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' },
     ]
     const ms = new MiniSearch({ fields: ['title', 'text'], storeFields: ['lang', 'category'] })
     ms.addAll(documents)
@@ -1163,7 +1161,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'] })
       const documents = [
         { id: 1, text: 'Poi che la gente poverella crebbe' },
-        { id: 2, text: 'Deus, venerunt gentes' }
+        { id: 2, text: 'Deus, venerunt gentes' },
       ]
       ms.addAll(documents)
       expect(ms.documentCount).toEqual(documents.length)
@@ -1203,7 +1201,7 @@ describe('MiniSearch', () => {
       const query = 'Commedia nova'
       const boostFactors = {
         commedia: 1.5,
-        nova: 1.1
+        nova: 1.1,
       }
       const boostTerm = jest.fn((term, i, terms) => boostFactors[term])
       const resultsWithoutBoost = ms.search(query)
@@ -1225,28 +1223,28 @@ describe('MiniSearch', () => {
     })
 
     it('uses a specific search-time tokenizer if specified', () => {
-      const tokenize = (string) => string.split('X')
+      const tokenize = string => string.split('X')
       const results = ms.search('divinaXcommedia', { tokenize })
       expect(results.length).toBeGreaterThan(0)
       expect(results.map(({ id }) => id).sort()).toEqual([1])
     })
 
     it('uses a specific search-time term processing function if specified', () => {
-      const processTerm = (string) => string.replace(/1/g, 'i').replace(/4/g, 'a').toLowerCase()
+      const processTerm = string => string.replace(/1/g, 'i').replace(/4/g, 'a').toLowerCase()
       const results = ms.search('d1v1n4', { processTerm })
       expect(results.length).toBeGreaterThan(0)
       expect(results.map(({ id }) => id).sort()).toEqual([1])
     })
 
     it('rejects falsy terms', () => {
-      const processTerm = (term) => term === 'quel' ? null : term
+      const processTerm = term => term === 'quel' ? null : term
       const results = ms.search('quel commedia', { processTerm })
       expect(results.length).toBeGreaterThan(0)
       expect(results.map(({ id }) => id).sort()).toEqual([1])
     })
 
     it('allows processTerm to expand a single term into several terms', () => {
-      const processTerm = (string) => string === 'divinacommedia' ? ['divina', 'commedia'] : string
+      const processTerm = string => string === 'divinacommedia' ? ['divina', 'commedia'] : string
       const results = ms.search('divinacommedia', { processTerm })
       expect(results.length).toBeGreaterThan(0)
       expect(results.map(({ id }) => id).sort()).toEqual([1])
@@ -1254,7 +1252,7 @@ describe('MiniSearch', () => {
 
     it('allows custom filtering of results on the basis of stored fields', () => {
       const results = ms.search('del', {
-        filter: ({ category }) => category === 'poetry'
+        filter: ({ category }) => category === 'poetry',
       })
       expect(results.length).toBe(1)
       expect(results.every(({ category }) => category === 'poetry')).toBe(true)
@@ -1265,8 +1263,8 @@ describe('MiniSearch', () => {
         fields: ['title', 'text'],
         storeFields: ['category'],
         searchOptions: {
-          filter: ({ category }) => category === 'poetry'
-        }
+          filter: ({ category }) => category === 'poetry',
+        },
       })
       ms.addAll(documents)
 
@@ -1279,7 +1277,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { bm25: { k: 1.2, b: 0.7, d: 0.5 } } })
       const documents = [
         { id: 1, text: 'something very very very cool' },
-        { id: 2, text: 'something cool' }
+        { id: 2, text: 'something cool' },
       ]
       ms.addAll(documents)
 
@@ -1299,7 +1297,7 @@ describe('MiniSearch', () => {
       const documents = [
         { id: 1, text: 'something cool', cool: true },
         { id: 2, text: 'something else', cool: false },
-        { id: 3, text: null, cool: true }
+        { id: 3, text: null, cool: true },
       ]
       ms.addAll(documents)
 
@@ -1314,8 +1312,8 @@ describe('MiniSearch', () => {
 
       // Filters and document boosting are still applied
       const results = ms.search(MiniSearch.wildcard, {
-        filter: (x) => x.cool,
-        boostDocument: (id) => id
+        filter: x => x.cool,
+        boostDocument: id => id,
       })
       expect(results.map(({ id }) => id)).toEqual([3, 1])
     })
@@ -1327,14 +1325,14 @@ describe('MiniSearch', () => {
           queries: [
             {
               combineWith: 'AND',
-              queries: ['vita', 'cammin']
+              queries: ['vita', 'cammin'],
             },
             'como sottomarino',
             {
               combineWith: 'AND',
-              queries: ['nova', 'pappagallo']
-            }
-          ]
+              queries: ['nova', 'pappagallo'],
+            },
+          ],
         })
         expect(results.length).toEqual(2)
         expect(results.map(({ id }) => id)).toEqual([1, 2])
@@ -1345,8 +1343,8 @@ describe('MiniSearch', () => {
           combineWith: 'AND_NOT',
           queries: [
             MiniSearch.wildcard,
-            'vita'
-          ]
+            'vita',
+          ],
         })
         expect(results.length).toEqual(1)
         expect(results.map(({ id }) => id)).toEqual([2])
@@ -1360,17 +1358,17 @@ describe('MiniSearch', () => {
             {
               prefix: true,
               fields: ['title'],
-              queries: ['vit']
+              queries: ['vit'],
             },
             {
               combineWith: 'AND',
-              queries: ['bago', 'coomo']
-            }
+              queries: ['bago', 'coomo'],
+            },
           ],
           weights: {
             fuzzy: 0.2,
-            prefix: 0.75
-          }
+            prefix: 0.75,
+          },
         })
 
         expect(results.length).toEqual(2)
@@ -1381,28 +1379,28 @@ describe('MiniSearch', () => {
         const reference = ms.search({
           queries: [
             { fields: ['text'], queries: ['vita'] },
-            { fields: ['title'], queries: ['promessi'] }
-          ]
+            { fields: ['title'], queries: ['promessi'] },
+          ],
         })
 
         // Boost field
         let results = ms.search({
           queries: [
             { fields: ['text'], queries: ['vita'] },
-            { fields: ['title'], queries: ['promessi'] }
-          ]
+            { fields: ['title'], queries: ['promessi'] },
+          ],
         }, { boost: { title: 2 } })
 
         expect(results.length).toEqual(reference.length)
-        expect(results.find((r) => r.id === 2).score)
-          .toBeGreaterThan(reference.find((r) => r.id === 2).score)
+        expect(results.find(r => r.id === 2).score)
+          .toBeGreaterThan(reference.find(r => r.id === 2).score)
 
         // Combine with AND
         results = ms.search({
           queries: [
             { fields: ['text'], queries: ['vita'] },
-            { fields: ['title'], queries: ['promessi'] }
-          ]
+            { fields: ['title'], queries: ['promessi'] },
+          ],
         }, { combineWith: 'AND' })
 
         expect(results.length).toEqual(0)
@@ -1411,9 +1409,9 @@ describe('MiniSearch', () => {
         results = ms.search({
           queries: [
             { fields: ['text'], queries: ['vita'] },
-            { fields: ['title'], queries: ['promessi'] }
+            { fields: ['title'], queries: ['promessi'] },
           ],
-          combineWith: 'OR'
+          combineWith: 'OR',
         }, { combineWith: 'AND' })
 
         expect(results.length).toEqual(reference.length)
@@ -1424,7 +1422,7 @@ describe('MiniSearch', () => {
       const documents = [
         { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita' },
         { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como' },
-        { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria ... vita' }
+        { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria ... vita' },
       ]
       const ms = new MiniSearch({ fields: ['title', 'text'] })
       ms.addAll(documents)
@@ -1434,28 +1432,28 @@ describe('MiniSearch', () => {
         expect(results.length).toBeGreaterThan(0)
         expect(results.map(({ match }) => match)).toEqual([
           { vita: ['title', 'text'], nova: ['title'] },
-          { vita: ['text'] }
+          { vita: ['text'] },
         ])
         expect(results.map(({ terms }) => terms)).toEqual([
           ['vita', 'nova'],
-          ['vita']
+          ['vita'],
         ])
         expect(results.map(({ queryTerms }) => queryTerms)).toEqual([
           ['vita', 'nova'],
-          ['vita']
+          ['vita'],
         ])
       })
 
       it('reports correct info when combining terms with AND', () => {
         const results = ms.search('vita nova', { combineWith: 'AND' })
         expect(results.map(({ match }) => match)).toEqual([
-          { vita: ['title', 'text'], nova: ['title'] }
+          { vita: ['title', 'text'], nova: ['title'] },
         ])
         expect(results.map(({ terms }) => terms)).toEqual([
-          ['vita', 'nova']
+          ['vita', 'nova'],
         ])
         expect(results.map(({ queryTerms }) => queryTerms)).toEqual([
-          ['vita', 'nova']
+          ['vita', 'nova'],
         ])
       })
 
@@ -1463,15 +1461,15 @@ describe('MiniSearch', () => {
         const results = ms.search('vi nuova', { fuzzy: 0.2, prefix: true })
         expect(results.map(({ match }) => match)).toEqual([
           { vita: ['title', 'text'], nova: ['title'] },
-          { vita: ['text'] }
+          { vita: ['text'] },
         ])
         expect(results.map(({ terms }) => terms)).toEqual([
           ['vita', 'nova'],
-          ['vita']
+          ['vita'],
         ])
         expect(results.map(({ queryTerms }) => queryTerms)).toEqual([
           ['vi', 'nuova'],
-          ['vi']
+          ['vi'],
         ])
       })
 
@@ -1480,17 +1478,17 @@ describe('MiniSearch', () => {
         expect(results.map(({ match }) => match)).toEqual([
           { del: ['text'], della: ['text'], memoria: ['text'], mia: ['text'], vita: ['title', 'text'], nova: ['title'] },
           { del: ['text'], mezzo: ['text'], vita: ['text'] },
-          { del: ['text'] }
+          { del: ['text'] },
         ])
         expect(results.map(({ terms }) => terms)).toEqual([
           ['vita', 'nova', 'memoria', 'mia', 'della', 'del'],
           ['vita', 'mezzo', 'del'],
-          ['del']
+          ['del'],
         ])
         expect(results.map(({ queryTerms }) => queryTerms)).toEqual([
           ['vi', 'nuova', 'm', 'de'],
           ['vi', 'm', 'de'],
-          ['de']
+          ['de'],
         ])
       })
 
@@ -1507,7 +1505,7 @@ describe('MiniSearch', () => {
         const ms = new MiniSearch({ fields: ['text', 'title'], searchOptions: { processTerm } })
         const query = 'some search query'
         ms.search(query)
-        query.split(/\W+/).forEach(term => {
+        query.split(/\W+/).forEach((term) => {
           expect(processTerm).toHaveBeenCalledWith(term)
         })
       })
@@ -1532,61 +1530,61 @@ describe('MiniSearch', () => {
     describe('movie ranking set', () => {
       const ms = new MiniSearch({
         fields: ['title', 'description'],
-        storeFields: ['title']
+        storeFields: ['title'],
       })
 
       ms.add({
         id: 'tt1487931',
         title: 'Khumba',
-        description: 'When half-striped zebra Khumba is blamed for the lack of rain by the rest of his insular, superstitious herd, he embarks on a daring quest to earn his stripes. In his search for the legendary waterhole in which the first zebras got their stripes, Khumba meets a quirky range of characters and teams up with an unlikely duo: overprotective wildebeest Mama V and Bradley, a self-obsessed, flamboyant ostrich. But before he can reunite with his herd, Khumba must confront Phango, a sadistic leopard who controls the waterholes and terrorizes all the animals in the Great Karoo. It\'s not all black-and-white in this colorful adventure with a difference.'
+        description: 'When half-striped zebra Khumba is blamed for the lack of rain by the rest of his insular, superstitious herd, he embarks on a daring quest to earn his stripes. In his search for the legendary waterhole in which the first zebras got their stripes, Khumba meets a quirky range of characters and teams up with an unlikely duo: overprotective wildebeest Mama V and Bradley, a self-obsessed, flamboyant ostrich. But before he can reunite with his herd, Khumba must confront Phango, a sadistic leopard who controls the waterholes and terrorizes all the animals in the Great Karoo. It\'s not all black-and-white in this colorful adventure with a difference.',
       })
 
       ms.add({
         id: 'tt8737608',
         title: 'Rams',
-        description: 'A feud between two sheep farmers.'
+        description: 'A feud between two sheep farmers.',
       })
 
       ms.add({
         id: 'tt0983983',
         title: 'Shaun the Sheep',
-        description: 'Shaun is a cheeky and mischievous sheep at Mossy Bottom farm who\'s the leader of the flock and always plays slapstick jokes, pranks and causes trouble especially on Farmer X and his grumpy guide dog, Bitzer.'
+        description: 'Shaun is a cheeky and mischievous sheep at Mossy Bottom farm who\'s the leader of the flock and always plays slapstick jokes, pranks and causes trouble especially on Farmer X and his grumpy guide dog, Bitzer.',
       })
 
       ms.add({
         id: 'tt5174284',
         title: 'Shaun the Sheep: The Farmer\'s Llamas',
-        description: 'At the annual County Fair, three peculiar llamas catch the eye of Shaun, who tricks the unsuspecting Farmer into buying them. At first, it\'s all fun and games at Mossy Bottom Farm until the trio of unruly animals shows their true colours, wreaking havoc before everyone\'s eyes. Now, it\'s up to Bitzer and Shaun to come up with a winning strategy, if they want to reclaim the farm. Can they rid the once-peaceful ranch of the troublemakers?'
+        description: 'At the annual County Fair, three peculiar llamas catch the eye of Shaun, who tricks the unsuspecting Farmer into buying them. At first, it\'s all fun and games at Mossy Bottom Farm until the trio of unruly animals shows their true colours, wreaking havoc before everyone\'s eyes. Now, it\'s up to Bitzer and Shaun to come up with a winning strategy, if they want to reclaim the farm. Can they rid the once-peaceful ranch of the troublemakers?',
       })
 
       ms.add({
         id: 'tt0102926',
         title: 'The Silence of the Lambs',
-        description: 'F.B.I. trainee Clarice Starling (Jodie Foster) works hard to advance her career, while trying to hide or put behind her West Virginia roots, of which if some knew, would automatically classify her as being backward or white trash. After graduation, she aspires to work in the agency\'s Behavioral Science Unit under the leadership of Jack Crawford (Scott Glenn). While she is still a trainee, Crawford asks her to question Dr. Hannibal Lecter (Sir Anthony Hopkins), a psychiatrist imprisoned, thus far, for eight years in maximum security isolation for being a serial killer who cannibalized his victims. Clarice is able to figure out the assignment is to pick Lecter\'s brains to help them solve another serial murder case, that of someone coined by the media as "Buffalo Bill" (Ted Levine), who has so far killed five victims, all located in the eastern U.S., all young women, who are slightly overweight (especially around the hips), all who were drowned in natural bodies of water, and all who were stripped of large swaths of skin. She also figures that Crawford chose her, as a woman, to be able to trigger some emotional response from Lecter. After speaking to Lecter for the first time, she realizes that everything with him will be a psychological game, with her often having to read between the very cryptic lines he provides. She has to decide how much she will play along, as his request in return for talking to him is to expose herself emotionally to him. The case takes a more dire turn when a sixth victim is discovered, this one from who they are able to retrieve a key piece of evidence, if Lecter is being forthright as to its meaning. A potential seventh victim is high profile Catherine Martin (Brooke Smith), the daughter of Senator Ruth Martin (Diane Baker), which places greater scrutiny on the case as they search for a hopefully still alive Catherine. Who may factor into what happens is Dr. Frederick Chilton (Anthony Heald), the warden at the prison, an opportunist who sees the higher profile with Catherine, meaning a higher profile for himself if he can insert himself successfully into the proceedings.'
+        description: 'F.B.I. trainee Clarice Starling (Jodie Foster) works hard to advance her career, while trying to hide or put behind her West Virginia roots, of which if some knew, would automatically classify her as being backward or white trash. After graduation, she aspires to work in the agency\'s Behavioral Science Unit under the leadership of Jack Crawford (Scott Glenn). While she is still a trainee, Crawford asks her to question Dr. Hannibal Lecter (Sir Anthony Hopkins), a psychiatrist imprisoned, thus far, for eight years in maximum security isolation for being a serial killer who cannibalized his victims. Clarice is able to figure out the assignment is to pick Lecter\'s brains to help them solve another serial murder case, that of someone coined by the media as "Buffalo Bill" (Ted Levine), who has so far killed five victims, all located in the eastern U.S., all young women, who are slightly overweight (especially around the hips), all who were drowned in natural bodies of water, and all who were stripped of large swaths of skin. She also figures that Crawford chose her, as a woman, to be able to trigger some emotional response from Lecter. After speaking to Lecter for the first time, she realizes that everything with him will be a psychological game, with her often having to read between the very cryptic lines he provides. She has to decide how much she will play along, as his request in return for talking to him is to expose herself emotionally to him. The case takes a more dire turn when a sixth victim is discovered, this one from who they are able to retrieve a key piece of evidence, if Lecter is being forthright as to its meaning. A potential seventh victim is high profile Catherine Martin (Brooke Smith), the daughter of Senator Ruth Martin (Diane Baker), which places greater scrutiny on the case as they search for a hopefully still alive Catherine. Who may factor into what happens is Dr. Frederick Chilton (Anthony Heald), the warden at the prison, an opportunist who sees the higher profile with Catherine, meaning a higher profile for himself if he can insert himself successfully into the proceedings.',
       })
 
       ms.add({
         id: 'tt0395479',
         title: 'Boundin\'',
-        description: 'In the not too distant past, a lamb lives in the desert plateau just below the snow line. He is proud of how bright and shiny his coat of wool is, so much so that it makes him want to dance, which in turn makes all the other creatures around him also want to dance. His life changes when one spring day he is captured, his wool shorn, and thrown back out onto the plateau all naked and pink. But a bounding jackalope who wanders by makes the lamb look at life a little differently in seeing that there is always something exciting in life to bound about.'
+        description: 'In the not too distant past, a lamb lives in the desert plateau just below the snow line. He is proud of how bright and shiny his coat of wool is, so much so that it makes him want to dance, which in turn makes all the other creatures around him also want to dance. His life changes when one spring day he is captured, his wool shorn, and thrown back out onto the plateau all naked and pink. But a bounding jackalope who wanders by makes the lamb look at life a little differently in seeing that there is always something exciting in life to bound about.',
       })
 
       ms.add({
         id: 'tt9812474',
         title: 'Lamb',
-        description: 'Haunted by the indelible mark of loss and silent grief, sad-eyed María and her taciturn husband, Ingvar, seek solace in back-breaking work and the demanding schedule at their sheep farm in the remote, harsh, wind-swept landscapes of mountainous Iceland. Then, with their relationship hanging on by a thread, something unexplainable happens, and just like that, happiness blesses the couple\'s grim household once more. Now, as a painful ending gives birth to a new beginning, Ingvar\'s troubled brother, Pétur, arrives at the farmhouse, threatening María and Ingvar\'s delicate, newfound bliss. But, nature\'s gifts demand sacrifice. How far are ecstatic María and Ingvar willing to go in the name of love?'
+        description: 'Haunted by the indelible mark of loss and silent grief, sad-eyed María and her taciturn husband, Ingvar, seek solace in back-breaking work and the demanding schedule at their sheep farm in the remote, harsh, wind-swept landscapes of mountainous Iceland. Then, with their relationship hanging on by a thread, something unexplainable happens, and just like that, happiness blesses the couple\'s grim household once more. Now, as a painful ending gives birth to a new beginning, Ingvar\'s troubled brother, Pétur, arrives at the farmhouse, threatening María and Ingvar\'s delicate, newfound bliss. But, nature\'s gifts demand sacrifice. How far are ecstatic María and Ingvar willing to go in the name of love?',
       })
 
       ms.add({
         id: 'tt0306646',
         title: 'Ringing Bell',
-        description: 'A baby lamb named Chirin is living an idyllic life on a farm with many other sheep. Chirin is very adventurous and tends to get lost, so he wears a bell around his neck so that his mother can always find him. His mother warns Chirin that he must never venture beyond the fence surrounding the farm, because a huge black wolf lives in the mountains and loves to eat sheep. Chirin is too young and naive to take the advice to heart, until one night the wolf enters the barn and is prepared to kill Chirin, but at the last moment the lamb\'s mother throws herself in the way and is killed instead. The wolf leaves, and Chirin is horrified to see his mother\'s body. Unable to understand why his mother was killed, he becomes very angry and swears that he will go into the mountains and kill the wolf.'
+        description: 'A baby lamb named Chirin is living an idyllic life on a farm with many other sheep. Chirin is very adventurous and tends to get lost, so he wears a bell around his neck so that his mother can always find him. His mother warns Chirin that he must never venture beyond the fence surrounding the farm, because a huge black wolf lives in the mountains and loves to eat sheep. Chirin is too young and naive to take the advice to heart, until one night the wolf enters the barn and is prepared to kill Chirin, but at the last moment the lamb\'s mother throws herself in the way and is killed instead. The wolf leaves, and Chirin is horrified to see his mother\'s body. Unable to understand why his mother was killed, he becomes very angry and swears that he will go into the mountains and kill the wolf.',
       })
 
       ms.add({
         id: 'tt1212022',
         title: 'The Lion of Judah',
-        description: 'Follow the adventures of a bold lamb (Judah) and his stable friends as they try to avoid the sacrificial alter the week preceding the crucifixion of Christ. It is a heart-warming account of the Easter story as seen through the eyes of a lovable pig (Horace), a faint-hearted horse (Monty), a pedantic rat (Slink), a rambling rooster (Drake), a motherly cow (Esmay) and a downtrodden donkey (Jack). This magnificent period piece with its epic sets is a roller coaster ride of emotions. Enveloped in humor, this quest follows the animals from the stable in Bethlehem to the great temple in Jerusalem and onto the hillside of Calvary as these unlikely heroes try to save their friend. The journey weaves seamlessly through the biblical accounts of Palm Sunday, Jesus turning the tables in the temple, Peter\'s denial and with a tense, heart-wrenching climax, depicts the crucifixion and resurrection with gentleness and breathtaking beauty. For Judah, the lamb with the heart of a lion, it is a story of courage and faith. For Jack, the disappointed donkey, it becomes a pivotal voyage of hope. For Horace, the, well the dirty pig, and Drake the ignorant rooster, it is an opportunity to do something inappropriate and get into trouble.'
+        description: 'Follow the adventures of a bold lamb (Judah) and his stable friends as they try to avoid the sacrificial alter the week preceding the crucifixion of Christ. It is a heart-warming account of the Easter story as seen through the eyes of a lovable pig (Horace), a faint-hearted horse (Monty), a pedantic rat (Slink), a rambling rooster (Drake), a motherly cow (Esmay) and a downtrodden donkey (Jack). This magnificent period piece with its epic sets is a roller coaster ride of emotions. Enveloped in humor, this quest follows the animals from the stable in Bethlehem to the great temple in Jerusalem and onto the hillside of Calvary as these unlikely heroes try to save their friend. The journey weaves seamlessly through the biblical accounts of Palm Sunday, Jesus turning the tables in the temple, Peter\'s denial and with a tense, heart-wrenching climax, depicts the crucifixion and resurrection with gentleness and breathtaking beauty. For Judah, the lamb with the heart of a lion, it is a story of courage and faith. For Jack, the disappointed donkey, it becomes a pivotal voyage of hope. For Horace, the, well the dirty pig, and Drake the ignorant rooster, it is an opportunity to do something inappropriate and get into trouble.',
       })
 
       it('returns best results for lamb', () => {
@@ -1608,7 +1606,7 @@ describe('MiniSearch', () => {
           'The Lion of Judah',
 
           // Prefix match in title.
-          'The Silence of the Lambs'
+          'The Silence of the Lambs',
         ])
       })
 
@@ -1634,7 +1632,7 @@ describe('MiniSearch', () => {
           'Ringing Bell',
 
           // Contains 'sheep' just once, in a long description.
-          'Lamb'
+          'Lamb',
         ])
       })
 
@@ -1671,55 +1669,55 @@ describe('MiniSearch', () => {
     describe('song ranking set', () => {
       const ms = new MiniSearch({
         fields: ['song', 'artist'],
-        storeFields: ['song']
+        storeFields: ['song'],
       })
 
       ms.add({
         id: '1',
         song: 'Killer Queen',
-        artist: 'Queen'
+        artist: 'Queen',
       })
 
       ms.add({
         id: '2',
         song: 'The Witch Queen Of New Orleans',
-        artist: 'Redbone'
+        artist: 'Redbone',
       })
 
       ms.add({
         id: '3',
         song: 'Waterloo',
-        artist: 'Abba'
+        artist: 'Abba',
       })
 
       ms.add({
         id: '4',
         song: 'Take A Chance On Me',
-        artist: 'Abba'
+        artist: 'Abba',
       })
 
       ms.add({
         id: '5',
         song: 'Help',
-        artist: 'The Beatles'
+        artist: 'The Beatles',
       })
 
       ms.add({
         id: '6',
         song: 'Yellow Submarine',
-        artist: 'The Beatles'
+        artist: 'The Beatles',
       })
 
       ms.add({
         id: '7',
         song: 'Dancing Queen',
-        artist: 'Abba'
+        artist: 'Abba',
       })
 
       ms.add({
         id: '8',
         song: 'Bohemian Rhapsody',
-        artist: 'Queen'
+        artist: 'Queen',
       })
 
       it('returns best results for witch queen', () => {
@@ -1736,7 +1734,7 @@ describe('MiniSearch', () => {
           'Bohemian Rhapsody',
 
           // Match on song only. Song is a worse match for 'Queen'.
-          'Dancing Queen'
+          'Dancing Queen',
         ])
       })
 
@@ -1758,12 +1756,12 @@ perché da noi si dura?
 Intatta luna, tale
 è lo stato mortale.
 Ma tu mortal non sei,
-e forse del mio dir poco ti cale`
+e forse del mio dir poco ti cale`,
         },
         {
           id: 2,
-          text: 'The estimates range from roughly 1 in 100 to 1 in 100,000. The higher figures come from the working engineers, and the very low figures from management. What are the causes and consequences of this lack of agreement? Since 1 part in 100,000 would imply that one could put a Shuttle up each day for 300 years expecting to lose only one, we could properly ask "What is the cause of management\'s fantastic faith in the machinery?"'
-        }
+          text: 'The estimates range from roughly 1 in 100 to 1 in 100,000. The higher figures come from the working engineers, and the very low figures from management. What are the causes and consequences of this lack of agreement? Since 1 part in 100,000 would imply that one could put a Shuttle up each day for 300 years expecting to lose only one, we could properly ask "What is the cause of management\'s fantastic faith in the machinery?"',
+        },
       ]
       const ms = new MiniSearch({ fields: ['text'] })
       ms.addAll(documents)
@@ -1781,7 +1779,7 @@ e forse del mio dir poco ti cale`
         { id: 2, title: 'アネモネ' },
         { id: 3, title: '«τέχνη»' },
         { id: 4, title: 'سمت  الرأس' },
-        { id: 5, title: '123 45' }
+        { id: 5, title: '123 45' },
       ]
       const ms = new MiniSearch({ fields: ['title'] })
       ms.addAll(documents)
@@ -1804,7 +1802,7 @@ e forse del mio dir poco ti cale`
     const documents = [
       { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita', category: 'poetry' },
       { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como', category: 'fiction' },
-      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' }
+      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' },
     ]
     const ms = new MiniSearch({ fields: ['title', 'text'], storeFields: ['category'] })
     ms.addAll(documents)
@@ -1854,13 +1852,13 @@ e forse del mio dir poco ti cale`
 
     it('applies the given custom filter', () => {
       let results = ms.autoSuggest('que', {
-        filter: ({ category }) => category === 'fiction'
+        filter: ({ category }) => category === 'fiction',
       })
       expect(results[0].suggestion).toEqual('quel')
       expect(results).toHaveLength(1)
 
       results = ms.autoSuggest('que', {
-        filter: ({ category }) => category === 'poetry'
+        filter: ({ category }) => category === 'poetry',
       })
       expect(results[0].suggestion).toEqual('quella')
       expect(results).toHaveLength(1)
@@ -1869,7 +1867,7 @@ e forse del mio dir poco ti cale`
     it('respects the custom defaults set in the constructor', () => {
       const ms = new MiniSearch({
         fields: ['title', 'text'],
-        autoSuggestOptions: { combineWith: 'OR', fuzzy: true }
+        autoSuggestOptions: { combineWith: 'OR', fuzzy: true },
       })
       ms.addAll(documents)
       const results = ms.autoSuggest('nosta vi')
@@ -1879,7 +1877,7 @@ e forse del mio dir poco ti cale`
     it('applies the default search options if not overridden by the auto suggest defaults', () => {
       const ms = new MiniSearch({
         fields: ['title', 'text'],
-        searchOptions: { combineWith: 'OR', fuzzy: true }
+        searchOptions: { combineWith: 'OR', fuzzy: true },
       })
       ms.addAll(documents)
       const results = ms.autoSuggest('nosta vi')
@@ -1891,7 +1889,7 @@ e forse del mio dir poco ti cale`
     const documents = [
       { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita', category: 'poetry' },
       { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como', category: 'fiction' },
-      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' }
+      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' },
     ]
 
     it('loads a JSON-serialized search index', () => {
@@ -1952,7 +1950,7 @@ e forse del mio dir poco ti cale`
 
     it('allows subclassing and changing .loadJS', () => {
       class Modified extends MiniSearch {
-        static loadJS (js, options) {
+        static loadJS(js, options) {
           return super.loadJS({ ...js, documentCount: 99 }, options)
         }
       }
@@ -1971,7 +1969,7 @@ e forse del mio dir poco ti cale`
     const documents = [
       { id: 1, title: 'Divina Commedia', text: 'Nel mezzo del cammin di nostra vita', category: 'poetry' },
       { id: 2, title: 'I Promessi Sposi', text: 'Quel ramo del lago di Como', category: 'fiction' },
-      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' }
+      { id: 3, title: 'Vita Nova', text: 'In quella parte del libro della mia memoria', category: 'poetry' },
     ]
 
     it('makes a MiniSearch instance that is identical to .loadJSON()', async () => {

@@ -8,17 +8,17 @@ import {
   deserializeTermIndexTree,
   validateFrozenSnapshot,
   crc32Buffer,
-  BINARY_MAGIC_V3
+  BINARY_MAGIC_V3,
 } from './binaryFormat'
 
 const docs = [
   { id: 1, title: 'hello', text: 'world wide' },
-  { id: 2, title: 'zen', text: 'art archery' }
+  { id: 2, title: 'zen', text: 'art archery' },
 ]
 
 const options = { fields: ['title', 'text'] }
 
-function buildSnapshotFromFrozen () {
+function buildSnapshotFromFrozen() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
   const frozen = mutable.freeze()
@@ -30,7 +30,7 @@ describe('binaryFormat MSv3', () => {
   test('round-trip preserves flat postings', () => {
     const treeShape = [
       ['hello', [[LEAF, 0]]],
-      ['world', [[LEAF, 1]]]
+      ['world', [[LEAF, 1]]],
     ]
     const snap = {
       documentCount: 2,
@@ -47,7 +47,7 @@ describe('binaryFormat MSv3', () => {
       postingsOffsets: new Uint32Array([0, 1]),
       postingsLengths: new Uint32Array([1, 1]),
       allDocIds: new Uint32Array([0, 1]),
-      allFreqs: new Uint8Array([1, 1])
+      allFreqs: new Uint8Array([1, 1]),
     }
 
     const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(treeShape))
@@ -199,7 +199,7 @@ describe('crc32Buffer verification', () => {
       'A'.repeat(100),
       'A'.repeat(1024),
       '🚀 emoji test 💖',
-      'accentués éàïô'
+      'accentués éàïô',
     ]
 
     for (const str of inputs) {

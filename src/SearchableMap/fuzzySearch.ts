@@ -32,7 +32,7 @@ export const fuzzySearch = <T = any>(node: RadixTree<T>, query: string, maxDista
     matrix,
     1,
     n,
-    ''
+    '',
   )
 
   return results
@@ -61,7 +61,7 @@ const recurse = <T = any>(
   matrix: Uint8Array,
   m: number,
   n: number,
-  prefix: string
+  prefix: string,
 ): void => {
   const offset = m * n
 
@@ -121,7 +121,7 @@ const recurse = <T = any>(
         matrix,
         i,
         n,
-        prefix + key
+        prefix + key,
       )
     }
   }

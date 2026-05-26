@@ -35,7 +35,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ idField: 'foo', fields: ['title', 'text'] })
       expect(() => {
         ms.add({ text: 'I do not have an ID' })
-      }).toThrowError('MiniSearch: document does not have ID field "foo"')
+      }).toThrow('MiniSearch: document does not have ID field "foo"')
     })
 
     it('throws error on duplicate ID', () => {
@@ -44,7 +44,7 @@ describe('MiniSearch', () => {
 
       expect(() => {
         ms.add({ foo: 'abc', text: 'I have a duplicate ID' })
-      }).toThrowError('MiniSearch: duplicate ID abc')
+      }).toThrow('MiniSearch: duplicate ID abc')
     })
 
     it('extracts the ID field using extractField', () => {
@@ -65,7 +65,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['title', 'text'], processTerm })
       expect(() => {
         ms.add({ id: 123, text: 'foo bar' })
-      }).not.toThrowError()
+      }).not.toThrow()
     })
 
     it('turns the field to string before tokenization', () => {
@@ -74,7 +74,7 @@ describe('MiniSearch', () => {
       expect(() => {
         ms.add({ id: 123, tags: ['foo', 'bar'], isBlinky: false })
         ms.add({ id: 321, isBlinky: true })
-      }).not.toThrowError()
+      }).not.toThrow()
 
       expect(tokenize).toHaveBeenCalledWith('123', 'id')
       expect(tokenize).toHaveBeenCalledWith('foo,bar', 'tags')
@@ -98,7 +98,7 @@ describe('MiniSearch', () => {
       expect(() => {
         ms.add({ id: 123, tags: ['foo', 'bar'], isBlinky: false })
         ms.add({ id: 321, isBlinky: true })
-      }).not.toThrowError()
+      }).not.toThrow()
 
       expect(tokenize).toHaveBeenCalledWith('123', 'id')
       expect(tokenize).toHaveBeenCalledWith('foo|bar', 'tags')
@@ -167,7 +167,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ fields: ['title', 'text'], processTerm })
       expect(() => {
         ms.add({ id: 123, text: 'foobar' })
-      }).not.toThrowError()
+      }).not.toThrow()
 
       expect(ms.search('bar')).toHaveLength(1)
     })
@@ -246,7 +246,7 @@ describe('MiniSearch', () => {
 
       expect(() => {
         ms.remove(document)
-      }).not.toThrowError()
+      }).not.toThrow()
 
       expect(ms.search('vita')).toEqual([])
     })
@@ -263,7 +263,7 @@ describe('MiniSearch', () => {
       const ms = new MiniSearch({ idField: 'foo', fields: ['title', 'text'] })
       expect(() => {
         ms.remove({ text: 'I do not have an ID' })
-      }).toThrowError('MiniSearch: document does not have ID field "foo"')
+      }).toThrow('MiniSearch: document does not have ID field "foo"')
     })
 
     it('extracts the ID field using extractField', () => {
@@ -277,7 +277,7 @@ describe('MiniSearch', () => {
 
       expect(() => {
         ms.remove(document)
-      }).not.toThrowError()
+      }).not.toThrow()
 
       expect(ms.search('vita')).toEqual([])
     })
@@ -289,7 +289,7 @@ describe('MiniSearch', () => {
 
       expect(() => {
         ms.remove(document)
-      }).not.toThrowError()
+      }).not.toThrow()
     })
 
     it('does not reassign IDs', () => {
@@ -306,7 +306,7 @@ describe('MiniSearch', () => {
       ms.add(document)
       expect(() => {
         ms.remove(document)
-      }).not.toThrowError()
+      }).not.toThrow()
     })
 
     it('allows processTerm to expand a single term into several terms', () => {
@@ -316,7 +316,7 @@ describe('MiniSearch', () => {
       ms.add(document)
       expect(() => {
         ms.remove(document)
-      }).not.toThrowError()
+      }).not.toThrow()
 
       expect(ms.search('bar')).toHaveLength(0)
     })
@@ -475,11 +475,11 @@ describe('MiniSearch', () => {
     it('raises an error if called with a falsey argument', () => {
       ms.addAll(documents)
 
-      expect(() => { ms.removeAll(null) }).toThrowError()
-      expect(() => { ms.removeAll(undefined) }).toThrowError()
-      expect(() => { ms.removeAll(false) }).toThrowError()
-      expect(() => { ms.removeAll('') }).toThrowError()
-      expect(() => { ms.removeAll([]) }).not.toThrowError()
+      expect(() => { ms.removeAll(null) }).toThrow()
+      expect(() => { ms.removeAll(undefined) }).toThrow()
+      expect(() => { ms.removeAll(false) }).toThrow()
+      expect(() => { ms.removeAll('') }).toThrow()
+      expect(() => { ms.removeAll([]) }).not.toThrow()
 
       expect(ms.documentCount).toEqual(documents.length)
     })
@@ -1052,7 +1052,7 @@ describe('MiniSearch', () => {
       let results
       expect(() => {
         results = ms.search('sottomarino aeroplano')
-      }).not.toThrowError()
+      }).not.toThrow()
       expect(results.length).toEqual(0)
     })
 
@@ -1110,7 +1110,7 @@ describe('MiniSearch', () => {
     it('raises an error if combineWith is not a valid operator', () => {
       expect(() => {
         ms.search('vita cammin', { combineWith: 'XOR' })
-      }).toThrowError('Invalid combination operator: XOR')
+      }).toThrow('Invalid combination operator: XOR')
     })
 
     it('returns empty results for empty search', () => {
@@ -1518,7 +1518,7 @@ describe('MiniSearch', () => {
         ms.add({ id: 1, text: specialWords.join(' ') })
 
         specialWords.forEach((word) => {
-          expect(() => { ms.search(word) }).not.toThrowError()
+          expect(() => { ms.search(word) }).not.toThrow()
 
           const results = ms.search(word)
           expect(results[0].id).toEqual(1)
@@ -1840,7 +1840,7 @@ e forse del mio dir poco ti cale`,
       let results
       expect(() => {
         results = ms.autoSuggest('sottomarino aeroplano')
-      }).not.toThrowError()
+      }).not.toThrow()
       expect(results.length).toEqual(0)
     })
 
@@ -1918,7 +1918,7 @@ e forse del mio dir poco ti cale`,
       const json = JSON.stringify(ms)
       expect(() => {
         MiniSearch.loadJSON(json)
-      }).toThrowError('MiniSearch: loadJSON should be given the same options used when serializing the index')
+      }).toThrow('MiniSearch: loadJSON should be given the same options used when serializing the index')
     })
 
     it('raises an error if given an incompatible serialized version', () => {
@@ -1927,7 +1927,7 @@ e forse del mio dir poco ti cale`,
 
       expect(() => {
         MiniSearch.loadJSON(json, options)
-      }).toThrowError('MiniSearch: cannot deserialize an index created with an incompatible version')
+      }).toThrow('MiniSearch: cannot deserialize an index created with an incompatible version')
     })
 
     it('is compatible with serializationVersion 1', () => {
@@ -1996,7 +1996,7 @@ e forse del mio dir poco ti cale`,
     })
 
     it('throws an error if there is no option with the given name', () => {
-      expect(() => { MiniSearch.getDefault('foo') }).toThrowError('MiniSearch: unknown option "foo"')
+      expect(() => { MiniSearch.getDefault('foo') }).toThrow('MiniSearch: unknown option "foo"')
     })
   })
 })

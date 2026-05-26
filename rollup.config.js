@@ -6,6 +6,7 @@ const production = process.env.NODE_ENV === 'production'
 
 const config = ({ format, input, output, dir, extension = 'js', exports = undefined }) => {
   const shouldMinify = process.env.MINIFY === 'true' && output !== 'dts'
+  const outDir = `dist/${dir || format}`
 
   return {
     input,
@@ -28,7 +29,9 @@ const config = ({ format, input, output, dir, extension = 'js', exports = undefi
     plugins: [
       output === 'dts'
         ? dts()
-        : typescript(production ? { sourceMap: false } : undefined)
+        : typescript(production
+          ? { sourceMap: false, compilerOptions: { outDir } }
+          : { compilerOptions: { outDir } })
     ]
   }
 }
@@ -43,7 +46,7 @@ const benchmarks = {
     plugins: []
   },
   external: ['benchmark'],
-  plugins: [typescript()]
+  plugins: [typescript({ compilerOptions: { outDir: 'benchmarks/dist' } })]
 }
 
 export default process.env.BENCHMARKS === 'true' ? [benchmarks] : [

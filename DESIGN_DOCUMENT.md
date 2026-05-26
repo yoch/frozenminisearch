@@ -212,41 +212,34 @@ indices instead of nested field maps.
    remap when `documentCount < nextId` after `discard`).
 2. **`fromDocuments` / `FrozenIndexBuilder`** — index directly into flat buffers
    (no intermediate nested postings).
-3. **`saveBinary` / `loadBinary`** — MSv2 on disk (MSv1 read-only for legacy
-   files).
+3. **`saveBinary` / `loadBinary`** — **MSv3** on disk only (MSv1/MSv2 removed).
 
-`assembleFrozen` is an advanced entry point for custom pipelines; it runs the
-same structural validation as decode.
+`assembleFrozen` is an advanced entry point for custom pipelines; it runs numeric
+validation plus radix leaf index checks.
 
-### On-disk format (MSv2)
+### On-disk format (MSv3)
 
-Sections: JSON metadata (field ids, external ids, stored fields, serialized tree
-shape), `avgFieldLength`, `fieldLengthMatrix`, term dictionary, flat posting
-offsets/lengths/doc ids/freqs. Load validates monotonic section offsets,
-posting bounds, `treeShape` leaf indices, and `fieldLengthMatrix` dimensions.
+64-byte header: magic `MSv3`, version `3`, CRC-32 IEEE over the payload (bytes after
+the header), and 12 section offsets plus end sentinel.
+
+Sections (in order):
+
+1. **Core** — `documentCount`, `nextId`, `fieldCount`
+2. **Field names** — length-prefixed UTF-8 strings (field id order)
+3. **External IDs** — per slot: empty, IEEE float64 number, UTF-8 string, or JSON blob
+4. **Stored fields** — offset table + heap of length-prefixed JSON objects
+5. **Term tree** — pre-order node bundles (child count, then leaf or edge records); Map insertion order preserved on write
+6. **avgFieldLength**, **fieldLengthMatrix**, **dictionary**, flat **postings**
+
+Load verifies CRC, monotonic offsets, posting bounds, and tree leaf indices.
 
 ### Design limits (current)
 
 - Term frequencies are `Uint8` (max 255 per document/field).
 - `tokenize` / `processTerm` are not persisted; reload must use the same
   functions as build if customized.
-- `loadBinary` requires the same `fields` set as at build time.
+- `loadBinary` may omit `fields` (read from snapshot); if provided, must match exactly.
 
 ### Suggested optimizations (future)
 
 User-facing summary: [README — FrozenMiniSearch optimizations](./README.md#frozenminisearch--optimizations).
-
-| Area | Suggestion | Rationale |
-|------|------------|-----------|
-| MSv3 integrity | Header checksum | Detect corrupted snapshots without silent bad rankings |
-| MSv3 metadata | Binary-encoded ids / stored fields / tree | Reduce JSON parse cost and file size on large indexes |
-| Runtime memory | Omit duplicate `terms[]` at rest | Terms are recoverable from the radix tree or only needed at save |
-| Node API | `loadBinaryAsync` with yields between sections | Avoid long main-thread blocks on huge cold loads |
-| MSv1 decode | Direct typed-array fill | Legacy path only; MSv2 is the write format |
-| Build | Single-pass posting allocation with size estimate | Fewer intermediate `number[]` growth steps |
-| Search | Wildcard over active doc ids only | Skip holes left by discard-before-freeze |
-| Search | Deeper posting access without wrapper objects | Further reduce GC on fuzzy/prefix-heavy queries |
-
-Items already shipped in the consolidation pass (validation, strict `fields`,
-single-buffer encode, per-query `fieldTermDataFor` cache) are listed in the
-README section above, not repeated here.

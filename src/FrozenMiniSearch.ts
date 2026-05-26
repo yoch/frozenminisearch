@@ -21,8 +21,7 @@ import {
   decodeFrozenSnapshot,
   encodeFrozenSnapshot,
   deserializeTermIndexTree,
-  serializeTermIndexTree,
-  validateFrozenSnapshot,
+  fieldNamesFromFieldIds,
   validateFrozenSnapshotNumeric
 } from './binaryFormat'
 import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
@@ -499,29 +498,31 @@ export default class FrozenMiniSearch<T = any> {
       nextId: this._nextId,
       fieldIds: this._fieldIds,
       fieldCount: this._fieldCount,
+      fieldNames: fieldNamesFromFieldIds(this._fieldIds),
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
       storedFields: this._storedFields,
       fieldLengthMatrix: this._fieldLengthMatrix,
       terms: this._terms,
-      treeShape: serializeTermIndexTree(this._index.radixTree),
+      treeShape: [],
       postingsOffsets: this._postingsOffsets,
       postingsLengths: this._postingsLengths,
       allDocIds: this._allDocIds,
       allFreqs: this._allFreqs
-    })
+    }, this._index.radixTree)
   }
 
-  static loadBinary<T> (buffer: Buffer, options: Options<T>): FrozenMiniSearch<T> {
-    if (options?.fields == null) {
-      throw new Error('FrozenMiniSearch: option "fields" must be provided')
-    }
+  static loadBinary<T> (buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     const snap = decodeFrozenSnapshot(buffer)
-    assertFieldsMatchSnapshot(options.fields, snap.fieldIds)
+    const snapshotFields = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
+    if (options.fields != null) {
+      assertFieldsMatchSnapshot(options.fields, snap.fieldIds)
+    }
 
     const opts: OptionsWithDefaults<T> = {
       ...defaultFrozenLoadOptions,
       ...options,
+      fields: options.fields ?? snapshotFields,
       searchOptions: {
         ...defaultSearchOptions,
         ...(options.searchOptions || {})
@@ -529,7 +530,9 @@ export default class FrozenMiniSearch<T = any> {
       autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) }
     } as OptionsWithDefaults<T>
 
-    const index = new SearchableMap<number>(deserializeTermIndexTree(snap.treeShape))
+    const index = new SearchableMap<number>(
+      snap.termTree ?? deserializeTermIndexTree(snap.treeShape)
+    )
 
     const idToShortId = new Map<unknown, number>()
     for (let i = 0; i < snap.externalIds.length; i++) {

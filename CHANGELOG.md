@@ -2,6 +2,19 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.0.0-beta.4
+
+**Breaking:** binary snapshots use **MSv3** only. Files written with MSv1 or MSv2
+(beta.3 and earlier) must be re-saved with `saveBinary()`.
+
+  - Replace MSv1/MSv2 with MSv3: CRC-32 payload integrity, binary field names,
+    external ids, stored fields, and term tree (no JSON metadata section)
+  - `loadBinary`: `fields` option is optional when reloading (names are embedded
+    in the snapshot); if provided, must still match exactly
+  - Reject legacy MSv1/MSv2 buffers with a clear error message
+  - Preserve radix tree sibling order on encode (prefix/fuzzy/autoSuggest parity
+    after round-trip)
+
 ## v8.0.0-beta.3
 
 Incremental frozen index construction without a temporary `documents[]` array.

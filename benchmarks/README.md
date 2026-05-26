@@ -61,7 +61,7 @@ Update `baselines/reference.json` only after intentional wins: `yarn benchmark:b
 - Isolated heap: mutable, frozen, loadJSON, loadBinary
 - Build heap: `addAll` + `freeze` vs `fromDocuments`
 - Indexing time: addAll, freeze, fromDocuments, saveBinary
-- Disk size: JSON vs MSv2 binary
+- Disk size: JSON vs MSv3 binary
 - `memoryBreakdown`: typed postings, radix tree, stored fields
 - Search: p50/p95 per query
 - `scoreDrift`: mutable vs frozen score delta on **overflow frequencies** (>255 occurrences of the same term)

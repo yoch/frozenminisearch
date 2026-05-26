@@ -263,12 +263,20 @@ describe('FrozenMiniSearch binary round-trip', () => {
     }
   })
 
-  test('saveBinary writes MSv2 format', () => {
+  test('saveBinary writes MSv3 format', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const buf = mutable.freeze().saveBinary()
-    expect(buf.toString('ascii', 0, 4)).toBe('MSv2')
-    expect(buf.readUInt16LE(4)).toBe(2)
+    expect(buf.toString('ascii', 0, 4)).toBe('MSv3')
+    expect(buf.readUInt16LE(4)).toBe(3)
+  })
+
+  test('loadBinary without fields option', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), {})
+    expectSameResults(frozen, loaded, 'zen')
   })
 })
 

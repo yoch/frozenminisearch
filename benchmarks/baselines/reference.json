@@ -27,7 +27,7 @@
         "fromDocumentsMs": 178.04,
         "jsonSerializeMs": 165.82,
         "saveBinaryMs": 49.77,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 16.128,
@@ -134,7 +134,7 @@
         "fromDocumentsMs": 157.15,
         "jsonSerializeMs": 142.47,
         "saveBinaryMs": 43.09,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 14.927,
@@ -223,7 +223,7 @@
         "fromDocumentsMs": 254.8,
         "jsonSerializeMs": 322.59,
         "saveBinaryMs": 72.84,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 47.198,
@@ -314,7 +314,7 @@
         "fromDocumentsMs": 1160.47,
         "jsonSerializeMs": 121.73,
         "saveBinaryMs": 122.56,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 6.56,
@@ -412,7 +412,7 @@
         "fromDocumentsMs": 84.91,
         "jsonSerializeMs": 138.34,
         "saveBinaryMs": 2.4,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 7.075,
@@ -501,7 +501,7 @@
         "fromDocumentsMs": 76.08,
         "jsonSerializeMs": 45.76,
         "saveBinaryMs": 1.27,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 7.367,
@@ -590,7 +590,7 @@
         "fromDocumentsMs": 214.32,
         "jsonSerializeMs": 3.03,
         "saveBinaryMs": 0.25,
-        "binaryMagic": "MSv2"
+        "binaryMagic": "MSv3"
       },
       "heapMb": {
         "mutable": 0.677,

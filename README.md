@@ -14,7 +14,7 @@
 |---|---------------------|-------------------|
 | **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed, or you reload from disk |
 | **Memory** | Maps and nested objects per posting | Flat `Uint32Array` / `Uint8Array` postings |
-| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv2, reads MSv1) |
+| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv3 only) |
 | **Typical search** | Baseline | Often **~20–35% faster** p50 on the same corpus (see benchmarks) |
 
 Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies are stored as `Uint8` (max **255** per document/field); extreme repetition can cause a small score drift versus the mutable index.
@@ -141,7 +141,7 @@ count on freeze if the hint was too large.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
 - **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
 - **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
-- **`saveBinary()` / `loadBinary()`** — MSv2 on write, MSv1 still readable (legacy read-only). On reload, pass the **exact same** `fields` array as at build time (same names, same count). Custom `tokenize` / `processTerm` are **not** stored in the binary snapshot — provide the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
+- **`saveBinary()` / `loadBinary()`** — **MSv3** binary format (CRC32, binary metadata). **MSv1/MSv2 snapshots are not supported** — re-save indexes built with older betas. Field names are stored in the snapshot; `fields` in `loadBinary` options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).
 
@@ -185,38 +185,30 @@ TypeScript definitions: `dist/es/index.d.ts`.
 
 ## FrozenMiniSearch — optimizations
 
-### Already in this release
-
-Recent consolidation work (MSv2 hardening) includes:
+### Already in MSv3 (beta.4+)
 
 | Area | Change | Effect |
 |------|--------|--------|
-| **Binary load** | Structural validation in `decodeFrozenSnapshot` / `validateFrozenSnapshot` | Corrupt or truncated snapshots fail fast with `Invalid frozen index: …` |
-| **`loadBinary`** | `fields` must match the snapshot exactly (no silent subset) | Misconfigured reload cannot return partial results |
-| **`saveBinary`** | Single pre-allocated buffer instead of `Buffer.concat` chains | Lower peak memory while serializing |
-| **Search** | Per-query cache for `fieldTermDataFor(termIndex)` | Fewer allocations on prefix/fuzzy multi-term queries |
-| **Weights** | Same default merge as `MiniSearch` | Avoids future drift if library defaults change |
+| **Format** | MSv3 replaces MSv1/MSv2 (breaking) | CRC32 payload check; binary field names, ids, stored fields, term tree |
+| **Binary load** | Structural validation in `decodeFrozenSnapshot` / `validateFrozenSnapshot` | Corrupt snapshots fail fast with `Invalid frozen index: …` |
+| **`loadBinary`** | `fields` optional (embedded in snapshot); if provided, must match exactly | Simpler reload; no silent field subset |
+| **`saveBinary`** | Single pre-allocated buffer | Lower peak memory while serializing |
+| **Search** | Per-query cache for `fieldTermDataFor(termIndex)` | Fewer allocations on prefix/fuzzy queries |
 
 Measure regressions with [`benchmarks/`](benchmarks/README.md) (`freezeMs`, `saveBinary`, `loadBinary`, search p50, heap frozen).
 
 ### Suggested follow-ups (not implemented yet)
 
-These came out of the release review. They are **optional** improvements for a future format (e.g. **MSv3**) or API revision — not required for the current beta.
-
 | Priority | Topic | Idea | Trade-off |
 |----------|-------|------|-----------|
-| **Format** | Integrity | CRC32 or hash in the MSv2 reserved header bytes | Detect bit rot / partial writes; breaks on-disk compat unless versioned |
-| **Format** | Metadata | Serialize `externalIds`, `storedFields`, and the term tree in binary instead of JSON in the meta section | Smaller disk + faster `loadBinary`; larger implementation effort |
-| **Format** | Term dictionary | Drop runtime `_terms[]` duplicate; rebuild from the radix tree only when saving, or store the tree once without separate `terms` + `treeShape` | Saves heap on large indexes; more complex encode/decode |
-| **API** | `loadBinaryAsync` | Chunked/async load like `loadJSONAsync` | Better cold start for huge indexes on Node; new public API |
-| **API** | Input types | Accept `Uint8Array` as well as `Buffer` on `loadBinary` | Slightly broader runtime support |
-| **Load (MSv1)** | Legacy decode | Pre-size posting buffers and fill `Uint32Array`/`Uint8Array` directly (avoid `number[]` scratch) | Faster migration from old MSv1 files only |
-| **Build** | `freeze` / builder | One-pass posting flatten with estimated total posting count | Faster `freeze()` / `fromDocuments` on very large corpora |
-| **Search** | Wildcard | Iterate only active document slots after dense remap | Faster `MiniSearch.wildcard` when the index had many `discard`s before freeze |
-| **Observability** | `memoryBreakdown()` | Option to skip `JSON.stringify` estimates for stored fields | Cheaper introspection in hot paths |
-| **Search** | Hot path | Reuse posting views across terms without even the per-query object cache (e.g. direct subarray in `aggregateTerm`) | More invasive; benchmark before shipping |
+| **Format** | Term dictionary | Drop runtime `_terms[]` duplicate at rest | Saves heap; more complex save path |
+| **API** | `loadBinaryAsync` | Chunked/async load like `loadJSONAsync` | Better cold start on huge indexes |
+| **API** | Input types | Accept `Uint8Array` as well as `Buffer` on `loadBinary` | Broader runtime support |
+| **Build** | `freeze` / builder | One-pass posting flatten with size estimate | Faster freeze on very large corpora |
+| **Search** | Wildcard | Iterate only active document slots after dense remap | Faster wildcard after many `discard`s |
+| **Search** | Hot path | Direct subarray posting access in `aggregateTerm` | Lower GC; invasive |
 
-**Intentionally deferred:** embedding `tokenize` / `processTerm` in the binary snapshot (callers must pass the same functions at load time if customized). Changing the `Uint8` term-frequency cap would require a new postings encoding, not a small patch.
+**Intentionally deferred:** embedding `tokenize` / `processTerm` in the snapshot. Raising the `Uint8` term-frequency cap needs a new postings encoding.
 
 For contributor-oriented notes, see [DESIGN_DOCUMENT.md — FrozenMiniSearch](./DESIGN_DOCUMENT.md#frozenminisearch).
 
@@ -258,6 +250,6 @@ npm run release:beta
 See [CHANGELOG.md](./CHANGELOG.md).
 
 - **MiniSearch** — [Luca Ongaro](https://github.com/lucaong/minisearch) (MIT)
-- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, MSv1/MSv2 binary format, shared scoring refactor
+- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, MSv3 binary format, shared scoring refactor
 
 Upstream docs: [MiniSearch site](https://lucaong.github.io/minisearch/) · [intro article](https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html)

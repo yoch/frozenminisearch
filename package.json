@@ -40,17 +40,20 @@
     "access": "public",
     "tag": "beta"
   },
+  "resolutions": {
+    "js-yaml": "^4.1.1"
+  },
   "devDependencies": {
-    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/benchmark": "^2.1.1",
-    "@typescript-eslint/eslint-plugin": "^6.9.0",
-    "@typescript-eslint/parser": "^6.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/parser": "^8.60.0",
     "benchmark": "^2.1.4",
     "core-js": "^3.1.4",
-    "coveralls-next": "^4.2.0",
+    "coveralls-next": "^6.0.1",
     "crc-32": "^1.2.2",
-    "eslint": "^8.16.0",
+    "eslint": "^8.57.0",
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.20.2",
     "eslint-plugin-n": "^16.2.0",
@@ -64,7 +67,7 @@
     "snazzy": "^9.0.0",
     "ts-jest": "^29.0.3",
     "tslib": "^2.0.1",
-    "typedoc": "^0.25.3",
+    "typedoc": "^0.28.19",
     "typedoc-plugin-rename-defaults": "^0.7.0",
     "typescript": "^5.2.2"
   },

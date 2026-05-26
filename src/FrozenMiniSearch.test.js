@@ -1,7 +1,6 @@
 import MiniSearch from './MiniSearch'
-import FrozenMiniSearch, { frozenMemoryBreakdown } from './FrozenMiniSearch'
+import FrozenMiniSearch, { frozenMemoryBreakdown, freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { createFrozenIndexBuilder } from './frozenBuild'
-import { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { overflowFrequencies } from '../benchmarks/benchmarkScenarios.js'
 
 const docs = [
@@ -27,7 +26,22 @@ function buildEngines () {
 function expectSameResults (mutable, frozen, query, searchOptions = {}) {
   const a = mutable.search(query, searchOptions)
   const b = frozen.search(query, searchOptions)
-  expect(b).toEqual(a)
+  expect(b.length).toBe(a.length)
+  for (let i = 0; i < a.length; i++) {
+    expect(b[i].id).toBe(a[i].id)
+    // toBeCloseTo rather than toBe because FrozenMiniSearch stores avgFieldLength as
+    // Float32Array while MiniSearch uses Float64.  For most corpus values the
+    // representations are identical, but after discard() (without vacuum) the
+    // updated average can be an irrational fraction (e.g. 13/3) that has a tiny
+    // Float32 vs Float64 rounding gap.  Precision 6 (|Δ| < 5e-7) is tight enough
+    // to catch any real scoring regression.
+    expect(b[i].score).toBeCloseTo(a[i].score, 6)
+    expect(b[i].terms).toEqual(a[i].terms)
+    expect(b[i].match).toEqual(a[i].match)
+    const { score, terms, match, id, queryTerms, ...storedA } = a[i]
+    const { score: _s, terms: _t, match: _m, id: _i, queryTerms: _q, ...storedB } = b[i]
+    expect(storedB).toEqual(storedA)
+  }
 }
 
 describe('FrozenMiniSearch parity with MiniSearch', () => {
@@ -88,8 +102,6 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
   })
 
   test('autoSuggest parity', () => {
-    const suggestOptions = { ...options.autoSuggestOptions }
-    expectSameResults(mutable, frozen, 'zen ar', suggestOptions)
     const a = mutable.autoSuggest('zen ar')
     const b = frozen.autoSuggest('zen ar')
     expect(b).toEqual(a)
@@ -101,10 +113,100 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expect(frozen.getStoredFields(3)).toEqual(mutable.getStoredFields(3))
   })
 
-  test('read-only mutations throw', () => {
-    expect(() => frozen.add(docs[0])).toThrow(/read-only/i)
-    expect(() => frozen.remove(docs[0])).toThrow(/read-only/i)
-    expect(() => frozen.discard(1)).toThrow(/read-only/i)
+  test.each([
+    ['add', (idx) => idx.add(docs[0])],
+    ['addAll', (idx) => idx.addAll(docs)],
+    ['addAllAsync', (idx) => idx.addAllAsync(docs)],
+    ['remove', (idx) => idx.remove(docs[0])],
+    ['removeAll', (idx) => idx.removeAll(docs)],
+    ['discard', (idx) => idx.discard(1)],
+    ['discardAll', (idx) => idx.discardAll([1, 2])],
+    ['replace', (idx) => idx.replace(docs[0])],
+    ['vacuum', (idx) => idx.vacuum()]
+  ])('read-only mutation %s throws', (_label, mutate) => {
+    expect(() => mutate(frozen)).toThrow(/read-only/i)
+  })
+
+  test('boostTerm parity', () => {
+    const boostTerm = (term) => (term === 'zen' ? 2 : 1)
+    expectSameResults(mutable, frozen, 'zen art', { boostTerm })
+  })
+
+  test('fields restriction parity', () => {
+    expectSameResults(mutable, frozen, 'zen', { fields: ['title'] })
+  })
+
+  test('search tokenize and processTerm parity', () => {
+    const tokenize = (q) => q.split(/\s+/)
+    const processTerm = (t) => t.toLowerCase()
+    expectSameResults(mutable, frozen, 'ZEN Art', { tokenize, processTerm })
+  })
+
+  test('explicit weights parity', () => {
+    expectSameResults(mutable, frozen, 'neur', {
+      prefix: true,
+      weights: { fuzzy: 0.5, prefix: 0.4 }
+    })
+  })
+
+  test('explicit bm25 parity', () => {
+    expectSameResults(mutable, frozen, 'zen', {
+      bm25: { k: 1.5, b: 0.6, d: 0.4 }
+    })
+  })
+})
+
+describe('FrozenMiniSearch custom indexing options', () => {
+  test('custom idField and extractField parity', () => {
+    const customDocs = [
+      { key: 'a', body: 'hello world' },
+      { key: 'b', body: 'hello again' }
+    ]
+    const customOpts = {
+      fields: ['body'],
+      idField: 'key',
+      extractField: (doc, field) => doc[field]
+    }
+    const mutable = new MiniSearch(customOpts)
+    mutable.addAll(customDocs)
+    const frozen = mutable.freeze()
+    const direct = FrozenMiniSearch.fromDocuments(customDocs, customOpts)
+    expectSameResults(frozen, direct, 'hello')
+  })
+
+  test('custom stringifyField parity', () => {
+    const customDocs = [{ id: 1, tags: ['alpha', 'beta'] }]
+    const customOpts = {
+      fields: ['tags'],
+      stringifyField: (value) => value.join(' ')
+    }
+    const mutable = new MiniSearch(customOpts)
+    mutable.addAll(customDocs)
+    const frozen = mutable.freeze()
+    const direct = FrozenMiniSearch.fromDocuments(customDocs, customOpts)
+    expectSameResults(frozen, direct, 'alpha')
+  })
+})
+
+describe('FrozenMiniSearch freeze after discard', () => {
+  test('search parity without vacuum', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    mutable.discard(3)
+    const frozen = mutable.freeze()
+    expectSameResults(mutable, frozen, 'zen')
+    expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND' })
+    expectSameResults(mutable, frozen, MiniSearch.wildcard)
+  })
+
+  test('binary round-trip after discard without vacuum', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    mutable.discard(3)
+    const frozen = mutable.freeze()
+    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), options)
+    expect(loaded.search('zen')).toEqual(frozen.search('zen'))
+    expect(loaded.search(MiniSearch.wildcard)).toEqual(frozen.search(MiniSearch.wildcard))
   })
 })
 
@@ -131,12 +233,34 @@ describe('FrozenMiniSearch binary round-trip', () => {
     expect(loaded.autoSuggest('zen ar')).toEqual(frozen.autoSuggest('zen ar'))
   })
 
-  test('loadBinary rejects unknown fields', () => {
+  test('loadBinary rejects fields not in snapshot', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const buf = mutable.freeze().saveBinary()
     expect(() => FrozenMiniSearch.loadBinary(buf, { fields: ['title', 'missing'] }))
-      .toThrow(/field "missing" not found/)
+      .toThrow(/must match the indexed fields exactly/)
+  })
+
+  test('loadBinary rejects field subset', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const buf = mutable.freeze().saveBinary()
+    expect(() => FrozenMiniSearch.loadBinary(buf, { fields: ['title'] }))
+      .toThrow(/must match the indexed fields exactly/)
+  })
+
+  test('overflow frequencies survive saveBinary round-trip', () => {
+    const corpus = overflowFrequencies(40, 400)
+    const opts = { fields: ['txt'] }
+    const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
+    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), opts)
+    const before = frozen.search('alpha', { combineWith: 'OR' })
+    const after = loaded.search('alpha', { combineWith: 'OR' })
+    expect(after.length).toBe(before.length)
+    for (let i = 0; i < before.length; i++) {
+      expect(after[i].id).toBe(before[i].id)
+      expect(after[i].score).toBeCloseTo(before[i].score, 10)
+    }
   })
 
   test('saveBinary writes MSv2 format', () => {

@@ -33,6 +33,16 @@ yarn benchmark:diff --runs 3
 Metrics are aggregated with the **median** per scenario.
 `--runs` is ignored for `benchmark:diff --latest` (no re-run).
 
+## What to watch when optimizing FrozenMiniSearch
+
+When implementing changes from [README — suggested optimizations](../README.md#suggested-follow-ups-not-implemented-yet), compare at least:
+
+- `indexing.freezeMs`, `indexing.saveBinaryMs`, `loadMs.binary`
+- `heapMb.frozen`, `heapMb.frozenVsMutableSavingPct`
+- Search p50/p95 on prefix and fuzzy scenarios (noisy; use median over `--runs 3`)
+
+Update `baselines/reference.json` only after intentional wins: `yarn benchmark:baseline:update`.
+
 ## Files
 
 - `benchmarkSuite.js` — shared metrics JSON

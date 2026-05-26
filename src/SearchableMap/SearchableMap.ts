@@ -214,7 +214,7 @@ export default class SearchableMap<T = any> {
    * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map/size
    */
   get size (): number {
-    if (this._size) { return this._size }
+    if (this._size !== undefined) { return this._size }
     /** @ignore */
     this._size = 0
 

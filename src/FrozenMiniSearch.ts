@@ -21,7 +21,9 @@ import {
   decodeFrozenSnapshot,
   encodeFrozenSnapshot,
   deserializeTermIndexTree,
-  serializeTermIndexTree
+  serializeTermIndexTree,
+  validateFrozenSnapshot,
+  validateFrozenSnapshotNumeric
 } from './binaryFormat'
 import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
 import type {
@@ -152,8 +154,31 @@ export interface FrozenAssembleParams<T = any> {
   allFreqs: Uint8Array
 }
 
+function assertFieldsMatchSnapshot (
+  optionsFields: readonly string[],
+  snapFieldIds: { [field: string]: number }
+): void {
+  const snapNames = Object.keys(snapFieldIds).sort()
+  const optNames = [...optionsFields].sort()
+  if (snapNames.length !== optNames.length || snapNames.some((name, i) => name !== optNames[i])) {
+    throw new Error(
+      `FrozenMiniSearch: option "fields" must match the indexed fields exactly (expected: ${snapNames.join(', ')})`
+    )
+  }
+}
+
 /** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts. */
 export function assembleFrozen<T> (params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
+  // Validate numeric invariants without serialising the radix tree to TreeShape.
+  // Full tree-shape validation (including JSON round-trip) is done by the decode
+  // path (decodeFrozenSnapshot) for untrusted external binary data.
+  validateFrozenSnapshotNumeric(params)
+  const termCount = params.terms.length
+  for (const [, ti] of params.index) {
+    if (!Number.isInteger(ti) || ti < 0 || ti >= termCount) {
+      throw new Error(`FrozenMiniSearch: radix tree leaf index out of range: ${ti}`)
+    }
+  }
   return new FrozenMiniSearch(params)
 }
 
@@ -315,6 +340,7 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _postingsLengths: Uint32Array
   private readonly _allDocIds: Uint32Array
   private readonly _allFreqs: Uint8Array
+  private _fieldTermDataCache: FieldTermDataLike[] | undefined
 
   constructor (params: {
     options: OptionsWithDefaults<T>
@@ -431,6 +457,7 @@ export default class FrozenMiniSearch<T = any> {
   search (query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     const { searchOptions: globalSearchOptions } = this._options
     const searchOptionsWithDefaults: SearchOptionsWithDefaults = { ...globalSearchOptions, ...searchOptions }
+    this._fieldTermDataCache = undefined
     const rawResults = this.executeQuery(query, searchOptions)
     const skipSort = query === FrozenMiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null
     return finalizeSearchResults({
@@ -490,12 +517,7 @@ export default class FrozenMiniSearch<T = any> {
       throw new Error('FrozenMiniSearch: option "fields" must be provided')
     }
     const snap = decodeFrozenSnapshot(buffer)
-    const fieldNames = options.fields
-    for (const name of fieldNames) {
-      if (snap.fieldIds[name] === undefined) {
-        throw new Error(`FrozenMiniSearch: field "${name}" not found in frozen index`)
-      }
-    }
+    assertFieldsMatchSnapshot(options.fields, snap.fieldIds)
 
     const opts: OptionsWithDefaults<T> = {
       ...defaultFrozenLoadOptions,
@@ -566,14 +588,24 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   private fieldTermDataFor (termIndex: number): FieldTermDataLike {
-    return flatFieldTermData(
-      termIndex,
-      this._fieldCount,
-      this._postingsOffsets,
-      this._postingsLengths,
-      this._allDocIds,
-      this._allFreqs
-    )
+    let cache = this._fieldTermDataCache
+    if (cache == null) {
+      cache = new Array(this._terms.length)
+      this._fieldTermDataCache = cache
+    }
+    let data = cache[termIndex]
+    if (data == null) {
+      data = flatFieldTermData(
+        termIndex,
+        this._fieldCount,
+        this._postingsOffsets,
+        this._postingsLengths,
+        this._allDocIds,
+        this._allFreqs
+      )
+      cache[termIndex] = data
+    }
+    return data
   }
 
   private aggregateContext () {
@@ -642,8 +674,7 @@ export default class FrozenMiniSearch<T = any> {
       {}
     )
     const { boostDocument, weights, maxFuzzy, bm25: bm25params } = options
-    const fuzzyWeight = weights?.fuzzy ?? 0.45
-    const prefixWeight = weights?.prefix ?? 0.375
+    const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
 
     const termIndex = this._index.get(query.term)
     const results = this.termResults(query.term, query.term, 1, query.termBoost, termIndex, boosts, boostDocument, bm25params)

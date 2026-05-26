@@ -4,7 +4,7 @@ This design document has the aim to explain the details of `MiniSearch`
 design and implementation to library developers that intend to contribute to
 this project, or that are simply curious about the internals.
 
-**Latest update: Feb. 21, 2022**
+**Latest update: May 26, 2026**
 
 ## Goals (and non-goals)
 
@@ -198,3 +198,55 @@ the following ideas:
 The scores are calculated for every document field matching a query term. The
 results are added. To reward documents that match the most terms, the final
 score is multiplied by the number of matching terms in the query.
+
+## FrozenMiniSearch
+
+`FrozenMiniSearch` is a read-only serving path added in this fork. It reuses the
+search API layer (`scoring.ts`, query execution) but replaces mutable posting
+`Map`s with flat typed arrays and a radix tree whose leaves hold numeric term
+indices instead of nested field maps.
+
+### Build paths
+
+1. **`MiniSearch.freeze()`** — flatten an existing mutable index (supports dense
+   remap when `documentCount < nextId` after `discard`).
+2. **`fromDocuments` / `FrozenIndexBuilder`** — index directly into flat buffers
+   (no intermediate nested postings).
+3. **`saveBinary` / `loadBinary`** — MSv2 on disk (MSv1 read-only for legacy
+   files).
+
+`assembleFrozen` is an advanced entry point for custom pipelines; it runs the
+same structural validation as decode.
+
+### On-disk format (MSv2)
+
+Sections: JSON metadata (field ids, external ids, stored fields, serialized tree
+shape), `avgFieldLength`, `fieldLengthMatrix`, term dictionary, flat posting
+offsets/lengths/doc ids/freqs. Load validates monotonic section offsets,
+posting bounds, `treeShape` leaf indices, and `fieldLengthMatrix` dimensions.
+
+### Design limits (current)
+
+- Term frequencies are `Uint8` (max 255 per document/field).
+- `tokenize` / `processTerm` are not persisted; reload must use the same
+  functions as build if customized.
+- `loadBinary` requires the same `fields` set as at build time.
+
+### Suggested optimizations (future)
+
+User-facing summary: [README — FrozenMiniSearch optimizations](./README.md#frozenminisearch--optimizations).
+
+| Area | Suggestion | Rationale |
+|------|------------|-----------|
+| MSv3 integrity | Header checksum | Detect corrupted snapshots without silent bad rankings |
+| MSv3 metadata | Binary-encoded ids / stored fields / tree | Reduce JSON parse cost and file size on large indexes |
+| Runtime memory | Omit duplicate `terms[]` at rest | Terms are recoverable from the radix tree or only needed at save |
+| Node API | `loadBinaryAsync` with yields between sections | Avoid long main-thread blocks on huge cold loads |
+| MSv1 decode | Direct typed-array fill | Legacy path only; MSv2 is the write format |
+| Build | Single-pass posting allocation with size estimate | Fewer intermediate `number[]` growth steps |
+| Search | Wildcard over active doc ids only | Skip holes left by discard-before-freeze |
+| Search | Deeper posting access without wrapper objects | Further reduce GC on fuzzy/prefix-heavy queries |
+
+Items already shipped in the consolidation pass (validation, strict `fields`,
+single-buffer encode, per-query `fieldTermDataFor` cache) are listed in the
+README section above, not repeated here.

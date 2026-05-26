@@ -2,6 +2,20 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.0.1
+
+Internal refactor with no intended public API or behaviour changes.
+
+  - Extract shared modules: `searchTypes`, `queryEngine`, `flatPostings`,
+    `frozenTypes`, and `suggestions` so `MiniSearch` and `FrozenMiniSearch` share
+    one search code path
+  - Pass `AggregateContext` directly into the query engine (remove redundant
+    `termResults` wrappers)
+  - Lazy prefix-match iteration in `QueryIndexView` (fewer intermediate `Map`s)
+  - Canonical `OptionsWithDefaults` type; single `clampFreq` on frozen postings build
+  - Restore public JSDoc on types moved to `searchTypes.ts`
+  - Parity test: `freeze()`, `fromDocuments()`, and `FrozenIndexBuilder`
+
 ## v8.0.0
 
 First stable release of `@yoch/minisearch` (Node.js fork of MiniSearch).

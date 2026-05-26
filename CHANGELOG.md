@@ -2,6 +2,21 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.0.0
+
+First stable release of `@yoch/minisearch` (Node.js fork of MiniSearch).
+
+  - **`FrozenMiniSearch`**: read-only index with compact postings, `fromDocuments`,
+    `FrozenIndexBuilder`, `fromAsyncIterable`, and search parity with mutable `MiniSearch`
+    when built with the same options
+  - **MSv3 binary snapshots** (`saveBinary` / `loadBinary`): CRC-32 integrity, embedded field
+    names and stored fields; MSv1/MSv2 not supported (re-save with `saveBinary()`)
+  - **Mutable `MiniSearch`** retained for incremental indexing (`add`, `remove`, `discard`, JSON
+    serialize)
+  - Node-only ESM + CJS build; no browser UMD bundle in this package
+
+Consolidates changes shipped in `8.0.0-beta.0` through `8.0.0-beta.4`.
+
 ## v8.0.0-beta.4
 
 **Breaking:** binary snapshots use **MSv3** only. Files written with MSv1 or MSv2

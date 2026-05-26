@@ -708,7 +708,7 @@ export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
   }
   if (magic === 'MSv1' || magic === 'MSv2') {
     throw invalidFrozenIndex(
-      `${magic} is no longer supported; re-save with MSv3 (minisearch 8.0.0-beta.4+)`,
+      `${magic} is no longer supported; re-save with MSv3 (minisearch 8.0.0+)`,
     )
   }
   throw invalidFrozenIndex(`magic=${magic} version=${version}`)

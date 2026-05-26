@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.0.0-beta.3` · install with `npm install @yoch/minisearch`
+> **Current release:** `8.0.0` · install with `npm install @yoch/minisearch`
 
 ---
 
@@ -25,8 +25,7 @@ Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators —
 
 ```bash
 npm install @yoch/minisearch
-# or pin the beta channel:
-# npm install @yoch/minisearch@beta
+# pre-releases: npm install @yoch/minisearch@beta
 ```
 
 **One-shot frozen index** (no mutable step):
@@ -185,7 +184,7 @@ TypeScript definitions: `dist/es/index.d.ts`.
 
 ## FrozenMiniSearch — optimizations
 
-### Already in MSv3 (beta.4+)
+### Already in MSv3 (8.0.0+)
 
 | Area | Change | Effect |
 |------|--------|--------|
@@ -235,7 +234,13 @@ npm run build
 
 Use `npm run` for scripts (Yarn 1.x on Node 22 prints `url.parse` deprecation noise when invoking `yarn test` / `yarn build`).
 
-**Publish a beta** (`publishConfig.tag` is `beta`, so use the release script to also move `latest`):
+**Publish stable** (updates npm `latest`):
+
+```bash
+npm run release:stable
+```
+
+**Publish a pre-release** (dist-tag `beta` only):
 
 ```bash
 npm run release:beta

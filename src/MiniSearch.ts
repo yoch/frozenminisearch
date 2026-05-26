@@ -3,18 +3,15 @@ import {
   OR,
   AND,
   AND_NOT,
-  aggregateTerm,
   mapFieldTermData,
-  combineResults,
   finalizeSearchResults,
-  termToQuerySpec,
   getOwnProperty,
-  type BM25Params,
+  type AggregateContext,
+  type FieldTermDataLike,
   type RawResult,
-  type QuerySpec,
-  byScore,
 } from './scoring'
 import { freezeFromMiniSearch } from './FrozenMiniSearch'
+import type { FreezeSource } from './frozenTypes'
 import { WILDCARD_QUERY } from './symbols'
 import {
   SPACE_OR_PUNCTUATION,
@@ -25,445 +22,43 @@ import {
   collectFieldTermFreqs,
   saveStoredFieldsForDocument,
 } from './indexingCore'
+import {
+  executeQuery as runQuery,
+  type QueryEngineParams,
+  type QueryIndexView,
+} from './queryEngine'
+import { autoSuggestFromSearch } from './suggestions'
+import type {
+  LogLevel,
+  Options,
+  OptionsWithDefaults,
+  SearchOptions,
+  SearchOptionsWithDefaults,
+  SearchResult,
+  Suggestion,
+  Query,
+  VacuumConditions,
+  VacuumOptions,
+} from './searchTypes'
 
-export type { BM25Params } from './scoring'
-export type LowercaseCombinationOperator = 'or' | 'and' | 'and_not'
-export type CombinationOperator = LowercaseCombinationOperator | Uppercase<LowercaseCombinationOperator> | Capitalize<LowercaseCombinationOperator>
+export type {
+  BM25Params,
+  LowercaseCombinationOperator,
+  CombinationOperator,
+  SearchOptions,
+  Options,
+  Suggestion,
+  MatchInfo,
+  SearchResult,
+  QueryCombination,
+  Wildcard,
+  Query,
+  VacuumOptions,
+  VacuumConditions,
+  AutoVacuumOptions,
+} from './searchTypes'
 
 export { OR, AND, AND_NOT }
-
-/**
- * Search options to customize the search behavior.
- */
-export type SearchOptions = {
-  /**
-   * Names of the fields to search in. If omitted, all fields are searched.
-   */
-  fields?: string[]
-
-  /**
-   * Function used to filter search results, for example on the basis of stored
-   * fields. It takes as argument each search result and should return a boolean
-   * to indicate if the result should be kept or not.
-   */
-  filter?: (result: SearchResult) => boolean
-
-  /**
-   * Key-value object of field names to boosting values. By default, fields are
-   * assigned a boosting factor of 1. If one assigns to a field a boosting value
-   * of 2, a result that matches the query in that field is assigned a score
-   * twice as high as a result matching the query in another field, all else
-   * being equal.
-   */
-  boost?: { [fieldName: string]: number }
-
-  /**
-   * Function to calculate a boost factor for each term.
-   *
-   * This function, if provided, is called for each query term (as split by
-   * `tokenize` and processed by `processTerm`). The arguments passed to the
-   * function are the query term, the positional index of the term in the query,
-   * and the array of all query terms. It is expected to return a numeric boost
-   * factor for the term. A factor lower than 1 reduces the importance of the
-   * term, a factor greater than 1 increases it. A factor of exactly 1 is
-   * neutral, and does not affect the term's importance.
-   */
-  boostTerm?: (term: string, i: number, terms: string[]) => number
-
-  /**
-   * Relative weights to assign to prefix search results and fuzzy search
-   * results. Exact matches are assigned a weight of 1.
-   */
-  weights?: { fuzzy: number, prefix: number }
-
-  /**
-   * Function to calculate a boost factor for documents. It takes as arguments
-   * the document ID, and a term that matches the search in that document, and
-   * the value of the stored fields for the document (if any).  It should return
-   * a boosting factor: a number higher than 1 increases the computed score, a
-   * number lower than 1 decreases the score, and a falsy value skips the search
-   * result completely.
-   */
-  boostDocument?: (documentId: any, term: string, storedFields?: Record<string, unknown>) => number
-
-  /**
-   * Controls whether to perform prefix search. It can be a simple boolean, or a
-   * function.
-   *
-   * If a boolean is passed, prefix search is performed if true.
-   *
-   * If a function is passed, it is called upon search with a search term, the
-   * positional index of that search term in the tokenized search query, and the
-   * tokenized search query. The function should return a boolean to indicate
-   * whether to perform prefix search for that search term.
-   */
-  prefix?: boolean | ((term: string, index: number, terms: string[]) => boolean)
-
-  /**
-   * Controls whether to perform fuzzy search. It can be a simple boolean, or a
-   * number, or a function.
-   *
-   * If a boolean is given, fuzzy search with a default fuzziness parameter is
-   * performed if true.
-   *
-   * If a number higher or equal to 1 is given, fuzzy search is performed, with
-   * a maximum edit distance (Levenshtein) equal to the number.
-   *
-   * If a number between 0 and 1 is given, fuzzy search is performed within a
-   * maximum edit distance corresponding to that fraction of the term length,
-   * approximated to the nearest integer. For example, 0.2 would mean an edit
-   * distance of 20% of the term length, so 1 character in a 5-characters term.
-   * The calculated fuzziness value is limited by the `maxFuzzy` option, to
-   * prevent slowdown for very long queries.
-   *
-   * If a function is passed, the function is called upon search with a search
-   * term, a positional index of that term in the tokenized search query, and
-   * the tokenized search query. It should return a boolean or a number, with
-   * the meaning documented above.
-   */
-  fuzzy?: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
-
-  /**
-   * Controls the maximum fuzziness when using a fractional fuzzy value. This is
-   * set to 6 by default. Very high edit distances usually don't produce
-   * meaningful results, but can excessively impact search performance.
-   */
-  maxFuzzy?: number
-
-  /**
-   * The operand to combine partial results for each term. By default it is
-   * "OR", so results matching _any_ of the search terms are returned by a
-   * search. If "AND" is given, only results matching _all_ the search terms are
-   * returned by a search.
-   */
-  combineWith?: CombinationOperator
-
-  /**
-   * Function to tokenize the search query. By default, the same tokenizer used
-   * for indexing is used also for search.
-   *
-   * @remarks This function is called after `extractField` extracts a truthy
-   * value from a field. This function is then expected to split the extracted
-   * `text` document into tokens (more commonly referred to as "terms" in this
-   * context). The resulting split might be simple, like for example on word
-   * boundaries, or it might be more complex, taking into account certain
-   * encoding, or parsing needs, or even just special cases. Think about how one
-   * might need to go about indexing the term "short-term". You would likely
-   * want to treat this case specially, and return two terms instead, `[
-   * "short", "term" ]`.
-   *
-   * Or, you could let such a case be handled by the `processTerm` function,
-   * which is designed to turn each token/term into whole terms or sub-terms. In
-   * any case, the purpose of this function is to split apart the provided
-   * `text` document into parts that can be processed by the `processTerm`
-   * function.
-   */
-  tokenize?: (text: string) => string[]
-
-  /**
-   * Function to process or normalize terms in the search query. By default, the
-   * same term processor used for indexing is used also for search.
-   *
-   * @remarks
-   * During the document indexing phase, the first step is to call the
-   * `extractField` function to fetch the requested value/field from the
-   * document. This is then passed off to the `tokenize` function, which will
-   * break apart each value into "terms". These terms are then individually
-   * passed through this function to compute each term individually. A term
-   * might for example be something like "lbs", in which case one would likely
-   * want to return `[ "lbs", "lb", "pound", "pounds" ]`. You may also return
-   * just a single string, or a falsy value if you would like to skip indexing
-   * entirely for a specific term.
-   *
-   * Truthy return value(s) are then fed to the indexer as positive matches for
-   * this document. In our example above, all four of the `[ "lbs", "lb",
-   * "pound", "pounds" ]` terms would be added to the indexing engine, matching
-   * against the current document being computed.
-   *
-   * *Note: Whatever values are returned from this function will receive no
-   * further processing before being indexed. This means for example, if you
-   * include whitespace at the beginning or end of a word, it will also be
-   * indexed that way, with the included whitespace.*
-   */
-  processTerm?: (term: string) => string | string[] | null | undefined | false
-
-  /**
-   * BM25+ algorithm parameters. Customizing these is almost never necessary,
-   * and finetuning them requires an understanding of the BM25 scoring model. In
-   * most cases, it is best to omit this option to use defaults, and instead use
-   * boosting to tweak scoring for specific use cases.
-   */
-  bm25?: BM25Params
-}
-
-type SearchOptionsWithDefaults = SearchOptions & {
-  boost: { [fieldName: string]: number }
-
-  weights: { fuzzy: number, prefix: number }
-
-  prefix: boolean | ((term: string, index: number, terms: string[]) => boolean)
-
-  fuzzy: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
-
-  maxFuzzy: number
-
-  combineWith: CombinationOperator
-
-  bm25: BM25Params
-}
-
-/**
- * Configuration options passed to the {@link MiniSearch} constructor
- *
- * @typeParam T  The type of documents being indexed.
- */
-export type Options<T = any> = {
-  /**
-    * Names of the document fields to be indexed.
-    */
-  fields: string[]
-
-  /**
-    * Name of the ID field, uniquely identifying a document.
-    */
-  idField?: string
-
-  /**
-    * Names of fields to store, so that search results would include them. By
-    * default none, so results would only contain the id field.
-    */
-  storeFields?: string[]
-
-  /**
-    * Function used to extract the value of each field in documents. By default,
-    * the documents are assumed to be plain objects with field names as keys,
-    * but by specifying a custom `extractField` function one can completely
-    * customize how the fields are extracted.
-    *
-    * The function takes as arguments the document, and the name of the field to
-    * extract from it. It should return the field value as a string.
-    *
-    * @remarks
-    * The returned string is fed into the `tokenize` function to split it up
-    * into tokens.
-    */
-  extractField?: (document: T, fieldName: string) => any
-
-  /**
-   * Function used to turn field values into strings for indexing
-   *
-   * The function takes as arguments the field value, and the name of the field
-   * to stringify, so that its logic can be customized on specific fields. By
-   * default, it simply calls `toString()` on the field value (which in many
-   * cases is already a string).
-   *
-   * ### Example:
-   *
-   * ```javascript
-   * // Custom stringifier that formats dates as "Tuesday, September 16, 2025"
-   * const miniSearch = new MiniSearch({
-   *   fields: ['title', 'date'],
-   *   stringifyField: ((fieldValue, _fieldName) => {
-   *     if (fieldValue instanceof Date) {
-   *       return fieldValue.toLocaleDateString('en-US', {
-   *         weekday: 'long',
-   *         year: 'numeric',
-   *         month: 'long',
-   *         day: 'numeric'
-   *       })
-   *     } else {
-   *      return fieldValue.toString()
-   *     }
-   *   }
-   * })
-   * ```
-   */
-  stringifyField?: (fieldValue: any, fieldName: string) => string
-
-  /**
-    * Function used to split a field value into individual terms to be indexed.
-    * The default tokenizer separates terms by space or punctuation, but a
-    * custom tokenizer can be provided for custom logic.
-    *
-    * The function takes as arguments string to tokenize, and the name of the
-    * field it comes from. It should return the terms as an array of strings.
-    * When used for tokenizing a search query instead of a document field, the
-    * `fieldName` is undefined.
-    *
-    * @remarks
-    * This function is called after `extractField` extracts a truthy value from a
-    * field. This function is then expected to split the extracted `text` document
-    * into tokens (more commonly referred to as "terms" in this context). The resulting
-    * split might be simple, like for example on word boundaries, or it might be more
-    * complex, taking into account certain encoding, or parsing needs, or even just
-    * special cases. Think about how one might need to go about indexing the term
-    * "short-term". You would likely want to treat this case specially, and return two
-    * terms instead, `[ "short", "term" ]`.
-    *
-    * Or, you could let such a case be handled by the `processTerm` function,
-    * which is designed to turn each token/term into whole terms or sub-terms. In any
-    * case, the purpose of this function is to split apart the provided `text` document
-    * into parts that can be processed by the `processTerm` function.
-    */
-  tokenize?: (text: string, fieldName?: string) => string[]
-
-  /**
-    * Function used to process a term before indexing or search. This can be
-    * used for normalization (such as stemming). By default, terms are
-    * downcased, and otherwise no other normalization is performed.
-    *
-    * The function takes as arguments a term to process, and the name of the
-    * field it comes from. It should return the processed term as a string, or a
-    * falsy value to reject the term entirely.
-    *
-    * It can also return an array of strings, in which case each string in the
-    * returned array is indexed as a separate term.
-    *
-    * @remarks
-    * During the document indexing phase, the first step is to call the `extractField`
-    * function to fetch the requested value/field from the document. This is then
-    * passed off to the `tokenizer`, which will break apart each value into "terms".
-    * These terms are then individually passed through the `processTerm` function
-    * to compute each term individually. A term might for example be something
-    * like "lbs", in which case one would likely want to return
-    * `[ "lbs", "lb", "pound", "pounds" ]`. You may also return a single string value,
-    * or a falsy value if you would like to skip indexing entirely for a specific term.
-    *
-    * Truthy return value(s) are then fed to the indexer as positive matches for this
-    * document. In our example above, all four of the `[ "lbs", "lb", "pound", "pounds" ]`
-    * terms would be added to the indexing engine, matching against the current document
-    * being computed.
-    *
-    * *Note: Whatever values are returned from this function will receive no further
-    * processing before being indexed. This means for example, if you include whitespace
-    * at the beginning or end of a word, it will also be indexed that way, with the
-    * included whitespace.*
-    */
-  processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
-
-  /**
-   * Function called to log messages. Arguments are a log level ('debug',
-   * 'info', 'warn', or 'error'), a log message, and an optional string code
-   * that identifies the reason for the log.
-   *
-   * The default implementation uses `console`, if defined.
-   */
-  logger?: (level: LogLevel, message: string, code?: string) => void
-
-  /**
-   * If `true` (the default), vacuuming is performed automatically as soon as
-   * {@link MiniSearch#discard} is called a certain number of times, cleaning up
-   * obsolete references from the index. If `false`, no automatic vacuuming is
-   * performed. Custom settings controlling auto vacuuming thresholds, as well
-   * as batching behavior, can be passed as an object (see the {@link
-   * AutoVacuumOptions} type).
-   */
-  autoVacuum?: boolean | AutoVacuumOptions
-
-  /**
-    * Default search options (see the {@link SearchOptions} type and the {@link
-    * MiniSearch#search} method for details)
-    */
-  searchOptions?: SearchOptions
-
-  /**
-    * Default auto suggest options (see the {@link SearchOptions} type and the
-    * {@link MiniSearch#autoSuggest} method for details)
-    */
-  autoSuggestOptions?: SearchOptions
-}
-
-type OptionsWithDefaults<T = any> = Options<T> & {
-  storeFields: string[]
-
-  idField: string
-
-  extractField: (document: T, fieldName: string) => any
-
-  stringifyField: (fieldValue: any, fieldName: string) => string
-
-  tokenize: (text: string, fieldName: string) => string[]
-
-  processTerm: (term: string, fieldName: string) => string | string[] | null | undefined | false
-
-  logger: (level: LogLevel, message: string, code?: string) => void
-
-  autoVacuum: false | AutoVacuumOptions
-
-  searchOptions: SearchOptionsWithDefaults
-
-  autoSuggestOptions: SearchOptions
-}
-
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-
-/**
- * The type of auto-suggestions
- */
-export type Suggestion = {
-  /**
-   * The suggestion
-   */
-  suggestion: string
-
-  /**
-   * Suggestion as an array of terms
-   */
-  terms: string[]
-
-  /**
-   * Score for the suggestion
-   */
-  score: number
-}
-
-/**
- * Match information for a search result. It is a key-value object where keys
- * are terms that matched, and values are the list of fields that the term was
- * found in.
- */
-export type MatchInfo = {
-  [term: string]: string[]
-}
-
-/**
- * Type of the search results. Each search result indicates the document ID, the
- * terms that matched, the match information, the score, and all the stored
- * fields.
- */
-export type SearchResult = {
-  /**
-   * The document ID
-   */
-  id: any
-
-  /**
-   * List of document terms that matched. For example, if a prefix search for
-   * `"moto"` matches `"motorcycle"`, `terms` will contain `"motorcycle"`.
-   */
-  terms: string[]
-
-  /**
-   * List of query terms that matched. For example, if a prefix search for
-   * `"moto"` matches `"motorcycle"`, `queryTerms` will contain `"moto"`.
-   */
-  queryTerms: string[]
-
-  /**
-   * Score of the search results
-   */
-  score: number
-
-  /**
-   * Match information, see {@link MatchInfo}
-   */
-  match: MatchInfo
-
-  /**
-   * Stored fields
-   */
-  [key: string]: any
-}
 
 /**
  * @ignore
@@ -480,73 +75,6 @@ export type AsPlainObject = {
   index: [string, { [fieldId: string]: SerializedIndexEntry }][]
   serializationVersion: number
 }
-
-export type QueryCombination = SearchOptions & { queries: Query[] }
-
-/**
- * Wildcard query, used to match all terms
- */
-export type Wildcard = typeof MiniSearch.wildcard
-
-/**
- * Search query expression, either a query string or an expression tree
- * combining several queries with a combination of AND or OR.
- */
-export type Query = QueryCombination | string | Wildcard
-
-/**
- * Options to control vacuuming behavior.
- *
- * Vacuuming cleans up document references made obsolete by {@link
- * MiniSearch.discard} from the index. On large indexes, vacuuming is
- * potentially costly, because it has to traverse the whole inverted index.
- * Therefore, in order to dilute this cost so it does not negatively affects the
- * application, vacuuming is performed in batches, with a delay between each
- * batch. These options are used to configure the batch size and the delay
- * between batches.
- */
-export type VacuumOptions = {
-  /**
-   * Size of each vacuuming batch (the number of terms in the index that will be
-   * traversed in each batch). Defaults to 1000.
-   */
-  batchSize?: number
-
-  /**
-   * Wait time between each vacuuming batch in milliseconds. Defaults to 10.
-   */
-  batchWait?: number
-}
-
-/**
- * Sets minimum thresholds for `dirtCount` and `dirtFactor` that trigger an
- * automatic vacuuming.
- */
-export type VacuumConditions = {
-  /**
-   * Minimum `dirtCount` (number of discarded documents since the last vacuuming)
-   * under which auto vacuum is not triggered. It defaults to 20.
-   */
-  minDirtCount?: number
-
-  /**
-   * Minimum `dirtFactor` (proportion of discarded documents over the total)
-   * under which auto vacuum is not triggered. It defaults to 0.1.
-   */
-  minDirtFactor?: number
-}
-
-/**
- * Options to control auto vacuum behavior. When discarding a document with
- * {@link MiniSearch#discard}, a vacuuming operation is automatically started if
- * the `dirtCount` and `dirtFactor` are above the `minDirtCount` and
- * `minDirtFactor` thresholds defined by this configuration. See {@link
- * VacuumConditions} for details on these.
- *
- * Also, `batchSize` and `batchWait` can be specified, controlling batching
- * behavior (see {@link VacuumOptions}).
- */
-export type AutoVacuumOptions = VacuumOptions & VacuumConditions
 
 type DocumentTermFreqs = Map<number, number>
 type FieldTermData = Map<number, DocumentTermFreqs>
@@ -1430,28 +958,8 @@ export default class MiniSearch<T = any> {
    * @return  A sorted array of suggestions sorted by relevance score.
    */
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
-    options = { ...this._options.autoSuggestOptions, ...options }
-
-    const suggestions: Map<string, Omit<Suggestion, 'suggestion'> & { count: number }> = new Map()
-
-    for (const { score, terms } of this.search(queryString, options)) {
-      const phrase = terms.join(' ')
-      const suggestion = suggestions.get(phrase)
-      if (suggestion != null) {
-        suggestion.score += score
-        suggestion.count += 1
-      } else {
-        suggestions.set(phrase, { score, terms, count: 1 })
-      }
-    }
-
-    const results = []
-    for (const [suggestion, { score, terms, count }] of suggestions) {
-      results.push({ suggestion, terms, score: score / count })
-    }
-
-    results.sort(byScore)
-    return results
+    const merged = { ...this._options.autoSuggestOptions, ...options }
+    return autoSuggestFromSearch((q, o) => this.search(q, o), queryString, merged)
   }
 
   /**
@@ -1665,127 +1173,84 @@ export default class MiniSearch<T = any> {
    * @ignore
    */
   private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
-    if (query === MiniSearch.wildcard) {
-      return this.executeWildcardQuery(searchOptions)
-    }
-
-    if (typeof query !== 'string') {
-      const options = { ...searchOptions, ...query, queries: undefined }
-      const results = query.queries.map(subquery => this.executeQuery(subquery, options))
-      return this.combineResults(results, options.combineWith)
-    }
-
-    const { tokenize, processTerm, searchOptions: globalSearchOptions } = this._options
-    const options = { tokenize, processTerm, ...globalSearchOptions, ...searchOptions }
-    const { tokenize: searchTokenize, processTerm: searchProcessTerm } = options
-    const terms = searchTokenize(query)
-      .flatMap((term: string) => searchProcessTerm(term))
-      .filter(term => !!term) as string[]
-    const queries: QuerySpec[] = terms.map(termToQuerySpec(options))
-    const results = queries.map(query => this.executeQuerySpec(query, options))
-
-    return this.combineResults(results, options.combineWith)
+    return runQuery(query, searchOptions, this.queryEngineParams())
   }
 
-  /**
-   * @ignore
-   */
-  private executeQuerySpec(query: QuerySpec, searchOptions: SearchOptions): RawResult {
-    const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }
-
-    const boosts = (options.fields || this._options.fields).reduce((boosts, field) =>
-      ({ ...boosts, [field]: getOwnProperty(options.boost, field) || 1 }), {})
-
-    const {
-      boostDocument,
-      weights,
-      maxFuzzy,
-      bm25: bm25params,
-    } = options
-
-    const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
-
-    const data = this._index.get(query.term)
-    const results = this.termResults(query.term, query.term, 1, query.termBoost, data, boosts, boostDocument, bm25params)
-
-    let prefixMatches
-    let fuzzyMatches
-
-    if (query.prefix) {
-      prefixMatches = this._index.atPrefix(query.term)
+  private queryEngineParams(): QueryEngineParams {
+    return {
+      fields: this._options.fields,
+      globalSearchOptions: this._options.searchOptions,
+      tokenize: this._options.tokenize,
+      processTerm: this._options.processTerm,
+      indexView: this.mutableQueryIndexView(),
+      aggregateContext: this.aggregateContext(),
     }
-
-    if (query.fuzzy) {
-      const fuzzy = (query.fuzzy === true) ? 0.2 : query.fuzzy
-      const maxDistance = fuzzy < 1 ? Math.min(maxFuzzy, Math.round(query.term.length * fuzzy)) : fuzzy
-      if (maxDistance) fuzzyMatches = this._index.fuzzyGet(query.term, maxDistance)
-    }
-
-    if (prefixMatches) {
-      for (const [term, data] of prefixMatches) {
-        const distance = term.length - query.term.length
-        if (!distance) { continue } // Skip exact match.
-
-        // Delete the term from fuzzy results (if present) if it is also a
-        // prefix result. This entry will always be scored as a prefix result.
-        fuzzyMatches?.delete(term)
-
-        // Weight gradually approaches 0 as distance goes to infinity, with the
-        // weight for the hypothetical distance 0 being equal to prefixWeight.
-        // The rate of change is much lower than that of fuzzy matches to
-        // account for the fact that prefix matches stay more relevant than
-        // fuzzy matches for longer distances.
-        const weight = prefixWeight * term.length / (term.length + 0.3 * distance)
-        this.termResults(query.term, term, weight, query.termBoost, data, boosts, boostDocument, bm25params, results)
-      }
-    }
-
-    if (fuzzyMatches) {
-      for (const term of fuzzyMatches.keys()) {
-        const [data, distance] = fuzzyMatches.get(term)!
-        if (!distance) { continue } // Skip exact match.
-
-        // Weight gradually approaches 0 as distance goes to infinity, with the
-        // weight for the hypothetical distance 0 being equal to fuzzyWeight.
-        const weight = fuzzyWeight * term.length / (term.length + distance)
-        this.termResults(query.term, term, weight, query.termBoost, data, boosts, boostDocument, bm25params, results)
-      }
-    }
-
-    return results
   }
 
-  /**
-   * @ignore
-   */
-  private executeWildcardQuery(searchOptions: SearchOptions): RawResult {
-    const results = new Map() as RawResult
-    const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }
-
-    for (const [shortId, id] of this._documentIds) {
-      const score = options.boostDocument ? options.boostDocument(id, '', this._storedFields.get(shortId)) : 1
-      results.set(shortId, {
-        score,
-        terms: [],
-        match: {},
-      })
+  private aggregateContext(): AggregateContext {
+    return {
+      documentCount: this._documentCount,
+      avgFieldLength: this._avgFieldLength,
+      fieldIds: this._fieldIds,
+      getFieldLength: (docId, fieldId) => this._fieldLength.get(docId)![fieldId],
+      getExternalId: docId => this._documentIds.get(docId),
+      getStoredFields: docId => this._storedFields.get(docId),
+      isDocActive: docId => this._documentIds.has(docId),
+      onInactiveDoc: (docId, fieldId, term) => this.removeTerm(fieldId, docId, term),
     }
-
-    return results
   }
 
-  /**
-   * @ignore
-   */
-  private combineResults(results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
-    return combineResults(results, combineWith)
+  private mutableQueryIndexView(): QueryIndexView {
+    const index = this._index
+    const storedFields = this._storedFields
+    const documentIds = this._documentIds
+    return {
+      getTermData(term) {
+        const data = index.get(term)
+        return data == null ? undefined : mapFieldTermData(data)
+      },
+      * getPrefixMatches(term) {
+        for (const [t, data] of index.atPrefix(term)) {
+          yield [t, mapFieldTermData(data)]
+        }
+      },
+      getFuzzyMatches(term, maxDistance) {
+        const matches = index.fuzzyGet(term, maxDistance)
+        if (matches == null) return undefined
+        const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
+        for (const [t, [data, distance]] of matches) {
+          out.set(t, { data: mapFieldTermData(data), distance })
+        }
+        return out
+      },
+      forEachActiveDoc(callback) {
+        for (const [shortId, id] of documentIds) {
+          callback(shortId, id, storedFields.get(shortId))
+        }
+      },
+    }
+  }
+
+  /** @ignore */
+  private toFreezeSource(): FreezeSource<T> {
+    return {
+      _options: this._options,
+      _index: this._index,
+      _documentCount: this._documentCount,
+      _nextId: this._nextId,
+      _documentIds: this._documentIds,
+      _fieldIds: this._fieldIds,
+      _fieldLength: this._fieldLength,
+      _avgFieldLength: this._avgFieldLength,
+      _storedFields: this._storedFields,
+    }
   }
 
   /**
    * Build a read-only {@link FrozenMiniSearch} snapshot optimized for RAM and search CPU.
    */
   freeze(): import('./FrozenMiniSearch').default {
-    return freezeFromMiniSearch(this as unknown as import('./FrozenMiniSearch').FreezeSource<T>)
+    return freezeFromMiniSearch(this.toFreezeSource())
   }
 
   /**
@@ -1837,43 +1302,6 @@ export default class MiniSearch<T = any> {
       index,
       serializationVersion: 2,
     }
-  }
-
-  /**
-   * @ignore
-   */
-  private termResults(
-    sourceTerm: string,
-    derivedTerm: string,
-    termWeight: number,
-    termBoost: number,
-    fieldTermData: FieldTermData | undefined,
-    fieldBoosts: { [field: string]: number },
-    boostDocumentFn: ((id: any, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
-    bm25params: BM25Params,
-    results: RawResult = new Map(),
-  ): RawResult {
-    return aggregateTerm(
-      sourceTerm,
-      derivedTerm,
-      termWeight,
-      termBoost,
-      fieldTermData == null ? undefined : mapFieldTermData(fieldTermData),
-      fieldBoosts,
-      {
-        documentCount: this._documentCount,
-        avgFieldLength: this._avgFieldLength,
-        fieldIds: this._fieldIds,
-        getFieldLength: (docId, fieldId) => this._fieldLength.get(docId)![fieldId],
-        getExternalId: docId => this._documentIds.get(docId),
-        getStoredFields: docId => this._storedFields.get(docId),
-        isDocActive: docId => this._documentIds.has(docId),
-        onInactiveDoc: (docId, fieldId, term) => this.removeTerm(fieldId, docId, term),
-      },
-      boostDocumentFn,
-      bm25params,
-      results,
-    )
   }
 
   /**

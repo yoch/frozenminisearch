@@ -1,13 +1,6 @@
-import type { MatchInfo, SearchOptions, SearchResult } from './MiniSearch'
+import type { MatchInfo, SearchOptions, SearchResult, CombinationOperator, LowercaseCombinationOperator, BM25Params } from './searchTypes'
 
-export type BM25Params = {
-  k: number
-  b: number
-  d: number
-}
-
-export type LowercaseCombinationOperator = 'or' | 'and' | 'and_not'
-export type CombinationOperator = LowercaseCombinationOperator | Uppercase<LowercaseCombinationOperator> | Capitalize<LowercaseCombinationOperator>
+export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
 
 export const OR: LowercaseCombinationOperator = 'or'
 export const AND: LowercaseCombinationOperator = 'and'

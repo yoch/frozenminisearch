@@ -1,7 +1,7 @@
 import SearchableMap from './SearchableMap/SearchableMap'
-import { clampFreq } from './compactPostings'
-import type { Options } from './MiniSearch'
-import type { FrozenAssembleParams } from './FrozenMiniSearch'
+import type { Options } from './searchTypes'
+import type { FrozenAssembleParams } from './frozenTypes'
+import { materializeFlatPostings } from './flatPostings'
 import {
   buildFieldIds,
   collectFieldTermFreqs,
@@ -49,48 +49,25 @@ function appendPosting(
     state.postingsFreqs[slot] = freqs
   }
   docIds.push(docId)
-  freqs!.push(clampFreq(freq))
+  freqs!.push(freq)
 }
 
-function finalizeFlatPostings(state: PostingsBuildState): {
-  postingsOffsets: Uint32Array
-  postingsLengths: Uint32Array
-  allDocIds: Uint32Array
-  allFreqs: Uint8Array
-} {
-  const termCount = state.terms.length
-  const slotCount = termCount * state.fieldCount
-  const postingsOffsets = new Uint32Array(slotCount)
-  const postingsLengths = new Uint32Array(slotCount)
-  const docScratch: number[] = []
-  const freqScratch: number[] = []
-
-  for (let ti = 0; ti < termCount; ti++) {
-    const base = ti * state.fieldCount
-    for (let f = 0; f < state.fieldCount; f++) {
-      const offset = docScratch.length
-      const docIds = state.postingsDocIds[base + f]
-      const freqs = state.postingsFreqs[base + f]
-      if (docIds == null || docIds.length === 0) {
-        postingsOffsets[base + f] = offset
-        postingsLengths[base + f] = 0
-        continue
-      }
+function finalizeFlatPostings(state: PostingsBuildState) {
+  const { fieldCount, terms } = state
+  return materializeFlatPostings({
+    fieldCount,
+    termCount: terms.length,
+    clampFrequencies: true,
+    forEachPosting(ti, f, emit) {
+      const slot = ti * fieldCount + f
+      const docIds = state.postingsDocIds[slot]
+      const freqs = state.postingsFreqs[slot]
+      if (docIds == null) return
       for (let i = 0; i < docIds.length; i++) {
-        docScratch.push(docIds[i])
-        freqScratch.push(freqs![i])
+        emit(docIds[i], freqs![i])
       }
-      postingsOffsets[base + f] = offset
-      postingsLengths[base + f] = docIds.length
-    }
-  }
-
-  return {
-    postingsOffsets,
-    postingsLengths,
-    allDocIds: new Uint32Array(docScratch),
-    allFreqs: new Uint8Array(freqScratch),
-  }
+    },
+  })
 }
 
 /** Incremental builder for {@link FrozenMiniSearch} without materializing a full `documents[]` array. */
@@ -218,7 +195,7 @@ export class FrozenIndexBuilder<T> {
       : this._storedFields
 
     return {
-      options: this._options as FrozenAssembleParams<T>['options'],
+      options: this._options,
       documentCount,
       nextId: documentCount,
       fieldIds: this._fieldIds,

@@ -52,6 +52,33 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     ({ mutable, frozen } = buildEngines())
   })
 
+  test('shared query engine: freeze, fromDocuments, and builder agree', () => {
+    const viaFreeze = buildFrozenViaFreeze()
+    const viaDocs = buildFrozenDirect()
+    const viaBuilder = buildFrozenViaBuilder()
+    const queries = [
+      'zen',
+      'zen whale',
+      { combineWith: 'AND', queries: ['zen', 'art'] },
+      'neur',
+      MiniSearch.wildcard,
+    ]
+    const searchOpts = [
+      {},
+      { combineWith: 'OR' },
+      { prefix: true },
+      { fuzzy: 0.3 },
+      { boost: { title: 2 } },
+      { filter: r => r.category === 'fiction' },
+    ]
+    for (const q of queries) {
+      for (const opts of searchOpts) {
+        expectSameResults(viaFreeze, viaDocs, q, opts)
+        expectSameResults(viaFreeze, viaBuilder, q, opts)
+      }
+    }
+  })
+
   test('exact search', () => {
     expectSameResults(mutable, frozen, 'zen')
   })

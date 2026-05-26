@@ -2,16 +2,12 @@ import SearchableMap from './SearchableMap/SearchableMap'
 import { LEAF } from './SearchableMap/TreeIterator'
 import type { RadixTree } from './SearchableMap/types'
 import {
-  aggregateTerm,
-  combineResults,
   finalizeSearchResults,
-  termToQuerySpec,
-  getOwnProperty,
-  type RawResult,
-  type QuerySpec,
+  type AggregateContext,
   type FieldTermDataLike,
+  type RawResult,
 } from './scoring'
-import { clampFreq, flatFieldTermData } from './compactPostings'
+import { flatFieldTermData } from './compactPostings'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
@@ -25,36 +21,29 @@ import {
   validateFrozenSnapshotNumeric,
 } from './binaryFormat'
 import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
+import {
+  executeQuery as runQuery,
+  type QueryEngineParams,
+  type QueryIndexView,
+} from './queryEngine'
+import { autoSuggestFromSearch } from './suggestions'
 import type {
   Options,
   Query,
   SearchOptions,
+  SearchOptionsWithDefaults,
   SearchResult,
-  CombinationOperator,
-  BM25Params,
-} from './MiniSearch'
+  Suggestion,
+} from './searchTypes'
+import type {
+  FreezeSource,
+  FrozenAssembleParams,
+  FrozenMemoryBreakdown,
+  OptionsWithDefaults,
+} from './frozenTypes'
+export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
+import { materializeFlatPostings, DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
-
-type SearchOptionsWithDefaults = SearchOptions & {
-  boost: { [fieldName: string]: number }
-  weights: { fuzzy: number, prefix: number }
-  prefix: boolean | ((term: string, index: number, terms: string[]) => boolean)
-  fuzzy: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
-  maxFuzzy: number
-  combineWith: CombinationOperator
-  bm25: BM25Params
-}
-
-type OptionsWithDefaults<T> = Options<T> & {
-  storeFields: string[]
-  idField: string
-  extractField: (document: T, fieldName: string) => any
-  stringifyField: (fieldValue: any, fieldName: string) => string
-  tokenize: (text: string, fieldName: string) => string[]
-  processTerm: (term: string, fieldName: string) => string | string[] | null | undefined | false
-  searchOptions: SearchOptionsWithDefaults
-  autoSuggestOptions: SearchOptions
-}
 
 const READ_ONLY_MSG = 'FrozenMiniSearch is read-only. Rebuild from a mutable MiniSearch instance.'
 
@@ -91,66 +80,8 @@ function countRadixMapNodes(tree: RadixTree<unknown>): number {
   return n
 }
 
-export interface FreezeSource<T = any> {
-  _options: OptionsWithDefaults<T>
-  _index: SearchableMap<Map<number, Map<number, number>>>
-  _documentCount: number
-  _nextId: number
-  _documentIds: Map<number, any>
-  _fieldIds: { [key: string]: number }
-  _fieldLength: Map<number, number[]>
-  _avgFieldLength: number[]
-  _storedFields: Map<number, Record<string, unknown>>
-}
-
-export interface FrozenMemoryBreakdown {
-  termCount: number
-  documentCount: number
-  nextId: number
-  postings: {
-    slotCount: number
-    allDocIdsBytes: number
-    allFreqsBytes: number
-    offsetsBytes: number
-    lengthsBytes: number
-    totalTypedBytes: number
-  }
-  radixTree: {
-    mapNodeCount: number
-    estimatedBytes: number
-  }
-  documents: {
-    externalIdsSlots: number
-    storedFieldsSlots: number
-    idToShortIdEntries: number
-    fieldLengthMatrixBytes: number
-    avgFieldLengthBytes: number
-    storedFieldsJsonBytes: number
-  }
-  estimatedStructuredBytes: number
-}
-
 export function frozenMemoryBreakdown(frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
   return frozen.memoryBreakdown()
-}
-
-export interface FrozenAssembleParams<T = any> {
-  options: OptionsWithDefaults<T>
-  documentCount: number
-  nextId: number
-  fieldIds: { [field: string]: number }
-  fieldCount: number
-  externalIds: unknown[]
-  idToShortId: Map<unknown, number>
-  storedFields: (Record<string, unknown> | undefined)[]
-  fieldLengthMatrix: Uint32Array
-  avgFieldLength: Float32Array
-  index: SearchableMap<number>
-  terms: string[]
-  postingsOffsets: Uint32Array
-  postingsLengths: Uint32Array
-  allDocIds: Uint32Array
-  allFreqs: Uint8Array
 }
 
 function assertFieldsMatchSnapshot(
@@ -194,50 +125,30 @@ function buildFlatPostingsFromSource<T>(
   allFreqs: Uint8Array
 } {
   const terms: string[] = []
+  const fieldIndexByTermIndex: Map<number, Map<number, number>>[] = []
   const leafToIndex = new WeakMap<Map<number, Map<number, number>>, number>()
 
   for (const [term, fieldIndex] of source._index) {
     const ti = terms.length
     terms.push(term)
+    fieldIndexByTermIndex.push(fieldIndex)
     leafToIndex.set(fieldIndex, ti)
   }
 
-  const termCount = terms.length
-  const slotCount = termCount * fieldCount
-  const postingsOffsets = new Uint32Array(slotCount)
-  const postingsLengths = new Uint32Array(slotCount)
-  const docScratch: number[] = []
-  const freqScratch: number[] = []
-
-  for (const [, fieldIndex] of source._index) {
-    const ti = leafToIndex.get(fieldIndex)!
-    const base = ti * fieldCount
-
-    for (let f = 0; f < fieldCount; f++) {
-      const offset = docScratch.length
-      const freqs = fieldIndex.get(f)
-      if (freqs == null || freqs.size === 0) {
-        postingsOffsets[base + f] = offset
-        postingsLengths[base + f] = 0
-        continue
-      }
-      let count = 0
+  const flat = materializeFlatPostings({
+    fieldCount,
+    termCount: terms.length,
+    clampFrequencies: true,
+    remapDocId: shortIdRemap != null ? (docId: number) => shortIdRemap![docId] : undefined,
+    forEachPosting(ti, f, emit) {
+      const freqs = fieldIndexByTermIndex[ti].get(f)
+      if (freqs == null) return
       for (const [shortId, freq] of freqs) {
-        const docId = shortIdRemap != null ? shortIdRemap[shortId] : shortId
-        // Skip discarded docs when dense remapping is enabled. This prevents
-        // invalid docIds (no externalId) from leaking into frozen search results.
-        if (docId === 0xffffffff) continue
-        docScratch.push(docId)
-        freqScratch.push(clampFreq(freq))
-        count++
+        emit(shortId, freq)
       }
-      postingsOffsets[base + f] = offset
-      postingsLengths[base + f] = count
-    }
-  }
-
-  const allDocIds = new Uint32Array(docScratch)
-  const allFreqs = new Uint8Array(freqScratch)
+    },
+  })
+  const { postingsOffsets, postingsLengths, allDocIds, allFreqs } = flat
   const tree = cloneRadixTreeWithTermIndex(
     source._index.radixTree as RadixTree<Map<number, Map<number, number>>>,
     leafToIndex,
@@ -258,7 +169,7 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
 
   if (useDense) {
     shortIdRemap = new Uint32Array(_nextId)
-    shortIdRemap.fill(0xffffffff)
+    shortIdRemap.fill(DISCARDED_DOC_ID)
     let dense = 0
     for (const [shortId, id] of source._documentIds) {
       shortIdRemap[shortId] = dense
@@ -279,7 +190,7 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
   const fieldLengthMatrix = new Uint32Array(matrixRows * fieldCount)
   for (const [shortId, lengths] of source._fieldLength) {
     const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
-    if (row === 0xffffffff) continue
+    if (row === DISCARDED_DOC_ID) continue
     for (let f = 0; f < fieldCount; f++) {
       fieldLengthMatrix[row * fieldCount + f] = lengths[f] ?? 0
     }
@@ -456,7 +367,6 @@ export default class FrozenMiniSearch<T = any> {
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     const { searchOptions: globalSearchOptions } = this._options
     const searchOptionsWithDefaults: SearchOptionsWithDefaults = { ...globalSearchOptions, ...searchOptions }
-    this._fieldTermDataCache = undefined
     const rawResults = this.executeQuery(query, searchOptions)
     const skipSort = query === FrozenMiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null
     return finalizeSearchResults({
@@ -468,28 +378,9 @@ export default class FrozenMiniSearch<T = any> {
     })
   }
 
-  autoSuggest(queryString: string, options: SearchOptions = {}): import('./MiniSearch').Suggestion[] {
-    options = { ...this._options.autoSuggestOptions, ...options }
-    const suggestions: Map<string, { score: number, terms: string[], count: number }> = new Map()
-
-    for (const { score, terms } of this.search(queryString, options)) {
-      const phrase = terms.join(' ')
-      const suggestion = suggestions.get(phrase)
-      if (suggestion != null) {
-        suggestion.score += score
-        suggestion.count += 1
-      } else {
-        suggestions.set(phrase, { score, terms, count: 1 })
-      }
-    }
-
-    return [...suggestions.entries()]
-      .map(([suggestion, { score, terms, count }]) => ({
-        suggestion,
-        terms,
-        score: score / count,
-      }))
-      .sort((a, b) => b.score - a.score)
+  autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
+    const merged = { ...this._options.autoSuggestOptions, ...options }
+    return autoSuggestFromSearch((q, o) => this.search(q, o), queryString, merged)
   }
 
   saveBinary(): Buffer {
@@ -611,126 +502,64 @@ export default class FrozenMiniSearch<T = any> {
     return data
   }
 
-  private aggregateContext() {
+  private aggregateContext(): AggregateContext {
     return {
       documentCount: this._documentCount,
       avgFieldLength: this._avgFieldLength,
       fieldIds: this._fieldIds,
-      getFieldLength: (docId: number, fieldId: number) => this.getFieldLength(docId, fieldId),
-      getExternalId: (docId: number) => this._externalIds[docId],
-      getStoredFields: (docId: number) => this._storedFields[docId],
+      getFieldLength: (docId, fieldId) => this.getFieldLength(docId, fieldId),
+      getExternalId: docId => this._externalIds[docId],
+      getStoredFields: docId => this._storedFields[docId],
     }
-  }
-
-  private termResults(
-    sourceTerm: string,
-    derivedTerm: string,
-    termWeight: number,
-    termBoost: number,
-    termIndex: number | undefined,
-    fieldBoosts: { [field: string]: number },
-    boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
-    bm25params: BM25Params,
-    results: RawResult = new Map(),
-  ): RawResult {
-    if (termIndex == null) return results
-    return aggregateTerm(
-      sourceTerm,
-      derivedTerm,
-      termWeight,
-      termBoost,
-      this.fieldTermDataFor(termIndex),
-      fieldBoosts,
-      this.aggregateContext(),
-      boostDocumentFn,
-      bm25params,
-      results,
-    )
   }
 
   private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
-    if (query === FrozenMiniSearch.wildcard) {
-      return this.executeWildcardQuery(searchOptions)
-    }
-
-    if (typeof query !== 'string') {
-      const options = { ...searchOptions, ...query, queries: undefined }
-      const results = query.queries.map(subquery => this.executeQuery(subquery, options))
-      return combineResults(results, options.combineWith as CombinationOperator)
-    }
-
-    const { tokenize, processTerm, searchOptions: globalSearchOptions } = this._options
-    const options = { tokenize, processTerm, ...globalSearchOptions, ...searchOptions }
-    const { tokenize: searchTokenize, processTerm: searchProcessTerm } = options
-    const terms = searchTokenize(query)
-      .flatMap((term: string) => searchProcessTerm(term))
-      .filter(term => !!term) as string[]
-    const queries: QuerySpec[] = terms.map(termToQuerySpec(options))
-    const results = queries.map(q => this.executeQuerySpec(q, options))
-    return combineResults(results, options.combineWith as CombinationOperator)
+    return runQuery(query, searchOptions, this.queryEngineParams())
   }
 
-  private executeQuerySpec(query: QuerySpec, searchOptions: SearchOptions): RawResult {
-    const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }
-    const boosts = (options.fields || this._options.fields).reduce<{ [field: string]: number }>(
-      (b: { [field: string]: number }, field: string) => ({ ...b, [field]: (getOwnProperty(options.boost as Record<string, unknown>, field) as number) || 1 }),
-      {},
-    )
-    const { boostDocument, weights, maxFuzzy, bm25: bm25params } = options
-    const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
-
-    const termIndex = this._index.get(query.term)
-    const results = this.termResults(query.term, query.term, 1, query.termBoost, termIndex, boosts, boostDocument, bm25params)
-
-    let prefixMatches: SearchableMap<number> | undefined
-    let fuzzyMatches: ReturnType<SearchableMap<number>['fuzzyGet']> | undefined
-
-    if (query.prefix) {
-      prefixMatches = this._index.atPrefix(query.term)
+  private queryEngineParams(): QueryEngineParams {
+    return {
+      fields: this._options.fields,
+      globalSearchOptions: this._options.searchOptions,
+      tokenize: this._options.tokenize,
+      processTerm: this._options.processTerm,
+      indexView: this.frozenQueryIndexView(),
+      aggregateContext: this.aggregateContext(),
     }
-
-    if (query.fuzzy) {
-      const fuzzy = (query.fuzzy === true) ? 0.2 : query.fuzzy
-      const maxDistance = fuzzy < 1
-        ? Math.min(maxFuzzy, Math.round(query.term.length * fuzzy))
-        : fuzzy
-      if (maxDistance) fuzzyMatches = this._index.fuzzyGet(query.term, maxDistance)
-    }
-
-    if (prefixMatches) {
-      for (const [term, ti] of prefixMatches) {
-        const distance = term.length - query.term.length
-        if (!distance) continue
-        fuzzyMatches?.delete(term)
-        const weight = prefixWeight * term.length / (term.length + 0.3 * distance)
-        this.termResults(query.term, term, weight, query.termBoost, ti, boosts, boostDocument, bm25params, results)
-      }
-    }
-
-    if (fuzzyMatches) {
-      for (const term of fuzzyMatches.keys()) {
-        const [ti, distance] = fuzzyMatches.get(term)!
-        if (!distance) continue
-        const weight = fuzzyWeight * term.length / (term.length + distance)
-        this.termResults(query.term, term, weight, query.termBoost, ti, boosts, boostDocument, bm25params, results)
-      }
-    }
-
-    return results
   }
 
-  private executeWildcardQuery(searchOptions: SearchOptions): RawResult {
-    const results = new Map() as RawResult
-    const options: SearchOptionsWithDefaults = { ...this._options.searchOptions, ...searchOptions }
-
-    for (let shortId = 0; shortId < this._nextId; shortId++) {
-      const id = this._externalIds[shortId]
-      if (id === undefined) continue
-      const score = options.boostDocument
-        ? options.boostDocument(id, '', this._storedFields[shortId])
-        : 1
-      results.set(shortId, { score, terms: [], match: {} })
+  private frozenQueryIndexView(): QueryIndexView {
+    const index = this._index
+    const fieldTermDataFor = (ti: number) => this.fieldTermDataFor(ti)
+    const externalIds = this._externalIds
+    const storedFields = this._storedFields
+    const nextId = this._nextId
+    return {
+      getTermData(term) {
+        const ti = index.get(term)
+        return ti == null ? undefined : fieldTermDataFor(ti)
+      },
+      * getPrefixMatches(term) {
+        for (const [t, ti] of index.atPrefix(term)) {
+          yield [t, fieldTermDataFor(ti)]
+        }
+      },
+      getFuzzyMatches(term, maxDistance) {
+        const matches = index.fuzzyGet(term, maxDistance)
+        if (matches == null) return undefined
+        const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
+        for (const [t, [ti, distance]] of matches) {
+          out.set(t, { data: fieldTermDataFor(ti), distance })
+        }
+        return out
+      },
+      forEachActiveDoc(callback) {
+        for (let shortId = 0; shortId < nextId; shortId++) {
+          const id = externalIds[shortId]
+          if (id === undefined) continue
+          callback(shortId, id, storedFields[shortId])
+        }
+      },
     }
-    return results
   }
 }

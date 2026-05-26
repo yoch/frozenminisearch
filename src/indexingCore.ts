@@ -1,21 +1,15 @@
-import type { Options } from './MiniSearch'
+import type { Options, OptionsWithDefaults } from './searchTypes'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
   defaultFrozenLoadOptions,
 } from './searchDefaults'
 
-export type IndexingOptions<T> = Options<T> & {
-  storeFields: string[]
-  idField: string
-  extractField: (document: T, fieldName: string) => any
-  stringifyField: (fieldValue: any, fieldName: string) => string
-  tokenize: (text: string, fieldName: string) => string[]
-  processTerm: (term: string, fieldName: string) => string | string[] | null | undefined | false
-  searchOptions: typeof defaultSearchOptions
-  autoSuggestOptions: typeof defaultAutoSuggestOptions
-  fields: string[]
-}
+/**
+ * Indexing-time view of options: same shape as the canonical {@link OptionsWithDefaults}
+ * so the mutable index, frozen builder and binary loader cannot drift.
+ */
+export type IndexingOptions<T> = OptionsWithDefaults<T>
 
 export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<T> {
   if (options?.fields == null) {

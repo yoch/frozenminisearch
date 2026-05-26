@@ -1,11 +1,11 @@
 {
-  "capturedAt": "2026-05-25T23:10:03.988Z",
+  "capturedAt": "2026-05-26T02:24:48.259Z",
   "node": "v22.22.0",
-  "packageVersion": "8.0.0-beta.0",
+  "packageVersion": "8.0.0-beta.2",
   "gcExposed": true,
   "git": {
-    "commit": "1f2f5ea7b33ab9530b845f1a2e585f3cf2e0903b",
-    "commitShort": "1f2f5ea",
+    "commit": "6d0e7c5e711d05c2ee125b87e3de907d00d4f9d5",
+    "commitShort": "6d0e7c5",
     "branch": "master",
     "dirty": true
   },
@@ -22,19 +22,19 @@
         "txt"
       ],
       "indexing": {
-        "addAllMs": 235.29,
-        "freezeMs": 95.33,
-        "fromDocumentsMs": 200.98,
-        "jsonSerializeMs": 167.39,
-        "saveBinaryMs": 51.18,
+        "addAllMs": 222.85,
+        "freezeMs": 88.78,
+        "fromDocumentsMs": 178.04,
+        "jsonSerializeMs": 165.82,
+        "saveBinaryMs": 49.77,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
         "mutable": 16.128,
         "frozen": 5.202,
         "buildMutableFreeze": 5.227,
-        "buildFromDocuments": 5.328,
-        "buildFromDocumentsVsMutableFreezeSavingPct": -1.9,
+        "buildFromDocuments": 5.345,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -2.3,
         "loadJson": 15.197,
         "loadBinary": 5.89,
         "frozenVsMutableSavingPct": 67.7
@@ -45,9 +45,9 @@
         "binaryVsJsonSavingPct": 18.4
       },
       "loadMs": {
-        "json": 118.96,
-        "binary": 29.67,
-        "binaryVsJsonSavingPct": 75.1
+        "json": 114.09,
+        "binary": 26.93,
+        "binaryVsJsonSavingPct": 76.4
       },
       "memoryBreakdown": {
         "termCount": 13497,
@@ -79,45 +79,45 @@
         {
           "label": "exact",
           "query": "inferno",
-          "mutableP50": 0.0475,
-          "frozenP50": 0.0708,
-          "mutableP95": 0.1055,
-          "frozenP95": 0.113,
-          "frozenP50VsMutablePct": 49.2
+          "mutableP50": 0.0478,
+          "frozenP50": 0.0707,
+          "mutableP95": 0.0993,
+          "frozenP95": 0.084,
+          "frozenP50VsMutablePct": 47.9
         },
         {
           "label": "AND",
           "query": "inferno paradiso",
-          "mutableP50": 0.0646,
-          "frozenP50": 0.0872,
-          "mutableP95": 0.1038,
-          "frozenP95": 0.1092,
-          "frozenP50VsMutablePct": 35
+          "mutableP50": 0.0634,
+          "frozenP50": 0.0307,
+          "mutableP95": 0.11,
+          "frozenP95": 0.0578,
+          "frozenP50VsMutablePct": -51.6
         },
         {
           "label": "prefix",
           "query": "infe",
-          "mutableP50": 0.1828,
-          "frozenP50": 0.0972,
-          "mutableP95": 0.3151,
-          "frozenP95": 0.1835,
-          "frozenP50VsMutablePct": -46.8
+          "mutableP50": 0.1674,
+          "frozenP50": 0.0906,
+          "mutableP95": 0.3072,
+          "frozenP95": 0.1695,
+          "frozenP50VsMutablePct": -45.9
         },
         {
           "label": "fuzzy",
           "query": "infern",
-          "mutableP50": 0.1772,
-          "frozenP50": 0.1389,
-          "mutableP95": 1.053,
-          "frozenP95": 0.1741,
-          "frozenP50VsMutablePct": -21.6
+          "mutableP50": 0.0826,
+          "frozenP50": 0.0746,
+          "mutableP95": 0.652,
+          "frozenP95": 0.1415,
+          "frozenP50VsMutablePct": -9.7
         }
       ],
       "summary": {
         "heapFrozenVsMutableSavingPct": 67.7,
         "diskBinaryVsJsonSavingPct": 18.4,
-        "loadBinaryVsJsonSavingPct": 75.1,
-        "searchFrozenP50AvgGainPct": -3.9
+        "loadBinaryVsJsonSavingPct": 76.4,
+        "searchFrozenP50AvgGainPct": 14.8
       }
     },
     {
@@ -129,19 +129,19 @@
       ],
       "storeFields": [],
       "indexing": {
-        "addAllMs": 164.79,
-        "freezeMs": 70.17,
-        "fromDocumentsMs": 182.22,
-        "jsonSerializeMs": 203.27,
-        "saveBinaryMs": 30.85,
+        "addAllMs": 153.65,
+        "freezeMs": 77.54,
+        "fromDocumentsMs": 157.15,
+        "jsonSerializeMs": 142.47,
+        "saveBinaryMs": 43.09,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
         "mutable": 14.927,
-        "frozen": 4.459,
-        "buildMutableFreeze": 4.437,
+        "frozen": 4.464,
+        "buildMutableFreeze": 4.431,
         "buildFromDocuments": 4.57,
-        "buildFromDocumentsVsMutableFreezeSavingPct": -3,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -3.1,
         "loadJson": 13.55,
         "loadBinary": 4.654,
         "frozenVsMutableSavingPct": 70.1
@@ -152,9 +152,9 @@
         "binaryVsJsonSavingPct": 16.7
       },
       "loadMs": {
-        "json": 85.51,
-        "binary": 24.98,
-        "binaryVsJsonSavingPct": 70.8
+        "json": 87.52,
+        "binary": 22.13,
+        "binaryVsJsonSavingPct": 74.7
       },
       "memoryBreakdown": {
         "termCount": 13497,
@@ -186,27 +186,27 @@
         {
           "label": "exact",
           "query": "inferno",
-          "mutableP50": 0.0343,
-          "frozenP50": 0.0315,
-          "mutableP95": 0.0731,
-          "frozenP95": 0.0462,
-          "frozenP50VsMutablePct": -8.3
+          "mutableP50": 0.0344,
+          "frozenP50": 0.0177,
+          "mutableP95": 0.069,
+          "frozenP95": 0.0626,
+          "frozenP50VsMutablePct": -48.5
         },
         {
           "label": "prefix",
           "query": "infe",
-          "mutableP50": 0.1637,
-          "frozenP50": 0.1009,
-          "mutableP95": 0.2144,
-          "frozenP95": 0.1928,
-          "frozenP50VsMutablePct": -38.4
+          "mutableP50": 0.1393,
+          "frozenP50": 0.1311,
+          "mutableP95": 0.2239,
+          "frozenP95": 0.1735,
+          "frozenP50VsMutablePct": -5.9
         }
       ],
       "summary": {
         "heapFrozenVsMutableSavingPct": 70.1,
         "diskBinaryVsJsonSavingPct": 16.7,
-        "loadBinaryVsJsonSavingPct": 70.8,
-        "searchFrozenP50AvgGainPct": 23.3
+        "loadBinaryVsJsonSavingPct": 74.7,
+        "searchFrozenP50AvgGainPct": 27.2
       }
     },
     {
@@ -218,22 +218,22 @@
       ],
       "storeFields": [],
       "indexing": {
-        "addAllMs": 381.78,
-        "freezeMs": 229.31,
-        "fromDocumentsMs": 297.74,
-        "jsonSerializeMs": 386.63,
-        "saveBinaryMs": 87.37,
+        "addAllMs": 267.17,
+        "freezeMs": 197.37,
+        "fromDocumentsMs": 254.8,
+        "jsonSerializeMs": 322.59,
+        "saveBinaryMs": 72.84,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
         "mutable": 47.198,
-        "frozen": 14.795,
-        "buildMutableFreeze": 14.817,
+        "frozen": 14.8,
+        "buildMutableFreeze": 14.823,
         "buildFromDocuments": 14.81,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 0,
+        "buildFromDocumentsVsMutableFreezeSavingPct": 0.1,
         "loadJson": 41.102,
         "loadBinary": 14.783,
-        "frozenVsMutableSavingPct": 68.7
+        "frozenVsMutableSavingPct": 68.6
       },
       "diskMb": {
         "json": 4.207,
@@ -241,9 +241,9 @@
         "binaryVsJsonSavingPct": 13.5
       },
       "loadMs": {
-        "json": 281.17,
-        "binary": 100.53,
-        "binaryVsJsonSavingPct": 64.2
+        "json": 254.11,
+        "binary": 74.73,
+        "binaryVsJsonSavingPct": 70.6
       },
       "memoryBreakdown": {
         "termCount": 50003,
@@ -275,27 +275,27 @@
         {
           "label": "exact",
           "query": "unique12345",
-          "mutableP50": 0.0131,
-          "frozenP50": 0.0113,
-          "mutableP95": 0.0266,
-          "frozenP95": 0.0208,
-          "frozenP50VsMutablePct": -13.2
+          "mutableP50": 0.0126,
+          "frozenP50": 0.0097,
+          "mutableP95": 0.0389,
+          "frozenP95": 0.0203,
+          "frozenP50VsMutablePct": -23.3
         },
         {
           "label": "prefix",
           "query": "unique1",
-          "mutableP50": 92.6313,
-          "frozenP50": 60.3123,
-          "mutableP95": 121.882,
-          "frozenP95": 76.9039,
-          "frozenP50VsMutablePct": -34.9
+          "mutableP50": 77.4551,
+          "frozenP50": 48.3355,
+          "mutableP95": 95.6392,
+          "frozenP95": 54.8938,
+          "frozenP50VsMutablePct": -37.6
         }
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 68.7,
+        "heapFrozenVsMutableSavingPct": 68.6,
         "diskBinaryVsJsonSavingPct": 13.5,
-        "loadBinaryVsJsonSavingPct": 64.2,
-        "searchFrozenP50AvgGainPct": 24.3
+        "loadBinaryVsJsonSavingPct": 70.6,
+        "searchFrozenP50AvgGainPct": 30.3
       }
     },
     {
@@ -309,22 +309,22 @@
         "txt"
       ],
       "indexing": {
-        "addAllMs": 1762.6,
-        "freezeMs": 31.06,
-        "fromDocumentsMs": 1143.3,
-        "jsonSerializeMs": 148.45,
-        "saveBinaryMs": 128.46,
+        "addAllMs": 1426.11,
+        "freezeMs": 34.85,
+        "fromDocumentsMs": 1160.47,
+        "jsonSerializeMs": 121.73,
+        "saveBinaryMs": 122.56,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
         "mutable": 6.56,
-        "frozen": 1.795,
-        "buildMutableFreeze": 1.781,
-        "buildFromDocuments": 1.785,
-        "buildFromDocumentsVsMutableFreezeSavingPct": -0.2,
-        "loadJson": 29.57,
-        "loadBinary": 25.369,
-        "frozenVsMutableSavingPct": 72.6
+        "frozen": 1.781,
+        "buildMutableFreeze": 1.748,
+        "buildFromDocuments": 1.778,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -1.7,
+        "loadJson": 29.575,
+        "loadBinary": 25.351,
+        "frozenVsMutableSavingPct": 72.9
       },
       "diskMb": {
         "json": 24.341,
@@ -332,9 +332,9 @@
         "binaryVsJsonSavingPct": 0.9
       },
       "loadMs": {
-        "json": 81.41,
-        "binary": 74.66,
-        "binaryVsJsonSavingPct": 8.3
+        "json": 55.27,
+        "binary": 52.53,
+        "binaryVsJsonSavingPct": 4.9
       },
       "memoryBreakdown": {
         "termCount": 5008,
@@ -366,27 +366,27 @@
         {
           "label": "exact",
           "query": "lorem",
-          "mutableP50": 5.6775,
-          "frozenP50": 4.0202,
-          "mutableP95": 9.0069,
-          "frozenP95": 7.2159,
-          "frozenP50VsMutablePct": -29.2
+          "mutableP50": 4.4966,
+          "frozenP50": 2.8939,
+          "mutableP95": 6.463,
+          "frozenP95": 5.8085,
+          "frozenP50VsMutablePct": -35.6
         },
         {
           "label": "AND",
           "query": "lorem ipsum",
-          "mutableP50": 12.5857,
-          "frozenP50": 11.4712,
-          "mutableP95": 16.438,
-          "frozenP95": 16.5618,
-          "frozenP50VsMutablePct": -8.9
+          "mutableP50": 10.4262,
+          "frozenP50": 8.1226,
+          "mutableP95": 13.9771,
+          "frozenP95": 11.6194,
+          "frozenP50VsMutablePct": -22.1
         }
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 72.6,
+        "heapFrozenVsMutableSavingPct": 72.9,
         "diskBinaryVsJsonSavingPct": 0.9,
-        "loadBinaryVsJsonSavingPct": 8.3,
-        "searchFrozenP50AvgGainPct": 19
+        "loadBinaryVsJsonSavingPct": 4.9,
+        "searchFrozenP50AvgGainPct": 28.9
       }
     },
     {
@@ -407,22 +407,22 @@
       ],
       "storeFields": [],
       "indexing": {
-        "addAllMs": 119.93,
-        "freezeMs": 62.25,
-        "fromDocumentsMs": 95.53,
-        "jsonSerializeMs": 190.79,
-        "saveBinaryMs": 3.27,
+        "addAllMs": 96.4,
+        "freezeMs": 46.41,
+        "fromDocumentsMs": 84.91,
+        "jsonSerializeMs": 138.34,
+        "saveBinaryMs": 2.4,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
         "mutable": 7.075,
-        "frozen": 0.597,
-        "buildMutableFreeze": 0.588,
+        "frozen": 0.551,
+        "buildMutableFreeze": 0.611,
         "buildFromDocuments": 0.58,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 1.4,
-        "loadJson": 6.988,
+        "buildFromDocumentsVsMutableFreezeSavingPct": 5.1,
+        "loadJson": 7.019,
         "loadBinary": 0.561,
-        "frozenVsMutableSavingPct": 91.6
+        "frozenVsMutableSavingPct": 92.2
       },
       "diskMb": {
         "json": 0.854,
@@ -430,9 +430,9 @@
         "binaryVsJsonSavingPct": 20.7
       },
       "loadMs": {
-        "json": 40.13,
-        "binary": 2.37,
-        "binaryVsJsonSavingPct": 94.1
+        "json": 38.78,
+        "binary": 2.9,
+        "binaryVsJsonSavingPct": 92.5
       },
       "memoryBreakdown": {
         "termCount": 2012,
@@ -464,27 +464,27 @@
         {
           "label": "exact",
           "query": "sharedterm",
-          "mutableP50": 5.3912,
-          "frozenP50": 3.8076,
-          "mutableP95": 8.855,
-          "frozenP95": 5.6601,
-          "frozenP50VsMutablePct": -29.4
+          "mutableP50": 4.7139,
+          "frozenP50": 3.0737,
+          "mutableP95": 6.6725,
+          "frozenP95": 5.3546,
+          "frozenP50VsMutablePct": -34.8
         },
         {
           "label": "prefix",
           "query": "share",
-          "mutableP50": 7.9161,
-          "frozenP50": 3.6088,
-          "mutableP95": 12.2929,
-          "frozenP95": 5.4177,
-          "frozenP50VsMutablePct": -54.4
+          "mutableP50": 5.5201,
+          "frozenP50": 3.3003,
+          "mutableP95": 7.1569,
+          "frozenP95": 4.4959,
+          "frozenP50VsMutablePct": -40.2
         }
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 91.6,
+        "heapFrozenVsMutableSavingPct": 92.2,
         "diskBinaryVsJsonSavingPct": 20.7,
-        "loadBinaryVsJsonSavingPct": 94.1,
-        "searchFrozenP50AvgGainPct": 41.9
+        "loadBinaryVsJsonSavingPct": 92.5,
+        "searchFrozenP50AvgGainPct": 37.5
       }
     },
     {
@@ -496,22 +496,22 @@
       ],
       "storeFields": [],
       "indexing": {
-        "addAllMs": 134.57,
-        "freezeMs": 49.32,
-        "fromDocumentsMs": 82.24,
-        "jsonSerializeMs": 62.56,
-        "saveBinaryMs": 1.33,
+        "addAllMs": 109.87,
+        "freezeMs": 41.17,
+        "fromDocumentsMs": 76.08,
+        "jsonSerializeMs": 45.76,
+        "saveBinaryMs": 1.27,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
-        "mutable": 7.37,
-        "frozen": 0.659,
-        "buildMutableFreeze": 0.66,
+        "mutable": 7.367,
+        "frozen": 0.646,
+        "buildMutableFreeze": 0.644,
         "buildFromDocuments": 0.655,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 0.8,
-        "loadJson": 6.111,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -1.7,
+        "loadJson": 6.147,
         "loadBinary": 0.655,
-        "frozenVsMutableSavingPct": 91.1
+        "frozenVsMutableSavingPct": 91.2
       },
       "diskMb": {
         "json": 1.079,
@@ -519,9 +519,9 @@
         "binaryVsJsonSavingPct": 42.6
       },
       "loadMs": {
-        "json": 29,
-        "binary": 4.33,
-        "binaryVsJsonSavingPct": 85.1
+        "json": 27.39,
+        "binary": 4.32,
+        "binaryVsJsonSavingPct": 84.2
       },
       "memoryBreakdown": {
         "termCount": 258,
@@ -553,27 +553,27 @@
         {
           "label": "exact",
           "query": "alpha",
-          "mutableP50": 11.9531,
-          "frozenP50": 9.6062,
-          "mutableP95": 20.9021,
-          "frozenP95": 13.8325,
-          "frozenP50VsMutablePct": -19.6
+          "mutableP50": 9.883,
+          "frozenP50": 5.6791,
+          "mutableP95": 27.9629,
+          "frozenP95": 8.5593,
+          "frozenP50VsMutablePct": -42.5
         },
         {
           "label": "AND",
           "query": "alpha beta",
-          "mutableP50": 33.229,
-          "frozenP50": 24.9095,
-          "mutableP95": 47.8766,
-          "frozenP95": 39.2192,
-          "frozenP50VsMutablePct": -25
+          "mutableP50": 24.5427,
+          "frozenP50": 22.6575,
+          "mutableP95": 34.8426,
+          "frozenP95": 36.1814,
+          "frozenP50VsMutablePct": -7.7
         }
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 91.1,
+        "heapFrozenVsMutableSavingPct": 91.2,
         "diskBinaryVsJsonSavingPct": 42.6,
-        "loadBinaryVsJsonSavingPct": 85.1,
-        "searchFrozenP50AvgGainPct": 22.3
+        "loadBinaryVsJsonSavingPct": 84.2,
+        "searchFrozenP50AvgGainPct": 25.1
       }
     },
     {
@@ -585,19 +585,19 @@
       ],
       "storeFields": [],
       "indexing": {
-        "addAllMs": 329.53,
-        "freezeMs": 3.15,
-        "fromDocumentsMs": 293.99,
-        "jsonSerializeMs": 4.23,
-        "saveBinaryMs": 0.35,
+        "addAllMs": 266.23,
+        "freezeMs": 2.19,
+        "fromDocumentsMs": 214.32,
+        "jsonSerializeMs": 3.03,
+        "saveBinaryMs": 0.25,
         "binaryMagic": "MSv2"
       },
       "heapMb": {
         "mutable": 0.677,
         "frozen": 0.078,
         "buildMutableFreeze": 0.12,
-        "buildFromDocuments": 0.088,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 26.7,
+        "buildFromDocuments": 0.087,
+        "buildFromDocumentsVsMutableFreezeSavingPct": 27.5,
         "loadJson": 0.438,
         "loadBinary": 0.088,
         "frozenVsMutableSavingPct": 88.5
@@ -608,9 +608,9 @@
         "binaryVsJsonSavingPct": 39.6
       },
       "loadMs": {
-        "json": 1.97,
-        "binary": 0.32,
-        "binaryVsJsonSavingPct": 83.6
+        "json": 3.04,
+        "binary": 0.41,
+        "binaryVsJsonSavingPct": 86.4
       },
       "memoryBreakdown": {
         "termCount": 4,
@@ -642,11 +642,11 @@
         {
           "label": "exact",
           "query": "alpha",
-          "mutableP50": 1.7445,
-          "frozenP50": 1.79,
-          "mutableP95": 2.9222,
-          "frozenP95": 2.5122,
-          "frozenP50VsMutablePct": 2.6
+          "mutableP50": 1.4045,
+          "frozenP50": 1.1466,
+          "mutableP95": 2.1178,
+          "frozenP95": 2.2485,
+          "frozenP50VsMutablePct": -18.4
         }
       ],
       "scoreDrift": [
@@ -662,8 +662,8 @@
       "summary": {
         "heapFrozenVsMutableSavingPct": 88.5,
         "diskBinaryVsJsonSavingPct": 39.6,
-        "loadBinaryVsJsonSavingPct": 83.6,
-        "searchFrozenP50AvgGainPct": -2.6
+        "loadBinaryVsJsonSavingPct": 86.4,
+        "searchFrozenP50AvgGainPct": 18.4
       }
     }
   ]

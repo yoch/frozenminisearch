@@ -124,8 +124,8 @@ TypeScript definitions: `dist/es/index.d.ts`.
 Reproducible comparisons (heap, load time, search latency) live under [`benchmarks/`](benchmarks/README.md):
 
 ```bash
-yarn benchmark:compare    # terminal report
-yarn benchmark:diff       # vs versioned baseline
+npm run benchmark:compare    # terminal report
+npm run benchmark:diff       # vs versioned baseline
 ```
 
 ---
@@ -133,10 +133,12 @@ yarn benchmark:diff       # vs versioned baseline
 ## Development
 
 ```bash
-yarn install
-yarn test
-yarn build
+npm install
+npm test
+npm run build
 ```
+
+Use `npm run` for scripts (Yarn 1.x on Node 22 prints `url.parse` deprecation noise when invoking `yarn test` / `yarn build`).
 
 **Requirements:** Node.js **ES2018+**. No browser UMD/CDN build in this fork (Node-only ESM + CJS).
 

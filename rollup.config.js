@@ -25,7 +25,11 @@ const config = ({ format, input, output, dir, extension = 'js', exports = undefi
         })]
         : []
     },
-    plugins: [output === 'dts' ? dts() : typescript()]
+    plugins: [
+      output === 'dts'
+        ? dts()
+        : typescript(production ? { sourceMap: false } : undefined)
+    ]
   }
 }
 

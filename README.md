@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.0.0-beta.2` · install with `npm install @yoch/minisearch`
+> **Current release:** `8.0.0-beta.3` · install with `npm install @yoch/minisearch`
 
 ---
 
@@ -99,14 +99,48 @@ function buildFrozenIndexFromRows (rows, options) {
 // After search: enrich from your store — frozen.getStoredFields(res.id) or dataCache[type][res.id]
 ```
 
+**Async stream** (no intermediate array; documents are indexed as they arrive):
+
+```javascript
+import { createReadStream } from 'node:fs'
+import { parse } from 'csv-parse'
+import { FrozenMiniSearch } from '@yoch/minisearch'
+
+async function buildFromCsv (path, options) {
+  async function * documents () {
+    const parser = createReadStream(path).pipe(parse({ columns: true }))
+    for await (const row of parser) {
+      yield { id: row.cis, denomination: row.denomination, /* … */ }
+    }
+  }
+  return FrozenMiniSearch.fromAsyncIterable(documents(), options)
+}
+```
+
+For a **sync** iterable (`for...of` on an array or generator), use the builder directly:
+
+```javascript
+import { createFrozenIndexBuilder, freezeFrozenIndexBuilder } from '@yoch/minisearch'
+
+const builder = createFrozenIndexBuilder(options)
+for (const doc of documentGenerator()) {
+  builder.add(doc)
+}
+const frozen = freezeFrozenIndexBuilder(builder)
+```
+
+`estimatedDocumentCount` in the second argument to `createFrozenIndexBuilder` pre-allocates
+per-document arrays when the final size is known; internal buffers are trimmed to the actual
+count on freeze if the hint was too large.
+
 ---
 
 ## FrozenMiniSearch in a bit more detail
 
 - **`freeze()`** — snapshot a mutable index into compact typed postings + a radix tree keyed by term index.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
-- **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)`.
-- **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index.
+- **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
+- **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
 - **`saveBinary()` / `loadBinary()`** — MSv2 on write, MSv1 still readable; pass the same `fields` (and custom `tokenize` / `processTerm` if used at build time).
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint.
@@ -118,6 +152,8 @@ import {
   FrozenMiniSearch,
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
+  FrozenIndexBuilder,
+  type FrozenIndexBuilderHints,
   buildFrozenFromDocuments,
   assembleFrozen,
   freezeFromMiniSearch,

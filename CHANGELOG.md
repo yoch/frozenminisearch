@@ -2,6 +2,20 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.0.0-beta.3
+
+Incremental frozen index construction without a temporary `documents[]` array.
+
+  - Add `FrozenIndexBuilder` and `createFrozenIndexBuilder(options, hints?)` with `.add(doc)`
+    and optional `estimatedDocumentCount` pre-sizing
+  - Add `freezeFrozenIndexBuilder(builder)` to finalize into `FrozenMiniSearch` (avoids a
+    circular import between build and assembly modules)
+  - Add `FrozenMiniSearch.fromAsyncIterable(iterable, options)` for async document streams
+    (e.g. CSV parsers)
+  - Refactor `buildFrozenParamsFromDocuments` to use the builder internally (same output)
+  - Trim per-document arrays when `estimatedDocumentCount` exceeds the actual document count
+  - Export `FrozenIndexBuilderHints` type
+
 ## v8.0.0-beta.2
 
 Consolidated beta on npm. Supersedes `8.0.0-beta.0` and `8.0.0-beta.1` (unpublished).

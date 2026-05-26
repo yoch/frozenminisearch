@@ -238,6 +238,7 @@ export class FrozenIndexBuilder<T> {
   }
 }
 
+/** Create an incremental builder for {@link FrozenMiniSearch}. */
 export function createFrozenIndexBuilder<T> (
   options: Options<T>,
   hints?: FrozenIndexBuilderHints

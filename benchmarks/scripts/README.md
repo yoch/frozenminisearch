@@ -19,6 +19,15 @@ benchmarks/scripts/analyze-history.sh --changelog
 # 5. Versionner l'historique
 git add benchmarks/perf-history.jsonl CHANGELOG.md
 git commit -m "Record benchmark history at $(git rev-parse --short HEAD)."
+
+`baselines/reference.json` (pour `benchmark:diff`) : mettre à jour **après** le commit
+de release, sur arbre propre — pas dans le même commit que le bump de version :
+
+```bash
+RUNS=3 yarn benchmark:baseline:update
+git add benchmarks/baselines/reference.json
+git commit -m "Refresh benchmark reference for 8.1.0."
+```
 ```
 
 Seuls les fichiers **suivis** modifiés bloquent l'enregistrement ; `benchmarks/scripts/` peut rester non commité.

@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.0.1` · install with `npm install @yoch/minisearch`
+> **Current release:** `8.1.0` · install with `npm install @yoch/minisearch`
 
 ---
 
@@ -14,7 +14,7 @@
 |---|---------------------|-------------------|
 | **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed, or you reload from disk |
 | **Memory** | Maps and nested objects per posting | Flat `Uint32Array` / `Uint8Array` postings |
-| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv3 only) |
+| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv4 / MSv3) |
 | **Typical search** | Baseline | Often **~20–35% faster** p50 on the same corpus (see benchmarks) |
 
 Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies are stored as `Uint8` (max **255** per document/field); extreme repetition can cause a small score drift versus the mutable index.
@@ -140,7 +140,7 @@ count on freeze if the hint was too large.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
 - **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
 - **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
-- **`saveBinary()` / `loadBinary()`** — **MSv3** binary format (CRC32, binary metadata). **MSv1/MSv2 snapshots are not supported** — re-save indexes built with older betas. Field names are stored in the snapshot; `fields` in `loadBinary` options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
+- **`saveBinary()` / `loadBinary()`** — **MSv4** (sparse multi-field, Uint16 doc ids when possible) or **MSv3** (single-field dense, Uint32 doc ids). **MSv1/MSv2 are not supported** — re-save older snapshots. Field names are stored in the snapshot; `fields` in `loadBinary` options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).
 
@@ -184,7 +184,7 @@ TypeScript definitions: `dist/es/index.d.ts`.
 
 ## FrozenMiniSearch — optimizations
 
-### Already in MSv3 (8.0.0+)
+### Already in MSv3 / MSv4 (8.0.0+)
 
 | Area | Change | Effect |
 |------|--------|--------|
@@ -255,6 +255,6 @@ npm run release:beta
 See [CHANGELOG.md](./CHANGELOG.md).
 
 - **MiniSearch** — [Luca Ongaro](https://github.com/lucaong/minisearch) (MIT)
-- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, MSv3 binary format, shared scoring refactor
+- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, MSv4/MSv3 binary snapshots, shared scoring refactor
 
 Upstream docs: [MiniSearch site](https://lucaong.github.io/minisearch/) · [intro article](https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html)

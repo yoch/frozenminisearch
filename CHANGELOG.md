@@ -2,6 +2,21 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.1.0
+
+Frozen index memory and on-disk format improvements (MSv4).
+
+  - **MSv4** binary snapshots: sparse postings for multi-field indexes, Uint16 doc ids when
+    `nextId ≤ 65535`, dynamic sparse field-id width (Uint8/Uint16). **MSv3** is still written
+    for single-field dense indexes that need Uint32 doc ids (>65 536 documents)
+  - Adaptive frozen postings (dense vs sparse), identity or lazy-map external-id lookup, term
+    dictionary rebuilt at `saveBinary()` instead of kept in memory
+  - Scoring fast path for `SegmentPostingList` (typed-array postings)
+  - [breaking change] Re-save indexes with `saveBinary()` after upgrade — most corpora now
+    serialize as MSv4 instead of MSv3
+  - Benchmark suite extended (13 scenarios); commit timeline in `benchmarks/perf-history.jsonl`
+    and `benchmarks/scripts/` for recording and analysis (frozen vs mutable MiniSearch)
+
 ## v8.0.1
 
 Internal refactor with no intended public API or behaviour changes.

@@ -1,4 +1,6 @@
 import SearchableMap from './SearchableMap/SearchableMap'
+import type { IdToShortIdLookup } from './frozenIdLookup'
+import type { FrozenPostingsLayout } from './frozenPostings'
 import type { OptionsWithDefaults } from './searchTypes'
 
 export type { OptionsWithDefaults } from './searchTypes'
@@ -22,6 +24,8 @@ export interface FrozenMemoryBreakdown {
   nextId: number
   postings: {
     slotCount: number
+    layout: string
+    docIdWidth: number
     allDocIdsBytes: number
     allFreqsBytes: number
     offsetsBytes: number
@@ -35,6 +39,7 @@ export interface FrozenMemoryBreakdown {
   documents: {
     externalIdsSlots: number
     storedFieldsSlots: number
+    idLookupMode: string
     idToShortIdEntries: number
     fieldLengthMatrixBytes: number
     avgFieldLengthBytes: number
@@ -50,14 +55,13 @@ export interface FrozenAssembleParams<T = any> {
   fieldIds: { [field: string]: number }
   fieldCount: number
   externalIds: unknown[]
-  idToShortId: Map<unknown, number>
+  idLookup: IdToShortIdLookup
   storedFields: (Record<string, unknown> | undefined)[]
   fieldLengthMatrix: Uint32Array
   avgFieldLength: Float32Array
   index: SearchableMap<number>
-  terms: string[]
-  postingsOffsets: Uint32Array
-  postingsLengths: Uint32Array
-  allDocIds: Uint32Array
-  allFreqs: Uint8Array
+  /** Dictionary size; {@link terms} required only when validating term indices at assembly. */
+  termCount: number
+  terms?: string[]
+  postings: FrozenPostingsLayout
 }

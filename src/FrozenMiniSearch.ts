@@ -7,7 +7,6 @@ import {
   type FieldTermDataLike,
   type RawResult,
 } from './scoring'
-import { flatFieldTermData } from './compactPostings'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
@@ -18,8 +17,15 @@ import {
   encodeFrozenSnapshot,
   deserializeTermIndexTree,
   fieldNamesFromFieldIds,
-  validateFrozenSnapshotNumeric,
 } from './binaryFormat'
+import { createIdToShortIdLookup, type IdToShortIdLookup } from './frozenIdLookup'
+import {
+  fieldTermDataFromLayout,
+  materializeFrozenPostings,
+  postingsTypedBytes,
+  validateFrozenPostingsLayout,
+  type FrozenPostingsLayout,
+} from './frozenPostings'
 import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
 import {
   executeQuery as runQuery,
@@ -42,8 +48,16 @@ import type {
   OptionsWithDefaults,
 } from './frozenTypes'
 export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
-import { materializeFlatPostings, DISCARDED_DOC_ID } from './flatPostings'
+import { DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
+
+function rebuildTermsFromIndex(index: SearchableMap<number>, termCount: number): string[] {
+  const terms: string[] = new Array(termCount)
+  for (const [term, ti] of index) {
+    terms[ti] = term
+  }
+  return terms
+}
 
 const READ_ONLY_MSG = 'FrozenMiniSearch is read-only. Rebuild from a mutable MiniSearch instance.'
 
@@ -99,14 +113,22 @@ function assertFieldsMatchSnapshot(
 
 /** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts. */
 export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
-  // Validate numeric invariants without serialising the radix tree to TreeShape.
-  // Full tree-shape validation (including JSON round-trip) is done by the decode
-  // path (decodeFrozenSnapshot) for untrusted external binary data.
-  validateFrozenSnapshotNumeric(params)
-  const termCount = params.terms.length
-  for (const [, ti] of params.index) {
-    if (!Number.isInteger(ti) || ti < 0 || ti >= termCount) {
-      throw new Error(`FrozenMiniSearch: radix tree leaf index out of range: ${ti}`)
+  const termCount = params.termCount
+  validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
+  if (params.fieldLengthMatrix.length !== params.nextId * params.fieldCount) {
+    throw new Error('FrozenMiniSearch: fieldLengthMatrix size mismatch')
+  }
+  if (params.avgFieldLength.length !== params.fieldCount) {
+    throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
+  }
+  if (params.terms != null) {
+    if (params.terms.length !== termCount) {
+      throw new Error('FrozenMiniSearch: terms length mismatch')
+    }
+    for (const [, ti] of params.index) {
+      if (!Number.isInteger(ti) || ti < 0 || ti >= termCount) {
+        throw new Error(`FrozenMiniSearch: radix tree leaf index out of range: ${ti}`)
+      }
     }
   }
   return new FrozenMiniSearch(params)
@@ -115,14 +137,12 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
 function buildFlatPostingsFromSource<T>(
   source: FreezeSource<T>,
   fieldCount: number,
+  nextId: number,
   shortIdRemap: Uint32Array | null,
 ): {
   terms: string[]
   tree: RadixTree<number>
-  postingsOffsets: Uint32Array
-  postingsLengths: Uint32Array
-  allDocIds: Uint32Array
-  allFreqs: Uint8Array
+  postings: FrozenPostingsLayout
 } {
   const terms: string[] = []
   const fieldIndexByTermIndex: Map<number, Map<number, number>>[] = []
@@ -135,9 +155,10 @@ function buildFlatPostingsFromSource<T>(
     leafToIndex.set(fieldIndex, ti)
   }
 
-  const flat = materializeFlatPostings({
+  const postings = materializeFrozenPostings({
     fieldCount,
     termCount: terms.length,
+    nextId,
     clampFrequencies: true,
     remapDocId: shortIdRemap != null ? (docId: number) => shortIdRemap![docId] : undefined,
     forEachPosting(ti, f, emit) {
@@ -148,13 +169,12 @@ function buildFlatPostingsFromSource<T>(
       }
     },
   })
-  const { postingsOffsets, postingsLengths, allDocIds, allFreqs } = flat
   const tree = cloneRadixTreeWithTermIndex(
     source.index.radixTree as RadixTree<Map<number, Map<number, number>>>,
     leafToIndex,
   )
 
-  return { terms, tree, postingsOffsets, postingsLengths, allDocIds, allFreqs }
+  return { terms, tree, postings }
 }
 
 export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSearch<T> {
@@ -163,9 +183,9 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
 
   const useDense = documentCount < nextId
   let shortIdRemap: Uint32Array | null = null
-  const externalIds: unknown[] = new Array(useDense ? documentCount : nextId)
+  const resolvedNextId = useDense ? documentCount : nextId
+  const externalIds: unknown[] = new Array(resolvedNextId)
   const storedFields: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
-  const idToShortId = new Map<unknown, number>()
 
   if (useDense) {
     shortIdRemap = new Uint32Array(nextId)
@@ -174,17 +194,17 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
     for (const [shortId, id] of source.documentIds) {
       shortIdRemap[shortId] = dense
       externalIds[dense] = id
-      idToShortId.set(id, dense)
       storedFields[dense] = source.storedFields.get(shortId)
       dense++
     }
   } else {
     for (const [shortId, id] of source.documentIds) {
       externalIds[shortId] = id
-      idToShortId.set(id, shortId)
       storedFields[shortId] = source.storedFields.get(shortId)
     }
   }
+
+  const idLookup = createIdToShortIdLookup(externalIds, resolvedNextId)
 
   const matrixRows = useDense ? documentCount : nextId
   const fieldLengthMatrix = new Uint32Array(matrixRows * fieldCount)
@@ -201,26 +221,24 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
     avgFieldLength[i] = source.avgFieldLength[i]
   }
 
-  const flat = buildFlatPostingsFromSource(source, fieldCount, shortIdRemap)
+  const flat = buildFlatPostingsFromSource(source, fieldCount, resolvedNextId, shortIdRemap)
   const frozenIndex = new SearchableMap<number>(flat.tree)
 
   return assembleFrozen({
     options: source.options,
     documentCount,
-    nextId: useDense ? documentCount : nextId,
+    nextId: resolvedNextId,
     fieldIds: source.fieldIds,
     fieldCount,
     externalIds,
-    idToShortId,
+    idLookup,
     storedFields,
     fieldLengthMatrix,
     avgFieldLength,
     index: frozenIndex,
+    termCount: flat.terms.length,
     terms: flat.terms,
-    postingsOffsets: flat.postingsOffsets,
-    postingsLengths: flat.postingsLengths,
-    allDocIds: flat.allDocIds,
-    allFreqs: flat.allFreqs,
+    postings: flat.postings,
   })
 }
 
@@ -239,56 +257,33 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _documentCount: number
   private readonly _nextId: number
   private readonly _externalIds: unknown[]
-  private readonly _idToShortId: Map<unknown, number>
+  private readonly _idLookup: IdToShortIdLookup
   private readonly _fieldIds: { [field: string]: number }
   private readonly _fieldCount: number
   private readonly _fieldLengthMatrix: Uint32Array
   private readonly _avgFieldLength: Float32Array
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
-  private readonly _terms: string[]
-  private readonly _postingsOffsets: Uint32Array
-  private readonly _postingsLengths: Uint32Array
-  private readonly _allDocIds: Uint32Array
-  private readonly _allFreqs: Uint8Array
+  private readonly _termCount: number
+  private readonly _postings: FrozenPostingsLayout
   /** Per-term {@link FieldTermDataLike} views; safe to retain for the instance lifetime (index is immutable). */
   private _fieldTermDataCache: FieldTermDataLike[] | undefined
   private readonly _aggregateContext: AggregateContext
   private readonly _queryEngineParams: QueryEngineParams
 
-  constructor(params: {
-    options: OptionsWithDefaults<T>
-    documentCount: number
-    nextId: number
-    fieldIds: { [field: string]: number }
-    fieldCount: number
-    externalIds: unknown[]
-    idToShortId: Map<unknown, number>
-    storedFields: (Record<string, unknown> | undefined)[]
-    fieldLengthMatrix: Uint32Array
-    avgFieldLength: Float32Array
-    index: SearchableMap<number>
-    terms: string[]
-    postingsOffsets: Uint32Array
-    postingsLengths: Uint32Array
-    allDocIds: Uint32Array
-    allFreqs: Uint8Array
-  }) {
+  constructor(params: FrozenAssembleParams<T>) {
     this._options = params.options
     this._documentCount = params.documentCount
     this._nextId = params.nextId
     this._externalIds = params.externalIds
-    this._idToShortId = params.idToShortId
+    this._idLookup = params.idLookup
     this._fieldIds = params.fieldIds
     this._fieldCount = params.fieldCount
     this._fieldLengthMatrix = params.fieldLengthMatrix
     this._avgFieldLength = params.avgFieldLength
     this._storedFields = params.storedFields
     this._index = params.index
-    this._terms = params.terms
-    this._postingsOffsets = params.postingsOffsets
-    this._postingsLengths = params.postingsLengths
-    this._allDocIds = params.allDocIds
-    this._allFreqs = params.allFreqs
+    this._termCount = params.termCount
+    this._postings = params.postings
 
     this._aggregateContext = {
       documentCount: this._documentCount,
@@ -321,11 +316,7 @@ export default class FrozenMiniSearch<T = any> {
 
   memoryBreakdown(): FrozenMemoryBreakdown {
     const termCount = this.termCount
-    const slotCount = termCount * this._fieldCount
-
-    const postingsTyped
-      = this._allDocIds.byteLength + this._allFreqs.byteLength
-        + this._postingsOffsets.byteLength + this._postingsLengths.byteLength
+    const postingsStats = postingsTypedBytes(this._postings)
 
     let storedJson = 0
     for (const row of this._storedFields) {
@@ -334,26 +325,29 @@ export default class FrozenMiniSearch<T = any> {
 
     const mapNodeCount = countRadixMapNodes(this._index.radixTree)
     const radixEst = mapNodeCount * MAP_NODE_ESTIMATE_BYTES
+    const idMapBytes = this._idLookup.mode === 'lazy-map' ? this._idLookup.mapEntryCount * 32 : 0
 
     const estimatedStructuredBytes
-      = postingsTyped
+      = postingsStats.totalTypedBytes
         + this._fieldLengthMatrix.byteLength
         + this._avgFieldLength.byteLength
         + radixEst
         + storedJson
-        + this._idToShortId.size * 32
+        + idMapBytes
 
     return {
       termCount,
       documentCount: this._documentCount,
       nextId: this._nextId,
       postings: {
-        slotCount,
-        allDocIdsBytes: this._allDocIds.byteLength,
-        allFreqsBytes: this._allFreqs.byteLength,
-        offsetsBytes: this._postingsOffsets.byteLength,
-        lengthsBytes: this._postingsLengths.byteLength,
-        totalTypedBytes: postingsTyped,
+        slotCount: postingsStats.slotCount,
+        layout: this._postings.layout,
+        docIdWidth: this._postings.docIdWidth,
+        allDocIdsBytes: postingsStats.allDocIdsBytes,
+        allFreqsBytes: postingsStats.allFreqsBytes,
+        offsetsBytes: postingsStats.offsetsBytes,
+        lengthsBytes: postingsStats.lengthsBytes,
+        totalTypedBytes: postingsStats.totalTypedBytes,
       },
       radixTree: {
         mapNodeCount,
@@ -362,7 +356,8 @@ export default class FrozenMiniSearch<T = any> {
       documents: {
         externalIdsSlots: this._externalIds.length,
         storedFieldsSlots: this._storedFields.length,
-        idToShortIdEntries: this._idToShortId.size,
+        idLookupMode: this._idLookup.mode,
+        idToShortIdEntries: this._idLookup.mapEntryCount,
         fieldLengthMatrixBytes: this._fieldLengthMatrix.byteLength,
         avgFieldLengthBytes: this._avgFieldLength.byteLength,
         storedFieldsJsonBytes: storedJson,
@@ -372,11 +367,11 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   has(id: unknown): boolean {
-    return this._idToShortId.has(id)
+    return this._idLookup.has(id)
   }
 
   getStoredFields(id: unknown): Record<string, unknown> | undefined {
-    const shortId = this._idToShortId.get(id)
+    const shortId = this._idLookup.get(id)
     return shortId == null ? undefined : this._storedFields[shortId]
   }
 
@@ -410,6 +405,7 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   saveBinary(): Buffer {
+    const terms = rebuildTermsFromIndex(this._index, this._termCount)
     return encodeFrozenSnapshot({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -420,12 +416,9 @@ export default class FrozenMiniSearch<T = any> {
       externalIds: this._externalIds,
       storedFields: this._storedFields,
       fieldLengthMatrix: this._fieldLengthMatrix,
-      terms: this._terms,
+      terms,
       treeShape: [],
-      postingsOffsets: this._postingsOffsets,
-      postingsLengths: this._postingsLengths,
-      allDocIds: this._allDocIds,
-      allFreqs: this._allFreqs,
+      postings: this._postings,
     }, this._index.radixTree)
   }
 
@@ -451,12 +444,7 @@ export default class FrozenMiniSearch<T = any> {
       snap.termTree ?? deserializeTermIndexTree(snap.treeShape),
     )
 
-    const idToShortId = new Map<unknown, number>()
-    for (let i = 0; i < snap.externalIds.length; i++) {
-      if (snap.externalIds[i] !== undefined) {
-        idToShortId.set(snap.externalIds[i], i)
-      }
-    }
+    const idLookup = createIdToShortIdLookup(snap.externalIds, snap.nextId)
 
     return assembleFrozen({
       options: opts,
@@ -465,16 +453,14 @@ export default class FrozenMiniSearch<T = any> {
       fieldIds: snap.fieldIds,
       fieldCount: snap.fieldCount,
       externalIds: snap.externalIds,
-      idToShortId,
+      idLookup,
       storedFields: snap.storedFields,
       fieldLengthMatrix: snap.fieldLengthMatrix,
       avgFieldLength: snap.avgFieldLength,
       index,
+      termCount: snap.terms.length,
       terms: snap.terms,
-      postingsOffsets: snap.postingsOffsets,
-      postingsLengths: snap.postingsLengths,
-      allDocIds: snap.allDocIds,
-      allFreqs: snap.allFreqs,
+      postings: snap.postings,
     })
   }
 
@@ -510,19 +496,12 @@ export default class FrozenMiniSearch<T = any> {
   private fieldTermDataFor(termIndex: number): FieldTermDataLike {
     let cache = this._fieldTermDataCache
     if (cache == null) {
-      cache = new Array(this.termCount)
+      cache = new Array(this._termCount)
       this._fieldTermDataCache = cache
     }
     let data = cache[termIndex]
     if (data == null) {
-      data = flatFieldTermData(
-        termIndex,
-        this._fieldCount,
-        this._postingsOffsets,
-        this._postingsLengths,
-        this._allDocIds,
-        this._allFreqs,
-      )
+      data = fieldTermDataFromLayout(this._postings, termIndex)
       cache[termIndex] = data
     }
     return data

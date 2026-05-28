@@ -290,9 +290,21 @@ describe('FrozenMiniSearch binary round-trip', () => {
     }
   })
 
-  test('saveBinary writes MSv3 format', () => {
+  test('saveBinary writes MSv4 for multi-field index', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
+    const buf = mutable.freeze().saveBinary()
+    expect(buf.toString('ascii', 0, 4)).toBe('MSv4')
+    expect(buf.readUInt16LE(4)).toBe(4)
+  })
+
+  test('saveBinary writes MSv3 for single-field Uint32 doc ids', () => {
+    const docsBig = Array.from({ length: 70000 }, (_, i) => ({
+      id: i,
+      text: `hello world ${i}`,
+    }))
+    const mutable = new MiniSearch({ fields: ['text'] })
+    mutable.addAll(docsBig)
     const buf = mutable.freeze().saveBinary()
     expect(buf.toString('ascii', 0, 4)).toBe('MSv3')
     expect(buf.readUInt16LE(4)).toBe(3)

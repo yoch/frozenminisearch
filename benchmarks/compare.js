@@ -40,7 +40,10 @@ function printMemoryBreakdown (b) {
   console.log(`  radix tree (~${b.radixTree.mapNodeCount} Map nodes): ~${mb(b.radixTree.estimatedBytes)} MB`)
   console.log(`  stored fields (JSON est.): ${mb(b.documents.storedFieldsJsonBytes)} MB`)
   console.log(`  field length matrix: ${mb(b.documents.fieldLengthMatrixBytes)} MB`)
-  console.log(`  idToShortId entries: ${b.documents.idToShortIdEntries}`)
+  console.log(`  id lookup: ${b.documents.idLookupMode} (map entries: ${b.documents.idToShortIdEntries})`)
+  if (b.postings.layout != null) {
+    console.log(`  postings layout: ${b.postings.layout}, docId width: ${b.postings.docIdWidth} bits`)
+  }
   console.log(`  total structured estimate: ${mb(b.estimatedStructuredBytes)} MB`)
 }
 

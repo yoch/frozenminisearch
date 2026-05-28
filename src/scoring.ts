@@ -1,3 +1,4 @@
+import { readDocId, SegmentPostingList } from './compactPostings'
 import type { MatchInfo, SearchOptions, SearchResult, CombinationOperator, LowercaseCombinationOperator, BM25Params } from './searchTypes'
 
 export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
@@ -90,6 +91,88 @@ export function mapFieldTermData(data: Map<number, Map<number, number>>): FieldT
   }
 }
 
+function scorePostingDoc(
+  sourceTerm: string,
+  derivedTerm: string,
+  field: string,
+  fieldId: number,
+  docId: number,
+  termFreq: number,
+  termWeight: number,
+  termBoost: number,
+  fieldBoost: number,
+  matchingFields: number,
+  context: AggregateContext,
+  boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
+  bm25params: BM25Params,
+  avgFieldLength: number,
+  results: RawResult,
+): void {
+  const docBoost = boostDocumentFn
+    ? boostDocumentFn(context.getExternalId(docId), derivedTerm, context.getStoredFields(docId))
+    : 1
+  if (!docBoost) return
+
+  const fieldLength = context.getFieldLength(docId, fieldId)
+  const rawScore = calcBM25Score(termFreq, matchingFields, context.documentCount, fieldLength, avgFieldLength, bm25params)
+  const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
+
+  const result = results.get(docId)
+  if (result) {
+    result.score += weightedScore
+    assignUniqueTerm(result.terms, sourceTerm)
+    const match = getOwnProperty(result.match as Record<string, unknown>, derivedTerm) as string[] | undefined
+    if (match) {
+      match.push(field)
+    } else {
+      result.match[derivedTerm] = [field]
+    }
+  } else {
+    results.set(docId, {
+      score: weightedScore,
+      terms: [sourceTerm],
+      match: { [derivedTerm]: [field] },
+    })
+  }
+}
+
+function aggregateSegmentPostingList(
+  sourceTerm: string,
+  derivedTerm: string,
+  termWeight: number,
+  termBoost: number,
+  field: string,
+  fieldId: number,
+  fieldBoost: number,
+  list: SegmentPostingList,
+  context: AggregateContext,
+  boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
+  bm25params: BM25Params,
+  results: RawResult,
+): number {
+  let matchingFields = list.length
+  const avgFieldLength = context.avgFieldLength[fieldId]
+  const { docIds, freqs, offset, length } = list
+
+  for (let i = 0; i < length; i++) {
+    const docId = readDocId(docIds, offset + i)
+    const termFreq = freqs[offset + i]
+
+    if (context.isDocActive != null && !context.isDocActive(docId)) {
+      context.onInactiveDoc?.(docId, fieldId, derivedTerm)
+      matchingFields -= 1
+      continue
+    }
+
+    scorePostingDoc(
+      sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
+      termWeight, termBoost, fieldBoost, matchingFields,
+      context, boostDocumentFn, bm25params, avgFieldLength, results,
+    )
+  }
+  return matchingFields
+}
+
 export function aggregateTerm(
   sourceTerm: string,
   derivedTerm: string,
@@ -110,6 +193,15 @@ export function aggregateTerm(
     const postingList = fieldTermData.get(fieldId)
     if (postingList == null) continue
 
+    if (postingList instanceof SegmentPostingList) {
+      aggregateSegmentPostingList(
+        sourceTerm, derivedTerm, termWeight, termBoost,
+        field, fieldId, fieldBoost, postingList,
+        context, boostDocumentFn, bm25params, results,
+      )
+      continue
+    }
+
     let matchingFields = postingList.size
     const avgFieldLength = context.avgFieldLength[fieldId]
 
@@ -120,32 +212,11 @@ export function aggregateTerm(
         return
       }
 
-      const docBoost = boostDocumentFn
-        ? boostDocumentFn(context.getExternalId(docId), derivedTerm, context.getStoredFields(docId))
-        : 1
-      if (!docBoost) return
-
-      const fieldLength = context.getFieldLength(docId, fieldId)
-      const rawScore = calcBM25Score(termFreq, matchingFields, context.documentCount, fieldLength, avgFieldLength, bm25params)
-      const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
-
-      const result = results.get(docId)
-      if (result) {
-        result.score += weightedScore
-        assignUniqueTerm(result.terms, sourceTerm)
-        const match = getOwnProperty(result.match as Record<string, unknown>, derivedTerm) as string[] | undefined
-        if (match) {
-          match.push(field)
-        } else {
-          result.match[derivedTerm] = [field]
-        }
-      } else {
-        results.set(docId, {
-          score: weightedScore,
-          terms: [sourceTerm],
-          match: { [derivedTerm]: [field] },
-        })
-      }
+      scorePostingDoc(
+        sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
+        termWeight, termBoost, fieldBoost, matchingFields,
+        context, boostDocumentFn, bm25params, avgFieldLength, results,
+      )
     })
   }
 

@@ -9,6 +9,16 @@ export const gc = () => { if (global.gc) global.gc() }
 
 export const heapBytes = () => process.memoryUsage().heapUsed
 
+export function memorySnapshot () {
+  const u = process.memoryUsage()
+  return {
+    heapUsed: u.heapUsed,
+    external: u.external,
+    arrayBuffers: u.arrayBuffers,
+    rss: u.rss
+  }
+}
+
 export function mb (bytes) {
   return bytes / 1024 / 1024
 }
@@ -30,12 +40,59 @@ export function pctDeltaRound (base, value, digits = 1) {
 
 export function measureHeap (fn) {
   gc()
-  const before = heapBytes()
+  const before = memorySnapshot()
   const value = fn()
   gc()
-  const after = heapBytes()
-  const delta = Math.max(0, after - before)
-  return { value, heapMb: mbRound(delta), heapBytes: delta }
+  const after = memorySnapshot()
+  const delta = (key) => Math.max(0, after[key] - before[key])
+  const heapBytesDelta = delta('heapUsed')
+  const externalBytes = delta('external')
+  const arrayBuffersBytes = delta('arrayBuffers')
+  const rssBytes = delta('rss')
+  return {
+    value,
+    heapMb: mbRound(heapBytesDelta),
+    heapBytes: heapBytesDelta,
+    externalMb: mbRound(externalBytes),
+    externalBytes,
+    arrayBuffersMb: mbRound(arrayBuffersBytes),
+    arrayBuffersBytes,
+    rssMb: mbRound(rssBytes),
+    rssBytes,
+    totalResidentApproxMb: mbRound(heapBytesDelta + externalBytes),
+    totalResidentApproxBytes: heapBytesDelta + externalBytes
+  }
+}
+
+export function medianOf (values) {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)]
+}
+
+export function medianMeasureHeap (fn, runs = 1) {
+  if (runs <= 1) return measureHeap(fn)
+  const samples = []
+  let lastValue
+  for (let i = 0; i < runs; i++) {
+    const sample = measureHeap(fn)
+    lastValue = sample.value
+    samples.push(sample)
+  }
+  const pick = (key) => medianOf(samples.map((s) => s[key]))
+  return {
+    value: lastValue,
+    heapMb: mbRound(pick('heapBytes')),
+    heapBytes: pick('heapBytes'),
+    externalMb: mbRound(pick('externalBytes')),
+    externalBytes: pick('externalBytes'),
+    arrayBuffersMb: mbRound(pick('arrayBuffersBytes')),
+    arrayBuffersBytes: pick('arrayBuffersBytes'),
+    rssMb: mbRound(pick('rssBytes')),
+    rssBytes: pick('rssBytes'),
+    totalResidentApproxMb: mbRound(pick('totalResidentApproxBytes')),
+    totalResidentApproxBytes: pick('totalResidentApproxBytes')
+  }
 }
 
 export function benchSearch (index, query, searchOptions = {}, iterations = 80) {

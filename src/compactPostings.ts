@@ -2,28 +2,34 @@ import type { FieldTermDataLike, PostingListLike } from './scoring'
 
 const MAX_FREQ_UINT8 = 255
 
+export type DocIdArray = Uint16Array | Uint32Array
+
+export function readDocId(docIds: DocIdArray, index: number): number {
+  return docIds[index] as number
+}
+
 /** View into global flat posting buffers (no per-list allocation). */
 export class SegmentPostingList implements PostingListLike {
-  private readonly _docIds: Uint32Array
-  private readonly _freqs: Uint8Array
-  private readonly _offset: number
-  private readonly _length: number
+  readonly docIds: DocIdArray
+  readonly freqs: Uint8Array
+  readonly offset: number
+  readonly length: number
 
-  constructor(docIds: Uint32Array, freqs: Uint8Array, offset: number, length: number) {
-    this._docIds = docIds
-    this._freqs = freqs
-    this._offset = offset
-    this._length = length
+  constructor(docIds: DocIdArray, freqs: Uint8Array, offset: number, length: number) {
+    this.docIds = docIds
+    this.freqs = freqs
+    this.offset = offset
+    this.length = length
   }
 
   get size(): number {
-    return this._length
+    return this.length
   }
 
   forEachDoc(callback: (docId: number, termFreq: number) => void): void {
-    const { _docIds, _freqs, _offset, _length } = this
-    for (let i = 0; i < _length; i++) {
-      callback(_docIds[_offset + i], _freqs[_offset + i])
+    const { docIds, freqs, offset, length } = this
+    for (let i = 0; i < length; i++) {
+      callback(readDocId(docIds, offset + i), freqs[offset + i])
     }
   }
 }
@@ -42,7 +48,7 @@ export function flatFieldTermData(
   fieldCount: number,
   postingsOffsets: Uint32Array,
   postingsLengths: Uint32Array,
-  allDocIds: Uint32Array,
+  allDocIds: DocIdArray,
   allFreqs: Uint8Array,
 ): FieldTermDataLike {
   const base = termIndex * fieldCount

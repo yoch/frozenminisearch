@@ -1,7 +1,8 @@
 import SearchableMap from './SearchableMap/SearchableMap'
 import type { Options } from './searchTypes'
 import type { FrozenAssembleParams } from './frozenTypes'
-import { materializeFlatPostings } from './flatPostings'
+import { materializeFrozenPostings } from './frozenPostings'
+import { createIdToShortIdLookup } from './frozenIdLookup'
 import {
   buildFieldIds,
   collectFieldTermFreqs,
@@ -52,11 +53,12 @@ function appendPosting(
   freqs!.push(freq)
 }
 
-function finalizeFlatPostings(state: PostingsBuildState) {
+function finalizeFlatPostings(state: PostingsBuildState, nextId: number) {
   const { fieldCount, terms } = state
-  return materializeFlatPostings({
+  return materializeFrozenPostings({
     fieldCount,
     termCount: terms.length,
+    nextId,
     clampFrequencies: true,
     forEachPosting(ti, f, emit) {
       const slot = ti * fieldCount + f
@@ -80,11 +82,11 @@ export class FrozenIndexBuilder<T> {
   private readonly _postingsDocIds: (number[] | undefined)[]
   private readonly _postingsFreqs: (number[] | undefined)[]
   private readonly _externalIds: unknown[]
-  private readonly _idToShortId: Map<unknown, number>
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
   private readonly _fieldLengthData: number[]
   private readonly _avgFieldLength: number[]
   private readonly _postingsState: PostingsBuildState
+  private readonly _seenIds: Set<unknown>
   private _nextId: number
   private _frozen: boolean
 
@@ -96,8 +98,8 @@ export class FrozenIndexBuilder<T> {
     this._terms = []
     this._postingsDocIds = []
     this._postingsFreqs = []
-    this._idToShortId = new Map()
     this._avgFieldLength = []
+    this._seenIds = new Set()
     this._nextId = 0
     this._frozen = false
 
@@ -135,12 +137,12 @@ export class FrozenIndexBuilder<T> {
     if (id == null) {
       throw new Error(`MiniSearch: document does not have ID field "${idField}"`)
     }
-    if (this._idToShortId.has(id)) {
+    if (this._seenIds.has(id)) {
       throw new Error(`MiniSearch: duplicate ID ${id}`)
     }
+    this._seenIds.add(id)
 
     const shortId = this._nextId++
-    this._idToShortId.set(id, shortId)
     this._externalIds[shortId] = id
     this._storedFields[shortId] = saveStoredFieldsForDocument(storeFields, extractField, document)
 
@@ -176,23 +178,23 @@ export class FrozenIndexBuilder<T> {
     this._frozen = true
 
     const documentCount = this._nextId
-    const flat = finalizeFlatPostings(this._postingsState)
+    const postings = finalizeFlatPostings(this._postingsState, documentCount)
 
     const avgFieldLength = new Float32Array(this._fieldCount)
     for (let f = 0; f < this._fieldCount; f++) {
       avgFieldLength[f] = this._avgFieldLength[f] ?? 0
     }
 
-    // Ensure exact size regardless of over- or under-estimated documentCount.
     this._fieldLengthData.length = documentCount * this._fieldCount
 
-    // Trim per-document arrays to actual count when estimatedDocumentCount was too large.
     const externalIds = this._externalIds.length > documentCount
       ? this._externalIds.slice(0, documentCount)
       : this._externalIds
     const storedFields = this._storedFields.length > documentCount
       ? this._storedFields.slice(0, documentCount)
       : this._storedFields
+
+    const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 
     return {
       options: this._options,
@@ -201,16 +203,14 @@ export class FrozenIndexBuilder<T> {
       fieldIds: this._fieldIds,
       fieldCount: this._fieldCount,
       externalIds,
-      idToShortId: this._idToShortId,
+      idLookup,
       storedFields,
       fieldLengthMatrix: new Uint32Array(this._fieldLengthData),
       avgFieldLength,
       index: this._index,
+      termCount: this._terms.length,
       terms: this._terms,
-      postingsOffsets: flat.postingsOffsets,
-      postingsLengths: flat.postingsLengths,
-      allDocIds: flat.allDocIds,
-      allFreqs: flat.allFreqs,
+      postings,
     }
   }
 }

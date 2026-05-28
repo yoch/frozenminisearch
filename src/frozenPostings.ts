@@ -1,0 +1,292 @@
+import {
+  clampFreq,
+  flatFieldTermData,
+  readDocId,
+  SegmentPostingList,
+  type DocIdArray,
+} from './compactPostings'
+import type { FieldTermDataLike } from './scoring'
+import { materializeFlatPostings, type FlatPostingsMaterializeParams } from './flatPostings'
+
+export type { DocIdArray } from './compactPostings'
+
+export type FieldIdArray = Uint8Array | Uint16Array
+
+export function readFieldId(fieldIds: FieldIdArray, index: number): number {
+  return fieldIds[index] as number
+}
+
+export type PostingsLayoutKind = 'dense' | 'sparse'
+
+export interface FrozenPostingsLayout {
+  fieldCount: number
+  termCount: number
+  nextId: number
+  layout: PostingsLayoutKind
+  docIdWidth: 16 | 32
+  /** Width of sparse field id column; null when layout is dense. */
+  sparseFieldIdWidth: 8 | 16 | null
+  allDocIds: DocIdArray
+  allFreqs: Uint8Array
+  denseOffsets: Uint32Array | null
+  denseLengths: Uint32Array | null
+  sparseTermStarts: Uint32Array | null
+  sparseFieldIds: FieldIdArray | null
+  sparseOffsets: Uint32Array | null
+  sparseLengths: Uint32Array | null
+}
+
+export function choosePostingsLayout(fieldCount: number): PostingsLayoutKind {
+  return fieldCount === 1 ? 'dense' : 'sparse'
+}
+
+export function chooseSparseFieldIdWidth(fieldCount: number): 8 | 16 {
+  return fieldCount > 255 ? 16 : 8
+}
+
+export function materializeFrozenPostings(
+  params: FlatPostingsMaterializeParams & { nextId: number },
+): FrozenPostingsLayout {
+  const { fieldCount, termCount, nextId } = params
+  const layout = choosePostingsLayout(fieldCount)
+  const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
+
+  if (layout === 'dense') {
+    const flat = materializeFlatPostings({ ...params, nextId })
+    return {
+      fieldCount,
+      termCount,
+      nextId,
+      layout,
+      docIdWidth,
+      sparseFieldIdWidth: null,
+      allDocIds: flat.allDocIds,
+      allFreqs: flat.allFreqs,
+      denseOffsets: flat.postingsOffsets,
+      denseLengths: flat.postingsLengths,
+      sparseTermStarts: null,
+      sparseFieldIds: null,
+      sparseOffsets: null,
+      sparseLengths: null,
+    }
+  }
+
+  const sparseFieldIdWidth = chooseSparseFieldIdWidth(fieldCount)
+  const sparseFieldIdsScratch: number[] = []
+  const sparseOffsets: number[] = []
+  const sparseLengths: number[] = []
+  const termStarts: number[] = new Array(termCount + 1).fill(0)
+  const { forEachPosting, remapDocId, clampFrequencies } = params
+
+  let totalPostings = 0
+  for (let ti = 0; ti < termCount; ti++) {
+    termStarts[ti] = sparseFieldIdsScratch.length
+    for (let f = 0; f < fieldCount; f++) {
+      let count = 0
+      forEachPosting(ti, f, (rawDocId) => {
+        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
+        if (docId !== 0xffffffff) count++
+      })
+      if (count === 0) continue
+      sparseFieldIdsScratch.push(f)
+      sparseOffsets.push(totalPostings)
+      sparseLengths.push(count)
+      totalPostings += count
+    }
+    termStarts[ti + 1] = sparseFieldIdsScratch.length
+  }
+
+  const allDocIds: DocIdArray = docIdWidth === 16
+    ? new Uint16Array(totalPostings)
+    : new Uint32Array(totalPostings)
+  const allFreqs = new Uint8Array(totalPostings)
+
+  const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
+    ? new Uint16Array(sparseFieldIdsScratch)
+    : new Uint8Array(sparseFieldIdsScratch)
+
+  let write = 0
+  for (let ti = 0; ti < termCount; ti++) {
+    const start = termStarts[ti]
+    const end = termStarts[ti + 1]
+    for (let s = start; s < end; s++) {
+      const f = readFieldId(sparseFieldIds, s)
+      forEachPosting(ti, f, (rawDocId, freq) => {
+        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
+        if (docId === 0xffffffff) return
+        if (docIdWidth === 16) {
+          (allDocIds as Uint16Array)[write] = docId
+        } else {
+          (allDocIds as Uint32Array)[write] = docId
+        }
+        allFreqs[write] = clampFrequencies ? clampFreq(freq) : freq
+        write++
+      })
+    }
+  }
+
+  return {
+    fieldCount,
+    termCount,
+    nextId,
+    layout,
+    docIdWidth,
+    sparseFieldIdWidth,
+    allDocIds,
+    allFreqs,
+    denseOffsets: null,
+    denseLengths: null,
+    sparseTermStarts: new Uint32Array(termStarts),
+    sparseFieldIds,
+    sparseOffsets: new Uint32Array(sparseOffsets),
+    sparseLengths: new Uint32Array(sparseLengths),
+  }
+}
+
+export function postingsTypedBytes(layout: FrozenPostingsLayout): {
+  allDocIdsBytes: number
+  allFreqsBytes: number
+  offsetsBytes: number
+  lengthsBytes: number
+  totalTypedBytes: number
+  slotCount: number
+} {
+  const allDocIdsBytes = layout.allDocIds.byteLength
+  const allFreqsBytes = layout.allFreqs.byteLength
+  if (layout.layout === 'dense') {
+    const offsetsBytes = layout.denseOffsets!.byteLength
+    const lengthsBytes = layout.denseLengths!.byteLength
+    return {
+      allDocIdsBytes,
+      allFreqsBytes,
+      offsetsBytes,
+      lengthsBytes,
+      totalTypedBytes: allDocIdsBytes + allFreqsBytes + offsetsBytes + lengthsBytes,
+      slotCount: layout.termCount * layout.fieldCount,
+    }
+  }
+  const offsetsBytes = layout.sparseOffsets!.byteLength + layout.sparseTermStarts!.byteLength
+  const lengthsBytes = layout.sparseLengths!.byteLength + layout.sparseFieldIds!.byteLength
+  const slotCount = layout.sparseFieldIds!.length
+  return {
+    allDocIdsBytes,
+    allFreqsBytes,
+    offsetsBytes,
+    lengthsBytes,
+    totalTypedBytes: allDocIdsBytes + allFreqsBytes + offsetsBytes + lengthsBytes,
+    slotCount,
+  }
+}
+
+export function validateFrozenPostingsLayout(
+  layout: FrozenPostingsLayout,
+  documentCount: number,
+  nextId: number,
+): void {
+  if (layout.fieldCount <= 0) throw new Error('fieldCount must be positive')
+  if (layout.nextId !== nextId) throw new Error('nextId mismatch')
+  if (layout.termCount < 0) throw new Error('termCount out of range')
+  if (layout.allDocIds.length !== layout.allFreqs.length) {
+    throw new Error('allDocIds and allFreqs length mismatch')
+  }
+  if (layout.layout === 'dense') {
+    if (layout.sparseFieldIdWidth != null) {
+      throw new Error('dense layout must not have sparseFieldIdWidth')
+    }
+    const slotCount = layout.termCount * layout.fieldCount
+    if (layout.denseOffsets!.length !== slotCount || layout.denseLengths!.length !== slotCount) {
+      throw new Error('dense postings slot count mismatch')
+    }
+    for (let slot = 0; slot < slotCount; slot++) {
+      const off = layout.denseOffsets![slot]
+      const len = layout.denseLengths![slot]
+      if (off + len > layout.allDocIds.length) {
+        throw new Error(`posting slot ${slot} exceeds allDocIds bounds`)
+      }
+      for (let i = 0; i < len; i++) {
+        const docId = readDocId(layout.allDocIds, off + i)
+        if (docId >= nextId) throw new Error(`posting docId ${docId} >= nextId ${nextId}`)
+      }
+    }
+    return
+  }
+
+  const expectedFieldIdWidth = chooseSparseFieldIdWidth(layout.fieldCount)
+  if (layout.sparseFieldIdWidth !== expectedFieldIdWidth) {
+    throw new Error('sparseFieldIdWidth mismatch with fieldCount')
+  }
+
+  const starts = layout.sparseTermStarts!
+  if (starts.length !== layout.termCount + 1) throw new Error('sparseTermStarts length mismatch')
+  const slotCount = layout.sparseFieldIds!.length
+  if (layout.sparseOffsets!.length !== slotCount || layout.sparseLengths!.length !== slotCount) {
+    throw new Error('sparse slot count mismatch')
+  }
+  for (let slot = 0; slot < slotCount; slot++) {
+    const fieldId = readFieldId(layout.sparseFieldIds!, slot)
+    if (fieldId >= layout.fieldCount) {
+      throw new Error(`sparse fieldId ${fieldId} >= fieldCount ${layout.fieldCount}`)
+    }
+    const off = layout.sparseOffsets![slot]
+    const len = layout.sparseLengths![slot]
+    if (off + len > layout.allDocIds.length) {
+      throw new Error(`sparse slot ${slot} exceeds allDocIds bounds`)
+    }
+    for (let i = 0; i < len; i++) {
+      const docId = readDocId(layout.allDocIds, off + i)
+      if (docId >= nextId) throw new Error(`posting docId ${docId} >= nextId ${nextId}`)
+    }
+  }
+  if (documentCount < 0 || documentCount > nextId) {
+    throw new Error('documentCount inconsistent with nextId')
+  }
+}
+
+function postingListForSlot(
+  layout: FrozenPostingsLayout,
+  offset: number,
+  length: number,
+): SegmentPostingList {
+  return new SegmentPostingList(layout.allDocIds, layout.allFreqs, offset, length)
+}
+
+export function fieldTermDataFromLayout(
+  layout: FrozenPostingsLayout,
+  termIndex: number,
+): FieldTermDataLike {
+  if (layout.layout === 'dense') {
+    return flatFieldTermData(
+      termIndex,
+      layout.fieldCount,
+      layout.denseOffsets!,
+      layout.denseLengths!,
+      layout.allDocIds,
+      layout.allFreqs,
+    )
+  }
+
+  const starts = layout.sparseTermStarts!
+  const start = starts[termIndex]
+  const end = starts[termIndex + 1]
+  const fieldIds = layout.sparseFieldIds!
+  const offsets = layout.sparseOffsets!
+  const lengths = layout.sparseLengths!
+
+  return {
+    get(fieldId: number) {
+      for (let i = start; i < end; i++) {
+        if (readFieldId(fieldIds, i) !== fieldId) continue
+        const len = lengths[i]
+        if (len === 0) return undefined
+        return postingListForSlot(layout, offsets[i], len)
+      }
+      return undefined
+    },
+  }
+}
+
+/** MSv4 required when sparse layout or doc ids do not fit Uint16 on disk. */
+export function shouldEncodeBinaryAsMSv4(postings: FrozenPostingsLayout): boolean {
+  if (postings.layout === 'sparse') return true
+  return postings.docIdWidth === 16
+}

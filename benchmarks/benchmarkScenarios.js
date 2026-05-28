@@ -56,3 +56,43 @@ export function overflowFrequencies (docCount = 2000, repeat = 800) {
   }
   return docs
 }
+
+/** Numeric ids 0..n-1 for identity id lookup elision. */
+export function denseNumericIds (count = 100000) {
+  const docs = []
+  for (let i = 0; i < count; i++) {
+    docs.push({ id: i, txt: `doc ${i} token${i % 1000}` })
+  }
+  return docs
+}
+
+/** Generic string ids for lazy-map id lookup. */
+export function genericStringIds (count = 100000) {
+  const docs = []
+  for (let i = 0; i < count; i++) {
+    docs.push({ id: `doc-${i}`, txt: `doc ${i} token${i % 1000}` })
+  }
+  return docs
+}
+
+/** Many terms, sparse field occupancy (one field per doc). */
+export function sparseFields (docCount = 5000, fieldCount = 20) {
+  const fields = Array.from({ length: fieldCount }, (_, i) => `f${i}`)
+  const docs = []
+  for (let d = 0; d < docCount; d++) {
+    const doc = { id: d }
+    const active = d % fieldCount
+    doc[fields[active]] = `term${d} shared sparse`
+    docs.push(doc)
+  }
+  return { docs, fields }
+}
+
+/** Document count at Uint16 doc-id boundary. */
+export function docIdUint16Boundary (count) {
+  const docs = []
+  for (let i = 0; i < count; i++) {
+    docs.push({ id: i, txt: `boundary ${i} alpha beta` })
+  }
+  return docs
+}

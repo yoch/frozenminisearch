@@ -9,7 +9,26 @@ import {
   validateFrozenSnapshot,
   crc32Buffer,
   BINARY_MAGIC_V3,
+  BINARY_MAGIC_V4,
 } from './binaryFormat'
+function densePostings(fieldCount, termCount, nextId, offsets, lengths, docIds, freqs) {
+  return {
+    fieldCount,
+    termCount,
+    nextId,
+    layout: 'dense',
+    docIdWidth: 32,
+    sparseFieldIdWidth: null,
+    allDocIds: docIds,
+    allFreqs: freqs,
+    denseOffsets: offsets,
+    denseLengths: lengths,
+    sparseTermStarts: null,
+    sparseFieldIds: null,
+    sparseOffsets: null,
+    sparseLengths: null,
+  }
+}
 
 const docs = [
   { id: 1, title: 'hello', text: 'world wide' },
@@ -26,7 +45,7 @@ function buildSnapshotFromFrozen() {
   return decodeFrozenSnapshot(buf)
 }
 
-describe('binaryFormat MSv3', () => {
+describe('binaryFormat MSv4', () => {
   test('round-trip preserves flat postings', () => {
     const treeShape = [
       ['hello', [[LEAF, 0]]],
@@ -44,10 +63,13 @@ describe('binaryFormat MSv3', () => {
       fieldLengthMatrix: new Uint32Array([1, 2]),
       terms: ['hello', 'world'],
       treeShape,
-      postingsOffsets: new Uint32Array([0, 1]),
-      postingsLengths: new Uint32Array([1, 1]),
-      allDocIds: new Uint32Array([0, 1]),
-      allFreqs: new Uint8Array([1, 1]),
+      postings: densePostings(
+        1, 2, 2,
+        new Uint32Array([0, 1]),
+        new Uint32Array([1, 1]),
+        new Uint32Array([0, 1]),
+        new Uint8Array([1, 1]),
+      ),
     }
 
     const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(treeShape))
@@ -57,14 +79,14 @@ describe('binaryFormat MSv3', () => {
     expect(loaded.documentCount).toBe(2)
     expect(loaded.fieldNames).toEqual(['txt'])
     expect(loaded.terms).toEqual(['hello', 'world'])
-    expect(Array.from(loaded.allDocIds)).toEqual([0, 1])
-    expect(Array.from(loaded.allFreqs)).toEqual([1, 1])
-    expect(Array.from(loaded.postingsLengths)).toEqual([1, 1])
+    expect(Array.from(loaded.postings.allDocIds)).toEqual([0, 1])
+    expect(Array.from(loaded.postings.allFreqs)).toEqual([1, 1])
+    expect(Array.from(loaded.postings.denseLengths)).toEqual([1, 1])
   })
 
   test('encode rejects invalid snapshot', () => {
     const snap = buildSnapshotFromFrozen()
-    snap.allFreqs = new Uint8Array(snap.allDocIds.length - 1)
+    snap.postings.allFreqs = new Uint8Array(snap.postings.allDocIds.length - 1)
     expect(() => encodeFrozenSnapshot(snap)).toThrow(/Invalid frozen index/)
   })
 
@@ -106,6 +128,52 @@ describe('binaryFormat MSv3', () => {
     expect(snap.externalIds[1]).toBe(42)
   })
 
+  test('dense Uint32 postings encode as MSv3', () => {
+    const snap = {
+      documentCount: 70000,
+      nextId: 70000,
+      fieldIds: { txt: 0 },
+      fieldCount: 1,
+      fieldNames: ['txt'],
+      avgFieldLength: new Float32Array([1]),
+      externalIds: new Array(70000).fill(0).map((_, i) => i),
+      storedFields: new Array(70000),
+      fieldLengthMatrix: new Uint32Array(70000),
+      terms: ['only'],
+      treeShape: [['only', [[LEAF, 0]]]],
+      postings: densePostings(
+        1, 1, 70000,
+        new Uint32Array([0]),
+        new Uint32Array([1]),
+        new Uint32Array([0]),
+        new Uint8Array([1]),
+      ),
+    }
+    const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(snap.treeShape))
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V3)
+    expect(buf.readUInt16LE(4)).toBe(3)
+  })
+
+  test('sparse layout with >255 fields uses Uint16 field ids', () => {
+    const fieldCount = 300
+    const fields = Array.from({ length: fieldCount }, (_, i) => `f${i}`)
+    const docs = [{ id: 0 }]
+    for (let f = 0; f < fieldCount; f++) {
+      docs[0][fields[f]] = `value field ${f}`
+    }
+    const mutable = new MiniSearch({ fields, storeFields: [] })
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    expect(frozen.memoryBreakdown().postings.layout).toBe('sparse')
+
+    const buf = frozen.saveBinary()
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V4)
+    expect(buf.readUInt16LE(6) & 4).toBe(4)
+
+    const loaded = FrozenMiniSearch.loadBinary(buf, { fields })
+    expect(loaded.search('value').length).toBeGreaterThan(0)
+  })
+
   test('external id JSON blob round-trip', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: { k: 'complex' }, text: 'data' })
@@ -133,34 +201,48 @@ describe('binaryFormat corruption guards', () => {
     const dictOff = corrupt.readUInt32LE(40)
     corrupt.writeUInt32LE(dictOff, 36)
     corrupt.writeUInt32LE(flOff, 40)
-    corrupt.writeUInt32LE(crc32Buffer(corrupt, 64, corrupt.length), 8)
+    corrupt.writeUInt32LE(crc32Buffer(corrupt, 72, corrupt.length), 8)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/not monotonic/)
   })
 
   test('rejects end offset past buffer end', () => {
     const corrupt = Buffer.from(validBuf)
-    corrupt.writeUInt32LE(validBuf.length + 100, 60)
+    corrupt.writeUInt32LE(validBuf.length + 100, 68)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/Invalid frozen index/)
   })
 
   test('rejects allFreqs shorter than allDocIds', () => {
     const corrupt = Buffer.from(validBuf)
-    const freqsOff = corrupt.readUInt32LE(56)
-    const endOff = corrupt.readUInt32LE(60)
-    corrupt.writeUInt32LE(endOff - 1, 60)
+    const freqsOff = corrupt.readUInt32LE(64)
+    const endOff = corrupt.readUInt32LE(68)
+    corrupt.writeUInt32LE(endOff - 1, 68)
     corrupt.writeUInt8(0, freqsOff + (endOff - freqsOff) - 1)
-    const crc = crc32Buffer(corrupt, 64, corrupt.length)
+    const crc = crc32Buffer(corrupt, 72, corrupt.length)
     corrupt.writeUInt32LE(crc, 8)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/length mismatch/)
   })
 
   test('rejects posting offset beyond allDocIds', () => {
     const snap = decodeFrozenSnapshot(validBuf)
-    for (let i = 0; i < snap.postingsLengths.length; i++) {
-      if (snap.postingsLengths[i] > 0) {
-        snap.postingsOffsets[i] = snap.allDocIds.length
-        expect(() => encodeFrozenSnapshot(snap)).toThrow(/exceeds allDocIds/)
-        return
+    if (snap.postings.layout === 'sparse') {
+      const lengths = snap.postings.sparseLengths
+      const offsets = snap.postings.sparseOffsets
+      for (let i = 0; i < lengths.length; i++) {
+        if (lengths[i] > 0) {
+          offsets[i] = snap.postings.allDocIds.length
+          expect(() => encodeFrozenSnapshot(snap)).toThrow(/exceeds allDocIds/)
+          return
+        }
+      }
+    } else {
+      const lengths = snap.postings.denseLengths
+      const offsets = snap.postings.denseOffsets
+      for (let i = 0; i < lengths.length; i++) {
+        if (lengths[i] > 0) {
+          offsets[i] = snap.postings.allDocIds.length
+          expect(() => encodeFrozenSnapshot(snap)).toThrow(/exceeds allDocIds/)
+          return
+        }
       }
     }
     throw new Error('fixture has no non-empty posting')
@@ -173,7 +255,7 @@ describe('binaryFormat corruption guards', () => {
   })
 
   test('CRC covers full payload', () => {
-    const payloadCrc = crc32Buffer(validBuf, 64, validBuf.length)
+    const payloadCrc = crc32Buffer(validBuf, 72, validBuf.length)
     expect(validBuf.readUInt32LE(8)).toBe(payloadCrc)
   })
 })

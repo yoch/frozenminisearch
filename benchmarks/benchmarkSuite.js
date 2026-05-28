@@ -5,7 +5,11 @@ import {
   largeDocuments,
   manyFields,
   highFrequencyTerms,
-  overflowFrequencies
+  overflowFrequencies,
+  denseNumericIds,
+  genericStringIds,
+  sparseFields,
+  docIdUint16Boundary
 } from './benchmarkScenarios.js'
 import {
   gc,
@@ -184,6 +188,7 @@ function aggregateScenarioRuns (runs) {
 export function buildScenarioList () {
   const divina = loadDivinaLines()
   const many = manyFields()
+  const sparse = sparseFields(5000, 20)
 
   return [
     {
@@ -257,6 +262,63 @@ export function buildScenarioList () {
         { label: 'exact', q: 'alpha', opts: {} }
       ],
       driftQueries: ['alpha']
+    },
+    {
+      id: 'denseNumericIds-100k',
+      name: 'Dense numeric ids (100k, identity lookup)',
+      corpus: denseNumericIds(100000),
+      options: { fields: ['txt'], storeFields: [] },
+      queries: [
+        { label: 'exact', q: 'token42', opts: {} }
+      ]
+    },
+    {
+      id: 'genericStringIds-100k',
+      name: 'Generic string ids (100k, lazy-map lookup)',
+      corpus: genericStringIds(100000),
+      options: { fields: ['txt'], storeFields: [] },
+      queries: [
+        { label: 'exact', q: 'token42', opts: {} }
+      ]
+    },
+    {
+      id: 'sparseFields-50kTerms-20Fields',
+      name: 'Sparse fields (5k docs × 20 fields, one active field/doc)',
+      corpus: sparse.docs,
+      options: {
+        fields: sparse.fields,
+        storeFields: []
+      },
+      queries: [
+        { label: 'exact', q: 'shared', opts: {} }
+      ]
+    },
+    {
+      id: 'docIdUint16Boundary-65535',
+      name: 'Doc id Uint16 boundary (65535 docs)',
+      corpus: docIdUint16Boundary(65535),
+      options: { fields: ['txt'], storeFields: [] },
+      queries: [
+        { label: 'exact', q: 'alpha', opts: {} }
+      ]
+    },
+    {
+      id: 'docIdUint16Boundary-65536',
+      name: 'Doc id Uint32 boundary (65536 docs)',
+      corpus: docIdUint16Boundary(65536),
+      options: { fields: ['txt'], storeFields: [] },
+      queries: [
+        { label: 'exact', q: 'alpha', opts: {} }
+      ]
+    },
+    {
+      id: 'saveBinaryAfterNoTerms',
+      name: 'saveBinary dictionary rebuild (50k terms)',
+      corpus: giantVocabulary(50000),
+      options: { fields: ['txt'], storeFields: [] },
+      queries: [
+        { label: 'exact', q: 'unique9999', opts: {} }
+      ]
     }
   ]
 }
@@ -439,6 +501,22 @@ export function runScenario (scenario) {
       loadJson: heapJsonLoaded.heapMb,
       loadBinary: heapBinaryLoaded.heapMb,
       frozenVsMutableSavingPct: heapSavingPct
+    },
+    memoryMb: {
+      frozen: {
+        heapUsed: heapFrozen.heapMb,
+        external: heapFrozen.externalMb,
+        arrayBuffers: heapFrozen.arrayBuffersMb,
+        rss: heapFrozen.rssMb,
+        totalResidentApprox: heapFrozen.totalResidentApproxMb
+      },
+      mutable: {
+        heapUsed: heapMutable.heapMb,
+        external: heapMutable.externalMb,
+        arrayBuffers: heapMutable.arrayBuffersMb,
+        rss: heapMutable.rssMb,
+        totalResidentApprox: heapMutable.totalResidentApproxMb
+      }
     },
     diskMb: {
       json: jsonMb,

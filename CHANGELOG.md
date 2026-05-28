@@ -2,6 +2,15 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.1.1
+
+Internal maintainability refactor with no intended public API or behaviour changes.
+
+  - Split `binaryFormat.ts` into `binaryIo`, `binaryStructures`, `binaryEncode`, and
+    `binaryDecode` (shared `assembleSections` for MSv3/MSv4 encode)
+  - Add `createQueryIndexView` factory in `queryEngine.ts` (deduplicate mutable/frozen adapters)
+  - Sparse frozen postings: binary search on sorted per-term field ids (documented invariant)
+
 ## v8.1.0
 
 Frozen index memory and on-disk format improvements (MSv4).

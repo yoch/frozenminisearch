@@ -49,6 +49,8 @@ export function materializeFlatPostings(params: FlatPostingsMaterializeParams): 
     : new Uint32Array(totalPostings)
   const allFreqs = new Uint8Array(totalPostings)
 
+  // Slots are visited in ascending fieldId (0..fieldCount-1) per term. Sparse layouts
+  // rely on this ordering so field ids per term stay sorted for binary lookup.
   let write = 0
   for (let ti = 0; ti < termCount; ti++) {
     const base = ti * fieldCount

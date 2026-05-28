@@ -7,7 +7,6 @@ import {
   finalizeSearchResults,
   getOwnProperty,
   type AggregateContext,
-  type FieldTermDataLike,
   type RawResult,
 } from './scoring'
 import { freezeFromMiniSearch } from './FrozenMiniSearch'
@@ -23,9 +22,9 @@ import {
   saveStoredFieldsForDocument,
 } from './indexingCore'
 import {
+  createQueryIndexView,
   executeQuery as runQuery,
   type QueryEngineParams,
-  type QueryIndexView,
 } from './queryEngine'
 import { autoSuggestFromSearch } from './suggestions'
 import type {
@@ -1200,35 +1199,18 @@ export default class MiniSearch<T = any> {
     }
   }
 
-  private mutableQueryIndexView(): QueryIndexView {
-    const index = this._index
+  private mutableQueryIndexView() {
     const storedFields = this._storedFields
     const documentIds = this._documentIds
-    return {
-      getTermData(term) {
-        const data = index.get(term)
-        return data == null ? undefined : mapFieldTermData(data)
-      },
-      * getPrefixMatches(term) {
-        for (const [t, data] of index.atPrefix(term)) {
-          yield [t, mapFieldTermData(data)]
-        }
-      },
-      getFuzzyMatches(term, maxDistance) {
-        const matches = index.fuzzyGet(term, maxDistance)
-        if (matches == null) return undefined
-        const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
-        for (const [t, [data, distance]] of matches) {
-          out.set(t, { data: mapFieldTermData(data), distance })
-        }
-        return out
-      },
-      forEachActiveDoc(callback) {
+    return createQueryIndexView(
+      this._index,
+      mapFieldTermData,
+      (callback) => {
         for (const [shortId, id] of documentIds) {
           callback(shortId, id, storedFields.get(shortId))
         }
       },
-    }
+    )
   }
 
   /** @ignore */

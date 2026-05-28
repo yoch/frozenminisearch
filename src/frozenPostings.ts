@@ -78,6 +78,7 @@ export function materializeFrozenPostings(
   const termStarts: number[] = new Array(termCount + 1).fill(0)
   const { forEachPosting, remapDocId, clampFrequencies } = params
 
+  // Non-empty slots per term are emitted with fieldId in ascending order (f loops 0..fieldCount-1).
   let totalPostings = 0
   for (let ti = 0; ti < termCount; ti++) {
     termStarts[ti] = sparseFieldIdsScratch.length
@@ -250,6 +251,28 @@ function postingListForSlot(
   return new SegmentPostingList(layout.allDocIds, layout.allFreqs, offset, length)
 }
 
+/**
+ * Locate the slot for `fieldId` within a term's range.
+ *
+ * `sparseFieldIds[start..end)` is sorted ascending (see materializeFrozenPostings),
+ * and the range is short (at most `fieldCount`, usually 1-3 fields per term). A linear
+ * scan with early exit beats binary search at this size: sequential access, predictable
+ * branches, no per-step division. The sorted invariant only powers the early break.
+ */
+function findSparseSlotByFieldId(
+  fieldIds: FieldIdArray,
+  start: number,
+  end: number,
+  fieldId: number,
+): number {
+  for (let i = start; i < end; i++) {
+    const fid = readFieldId(fieldIds, i)
+    if (fid === fieldId) return i
+    if (fid > fieldId) break
+  }
+  return -1
+}
+
 export function fieldTermDataFromLayout(
   layout: FrozenPostingsLayout,
   termIndex: number,
@@ -274,13 +297,11 @@ export function fieldTermDataFromLayout(
 
   return {
     get(fieldId: number) {
-      for (let i = start; i < end; i++) {
-        if (readFieldId(fieldIds, i) !== fieldId) continue
-        const len = lengths[i]
-        if (len === 0) return undefined
-        return postingListForSlot(layout, offsets[i], len)
-      }
-      return undefined
+      const slot = findSparseSlotByFieldId(fieldIds, start, end, fieldId)
+      if (slot < 0) return undefined
+      const len = lengths[slot]
+      if (len === 0) return undefined
+      return postingListForSlot(layout, offsets[slot], len)
     },
   }
 }

@@ -1,3 +1,4 @@
+import SearchableMap from './SearchableMap/SearchableMap'
 import {
   aggregateTerm,
   combineResults,
@@ -43,6 +44,35 @@ export interface QueryEngineParams {
   processTerm: (term: string, fieldName?: string) => string | string[] | null | undefined | false
   indexView: QueryIndexView
   aggregateContext: AggregateContext
+}
+
+/** Shared radix-index adapter for mutable and frozen query paths. */
+export function createQueryIndexView<L>(
+  index: SearchableMap<L>,
+  toFieldTermData: (leaf: L) => FieldTermDataLike,
+  forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
+): QueryIndexView {
+  return {
+    getTermData(term) {
+      const leaf = index.get(term)
+      return leaf == null ? undefined : toFieldTermData(leaf)
+    },
+    * getPrefixMatches(term) {
+      for (const [t, leaf] of index.atPrefix(term)) {
+        yield [t, toFieldTermData(leaf)]
+      }
+    },
+    getFuzzyMatches(term, maxDistance) {
+      const matches = index.fuzzyGet(term, maxDistance)
+      if (matches == null) return undefined
+      const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
+      for (const [t, [leaf, distance]] of matches) {
+        out.set(t, { data: toFieldTermData(leaf), distance })
+      }
+      return out
+    },
+    forEachActiveDoc,
+  }
 }
 
 function fieldBoostsFromOptions(

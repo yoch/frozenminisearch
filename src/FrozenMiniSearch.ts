@@ -28,9 +28,9 @@ import {
 } from './frozenPostings'
 import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
 import {
+  createQueryIndexView,
   executeQuery as runQuery,
   type QueryEngineParams,
-  type QueryIndexView,
 } from './queryEngine'
 import { autoSuggestFromSearch } from './suggestions'
 import type {
@@ -517,33 +517,17 @@ export default class FrozenMiniSearch<T = any> {
     externalIds: unknown[],
     storedFields: (Record<string, unknown> | undefined)[],
     nextId: number,
-  ): QueryIndexView {
-    return {
-      getTermData(term) {
-        const ti = index.get(term)
-        return ti == null ? undefined : fieldTermDataFor(ti)
-      },
-      * getPrefixMatches(term) {
-        for (const [t, ti] of index.atPrefix(term)) {
-          yield [t, fieldTermDataFor(ti)]
-        }
-      },
-      getFuzzyMatches(term, maxDistance) {
-        const matches = index.fuzzyGet(term, maxDistance)
-        if (matches == null) return undefined
-        const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
-        for (const [t, [ti, distance]] of matches) {
-          out.set(t, { data: fieldTermDataFor(ti), distance })
-        }
-        return out
-      },
-      forEachActiveDoc(callback) {
+  ) {
+    return createQueryIndexView(
+      index,
+      fieldTermDataFor,
+      (callback) => {
         for (let shortId = 0; shortId < nextId; shortId++) {
           const id = externalIds[shortId]
           if (id === undefined) continue
           callback(shortId, id, storedFields[shortId])
         }
       },
-    }
+    )
   }
 }

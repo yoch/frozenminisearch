@@ -1,6 +1,6 @@
 {
   "name": "@yoch/minisearch",
-  "version": "8.1.1",
+  "version": "8.2.0-beta0",
   "description": "Node.js full-text search with FrozenMiniSearch and binary index snapshots",
   "main": "dist/cjs/index.cjs",
   "module": "dist/es/index.js",

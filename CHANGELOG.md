@@ -2,6 +2,21 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.0-beta0
+
+Packed frozen term index beta focused on memory/runtime improvements for `FrozenMiniSearch`.
+
+  - Add `PackedFrozenRadixTree` backend (`FrozenTermIndex`) for frozen exact/prefix/fuzzy lookups
+    while keeping mutable `MiniSearch` on `SearchableMap`
+  - Preserve observable iteration order parity (prefix/fuzzy/autoSuggest tie behavior) via packed
+    leaf-slot ordering
+  - Keep binary wire compatibility for **MSv3/MSv4** while encoding/decoding directly with packed
+    term trees (no `Map` rebuild on frozen load path)
+  - Extend parity and corruption-guard tests (UTF-16 edge cases, mid-edge prefixes, binary
+    malformed nodes, round-trip checks)
+  - Benchmarks now report packed radix metrics as `nodeCount`/`edgeCount` instead of legacy
+    `mapNodeCount`
+
 ## v8.1.1
 
 Internal maintainability refactor with no intended public API or behaviour changes.

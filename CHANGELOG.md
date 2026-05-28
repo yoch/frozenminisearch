@@ -9,7 +9,7 @@ Internal maintainability refactor with no intended public API or behaviour chang
   - Split `binaryFormat.ts` into `binaryIo`, `binaryStructures`, `binaryEncode`, and
     `binaryDecode` (shared `assembleSections` for MSv3/MSv4 encode)
   - Add `createQueryIndexView` factory in `queryEngine.ts` (deduplicate mutable/frozen adapters)
-  - Sparse frozen postings: binary search on sorted per-term field ids (documented invariant)
+  - Sparse frozen postings: sorted early-exit linear lookup per term (documented invariant)
 
 ## v8.1.0
 

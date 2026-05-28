@@ -1,5 +1,7 @@
 import type { RadixTree } from './SearchableMap/types'
 import { shouldEncodeBinaryAsMSv4 } from './frozenPostings'
+import type PackedFrozenRadixTree from './packedRadixTree'
+import { buildTermTreeSectionFromPacked } from './packedRadixBinary'
 import {
   BINARY_MAGIC_V3,
   BINARY_MAGIC_V4,
@@ -61,25 +63,45 @@ function assembleSections(
   return out
 }
 
+type EncodeTreeSource =
+  | { kind: 'packed', tree: PackedFrozenRadixTree }
+  | { kind: 'radix', tree: RadixTree<number> }
+
 function prepareEncodeSnapshot(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-): { snap: FrozenSnapshot, tree: RadixTree<number>, fieldNames: string[] } {
+  packedTermIndex?: PackedFrozenRadixTree,
+): { snap: FrozenSnapshot, treeSource: EncodeTreeSource, fieldNames: string[] } {
   validateFrozenSnapshotNumeric(snap)
-  const tree = termTree ?? deserializeTermIndexTree(snap.treeShape)
-  validateTermTreeLeaves(tree, snap.terms.length)
   const fieldNames = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
   if (fieldNames.length !== snap.fieldCount) {
     throw invalidFrozenIndex('fieldNames length mismatch')
   }
-  return { snap, tree, fieldNames }
+
+  const packed = packedTermIndex ?? snap.packedTermIndex
+  if (packed != null) {
+    packed.validateLeaves(snap.terms.length)
+    return { snap, treeSource: { kind: 'packed', tree: packed }, fieldNames }
+  }
+
+  const tree = termTree ?? deserializeTermIndexTree(snap.treeShape)
+  validateTermTreeLeaves(tree, snap.terms.length)
+  return { snap, treeSource: { kind: 'radix', tree }, fieldNames }
+}
+
+function buildTermTreeSectionFromSource(source: EncodeTreeSource): Buffer {
+  if (source.kind === 'packed') {
+    return buildTermTreeSectionFromPacked(source.tree)
+  }
+  return buildTermTreeSection(source.tree)
 }
 
 function encodeMSv3(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
+  packedTermIndex?: PackedFrozenRadixTree,
 ): Buffer {
-  const { snap: validated, tree, fieldNames } = prepareEncodeSnapshot(snap, termTree)
+  const { snap: validated, treeSource, fieldNames } = prepareEncodeSnapshot(snap, termTree, packedTermIndex)
   const p = validated.postings
   if (p.layout !== 'dense' || p.docIdWidth !== 32) {
     throw invalidFrozenIndex('MSv3 encode requires dense layout with Uint32 doc ids')
@@ -93,7 +115,7 @@ function encodeMSv3(
     buildFieldNamesSection(fieldNames),
     buildExternalIdsSection(validated.externalIds, validated.nextId),
     buildStoredFieldsSection(validated.storedFields, validated.nextId),
-    buildTermTreeSection(tree),
+    buildTermTreeSectionFromSource(treeSource),
     bufferFromView(validated.avgFieldLength),
     bufferFromView(validated.fieldLengthMatrix),
     buildDictionarySection(validated.terms),
@@ -109,8 +131,9 @@ function encodeMSv3(
 function encodeMSv4(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
+  packedTermIndex?: PackedFrozenRadixTree,
 ): Buffer {
-  const { snap: validated, tree, fieldNames } = prepareEncodeSnapshot(snap, termTree)
+  const { snap: validated, treeSource, fieldNames } = prepareEncodeSnapshot(snap, termTree, packedTermIndex)
 
   const p = validated.postings
   const flags = (p.docIdWidth === 16 ? FLAG_DOC_ID_16 : 0)
@@ -139,7 +162,7 @@ function encodeMSv4(
     buildFieldNamesSection(fieldNames),
     buildExternalIdsSection(validated.externalIds, validated.nextId),
     buildStoredFieldsSection(validated.storedFields, validated.nextId),
-    buildTermTreeSection(tree),
+    buildTermTreeSectionFromSource(treeSource),
     bufferFromView(validated.avgFieldLength),
     bufferFromView(validated.fieldLengthMatrix),
     buildDictionarySection(validated.terms),
@@ -157,9 +180,11 @@ function encodeMSv4(
 export function encodeFrozenSnapshot(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
+  packedTermIndex?: PackedFrozenRadixTree,
 ): Buffer {
+  const packed = packedTermIndex ?? snap.packedTermIndex
   if (shouldEncodeBinaryAsMSv4(snap.postings)) {
-    return encodeMSv4(snap, termTree)
+    return encodeMSv4(snap, termTree, packed)
   }
-  return encodeMSv3(snap, termTree)
+  return encodeMSv3(snap, termTree, packed)
 }

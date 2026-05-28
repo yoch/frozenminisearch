@@ -17,3 +17,4 @@ export {
 
 export { encodeFrozenSnapshot } from './binaryEncode'
 export { decodeFrozenSnapshot } from './binaryDecode'
+export { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from './packedRadixBinary'

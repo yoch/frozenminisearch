@@ -1,4 +1,5 @@
 import SearchableMap from './SearchableMap/SearchableMap'
+import type { FrozenTermIndex } from './frozenTermIndex'
 import {
   aggregateTerm,
   combineResults,
@@ -44,6 +45,34 @@ export interface QueryEngineParams {
   processTerm: (term: string, fieldName?: string) => string | string[] | null | undefined | false
   indexView: QueryIndexView
   aggregateContext: AggregateContext
+}
+
+/** Query adapter for packed frozen term indexes. */
+export function createFrozenQueryIndexView(
+  index: FrozenTermIndex,
+  fieldTermDataFor: (termIndex: number) => FieldTermDataLike,
+  forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
+): QueryIndexView {
+  return {
+    getTermData(term) {
+      const ti = index.get(term)
+      return ti == null ? undefined : fieldTermDataFor(ti)
+    },
+    * getPrefixMatches(term) {
+      for (const [t, ti] of index.prefixEntries(term)) {
+        yield [t, fieldTermDataFor(ti)]
+      }
+    },
+    getFuzzyMatches(term, maxDistance) {
+      const matches = index.fuzzyEntries(term, maxDistance)
+      const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
+      for (const [t, ti, distance] of matches) {
+        out.set(t, { data: fieldTermDataFor(ti), distance })
+      }
+      return out
+    },
+    forEachActiveDoc,
+  }
 }
 
 /** Shared radix-index adapter for mutable and frozen query paths. */

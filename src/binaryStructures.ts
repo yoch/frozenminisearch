@@ -2,6 +2,7 @@ import { LEAF } from './SearchableMap/TreeIterator'
 import type { RadixTree } from './SearchableMap/types'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import { validateFrozenPostingsLayout } from './frozenPostings'
+import type PackedFrozenRadixTree from './packedRadixTree'
 import {
   TREE_NODE_EDGE,
   TREE_NODE_LEAF,
@@ -29,8 +30,10 @@ export interface FrozenSnapshot {
   fieldLengthMatrix: Uint32Array
   terms: string[]
   treeShape: TreeShape
-  /** Populated on decode; preferred over deserializing {@link treeShape}. */
+  /** Populated on decode; legacy path when {@link packedTermIndex} is absent. */
   termTree?: RadixTree<number>
+  /** Preferred runtime term index after binary decode. */
+  packedTermIndex?: PackedFrozenRadixTree
   postings: FrozenPostingsLayout
 }
 
@@ -178,7 +181,13 @@ export function readStoredFieldsSection(
 /** Validate structural invariants of a decoded or assembled frozen snapshot. */
 export function validateFrozenSnapshot(snap: FrozenSnapshot): void {
   validateFrozenSnapshotNumeric(snap)
-  validateTreeShape(snap.treeShape, snap.terms.length)
+  if (snap.packedTermIndex != null) {
+    snap.packedTermIndex.validateLeaves(snap.terms.length)
+  } else if (snap.termTree != null) {
+    validateTermTreeLeaves(snap.termTree, snap.terms.length)
+  } else {
+    validateTreeShape(snap.treeShape, snap.terms.length)
+  }
 }
 
 export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): string[] {

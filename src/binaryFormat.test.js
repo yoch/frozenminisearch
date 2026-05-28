@@ -1,5 +1,6 @@
 import MiniSearch from './MiniSearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
+import PackedFrozenRadixTree from './packedRadixTree'
 import CRC32 from 'crc-32'
 import { LEAF } from './SearchableMap/TreeIterator'
 import {
@@ -90,10 +91,28 @@ describe('binaryFormat MSv4', () => {
     expect(() => encodeFrozenSnapshot(snap)).toThrow(/Invalid frozen index/)
   })
 
-  test('validateFrozenSnapshot rejects bad treeShape index', () => {
+  test('validateFrozenSnapshot rejects bad packed term leaf index', () => {
     const snap = buildSnapshotFromFrozen()
-    snap.treeShape = [['bad', [[LEAF, 999]]]]
-    expect(() => validateFrozenSnapshot(snap)).toThrow(/treeShape leaf/)
+    const tree = snap.packedTermIndex
+    const nodeValue = new Uint32Array(tree.nodeValue)
+    const leafNode = nodeValue.findIndex(value => value !== 0xffffffff)
+    nodeValue[leafNode] = 999
+    const bad = PackedFrozenRadixTree.fromData({
+      size: tree.size,
+      nodeCount: tree.nodeCount,
+      edgeCount: tree.edgeCount,
+      labelHeap: tree.labelHeap,
+      nodeFirstEdge: tree.nodeFirstEdge,
+      nodeEdgeCount: tree.nodeEdgeCount,
+      nodeValue,
+      nodeLeafOrder: tree.nodeLeafOrder,
+      edgeLabelStart: tree.edgeLabelStart,
+      edgeLabelLength: tree.edgeLabelLength,
+      edgeChild: tree.edgeChild,
+      edgeFirstChar: tree.edgeFirstChar,
+    })
+    snap.packedTermIndex = bad
+    expect(() => validateFrozenSnapshot(snap)).toThrow(/leaf index out of range/)
   })
 
   test('rejects legacy MSv1 and MSv2', () => {

@@ -1,4 +1,5 @@
 import SearchableMap from './SearchableMap/SearchableMap'
+import { frozenTermIndexFromRadixTree } from './packedRadixTree'
 import type { Options } from './searchTypes'
 import type { FrozenAssembleParams } from './frozenTypes'
 import { materializeFrozenPostings } from './frozenPostings'
@@ -207,7 +208,7 @@ export class FrozenIndexBuilder<T> {
       storedFields,
       fieldLengthMatrix: new Uint32Array(this._fieldLengthData),
       avgFieldLength,
-      index: this._index,
+      index: frozenTermIndexFromRadixTree(this._index.radixTree, this._terms.length),
       termCount: this._terms.length,
       terms: this._terms,
       postings,

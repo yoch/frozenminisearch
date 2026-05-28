@@ -1,6 +1,8 @@
 import SearchableMap from './SearchableMap/SearchableMap'
 import { LEAF } from './SearchableMap/TreeIterator'
 import type { RadixTree } from './SearchableMap/types'
+import type { FrozenTermIndex } from './frozenTermIndex'
+import PackedFrozenRadixTree, { frozenTermIndexFromRadixTree } from './packedRadixTree'
 import {
   finalizeSearchResults,
   type AggregateContext,
@@ -15,7 +17,6 @@ import {
 import {
   decodeFrozenSnapshot,
   encodeFrozenSnapshot,
-  deserializeTermIndexTree,
   fieldNamesFromFieldIds,
 } from './binaryFormat'
 import { createIdToShortIdLookup, type IdToShortIdLookup } from './frozenIdLookup'
@@ -28,7 +29,7 @@ import {
 } from './frozenPostings'
 import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
 import {
-  createQueryIndexView,
+  createFrozenQueryIndexView,
   executeQuery as runQuery,
   type QueryEngineParams,
 } from './queryEngine'
@@ -51,17 +52,15 @@ export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from '
 import { DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
 
-function rebuildTermsFromIndex(index: SearchableMap<number>, termCount: number): string[] {
+function rebuildTermsFromIndex(index: FrozenTermIndex, termCount: number): string[] {
   const terms: string[] = new Array(termCount)
-  for (const [term, ti] of index) {
+  for (const [term, ti] of index.entries()) {
     terms[ti] = term
   }
   return terms
 }
 
 const READ_ONLY_MSG = 'FrozenMiniSearch is read-only. Rebuild from a mutable MiniSearch instance.'
-
-const MAP_NODE_ESTIMATE_BYTES = 120
 
 function throwReadOnly(): never {
   throw new Error(READ_ONLY_MSG)
@@ -84,14 +83,6 @@ function cloneRadixTreeWithTermIndex(
     }
   }
   return out
-}
-
-function countRadixMapNodes(tree: RadixTree<unknown>): number {
-  let n = 1
-  for (const [key, val] of tree) {
-    if (key !== LEAF) n += countRadixMapNodes(val as RadixTree<unknown>)
-  }
-  return n
 }
 
 export function frozenMemoryBreakdown(frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
@@ -121,16 +112,10 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
   if (params.avgFieldLength.length !== params.fieldCount) {
     throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
   }
-  if (params.terms != null) {
-    if (params.terms.length !== termCount) {
-      throw new Error('FrozenMiniSearch: terms length mismatch')
-    }
-    for (const [, ti] of params.index) {
-      if (!Number.isInteger(ti) || ti < 0 || ti >= termCount) {
-        throw new Error(`FrozenMiniSearch: radix tree leaf index out of range: ${ti}`)
-      }
-    }
+  if (params.terms != null && params.terms.length !== termCount) {
+    throw new Error('FrozenMiniSearch: terms length mismatch')
   }
+  params.index.validateLeaves(termCount)
   return new FrozenMiniSearch(params)
 }
 
@@ -222,7 +207,7 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
   }
 
   const flat = buildFlatPostingsFromSource(source, fieldCount, resolvedNextId, shortIdRemap)
-  const frozenIndex = new SearchableMap<number>(flat.tree)
+  const frozenIndex = frozenTermIndexFromRadixTree(flat.tree, flat.terms.length)
 
   return assembleFrozen({
     options: source.options,
@@ -253,7 +238,7 @@ export function freezeFrozenIndexBuilder<T>(builder: FrozenIndexBuilder<T>): Fro
 
 export default class FrozenMiniSearch<T = any> {
   private readonly _options: OptionsWithDefaults<T>
-  private readonly _index: SearchableMap<number>
+  private readonly _index: FrozenTermIndex
   private readonly _documentCount: number
   private readonly _nextId: number
   private readonly _externalIds: unknown[]
@@ -298,12 +283,16 @@ export default class FrozenMiniSearch<T = any> {
       globalSearchOptions: this._options.searchOptions,
       tokenize: this._options.tokenize,
       processTerm: this._options.processTerm,
-      indexView: FrozenMiniSearch.buildQueryIndexView(
+      indexView: createFrozenQueryIndexView(
         this._index,
         ti => this.fieldTermDataFor(ti),
-        this._externalIds,
-        this._storedFields,
-        this._nextId,
+        (callback) => {
+          for (let shortId = 0; shortId < this._nextId; shortId++) {
+            const id = this._externalIds[shortId]
+            if (id === undefined) continue
+            callback(shortId, id, this._storedFields[shortId])
+          }
+        },
       ),
       aggregateContext: this._aggregateContext,
     }
@@ -312,7 +301,7 @@ export default class FrozenMiniSearch<T = any> {
   static readonly wildcard: typeof WILDCARD_QUERY = WILDCARD_QUERY
 
   get documentCount(): number { return this._documentCount }
-  get termCount(): number { return this._index.size }
+  get termCount(): number { return this._termCount }
 
   memoryBreakdown(): FrozenMemoryBreakdown {
     const termCount = this.termCount
@@ -323,8 +312,7 @@ export default class FrozenMiniSearch<T = any> {
       if (row != null) storedJson += JSON.stringify(row).length
     }
 
-    const mapNodeCount = countRadixMapNodes(this._index.radixTree)
-    const radixEst = mapNodeCount * MAP_NODE_ESTIMATE_BYTES
+    const radixEst = this._index.packedByteLength()
     const idMapBytes = this._idLookup.mode === 'lazy-map' ? this._idLookup.mapEntryCount * 32 : 0
 
     const estimatedStructuredBytes
@@ -350,7 +338,8 @@ export default class FrozenMiniSearch<T = any> {
         totalTypedBytes: postingsStats.totalTypedBytes,
       },
       radixTree: {
-        mapNodeCount,
+        nodeCount: this._index.packedNodeCount(),
+        edgeCount: this._index.packedEdgeCount(),
         estimatedBytes: radixEst,
       },
       documents: {
@@ -419,7 +408,7 @@ export default class FrozenMiniSearch<T = any> {
       terms,
       treeShape: [],
       postings: this._postings,
-    }, this._index.radixTree)
+    }, undefined, this._index as PackedFrozenRadixTree)
   }
 
   static loadBinary<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
@@ -440,9 +429,10 @@ export default class FrozenMiniSearch<T = any> {
       autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
     } as OptionsWithDefaults<T>
 
-    const index = new SearchableMap<number>(
-      snap.termTree ?? deserializeTermIndexTree(snap.treeShape),
-    )
+    const index = snap.packedTermIndex
+    if (index == null) {
+      throw new Error('FrozenMiniSearch: binary snapshot missing packed term index')
+    }
 
     const idLookup = createIdToShortIdLookup(snap.externalIds, snap.nextId)
 
@@ -511,23 +501,4 @@ export default class FrozenMiniSearch<T = any> {
     return runQuery(query, searchOptions, this._queryEngineParams)
   }
 
-  private static buildQueryIndexView(
-    index: SearchableMap<number>,
-    fieldTermDataFor: (termIndex: number) => FieldTermDataLike,
-    externalIds: unknown[],
-    storedFields: (Record<string, unknown> | undefined)[],
-    nextId: number,
-  ) {
-    return createQueryIndexView(
-      index,
-      fieldTermDataFor,
-      (callback) => {
-        for (let shortId = 0; shortId < nextId; shortId++) {
-          const id = externalIds[shortId]
-          if (id === undefined) continue
-          callback(shortId, id, storedFields[shortId])
-        }
-      },
-    )
-  }
 }

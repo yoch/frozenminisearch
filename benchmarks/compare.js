@@ -37,7 +37,7 @@ function printMemoryBreakdown (b) {
   console.log('\nMemory breakdown (FrozenMiniSearch, estimated structured bytes):')
   console.log(`  terms: ${b.termCount}, docs: ${b.documentCount}, nextId slots: ${b.nextId}`)
   console.log(`  postings typed arrays: ${mb(b.postings.totalTypedBytes)} MB  (docIds ${mb(b.postings.allDocIdsBytes)}, freqs ${mb(b.postings.allFreqsBytes)})`)
-  console.log(`  radix tree (~${b.radixTree.mapNodeCount} Map nodes): ~${mb(b.radixTree.estimatedBytes)} MB`)
+  console.log(`  radix tree (${b.radixTree.nodeCount} nodes, ${b.radixTree.edgeCount} edges): ~${mb(b.radixTree.estimatedBytes)} MB`)
   console.log(`  stored fields (JSON est.): ${mb(b.documents.storedFieldsJsonBytes)} MB`)
   console.log(`  field length matrix: ${mb(b.documents.fieldLengthMatrixBytes)} MB`)
   console.log(`  id lookup: ${b.documents.idLookupMode} (map entries: ${b.documents.idToShortIdEntries})`)

@@ -1,4 +1,5 @@
-import SearchableMap from './SearchableMap/SearchableMap'
+import type SearchableMap from './SearchableMap/SearchableMap'
+import type { FrozenTermIndex } from './frozenTermIndex'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import type { OptionsWithDefaults } from './searchTypes'
@@ -33,7 +34,8 @@ export interface FrozenMemoryBreakdown {
     totalTypedBytes: number
   }
   radixTree: {
-    mapNodeCount: number
+    nodeCount: number
+    edgeCount: number
     estimatedBytes: number
   }
   documents: {
@@ -59,7 +61,7 @@ export interface FrozenAssembleParams<T = any> {
   storedFields: (Record<string, unknown> | undefined)[]
   fieldLengthMatrix: Uint32Array
   avgFieldLength: Float32Array
-  index: SearchableMap<number>
+  index: FrozenTermIndex
   /** Dictionary size; {@link terms} required only when validating term indices at assembly. */
   termCount: number
   terms?: string[]

@@ -26,11 +26,10 @@ import {
   readExternalIdsSection,
   readFieldNamesSection,
   readStoredFieldsSection,
-  readTermTreeSection,
-  serializeTermIndexTree,
   validateFrozenSnapshot,
   type FrozenSnapshot,
 } from './binaryStructures'
+import { readPackedTermTreeSection } from './packedRadixBinary'
 
 function denseLayoutFromMSv3(
   fieldCount: number,
@@ -111,8 +110,11 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
   const externalIds = readExternalIdsSection(buf, externalIdsOff, nextId, storedOff)
   const storedFields = readStoredFieldsSection(buf, storedOff, nextId, treeOff)
 
-  const termTree = readTermTreeSection(buf, treeOff, avgOff)
-  const treeShape = serializeTermIndexTree(termTree)
+  if (dictOff + 4 > postOffOff) {
+    throw invalidFrozenIndex('dictionary section truncated')
+  }
+  const termCount = buf.readUInt32LE(dictOff)
+  const packedTermIndex = readPackedTermTreeSection(buf, treeOff, avgOff, termCount)
 
   const avgFieldLength = readFloat32Array(buf, avgOff, flOff - avgOff)
   const fieldLengthMatrix = readUint32Array(buf, flOff, dictOff - flOff)
@@ -144,8 +146,8 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
     storedFields,
     fieldLengthMatrix,
     terms,
-    treeShape,
-    termTree,
+    treeShape: [],
+    packedTermIndex,
     postings,
   }
 
@@ -205,8 +207,12 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
   const externalIds = readExternalIdsSection(buf, externalIdsOff, nextId, storedOff)
   const storedFields = readStoredFieldsSection(buf, storedOff, nextId, treeOff)
 
-  const termTree = readTermTreeSection(buf, treeOff, avgOff)
-  const treeShape = serializeTermIndexTree(termTree)
+  if (dictOff + 4 > postMetaOff) {
+    throw invalidFrozenIndex('dictionary section truncated')
+  }
+  const dictTermCount = buf.readUInt32LE(dictOff)
+  const packedTermIndex = readPackedTermTreeSection(buf, treeOff, avgOff, dictTermCount)
+
   const avgFieldLength = readFloat32Array(buf, avgOff, flOff - avgOff)
   const fieldLengthMatrix = readUint32Array(buf, flOff, dictOff - flOff)
   const terms = readDictionarySection(buf, dictOff, postMetaOff)
@@ -281,8 +287,8 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
     storedFields,
     fieldLengthMatrix,
     terms,
-    treeShape,
-    termTree,
+    treeShape: [],
+    packedTermIndex,
     postings,
   }
 

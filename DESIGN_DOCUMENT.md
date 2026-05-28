@@ -201,44 +201,161 @@ score is multiplied by the number of matching terms in the query.
 
 ## FrozenMiniSearch
 
-`FrozenMiniSearch` is a read-only serving path added in this fork. It reuses the
-search API layer (`scoring.ts`, query execution) but replaces mutable posting
-`Map`s with flat typed arrays and a radix tree whose leaves hold numeric term
-indices instead of nested field maps.
+`FrozenMiniSearch` is a read-only variant of the index, added in this fork. Its
+existence follows directly from the project goals, and in particular from a
+tension within them: goal 5 (adding and removing documents at any time) is what
+makes `MiniSearch` mutable, but mutability has a cost that works against goal 1
+(small memory footprint). Many real applications build an index once and then
+only query it — a search box over a fixed documentation set, a product catalog
+shipped to the client, a precomputed index loaded from disk. For those
+workloads, paying the price of mutability buys nothing.
+
+`FrozenMiniSearch` is the answer to that workload. It deliberately gives up the
+ability to mutate the index (all `add`/`remove`/`discard`/`vacuum` methods throw)
+and, in exchange, stores the index in a much more compact and cache-friendly
+form. Giving up mutability is not just a footprint optimization: immutability is
+what makes the compact representation possible in the first place, because the
+data structures never need to grow, shrink, or be rebalanced after construction.
+
+The guiding principle mirrors the rest of the project: rather than reimplement
+search, `FrozenMiniSearch` reuses the existing search and scoring logic and only
+changes how the index is stored. Search behavior — ranking, fuzzy/prefix
+matching, query combinators — is identical to `MiniSearch` by construction.
+
+### Sharing the search layer with MiniSearch
+
+To guarantee that the two index types return the same results, the search API
+layer (query parsing, fuzzy/prefix expansion, BM25 scoring, result combination)
+was extracted into a shared layer that does not know how postings are stored.
+The two storage backends plug into it through two small abstractions:
+
+  - A `QueryIndexView`, which exposes exact/prefix/fuzzy term lookup and
+    iteration over active documents. Both backends produce one by wrapping their
+    own radix tree.
+  - A per-term posting accessor (`FieldTermDataLike` → `PostingListLike`), which
+    answers "give me the posting list for this term in this field". The mutable
+    index backs it with nested `Map`s; the frozen index backs it with a window
+    into flat arrays.
+
+Because the scoring code only ever sees these interfaces, the same code path
+serves both index types. This is a deliberate trade-off in favor of correctness
+and maintainability: a single scoring implementation cannot drift between the
+mutable and frozen variants.
+
+### Index data structure: flat arrays instead of nested maps
+
+This is the core difference from `MiniSearch`. The mutable index stores, at each
+radix-tree leaf, a nested structure `field -> document -> term frequency` built
+out of JavaScript `Map`s. That layout is excellent for incremental updates — any
+posting can be inserted or deleted in (amortized) constant time — but it is
+expensive at rest: every `Map` and every entry carries object and pointer
+overhead, and the postings for a single term are scattered across the heap,
+which is unfriendly to the CPU cache during scoring.
+
+`FrozenMiniSearch` keeps the radix tree (it is still the right structure for
+exact, prefix, and fuzzy lookup — see the sections above), but changes two
+things:
+
+  - **Leaves hold a numeric term index, not a posting structure.** The radix
+    tree becomes a compact map from term to a small integer.
+  - **Postings live in flat typed arrays shared by the whole index.** All
+    document ids and all term frequencies are concatenated into two global
+    arrays, and a side table records, for each `(term, field)` slot, the
+    `(offset, length)` window into those arrays.
+
+With this layout a posting list is just a view over a contiguous slice of the
+global arrays — no per-list object is allocated to read it. The footprint
+shrinks because the per-entry overhead of thousands of small `Map`s is replaced
+by a handful of large typed arrays, and scoring becomes a sequential scan over
+contiguous memory. This is the same reasoning that motivated the radix tree in
+the first place (goal 1), applied to the postings.
+
+The element widths are chosen adaptively to save further space:
+
+  - Document ids use `Uint16` when the index has at most 65535 documents,
+    otherwise `Uint32`.
+  - Term frequencies are stored as `Uint8`, clamped at 255. For BM25 this is
+    effectively free: term-frequency saturation already flattens the
+    contribution of very high counts, so the clamp only perturbs scores in
+    pathological cases (a term repeated hundreds of times in one field).
+
+### Dense and sparse posting layouts
+
+How the `(term, field)` slots map onto the flat arrays depends on the number of
+fields, because the two regimes have very different sparsity:
+
+  - **Single field (dense layout).** There is exactly one slot per term, so a
+    plain offset/length table indexed by term is both the smallest and the
+    fastest option.
+  - **Multiple fields (sparse layout).** A full `term × field` table is mostly
+    empty — most terms occur in only one or two fields — so storing every slot
+    would waste space. Instead, only non-empty slots are stored, together with a
+    field-id column and a per-term range into that column. Looking up a field
+    for a term is a short linear scan over its (few, sorted) entries, which beats
+    binary search at this size.
+
+The layout is selected automatically from the field count; callers never choose
+it.
 
 ### Build paths
 
-1. **`MiniSearch.freeze()`** — flatten an existing mutable index (supports dense
-   remap when `documentCount < nextId` after `discard`).
-2. **`fromDocuments` / `FrozenIndexBuilder`** — index directly into flat buffers
-   (no intermediate nested postings).
-3. **`saveBinary` / `loadBinary`** — **MSv3** on disk only (MSv1/MSv2 removed).
+There are three ways to obtain a frozen index, reflecting three different
+starting points:
 
-`assembleFrozen` is an advanced entry point for custom pipelines; it runs numeric
-validation plus radix leaf index checks.
+  1. **`MiniSearch.freeze()`** — convert an existing mutable index. This is the
+     path to use when you need the mutable features (incremental `add`,
+     `remove`, `discard`) *before* freezing. If documents were discarded, the
+     short ids are no longer dense; `freeze()` optionally remaps them to a dense
+     range so the frozen index does not carry holes.
+  2. **`fromDocuments` / `FrozenIndexBuilder` / `fromAsyncIterable`** — build the
+     flat representation directly from documents, without ever constructing the
+     intermediate nested-`Map` postings. This is cheaper in both time and peak
+     memory for the build-once case, and the async/iterator variants allow
+     streaming large corpora.
+  3. **`saveBinary` / `loadBinary`** — persist and restore a frozen index
+     to/from disk.
 
-### On-disk format (MSv3)
+`assembleFrozen` is the low-level entry point shared by all of these; it
+validates the assembled parts (posting bounds, matrix sizes, radix leaf indices)
+before handing back an instance, so custom pipelines fail fast on malformed
+input.
 
-64-byte header: magic `MSv3`, version `3`, CRC-32 IEEE over the payload (bytes after
-the header), and 12 section offsets plus end sentinel.
+### On-disk format
 
-Sections (in order):
+A frozen index can be serialized to a self-describing binary snapshot. The
+design goals for the format are: validate aggressively on load (snapshots may
+come from disk or the network and must not be trusted blindly), and mirror the
+in-memory typed arrays closely enough that loading is mostly a matter of taking
+views over the buffer rather than parsing.
 
-1. **Core** — `documentCount`, `nextId`, `fieldCount`
-2. **Field names** — length-prefixed UTF-8 strings (field id order)
-3. **External IDs** — per slot: empty, IEEE float64 number, UTF-8 string, or JSON blob
-4. **Stored fields** — offset table + heap of length-prefixed JSON objects
-5. **Term tree** — pre-order node bundles (child count, then leaf or edge records); Map insertion order preserved on write
-6. **avgFieldLength**, **fieldLengthMatrix**, **dictionary**, flat **postings**
+A snapshot begins with a fixed header (magic bytes, version, a CRC-32 checksum
+over the payload, and section offsets) followed by independently addressable
+sections: core counts, field names, external document ids, stored fields, the
+term tree, the field-length data, the term dictionary, and the flat postings.
+On load, the reader verifies the checksum, the monotonicity of the section
+offsets, that posting windows stay within bounds, and that every radix leaf
+points at a valid term — any violation is rejected rather than silently
+mis-read.
 
-Load verifies CRC, monotonic offsets, posting bounds, and tree leaf indices.
+There are two on-disk variants, chosen automatically to match the in-memory
+layout: **MSv3** for the dense (single-field, `Uint32` doc id) case, and
+**MSv4** for the sparse layout or narrower `Uint16` doc ids. The older MSv1/MSv2
+formats from before this fork are not supported and must be re-saved.
 
-### Design limits (current)
+### Design limits
 
-- Term frequencies are `Uint8` (max 255 per document/field).
-- `tokenize` / `processTerm` are not persisted; reload must use the same
-  functions as build if customized.
-- `loadBinary` may omit `fields` (read from snapshot); if provided, must match exactly.
+These limits are consequences of the design choices above and are worth keeping
+in mind when contributing:
+
+  - **Term frequencies cap at 255** (the `Uint8` choice). Raising the cap would
+    require a different posting encoding.
+  - **`tokenize` and `processTerm` are not persisted.** Functions cannot be
+    serialized safely, so a snapshot only stores data. If you customized these
+    functions at build time, you must pass the same ones to `loadBinary`,
+    otherwise queries will be tokenized differently from the indexed terms.
+  - **`fields` is optional on load** (the field names live in the snapshot), but
+    if supplied it must match the indexed fields exactly — a mismatch is an
+    error, not a silent subset.
 
 ### Suggested optimizations (future)
 

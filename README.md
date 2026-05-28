@@ -189,6 +189,10 @@ TypeScript definitions: `dist/es/index.d.ts`.
 | Area | Change | Effect |
 |------|--------|--------|
 | **Format** | MSv3 replaces MSv1/MSv2 (breaking) | CRC32 payload check; binary field names, ids, stored fields, term tree |
+| **Format** | MSv4 added: sparse postings for multi-field indexes, `Uint16` doc ids when `nextId ≤ 65535`, dynamic sparse field-id width | Smaller on-disk + in-memory footprint; MSv3 still written for single-field/`Uint32` |
+| **Build/Format** | Term dictionary rebuilt in `saveBinary()` instead of kept in memory | No resident `_terms[]` duplicate of the radix tree |
+| **Build** | Adaptive external-id lookup (`identity` vs lazy `Map`) | Contiguous numeric ids cost no lookup table |
+| **Build/Search** | `freeze()` compacts discarded slots to a dense id range | No holes to skip; wildcard iterates only active docs |
 | **Binary load** | Structural validation in `decodeFrozenSnapshot` / `validateFrozenSnapshot` | Corrupt snapshots fail fast with `Invalid frozen index: …` |
 | **`loadBinary`** | `fields` optional (embedded in snapshot); if provided, must match exactly | Simpler reload; no silent field subset |
 | **`saveBinary`** | Single pre-allocated buffer | Lower peak memory while serializing |
@@ -200,11 +204,10 @@ Measure regressions with [`benchmarks/`](benchmarks/README.md) (`freezeMs`, `sav
 
 | Priority | Topic | Idea | Trade-off |
 |----------|-------|------|-----------|
-| **Format** | Term dictionary | Drop runtime `_terms[]` duplicate at rest | Saves heap; more complex save path |
+| **Format** | On-disk dictionary | Reconstruct terms from the radix tree on load, drop the dictionary section | Smaller snapshots; slower load |
 | **API** | `loadBinaryAsync` | Chunked/async load like `loadJSONAsync` | Better cold start on huge indexes |
 | **API** | Input types | Accept `Uint8Array` as well as `Buffer` on `loadBinary` | Broader runtime support |
 | **Build** | `freeze` / builder | One-pass posting flatten with size estimate | Faster freeze on very large corpora |
-| **Search** | Wildcard | Iterate only active document slots after dense remap | Faster wildcard after many `discard`s |
 | **Search** | Hot path | Direct subarray posting access in `aggregateTerm` | Lower GC; invasive |
 
 **Intentionally deferred:** embedding `tokenize` / `processTerm` in the snapshot. Raising the `Uint8` term-frequency cap needs a new postings encoding.

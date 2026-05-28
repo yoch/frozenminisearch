@@ -1234,15 +1234,15 @@ export default class MiniSearch<T = any> {
   /** @ignore */
   private toFreezeSource(): FreezeSource<T> {
     return {
-      _options: this._options,
-      _index: this._index,
-      _documentCount: this._documentCount,
-      _nextId: this._nextId,
-      _documentIds: this._documentIds,
-      _fieldIds: this._fieldIds,
-      _fieldLength: this._fieldLength,
-      _avgFieldLength: this._avgFieldLength,
-      _storedFields: this._storedFields,
+      options: this._options,
+      index: this._index,
+      documentCount: this._documentCount,
+      nextId: this._nextId,
+      documentIds: this._documentIds,
+      fieldIds: this._fieldIds,
+      fieldLength: this._fieldLength,
+      avgFieldLength: this._avgFieldLength,
+      storedFields: this._storedFields,
     }
   }
 

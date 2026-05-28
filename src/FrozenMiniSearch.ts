@@ -128,7 +128,7 @@ function buildFlatPostingsFromSource<T>(
   const fieldIndexByTermIndex: Map<number, Map<number, number>>[] = []
   const leafToIndex = new WeakMap<Map<number, Map<number, number>>, number>()
 
-  for (const [term, fieldIndex] of source._index) {
+  for (const [term, fieldIndex] of source.index) {
     const ti = terms.length
     terms.push(term)
     fieldIndexByTermIndex.push(fieldIndex)
@@ -150,7 +150,7 @@ function buildFlatPostingsFromSource<T>(
   })
   const { postingsOffsets, postingsLengths, allDocIds, allFreqs } = flat
   const tree = cloneRadixTreeWithTermIndex(
-    source._index.radixTree as RadixTree<Map<number, Map<number, number>>>,
+    source.index.radixTree as RadixTree<Map<number, Map<number, number>>>,
     leafToIndex,
   )
 
@@ -158,37 +158,37 @@ function buildFlatPostingsFromSource<T>(
 }
 
 export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSearch<T> {
-  const fieldCount = source._options.fields.length
-  const { _documentCount, _nextId } = source
+  const fieldCount = source.options.fields.length
+  const { documentCount, nextId } = source
 
-  const useDense = _documentCount < _nextId
+  const useDense = documentCount < nextId
   let shortIdRemap: Uint32Array | null = null
-  const externalIds: unknown[] = new Array(useDense ? _documentCount : _nextId)
+  const externalIds: unknown[] = new Array(useDense ? documentCount : nextId)
   const storedFields: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
   const idToShortId = new Map<unknown, number>()
 
   if (useDense) {
-    shortIdRemap = new Uint32Array(_nextId)
+    shortIdRemap = new Uint32Array(nextId)
     shortIdRemap.fill(DISCARDED_DOC_ID)
     let dense = 0
-    for (const [shortId, id] of source._documentIds) {
+    for (const [shortId, id] of source.documentIds) {
       shortIdRemap[shortId] = dense
       externalIds[dense] = id
       idToShortId.set(id, dense)
-      storedFields[dense] = source._storedFields.get(shortId)
+      storedFields[dense] = source.storedFields.get(shortId)
       dense++
     }
   } else {
-    for (const [shortId, id] of source._documentIds) {
+    for (const [shortId, id] of source.documentIds) {
       externalIds[shortId] = id
       idToShortId.set(id, shortId)
-      storedFields[shortId] = source._storedFields.get(shortId)
+      storedFields[shortId] = source.storedFields.get(shortId)
     }
   }
 
-  const matrixRows = useDense ? _documentCount : _nextId
+  const matrixRows = useDense ? documentCount : nextId
   const fieldLengthMatrix = new Uint32Array(matrixRows * fieldCount)
-  for (const [shortId, lengths] of source._fieldLength) {
+  for (const [shortId, lengths] of source.fieldLength) {
     const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
     if (row === DISCARDED_DOC_ID) continue
     for (let f = 0; f < fieldCount; f++) {
@@ -196,19 +196,19 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
     }
   }
 
-  const avgFieldLength = new Float32Array(source._avgFieldLength.length)
-  for (let i = 0; i < source._avgFieldLength.length; i++) {
-    avgFieldLength[i] = source._avgFieldLength[i]
+  const avgFieldLength = new Float32Array(source.avgFieldLength.length)
+  for (let i = 0; i < source.avgFieldLength.length; i++) {
+    avgFieldLength[i] = source.avgFieldLength[i]
   }
 
   const flat = buildFlatPostingsFromSource(source, fieldCount, shortIdRemap)
   const frozenIndex = new SearchableMap<number>(flat.tree)
 
   return assembleFrozen({
-    options: source._options,
-    documentCount: _documentCount,
-    nextId: useDense ? _documentCount : _nextId,
-    fieldIds: source._fieldIds,
+    options: source.options,
+    documentCount,
+    nextId: useDense ? documentCount : nextId,
+    fieldIds: source.fieldIds,
     fieldCount,
     externalIds,
     idToShortId,
@@ -250,7 +250,10 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _postingsLengths: Uint32Array
   private readonly _allDocIds: Uint32Array
   private readonly _allFreqs: Uint8Array
+  /** Per-term {@link FieldTermDataLike} views; safe to retain for the instance lifetime (index is immutable). */
   private _fieldTermDataCache: FieldTermDataLike[] | undefined
+  private readonly _aggregateContext: AggregateContext
+  private readonly _queryEngineParams: QueryEngineParams
 
   constructor(params: {
     options: OptionsWithDefaults<T>
@@ -286,6 +289,29 @@ export default class FrozenMiniSearch<T = any> {
     this._postingsLengths = params.postingsLengths
     this._allDocIds = params.allDocIds
     this._allFreqs = params.allFreqs
+
+    this._aggregateContext = {
+      documentCount: this._documentCount,
+      avgFieldLength: this._avgFieldLength,
+      fieldIds: this._fieldIds,
+      getFieldLength: (docId, fieldId) => this.getFieldLength(docId, fieldId),
+      getExternalId: docId => this._externalIds[docId],
+      getStoredFields: docId => this._storedFields[docId],
+    }
+    this._queryEngineParams = {
+      fields: this._options.fields,
+      globalSearchOptions: this._options.searchOptions,
+      tokenize: this._options.tokenize,
+      processTerm: this._options.processTerm,
+      indexView: FrozenMiniSearch.buildQueryIndexView(
+        this._index,
+        ti => this.fieldTermDataFor(ti),
+        this._externalIds,
+        this._storedFields,
+        this._nextId,
+      ),
+      aggregateContext: this._aggregateContext,
+    }
   }
 
   static readonly wildcard: typeof WILDCARD_QUERY = WILDCARD_QUERY
@@ -484,7 +510,7 @@ export default class FrozenMiniSearch<T = any> {
   private fieldTermDataFor(termIndex: number): FieldTermDataLike {
     let cache = this._fieldTermDataCache
     if (cache == null) {
-      cache = new Array(this._terms.length)
+      cache = new Array(this.termCount)
       this._fieldTermDataCache = cache
     }
     let data = cache[termIndex]
@@ -502,38 +528,17 @@ export default class FrozenMiniSearch<T = any> {
     return data
   }
 
-  private aggregateContext(): AggregateContext {
-    return {
-      documentCount: this._documentCount,
-      avgFieldLength: this._avgFieldLength,
-      fieldIds: this._fieldIds,
-      getFieldLength: (docId, fieldId) => this.getFieldLength(docId, fieldId),
-      getExternalId: docId => this._externalIds[docId],
-      getStoredFields: docId => this._storedFields[docId],
-    }
-  }
-
   private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
-    return runQuery(query, searchOptions, this.queryEngineParams())
+    return runQuery(query, searchOptions, this._queryEngineParams)
   }
 
-  private queryEngineParams(): QueryEngineParams {
-    return {
-      fields: this._options.fields,
-      globalSearchOptions: this._options.searchOptions,
-      tokenize: this._options.tokenize,
-      processTerm: this._options.processTerm,
-      indexView: this.frozenQueryIndexView(),
-      aggregateContext: this.aggregateContext(),
-    }
-  }
-
-  private frozenQueryIndexView(): QueryIndexView {
-    const index = this._index
-    const fieldTermDataFor = (ti: number) => this.fieldTermDataFor(ti)
-    const externalIds = this._externalIds
-    const storedFields = this._storedFields
-    const nextId = this._nextId
+  private static buildQueryIndexView(
+    index: SearchableMap<number>,
+    fieldTermDataFor: (termIndex: number) => FieldTermDataLike,
+    externalIds: unknown[],
+    storedFields: (Record<string, unknown> | undefined)[],
+    nextId: number,
+  ): QueryIndexView {
     return {
       getTermData(term) {
         const ti = index.get(term)

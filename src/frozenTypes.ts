@@ -3,16 +3,17 @@ import type { OptionsWithDefaults } from './searchTypes'
 
 export type { OptionsWithDefaults } from './searchTypes'
 
+/** Snapshot of a mutable {@link MiniSearch} index for {@link freezeFromMiniSearch}. */
 export interface FreezeSource<T = any> {
-  _options: OptionsWithDefaults<T>
-  _index: SearchableMap<Map<number, Map<number, number>>>
-  _documentCount: number
-  _nextId: number
-  _documentIds: Map<number, any>
-  _fieldIds: { [key: string]: number }
-  _fieldLength: Map<number, number[]>
-  _avgFieldLength: number[]
-  _storedFields: Map<number, Record<string, unknown>>
+  options: OptionsWithDefaults<T>
+  index: SearchableMap<Map<number, Map<number, number>>>
+  documentCount: number
+  nextId: number
+  documentIds: Map<number, any>
+  fieldIds: { [key: string]: number }
+  fieldLength: Map<number, number[]>
+  avgFieldLength: number[]
+  storedFields: Map<number, Record<string, unknown>>
 }
 
 export interface FrozenMemoryBreakdown {

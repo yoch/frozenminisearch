@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Optional post-commit hook: record benchmark history on a clean tree.
+# Install: cp benchmarks/scripts/post-commit.sample .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Skip merge commits, rebases, etc. if desired:
+# [[ "$(git rev-parse --short HEAD)" =~ ^[0-9a-f]+$ ]] || exit 0
+
+RUNS="${BENCHMARK_RUNS:-3}"
+LOG="${ROOT}/benchmarks/perf-history-hook.log"
+
+{
+  echo "--- $(date -Iseconds) post-commit $(git rev-parse --short HEAD) ---"
+  if RUNS="$RUNS" "${ROOT}/benchmarks/scripts/record-history.sh"; then
+    "${ROOT}/benchmarks/scripts/analyze-history.sh" --changelog >> "${LOG}.changelog" 2>&1 || true
+    echo "recorded ok"
+  else
+    echo "record skipped or failed (dirty tree or duplicate commit)"
+  fi
+} >> "$LOG" 2>&1
+
+exit 0

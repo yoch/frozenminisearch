@@ -95,6 +95,8 @@
     "benchmark:diff": "npm run build && node --expose-gc benchmarks/diffBaseline.js",
     "benchmark:diff:latest": "node --expose-gc benchmarks/diffBaseline.js --latest",
     "benchmark:baseline:update": "npm run benchmark:record:reference",
+    "benchmark:history:analyze": "node benchmarks/scripts/analyze-history.mjs",
+    "benchmark:history:vs-mutable": "node benchmarks/scripts/analyze-history.mjs --vs-mutable",
     "build-benchmark": "BENCHMARKS=true npm run build",
     "build": "npm run clean-build && NODE_ENV=production rollup -c && node scripts/postbuild-cjs.cjs",
     "clean-build": "rm -rf dist",

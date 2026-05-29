@@ -6,7 +6,7 @@
  * Requires: yarn build && node --expose-gc
  */
 import { buildScenarioList, runBenchmarkSuite } from './benchmarkSuite.js'
-import { parseRunsArg } from './benchmarkUtils.js'
+import { parseBenchmarkArgs, loadBenchmarkPayload, argValue } from './benchmarkUtils.js'
 
 const mb = (bytes) => (bytes / 1024 / 1024).toFixed(2)
 
@@ -101,31 +101,41 @@ function printScenario (data) {
   }
 }
 
-const runs = parseRunsArg()
+const { runs, searchIterations } = parseBenchmarkArgs()
+const fromPath = argValue('--from')
 
 console.log('=== MiniSearch vs FrozenMiniSearch (isolated measurements) ===\n')
-if (runs > 1) {
-  console.log(`Using ${runs} runs per scenario (median aggregation)\n`)
+
+let scenarios
+if (fromPath) {
+  const payload = loadBenchmarkPayload(fromPath)
+  scenarios = payload.scenarios
+  console.log(`From file: ${fromPath}`)
+  console.log(`  captured: ${payload.capturedAt} @ ${payload.git?.commitShort}`)
+  console.log(`  runs: ${payload.runs ?? 1}, search iterations: ${payload.searchIterations ?? '(legacy)'}\n`)
+} else {
+  if (!global.gc) {
+    console.log('Tip: run with --expose-gc for accurate heap numbers.\n')
+  }
+  console.log(`${runs} run(s)/scenario, ${searchIterations} search iterations (median)\n`)
+  scenarios = runBenchmarkSuite(buildScenarioList(), runs, searchIterations)
 }
 
-if (!global.gc) {
-  console.log('Tip: run with --expose-gc for accurate heap numbers.\n')
-}
-
-for (const result of runBenchmarkSuite(buildScenarioList(), runs)) {
+for (const result of scenarios) {
   printScenario(result)
 }
 
 console.log('\n' + '='.repeat(72))
 console.log('JSON baselines')
 console.log('='.repeat(72))
-console.log('• yarn benchmark:record          → benchmarks/baselines/latest.json')
-console.log('• yarn benchmark:diff          → compare run vs reference.json')
-console.log('• yarn benchmark:baseline:update → promote latest to reference')
+console.log('• yarn benchmark:record            → benchmarks/baselines/latest.json')
+console.log('• yarn benchmark:diff              → latest.json vs reference (no re-run)')
+console.log('• yarn benchmark:compare --from …  → report from saved JSON')
+console.log('• yarn benchmark:baseline:update   → promote latest to reference')
 console.log('='.repeat(72))
 console.log('Notes')
 console.log('='.repeat(72))
 console.log('• Heap is measured with one index alive; use --expose-gc for stable numbers.')
 console.log('• Memory breakdown estimates structured data; V8 object overhead is additional.')
-console.log('• saveBinary writes MSv3 (flat postings + binary metadata); loadBinary reads MSv3 only.')
+console.log('• saveBinary writes MSv3 or MSv4 (no dictionary); loadBinary reads both.')
 console.log('• Production: build mutable → freeze() → release mutable → serve frozen (or loadBinary).\n')

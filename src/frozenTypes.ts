@@ -62,8 +62,6 @@ export interface FrozenAssembleParams<T = any> {
   fieldLengthMatrix: Uint32Array
   avgFieldLength: Float32Array
   index: FrozenTermIndex
-  /** Dictionary size; {@link terms} required only when validating term indices at assembly. */
   termCount: number
-  terms?: string[]
   postings: FrozenPostingsLayout
 }

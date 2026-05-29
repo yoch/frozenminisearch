@@ -17,7 +17,9 @@ import {
   pctDeltaRound,
   measureHeap,
   benchSearch,
-  timedMs
+  timedMs,
+  defaultBenchmarkRuns,
+  defaultSearchIterations,
 } from './benchmarkUtils.js'
 
 function median (values) {
@@ -357,7 +359,7 @@ function computeScoreDrift (mutable, frozen, query, limit = 20) {
 /**
  * Run one benchmark scenario and return JSON-serializable metrics.
  */
-export function runScenario (scenario) {
+export function runScenario (scenario, searchIterations = defaultSearchIterations()) {
   const { id, name, corpus, options, queries, driftQueries } = scenario
 
   let json
@@ -442,13 +444,13 @@ export function runScenario (scenario) {
       const ms = new MiniSearch(options)
       ms.addAll(corpus)
       return ms
-    }, (idx) => benchSearch(idx, q, opts))
+    }, (idx) => benchSearch(idx, q, opts, searchIterations))
 
     const frozen = withIndex(() => {
       const ms = new MiniSearch(options)
       ms.addAll(corpus)
       return ms.freeze()
-    }, (idx) => benchSearch(idx, q, opts))
+    }, (idx) => benchSearch(idx, q, opts, searchIterations))
 
     search.push({
       label,
@@ -545,14 +547,18 @@ export function runScenario (scenario) {
   }
 }
 
-export function runBenchmarkSuite (scenarios = buildScenarioList(), runs = 1) {
+export function runBenchmarkSuite (
+  scenarios = buildScenarioList(),
+  runs = defaultBenchmarkRuns(),
+  searchIterations = defaultSearchIterations(),
+) {
   if (runs <= 1) {
-    return scenarios.map((scenario) => runScenario(scenario))
+    return scenarios.map((scenario) => runScenario(scenario, searchIterations))
   }
   return scenarios.map((scenario) => {
     const results = []
     for (let i = 0; i < runs; i++) {
-      results.push(runScenario(scenario))
+      results.push(runScenario(scenario, searchIterations))
     }
     return aggregateScenarioRuns(results)
   })

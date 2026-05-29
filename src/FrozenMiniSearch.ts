@@ -1,8 +1,6 @@
-import SearchableMap from './SearchableMap/SearchableMap'
-import { LEAF } from './SearchableMap/TreeIterator'
 import type { RadixTree } from './SearchableMap/types'
 import type { FrozenTermIndex } from './frozenTermIndex'
-import PackedFrozenRadixTree, { frozenTermIndexFromRadixTree } from './packedRadixTree'
+import PackedFrozenRadixTree from './packedRadixTree'
 import {
   finalizeSearchResults,
   type AggregateContext,
@@ -52,38 +50,13 @@ export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from '
 import { DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
 
-function rebuildTermsFromIndex(index: FrozenTermIndex, termCount: number): string[] {
-  const terms: string[] = new Array(termCount)
-  for (const [term, ti] of index.entries()) {
-    terms[ti] = term
-  }
-  return terms
-}
-
 const READ_ONLY_MSG = 'FrozenMiniSearch is read-only. Rebuild from a mutable MiniSearch instance.'
 
 function throwReadOnly(): never {
   throw new Error(READ_ONLY_MSG)
 }
 
-function cloneRadixTreeWithTermIndex(
-  tree: RadixTree<Map<number, Map<number, number>>>,
-  termIndexByLeaf: WeakMap<Map<number, Map<number, number>>, number>,
-): RadixTree<number> {
-  const out = new Map() as RadixTree<number>
-  for (const [key, val] of tree) {
-    if (key === LEAF) {
-      const idx = termIndexByLeaf.get(val as Map<number, Map<number, number>>)
-      if (idx == null) {
-        throw new Error('FrozenMiniSearch: missing term index while cloning tree')
-      }
-      out.set(LEAF, idx)
-    } else {
-      out.set(key, cloneRadixTreeWithTermIndex(val as RadixTree<Map<number, Map<number, number>>>, termIndexByLeaf))
-    }
-  }
-  return out
-}
+type MutableFieldTermData = Map<number, Map<number, number>>
 
 export function frozenMemoryBreakdown(frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
   return frozen.memoryBreakdown()
@@ -112,9 +85,6 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
   if (params.avgFieldLength.length !== params.fieldCount) {
     throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
   }
-  if (params.terms != null && params.terms.length !== termCount) {
-    throw new Error('FrozenMiniSearch: terms length mismatch')
-  }
   params.index.validateLeaves(termCount)
   return new FrozenMiniSearch(params)
 }
@@ -125,24 +95,28 @@ function buildFlatPostingsFromSource<T>(
   nextId: number,
   shortIdRemap: Uint32Array | null,
 ): {
-  terms: string[]
-  tree: RadixTree<number>
+  termCount: number
+  index: PackedFrozenRadixTree
   postings: FrozenPostingsLayout
 } {
-  const terms: string[] = []
-  const fieldIndexByTermIndex: Map<number, Map<number, number>>[] = []
-  const leafToIndex = new WeakMap<Map<number, Map<number, number>>, number>()
+  const fieldIndexByTermIndex: MutableFieldTermData[] = []
+  const radixTree = source.index.radixTree as RadixTree<MutableFieldTermData>
 
-  for (const [term, fieldIndex] of source.index) {
-    const ti = terms.length
-    terms.push(term)
-    fieldIndexByTermIndex.push(fieldIndex)
-    leafToIndex.set(fieldIndex, ti)
-  }
+  const index = PackedFrozenRadixTree.fromRadixTreeWithLeaves(
+    radixTree,
+    0,
+    (leaf) => {
+      const ti = fieldIndexByTermIndex.length
+      fieldIndexByTermIndex[ti] = leaf
+      return ti
+    },
+    true,
+  )
+  const termCount = index.size
 
   const postings = materializeFrozenPostings({
     fieldCount,
-    termCount: terms.length,
+    termCount,
     nextId,
     clampFrequencies: true,
     remapDocId: shortIdRemap != null ? (docId: number) => shortIdRemap![docId] : undefined,
@@ -154,12 +128,8 @@ function buildFlatPostingsFromSource<T>(
       }
     },
   })
-  const tree = cloneRadixTreeWithTermIndex(
-    source.index.radixTree as RadixTree<Map<number, Map<number, number>>>,
-    leafToIndex,
-  )
 
-  return { terms, tree, postings }
+  return { termCount, index, postings }
 }
 
 export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSearch<T> {
@@ -207,7 +177,6 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
   }
 
   const flat = buildFlatPostingsFromSource(source, fieldCount, resolvedNextId, shortIdRemap)
-  const frozenIndex = frozenTermIndexFromRadixTree(flat.tree, flat.terms.length)
 
   return assembleFrozen({
     options: source.options,
@@ -220,9 +189,8 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
     storedFields,
     fieldLengthMatrix,
     avgFieldLength,
-    index: frozenIndex,
-    termCount: flat.terms.length,
-    terms: flat.terms,
+    index: flat.index,
+    termCount: flat.termCount,
     postings: flat.postings,
   })
 }
@@ -394,7 +362,6 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   saveBinary(): Buffer {
-    const terms = rebuildTermsFromIndex(this._index, this._termCount)
     return encodeFrozenSnapshot({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -405,7 +372,6 @@ export default class FrozenMiniSearch<T = any> {
       externalIds: this._externalIds,
       storedFields: this._storedFields,
       fieldLengthMatrix: this._fieldLengthMatrix,
-      terms,
       treeShape: [],
       postings: this._postings,
     }, undefined, this._index as PackedFrozenRadixTree)
@@ -448,8 +414,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldLengthMatrix: snap.fieldLengthMatrix,
       avgFieldLength: snap.avgFieldLength,
       index,
-      termCount: snap.terms.length,
-      terms: snap.terms,
+      termCount: snap.postings.termCount,
       postings: snap.postings,
     })
   }

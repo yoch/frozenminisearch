@@ -8,10 +8,11 @@ Reproducible memory and CPU measurements for regression tracking.
 
 | Command | Description |
 |---------|-------------|
-| `yarn benchmark:compare` | Human-readable terminal report (7 scenarios) |
+| `yarn benchmark:compare` | Human-readable report (runs suite; default 3×50 search iters) |
+| `yarn benchmark:compare --from baselines/latest.json` | Same report from saved JSON (no re-run) |
 | `yarn benchmark:record` | Run suite → `baselines/latest.json` |
-| `yarn benchmark:diff` | Current run vs `baselines/reference.json` (warn/fail thresholds) |
-| `yarn benchmark:diff --latest` | `latest.json` vs `reference.json` (no re-run) |
+| `yarn benchmark:diff` | `latest.json` vs `reference.json` (no re-run) |
+| `yarn benchmark:diff:run` | Re-run suite, update `latest.json`, then diff |
 | `yarn benchmark:baseline:update` | `record` + copy to `reference.json` |
 | `benchmarks/scripts/record-history.sh` | Append HEAD → `perf-history.jsonl` (clean tree) |
 | `benchmarks/scripts/analyze-history.sh` | Timeline, compare, CHANGELOG snippets, vs mutable |
@@ -24,18 +25,16 @@ NODE_ENV=production node --expose-gc benchmarks/compare.js
 
 `yarn benchmark:*` scripts run `yarn build` then `node --expose-gc` automatically.
 
-## Multi-run (optional)
+## Defaults (routine)
 
-Reduce variance with `--runs N`:
+- **3 runs** per scenario (median aggregation)
+- **50 timed searches** per query (`--iterations` to override)
+- Override via env: `RUNS=2 SEARCH_ITERATIONS=30 yarn benchmark:record`
 
-```bash
-yarn benchmark:compare --runs 3
-yarn benchmark:record --runs 3
-yarn benchmark:diff --runs 3
-```
+`benchmark:diff` does **not** re-run the suite: record once, diff as often as needed.
+Compare another capture: `yarn benchmark:diff --current=path/to/run.json`.
 
-Metrics are aggregated with the **median** per scenario.
-`--runs` is ignored for `benchmark:diff --latest` (no re-run).
+Force a fresh measurement: `yarn benchmark:diff:run` (writes `latest.json` then diffs).
 
 ## What to watch when optimizing FrozenMiniSearch
 
@@ -59,8 +58,8 @@ Update `baselines/reference.json` only after intentional wins: `yarn benchmark:b
 ## Optimization workflow
 
 1. Change code
-2. `yarn benchmark:diff` — catch regressions vs reference
-3. Commit; `RUNS=3 benchmarks/scripts/record-history.sh`
+2. `yarn benchmark:record` then `yarn benchmark:diff` — regressions vs reference
+3. Commit; `benchmarks/scripts/record-history.sh` (uses same defaults)
 4. `benchmarks/scripts/analyze-history.sh --changelog` — update CHANGELOG if significant
 5. If gains are intentional: `yarn benchmark:baseline:update` and commit `reference.json` + `perf-history.jsonl`
 
@@ -71,7 +70,7 @@ Update `baselines/reference.json` only after intentional wins: `yarn benchmark:b
 - Isolated heap: mutable, frozen, loadJSON, loadBinary
 - Build heap: `addAll` + `freeze` vs `fromDocuments`
 - Indexing time: addAll, freeze, fromDocuments, saveBinary
-- Disk size: JSON vs MSv3 binary
+- Disk size: JSON vs MSv3/MSv4 binary
 - `memoryBreakdown`: typed postings, radix tree, stored fields
 - Search: p50/p95 per query
 - `scoreDrift`: mutable vs frozen score delta on **overflow frequencies** (>255 occurrences of the same term)

@@ -11,6 +11,7 @@ export type { FrozenSnapshot, TreeShape } from './binaryStructures'
 export {
   deserializeTermIndexTree,
   fieldNamesFromFieldIds,
+  termCountOf,
   validateFrozenSnapshot,
   validateFrozenSnapshotNumeric,
 } from './binaryStructures'

@@ -95,7 +95,72 @@ export function medianMeasureHeap (fn, runs = 1) {
   }
 }
 
-export function benchSearch (index, query, searchOptions = {}, iterations = 80) {
+/** Routine defaults: median of 3 scenario runs, 50 timed searches each. */
+export const DEFAULT_BENCHMARK_RUNS = 3
+export const DEFAULT_SEARCH_ITERATIONS = 50
+
+export function defaultBenchmarkRuns () {
+  const fromEnv = Number(process.env.RUNS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
+  return DEFAULT_BENCHMARK_RUNS
+}
+
+export function defaultSearchIterations () {
+  const fromEnv = Number(process.env.SEARCH_ITERATIONS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
+  return DEFAULT_SEARCH_ITERATIONS
+}
+
+export function parseRunsArg (args = process.argv) {
+  let runs = defaultBenchmarkRuns()
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    if (arg === '--runs') {
+      const next = Number(args[i + 1])
+      if (Number.isFinite(next) && next > 0) runs = Math.floor(next)
+    } else if (arg.startsWith('--runs=')) {
+      const next = Number(arg.split('=')[1])
+      if (Number.isFinite(next) && next > 0) runs = Math.floor(next)
+    }
+  }
+  return runs
+}
+
+export function parseSearchIterationsArg (args = process.argv) {
+  let iterations = defaultSearchIterations()
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    if (arg === '--iterations') {
+      const next = Number(args[i + 1])
+      if (Number.isFinite(next) && next > 0) iterations = Math.floor(next)
+    } else if (arg.startsWith('--iterations=')) {
+      const next = Number(arg.split('=')[1])
+      if (Number.isFinite(next) && next > 0) iterations = Math.floor(next)
+    }
+  }
+  return iterations
+}
+
+export function parseBenchmarkArgs (args = process.argv) {
+  return {
+    runs: parseRunsArg(args),
+    searchIterations: parseSearchIterationsArg(args),
+  }
+}
+
+export function loadBenchmarkPayload (path) {
+  return JSON.parse(readFileSync(path, 'utf8'))
+}
+
+export function argValue (flag, args = process.argv) {
+  const eq = args.find((a) => a.startsWith(`${flag}=`))
+  if (eq) return eq.slice(flag.length + 1)
+  const i = args.indexOf(flag)
+  if (i >= 0 && args[i + 1] && !args[i + 1].startsWith('--')) return args[i + 1]
+  return null
+}
+
+export function benchSearch (index, query, searchOptions = {}, iterations = defaultSearchIterations()) {
   index.search(query, searchOptions)
   const times = []
   for (let i = 0; i < iterations; i++) {
@@ -144,17 +209,3 @@ export function collectRunMetadata () {
   }
 }
 
-export function parseRunsArg (args = process.argv) {
-  let runs = 1
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i]
-    if (arg === '--runs') {
-      const next = Number(args[i + 1])
-      if (Number.isFinite(next) && next > 0) runs = Math.floor(next)
-    } else if (arg.startsWith('--runs=')) {
-      const next = Number(arg.split('=')[1])
-      if (Number.isFinite(next) && next > 0) runs = Math.floor(next)
-    }
-  }
-  return runs
-}

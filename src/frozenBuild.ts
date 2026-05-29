@@ -197,6 +197,8 @@ export class FrozenIndexBuilder<T> {
 
     const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 
+    // Incremental builder: numeric radix leaves + build-time terms[] for postings.
+    // freezeFromMiniSearch packs Map leaves in one radix pass (no resident terms[]).
     return {
       options: this._options,
       documentCount,
@@ -210,7 +212,6 @@ export class FrozenIndexBuilder<T> {
       avgFieldLength,
       index: frozenTermIndexFromRadixTree(this._index.radixTree, this._terms.length),
       termCount: this._terms.length,
-      terms: this._terms,
       postings,
     }
   }

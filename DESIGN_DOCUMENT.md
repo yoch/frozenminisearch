@@ -331,16 +331,16 @@ views over the buffer rather than parsing.
 A snapshot begins with a fixed header (magic bytes, version, a CRC-32 checksum
 over the payload, and section offsets) followed by independently addressable
 sections: core counts, field names, external document ids, stored fields, the
-term tree, the field-length data, the term dictionary, and the flat postings.
+term tree, the field-length data, and the flat postings. **`termCount` is stored in
+the 16-byte core header** (no separate dictionary section).
 On load, the reader verifies the checksum, the monotonicity of the section
 offsets, that posting windows stay within bounds, and that every radix leaf
 points at a valid term — any violation is rejected rather than silently
 mis-read.
 
-There are two on-disk variants, chosen automatically to match the in-memory
-layout: **MSv3** for the dense (single-field, `Uint32` doc id) case, and
-**MSv4** for the sparse layout or narrower `Uint16` doc ids. The older MSv1/MSv2
-formats from before this fork are not supported and must be re-saved.
+**`saveBinary()`** chooses **MSv3** (dense Uint32 postings) or **MSv4** (sparse /
+Uint16 flags) as before; both omit the dictionary section. **`loadBinary()`**
+reads MSv3 and MSv4. MSv1/MSv2 are not supported and must be re-saved.
 
 ### Design limits
 

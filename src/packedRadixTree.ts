@@ -40,6 +40,14 @@ export function frozenTermIndexFromRadixTree(
   return PackedFrozenRadixTree.fromRadixTree(tree, termCount)
 }
 
+export function frozenTermIndexFromRadixTreeWithLeaves<Leaf>(
+  tree: RadixTree<Leaf>,
+  termCount: number,
+  mapLeaf: (leaf: Leaf) => number,
+): PackedFrozenRadixTree {
+  return PackedFrozenRadixTree.fromRadixTreeWithLeaves(tree, termCount, mapLeaf)
+}
+
 export default class PackedFrozenRadixTree implements FrozenTermIndex, PackedRadixTreeData {
   readonly size: number
   readonly nodeCount: number
@@ -70,12 +78,24 @@ export default class PackedFrozenRadixTree implements FrozenTermIndex, PackedRad
   }
 
   static fromRadixTree(tree: RadixTree<number>, termCount?: number): PackedFrozenRadixTree {
+    if (termCount == null) {
+      return PackedFrozenRadixTree.fromRadixTreeWithLeaves(tree, 0, leaf => leaf as number, true)
+    }
+    return PackedFrozenRadixTree.fromRadixTreeWithLeaves(tree, termCount, leaf => leaf as number, false)
+  }
+
+  static fromRadixTreeWithLeaves<Leaf>(
+    tree: RadixTree<Leaf>,
+    termCount: number,
+    mapLeaf: (leaf: Leaf) => number,
+    inferTermCountFromLeaves = false,
+  ): PackedFrozenRadixTree {
     type EdgeScratch = { label: string, child: number }
     type NodeScratch = { value: number, leafOrder: number, edges: EdgeScratch[] }
     const nodes: NodeScratch[] = []
     let leafCount = 0
 
-    function packNode(node: RadixTree<number>): number {
+    function packNode(node: RadixTree<Leaf>): number {
       const nodeId = nodes.length
       const scratch: NodeScratch = { value: PACKED_NO_VALUE, leafOrder: PACKED_NO_VALUE, edges: [] }
       nodes.push(scratch)
@@ -83,11 +103,11 @@ export default class PackedFrozenRadixTree implements FrozenTermIndex, PackedRad
 
       for (const [key, val] of node) {
         if (key === LEAF) {
-          scratch.value = val as number
+          scratch.value = mapLeaf(val as Leaf)
           scratch.leafOrder = childOrder
           leafCount++
         } else {
-          scratch.edges.push({ label: key, child: packNode(val as RadixTree<number>) })
+          scratch.edges.push({ label: key, child: packNode(val as RadixTree<Leaf>) })
         }
         childOrder++
       }
@@ -96,7 +116,7 @@ export default class PackedFrozenRadixTree implements FrozenTermIndex, PackedRad
     }
 
     packNode(tree)
-    const size = termCount ?? leafCount
+    const size = inferTermCountFromLeaves ? leafCount : termCount
 
     const nodeCount = nodes.length
     const edgeCount = nodes.reduce((sum, n) => sum + n.edges.length, 0)

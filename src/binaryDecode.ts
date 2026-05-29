@@ -22,7 +22,6 @@ import {
   readUint8Array,
 } from './binaryIo'
 import {
-  readDictionarySection,
   readExternalIdsSection,
   readFieldNamesSection,
   readStoredFieldsSection,
@@ -80,25 +79,25 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
   const treeOff = buf.readUInt32LE(28)
   const avgOff = buf.readUInt32LE(32)
   const flOff = buf.readUInt32LE(36)
-  const dictOff = buf.readUInt32LE(40)
-  const postOffOff = buf.readUInt32LE(44)
-  const postLenOff = buf.readUInt32LE(48)
-  const docIdsOff = buf.readUInt32LE(52)
-  const freqsOff = buf.readUInt32LE(56)
-  const endOff = buf.readUInt32LE(60)
+  const postOffOff = buf.readUInt32LE(40)
+  const postLenOff = buf.readUInt32LE(44)
+  const docIdsOff = buf.readUInt32LE(48)
+  const freqsOff = buf.readUInt32LE(52)
+  const endOff = buf.readUInt32LE(56)
 
   const sectionOffsets = [
     coreOff, fieldNamesOff, externalIdsOff, storedOff, treeOff,
-    avgOff, flOff, dictOff, postOffOff, postLenOff, docIdsOff, freqsOff, endOff,
+    avgOff, flOff, postOffOff, postLenOff, docIdsOff, freqsOff, endOff,
   ]
   assertSectionOffsets(buf, HEADER_SIZE_V3, sectionOffsets)
 
-  if (coreOff + 12 > fieldNamesOff) {
+  if (coreOff + 16 > fieldNamesOff) {
     throw invalidFrozenIndex('core section size mismatch')
   }
   const documentCount = buf.readUInt32LE(coreOff)
   const nextId = buf.readUInt32LE(coreOff + 4)
   const fieldCount = buf.readUInt32LE(coreOff + 8)
+  const termCount = buf.readUInt32LE(coreOff + 12)
 
   const fieldNames = readFieldNamesSection(buf, fieldNamesOff, fieldCount, externalIdsOff)
 
@@ -110,18 +109,12 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
   const externalIds = readExternalIdsSection(buf, externalIdsOff, nextId, storedOff)
   const storedFields = readStoredFieldsSection(buf, storedOff, nextId, treeOff)
 
-  if (dictOff + 4 > postOffOff) {
-    throw invalidFrozenIndex('dictionary section truncated')
-  }
-  const termCount = buf.readUInt32LE(dictOff)
   const packedTermIndex = readPackedTermTreeSection(buf, treeOff, avgOff, termCount)
 
   const avgFieldLength = readFloat32Array(buf, avgOff, flOff - avgOff)
-  const fieldLengthMatrix = readUint32Array(buf, flOff, dictOff - flOff)
+  const fieldLengthMatrix = readUint32Array(buf, flOff, postOffOff - flOff)
 
-  const terms = readDictionarySection(buf, dictOff, postOffOff)
-
-  const slotCount = terms.length * fieldCount
+  const slotCount = termCount * fieldCount
   if ((postLenOff - postOffOff) !== slotCount * 4 || (docIdsOff - postLenOff) !== slotCount * 4) {
     throw invalidFrozenIndex('postings section size mismatch')
   }
@@ -132,8 +125,12 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
   const allFreqs = readUint8Array(buf, freqsOff, endOff - freqsOff)
 
   const postings = denseLayoutFromMSv3(
-    fieldCount, terms.length, nextId, postingsOffsets, postingsLengths, allDocIds, allFreqs,
+    fieldCount, termCount, nextId, postingsOffsets, postingsLengths, allDocIds, allFreqs,
   )
+
+  if (postings.termCount !== termCount) {
+    throw invalidFrozenIndex('core termCount mismatch with postings')
+  }
 
   const snap: FrozenSnapshot = {
     documentCount,
@@ -145,7 +142,6 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
     externalIds,
     storedFields,
     fieldLengthMatrix,
-    terms,
     treeShape: [],
     packedTermIndex,
     postings,
@@ -178,24 +174,27 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
   const treeOff = buf.readUInt32LE(28)
   const avgOff = buf.readUInt32LE(32)
   const flOff = buf.readUInt32LE(36)
-  const dictOff = buf.readUInt32LE(40)
-  const postMetaOff = buf.readUInt32LE(44)
-  const postFieldsOff = buf.readUInt32LE(48)
-  const postOffOff = buf.readUInt32LE(52)
-  const postLenOff = buf.readUInt32LE(56)
-  const docIdsOff = buf.readUInt32LE(60)
-  const freqsOff = buf.readUInt32LE(64)
-  const endOff = buf.readUInt32LE(68)
+  const postMetaOff = buf.readUInt32LE(40)
+  const postFieldsOff = buf.readUInt32LE(44)
+  const postOffOff = buf.readUInt32LE(48)
+  const postLenOff = buf.readUInt32LE(52)
+  const docIdsOff = buf.readUInt32LE(56)
+  const freqsOff = buf.readUInt32LE(60)
+  const endOff = buf.readUInt32LE(64)
 
   const sectionOffsets = [
     coreOff, fieldNamesOff, externalIdsOff, storedOff, treeOff,
-    avgOff, flOff, dictOff, postMetaOff, postFieldsOff, postOffOff, postLenOff, docIdsOff, freqsOff, endOff,
+    avgOff, flOff, postMetaOff, postFieldsOff, postOffOff, postLenOff, docIdsOff, freqsOff, endOff,
   ]
   assertSectionOffsets(buf, HEADER_SIZE_V4, sectionOffsets)
 
+  if (coreOff + 16 > fieldNamesOff) {
+    throw invalidFrozenIndex('core section size mismatch')
+  }
   const documentCount = buf.readUInt32LE(coreOff)
   const nextId = buf.readUInt32LE(coreOff + 4)
   const fieldCount = buf.readUInt32LE(coreOff + 8)
+  const termCount = buf.readUInt32LE(coreOff + 12)
 
   const fieldNames = readFieldNamesSection(buf, fieldNamesOff, fieldCount, externalIdsOff)
 
@@ -207,20 +206,14 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
   const externalIds = readExternalIdsSection(buf, externalIdsOff, nextId, storedOff)
   const storedFields = readStoredFieldsSection(buf, storedOff, nextId, treeOff)
 
-  if (dictOff + 4 > postMetaOff) {
-    throw invalidFrozenIndex('dictionary section truncated')
-  }
-  const dictTermCount = buf.readUInt32LE(dictOff)
-  const packedTermIndex = readPackedTermTreeSection(buf, treeOff, avgOff, dictTermCount)
+  const packedTermIndex = readPackedTermTreeSection(buf, treeOff, avgOff, termCount)
 
   const avgFieldLength = readFloat32Array(buf, avgOff, flOff - avgOff)
-  const fieldLengthMatrix = readUint32Array(buf, flOff, dictOff - flOff)
-  const terms = readDictionarySection(buf, dictOff, postMetaOff)
+  const fieldLengthMatrix = readUint32Array(buf, flOff, postMetaOff - flOff)
 
   const sparse = (flags & FLAG_SPARSE_LAYOUT) !== 0
   const docId16 = (flags & FLAG_DOC_ID_16) !== 0
   const fieldId16 = (flags & FLAG_FIELD_ID_16) !== 0
-  const termCount = terms.length
   const allFreqs = readUint8Array(buf, freqsOff, endOff - freqsOff)
 
   let postings: FrozenPostingsLayout
@@ -276,6 +269,10 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
     }
   }
 
+  if (postings.termCount !== termCount) {
+    throw invalidFrozenIndex('core termCount mismatch with postings')
+  }
+
   const snap: FrozenSnapshot = {
     documentCount,
     nextId,
@@ -286,7 +283,6 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
     externalIds,
     storedFields,
     fieldLengthMatrix,
-    terms,
     treeShape: [],
     packedTermIndex,
     postings,
@@ -309,7 +305,7 @@ export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
   }
   if (magic === 'MSv1' || magic === 'MSv2') {
     throw invalidFrozenIndex(
-      `${magic} is no longer supported; re-save with MSv4 (minisearch 8.0.0+)`,
+      `${magic} is no longer supported; re-save with MSv3/MSv4`,
     )
   }
   throw invalidFrozenIndex(`magic=${magic} version=${version}`)

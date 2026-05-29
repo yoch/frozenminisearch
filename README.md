@@ -14,7 +14,7 @@
 |---|---------------------|-------------------|
 | **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed, or you reload from disk |
 | **Memory** | Maps and nested objects per posting | Flat `Uint32Array` / `Uint8Array` postings |
-| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv4 / MSv3) |
+| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv3 or MSv4, no dictionary section) |
 | **Typical search** | Baseline | Often **~20–35% faster** p50 on the same corpus (see benchmarks) |
 
 Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies are stored as `Uint8` (max **255** per document/field); extreme repetition can cause a small score drift versus the mutable index.
@@ -140,7 +140,7 @@ count on freeze if the hint was too large.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
 - **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
 - **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
-- **`saveBinary()` / `loadBinary()`** — **MSv4** (sparse multi-field, Uint16 doc ids when possible) or **MSv3** (single-field dense, Uint32 doc ids). **MSv1/MSv2 are not supported** — re-save older snapshots. Field names are stored in the snapshot; `fields` in `loadBinary` options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
+- **`saveBinary()` / `loadBinary()`** — **`saveBinary()` writes MSv3** (single-field dense, Uint32 doc ids) or **MSv4** (sparse multi-field, Uint16 doc ids when possible). No separate dictionary section (terms live in the packed term tree; `termCount` in core). **MSv1/MSv2 are not supported** — re-save older snapshots. Field names are stored in the snapshot; `fields` in `loadBinary` options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).
 
@@ -184,13 +184,15 @@ TypeScript definitions: `dist/es/index.d.ts`.
 
 ## FrozenMiniSearch — optimizations
 
-### Already in MSv3 / MSv4 (8.0.0+)
+### Already shipped (8.0.0+)
 
 | Area | Change | Effect |
 |------|--------|--------|
 | **Format** | MSv3 replaces MSv1/MSv2 (breaking) | CRC32 payload check; binary field names, ids, stored fields, term tree |
-| **Format** | MSv4 added: sparse postings for multi-field indexes, `Uint16` doc ids when `nextId ≤ 65535`, dynamic sparse field-id width | Smaller on-disk + in-memory footprint; MSv3 still written for single-field/`Uint32` |
-| **Build/Format** | Term dictionary rebuilt in `saveBinary()` instead of kept in memory | No resident `_terms[]` duplicate of the radix tree |
+| **Format** | MSv4: sparse postings, `Uint16` doc ids when `nextId ≤ 65535` | Smaller on-disk + in-memory footprint for multi-field indexes |
+| **Format** | MSv3/MSv4 (8.2+): no dictionary section; terms only in packed tree | Smaller snapshots; same MSv3 vs MSv4 encode choice as before |
+| **Build** | `freeze()` packs radix tree directly from mutable leaves | Lower peak memory and faster freeze vs clone-then-pack |
+| **Build/Format** | No resident `_terms[]` on `FrozenMiniSearch` | Term strings live in the packed radix tree only |
 | **Build** | Adaptive external-id lookup (`identity` vs lazy `Map`) | Contiguous numeric ids cost no lookup table |
 | **Build/Search** | `freeze()` compacts discarded slots to a dense id range | No holes to skip; wildcard iterates only active docs |
 | **Binary load** | Structural validation in `decodeFrozenSnapshot` / `validateFrozenSnapshot` | Corrupt snapshots fail fast with `Invalid frozen index: …` |
@@ -204,10 +206,8 @@ Measure regressions with [`benchmarks/`](benchmarks/README.md) (`freezeMs`, `sav
 
 | Priority | Topic | Idea | Trade-off |
 |----------|-------|------|-----------|
-| **Format** | On-disk dictionary | Reconstruct terms from the radix tree on load, drop the dictionary section | Smaller snapshots; slower load |
 | **API** | `loadBinaryAsync` | Chunked/async load like `loadJSONAsync` | Better cold start on huge indexes |
 | **API** | Input types | Accept `Uint8Array` as well as `Buffer` on `loadBinary` | Broader runtime support |
-| **Build** | `freeze` / builder | One-pass posting flatten with size estimate | Faster freeze on very large corpora |
 | **Search** | Hot path | Direct subarray posting access in `aggregateTerm` | Lower GC; invasive |
 
 **Intentionally deferred:** embedding `tokenize` / `processTerm` in the snapshot. Raising the `Uint8` term-frequency cap needs a new postings encoding.

@@ -8,8 +8,8 @@ Historique versionné : [`../perf-history.jsonl`](../perf-history.jsonl) (une li
 # 1. Committer d'abord (arbre propre côté fichiers suivis)
 git commit -m "..."
 
-# 2. Enregistrer (médiane recommandée)
-RUNS=3 benchmarks/scripts/record-history.sh
+# 2. Enregistrer (défaut 3 runs × 50 itérations de recherche)
+benchmarks/scripts/record-history.sh
 
 # 3. Analyser
 benchmarks/scripts/analyze-history.sh --vs-mutable
@@ -24,7 +24,8 @@ git commit -m "Record benchmark history at $(git rev-parse --short HEAD)."
 de release, sur arbre propre — pas dans le même commit que le bump de version :
 
 ```bash
-RUNS=3 yarn benchmark:baseline:update
+yarn benchmark:record
+yarn benchmark:baseline:update
 git add benchmarks/baselines/reference.json
 git commit -m "Refresh benchmark reference for 8.1.0."
 ```

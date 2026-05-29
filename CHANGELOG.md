@@ -10,12 +10,18 @@ Packed frozen term index beta focused on memory/runtime improvements for `Frozen
     while keeping mutable `MiniSearch` on `SearchableMap`
   - Preserve observable iteration order parity (prefix/fuzzy/autoSuggest tie behavior) via packed
     leaf-slot ordering
-  - Keep binary wire compatibility for **MSv3/MSv4** while encoding/decoding directly with packed
-    term trees (no `Map` rebuild on frozen load path)
+  - **`freeze()`** packs the mutable radix tree in one pass (`fromRadixTreeWithLeaves`) without
+    cloning to an intermediate `RadixTree<number>` or building a resident `terms[]`
+  - **MSv3/MSv4** on-disk: no separate dictionary section (`termCount` in 16-byte core); terms
+    only in the packed radix tree. **`saveBinary()`** still picks **MSv3** (dense Uint32) vs
+    **MSv4** (sparse / Uint16) for the same efficiency trade-off as before
+  - Encode/decode directly with packed term trees (no `Map` rebuild on frozen load path)
   - Extend parity and corruption-guard tests (UTF-16 edge cases, mid-edge prefixes, binary
     malformed nodes, round-trip checks)
   - Benchmarks now report packed radix metrics as `nodeCount`/`edgeCount` instead of legacy
     `mapNodeCount`
+  - [breaking change] On-disk layout changed (dictionary section removed); re-save with
+    `saveBinary()` if you have snapshots from an earlier 8.2 beta with a dictionary section
 
 ## v8.1.1
 

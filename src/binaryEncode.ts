@@ -15,14 +15,14 @@ import {
 } from './binaryConstants'
 import { bufferFromView, crc32Buffer, invalidFrozenIndex } from './binaryIo'
 import {
-  buildCoreSection,
-  buildDictionarySection,
+  buildCoreSectionWithTermCount,
   buildExternalIdsSection,
   buildFieldNamesSection,
   buildStoredFieldsSection,
   buildTermTreeSection,
   deserializeTermIndexTree,
   fieldNamesFromFieldIds,
+  termCountOf,
   validateFrozenSnapshotNumeric,
   validateTermTreeLeaves,
   type FrozenSnapshot,
@@ -78,14 +78,15 @@ function prepareEncodeSnapshot(
     throw invalidFrozenIndex('fieldNames length mismatch')
   }
 
+  const termCount = termCountOf(snap)
   const packed = packedTermIndex ?? snap.packedTermIndex
   if (packed != null) {
-    packed.validateLeaves(snap.terms.length)
+    packed.validateLeaves(termCount)
     return { snap, treeSource: { kind: 'packed', tree: packed }, fieldNames }
   }
 
   const tree = termTree ?? deserializeTermIndexTree(snap.treeShape)
-  validateTermTreeLeaves(tree, snap.terms.length)
+  validateTermTreeLeaves(tree, termCount)
   return { snap, treeSource: { kind: 'radix', tree }, fieldNames }
 }
 
@@ -94,6 +95,24 @@ function buildTermTreeSectionFromSource(source: EncodeTreeSource): Buffer {
     return buildTermTreeSectionFromPacked(source.tree)
   }
   return buildTermTreeSection(source.tree)
+}
+
+/** @internal Force MSv3 wire format (tests). */
+export function encodeFrozenSnapshotMSv3(
+  snap: FrozenSnapshot,
+  termTree?: RadixTree<number>,
+  packedTermIndex?: PackedFrozenRadixTree,
+): Buffer {
+  return encodeMSv3(snap, termTree, packedTermIndex)
+}
+
+/** @internal Force MSv4 wire format (tests). */
+export function encodeFrozenSnapshotMSv4(
+  snap: FrozenSnapshot,
+  termTree?: RadixTree<number>,
+  packedTermIndex?: PackedFrozenRadixTree,
+): Buffer {
+  return encodeMSv4(snap, termTree, packedTermIndex)
 }
 
 function encodeMSv3(
@@ -111,14 +130,13 @@ function encodeMSv3(
   }
 
   const sections = [
-    buildCoreSection(validated),
+    buildCoreSectionWithTermCount(validated),
     buildFieldNamesSection(fieldNames),
     buildExternalIdsSection(validated.externalIds, validated.nextId),
     buildStoredFieldsSection(validated.storedFields, validated.nextId),
     buildTermTreeSectionFromSource(treeSource),
     bufferFromView(validated.avgFieldLength),
     bufferFromView(validated.fieldLengthMatrix),
-    buildDictionarySection(validated.terms),
     bufferFromView(p.denseOffsets!),
     bufferFromView(p.denseLengths!),
     bufferFromView(p.allDocIds),
@@ -158,14 +176,13 @@ function encodeMSv4(
   }
 
   const sections = [
-    buildCoreSection(validated),
+    buildCoreSectionWithTermCount(validated),
     buildFieldNamesSection(fieldNames),
     buildExternalIdsSection(validated.externalIds, validated.nextId),
     buildStoredFieldsSection(validated.storedFields, validated.nextId),
     buildTermTreeSectionFromSource(treeSource),
     bufferFromView(validated.avgFieldLength),
     bufferFromView(validated.fieldLengthMatrix),
-    buildDictionarySection(validated.terms),
     postMetaBuf,
     postFieldsBuf,
     postOffBuf,

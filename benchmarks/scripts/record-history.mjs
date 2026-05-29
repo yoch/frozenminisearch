@@ -15,18 +15,10 @@ function git (args) {
   return execSync(`git ${args}`, { encoding: 'utf8', cwd: REPO_ROOT }).trim()
 }
 
-function parseRuns () {
-  let runs = 1
-  const args = process.argv.slice(2)
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--runs') runs = Math.max(1, Math.floor(Number(args[++i])))
-    else if (args[i].startsWith('--runs=')) runs = Math.max(1, Math.floor(Number(args[i].split('=')[1])))
-  }
-  return runs
-}
-
 const force = process.argv.includes('--force')
-const runs = parseRuns()
+const benchDirForArgs = pathToFileURL(join(REPO_ROOT, 'benchmarks/benchmarkUtils.js')).href
+const { parseBenchmarkArgs } = await import(benchDirForArgs)
+const { runs, searchIterations } = parseBenchmarkArgs(process.argv)
 
 if (git('status --porcelain --untracked-files=no')) {
   console.error('Refusing: tracked files are modified')
@@ -63,14 +55,15 @@ const benchDir = pathToFileURL(join(REPO_ROOT, 'benchmarks/')).href
 const { collectRunMetadata } = await import(new URL('benchmarkUtils.js', benchDir).href)
 const { runBenchmarkSuite } = await import(new URL('benchmarkSuite.js', benchDir).href)
 
-console.log(`Recording ${git('rev-parse --short HEAD')} (${runs} run(s))...`)
-const scenarios = runBenchmarkSuite(undefined, runs)
+console.log(`Recording ${git('rev-parse --short HEAD')} (${runs}×${searchIterations})...`)
+const scenarios = runBenchmarkSuite(undefined, runs, searchIterations)
 const meta = collectRunMetadata()
 const payload = {
   protocolVersion: 1,
   recordKind: 'clean-commit',
   ...meta,
   runs,
+  searchIterations,
   suiteFingerprint: scenarios.map((s) => s.id),
   git: {
     ...meta.git,

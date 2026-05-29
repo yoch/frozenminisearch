@@ -3,8 +3,10 @@ export const BINARY_VERSION_V3 = 3
 export const BINARY_MAGIC_V4 = 'MSv4'
 export const BINARY_VERSION_V4 = 4
 
-export const HEADER_SIZE_V3 = 64
-export const HEADER_SIZE_V4 = 72
+/** MSv3: dense Uint32 postings, no dictionary section (termCount in 16-byte core). */
+export const HEADER_SIZE_V3 = 60
+/** MSv4: sparse / Uint16 flags, no dictionary section (termCount in 16-byte core). */
+export const HEADER_SIZE_V4 = 68
 
 export const FLAG_DOC_ID_16 = 1
 export const FLAG_SPARSE_LAYOUT = 2

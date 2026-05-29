@@ -7,7 +7,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectRunMetadata, parseRunsArg } from './benchmarkUtils.js'
+import { collectRunMetadata, parseBenchmarkArgs } from './benchmarkUtils.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -15,7 +15,7 @@ const BASELINES_DIR = join(__dirname, 'baselines')
 
 const useReference = process.argv.includes('--reference')
 const outFile = join(BASELINES_DIR, useReference ? 'reference.json' : 'latest.json')
-const runs = parseRunsArg()
+const { runs, searchIterations } = parseBenchmarkArgs()
 
 console.log('Running benchmark suite (requires --expose-gc for stable heap)...\n')
 if (!global.gc) {
@@ -25,7 +25,8 @@ if (!global.gc) {
 const payload = {
   ...collectRunMetadata(),
   runs,
-  scenarios: runBenchmarkSuite(undefined, runs)
+  searchIterations,
+  scenarios: runBenchmarkSuite(undefined, runs, searchIterations),
 }
 
 mkdirSync(BASELINES_DIR, { recursive: true })
@@ -36,9 +37,7 @@ console.log(`  commit: ${payload.git.commitShort}${payload.git.dirty ? ' (dirty)
 if (payload.git.dirty) {
   console.warn('  warning: working tree is dirty; baseline may be harder to reproduce')
 }
-if (runs > 1) {
-  console.log(`  runs: ${runs} (median aggregation)`)
-}
+console.log(`  runs: ${runs}, search iterations: ${searchIterations} (median per scenario)`)
 console.log(`  scenarios: ${payload.scenarios.length}`)
 for (const s of payload.scenarios) {
   console.log(`  - ${s.id}: frozen heap ${s.heapMb.frozen} MB (${s.heapMb.frozenVsMutableSavingPct}% vs mutable)`)

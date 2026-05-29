@@ -12,6 +12,7 @@ import {
   BINARY_MAGIC_V3,
   BINARY_MAGIC_V4,
 } from './binaryFormat'
+import { encodeFrozenSnapshotMSv3, encodeFrozenSnapshotMSv4 } from './binaryEncode'
 function densePostings(fieldCount, termCount, nextId, offsets, lengths, docIds, freqs) {
   return {
     fieldCount,
@@ -62,7 +63,6 @@ describe('binaryFormat MSv4', () => {
       externalIds: [1, 2],
       storedFields: [undefined, undefined],
       fieldLengthMatrix: new Uint32Array([1, 2]),
-      terms: ['hello', 'world'],
       treeShape,
       postings: densePostings(
         1, 2, 2,
@@ -79,7 +79,8 @@ describe('binaryFormat MSv4', () => {
     const loaded = decodeFrozenSnapshot(buf)
     expect(loaded.documentCount).toBe(2)
     expect(loaded.fieldNames).toEqual(['txt'])
-    expect(loaded.terms).toEqual(['hello', 'world'])
+    expect(Array.from(loaded.packedTermIndex.entries()).map(([t]) => t).sort())
+      .toEqual(['hello', 'world'])
     expect(Array.from(loaded.postings.allDocIds)).toEqual([0, 1])
     expect(Array.from(loaded.postings.allFreqs)).toEqual([1, 1])
     expect(Array.from(loaded.postings.denseLengths)).toEqual([1, 1])
@@ -158,7 +159,6 @@ describe('binaryFormat MSv4', () => {
       externalIds: new Array(70000).fill(0).map((_, i) => i),
       storedFields: new Array(70000),
       fieldLengthMatrix: new Uint32Array(70000),
-      terms: ['only'],
       treeShape: [['only', [[LEAF, 0]]]],
       postings: densePostings(
         1, 1, 70000,
@@ -168,9 +168,19 @@ describe('binaryFormat MSv4', () => {
         new Uint8Array([1]),
       ),
     }
-    const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(snap.treeShape))
+    const buf = encodeFrozenSnapshotMSv3(snap, deserializeTermIndexTree(snap.treeShape))
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V3)
     expect(buf.readUInt16LE(4)).toBe(3)
+    expect(decodeFrozenSnapshot(buf).packedTermIndex.get('only')).toBe(0)
+  })
+
+  test('MSv4 encode/decode round-trip (multi-field path)', () => {
+    const snap = buildSnapshotFromFrozen()
+    const buf = encodeFrozenSnapshotMSv4(snap)
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V4)
+    const loaded = decodeFrozenSnapshot(buf)
+    expect(Array.from(loaded.packedTermIndex.entries()).map(([t]) => t).sort())
+      .toEqual(Array.from(snap.packedTermIndex.entries()).map(([t]) => t).sort())
   })
 
   test('sparse layout with >255 fields uses Uint16 field ids', () => {
@@ -217,26 +227,26 @@ describe('binaryFormat corruption guards', () => {
   test('rejects non-monotonic section offsets', () => {
     const corrupt = Buffer.from(validBuf)
     const flOff = corrupt.readUInt32LE(36)
-    const dictOff = corrupt.readUInt32LE(40)
-    corrupt.writeUInt32LE(dictOff, 36)
+    const postMetaOff = corrupt.readUInt32LE(40)
+    corrupt.writeUInt32LE(postMetaOff, 36)
     corrupt.writeUInt32LE(flOff, 40)
-    corrupt.writeUInt32LE(crc32Buffer(corrupt, 72, corrupt.length), 8)
+    corrupt.writeUInt32LE(crc32Buffer(corrupt, 68, corrupt.length), 8)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/not monotonic/)
   })
 
   test('rejects end offset past buffer end', () => {
     const corrupt = Buffer.from(validBuf)
-    corrupt.writeUInt32LE(validBuf.length + 100, 68)
+    corrupt.writeUInt32LE(validBuf.length + 100, 64)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/Invalid frozen index/)
   })
 
   test('rejects allFreqs shorter than allDocIds', () => {
     const corrupt = Buffer.from(validBuf)
-    const freqsOff = corrupt.readUInt32LE(64)
-    const endOff = corrupt.readUInt32LE(68)
-    corrupt.writeUInt32LE(endOff - 1, 68)
+    const freqsOff = corrupt.readUInt32LE(60)
+    const endOff = corrupt.readUInt32LE(64)
+    corrupt.writeUInt32LE(endOff - 1, 64)
     corrupt.writeUInt8(0, freqsOff + (endOff - freqsOff) - 1)
-    const crc = crc32Buffer(corrupt, 72, corrupt.length)
+    const crc = crc32Buffer(corrupt, 68, corrupt.length)
     corrupt.writeUInt32LE(crc, 8)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/length mismatch/)
   })
@@ -274,8 +284,16 @@ describe('binaryFormat corruption guards', () => {
   })
 
   test('CRC covers full payload', () => {
-    const payloadCrc = crc32Buffer(validBuf, 72, validBuf.length)
+    const payloadCrc = crc32Buffer(validBuf, 68, validBuf.length)
     expect(validBuf.readUInt32LE(8)).toBe(payloadCrc)
+  })
+
+  test('rejects core termCount mismatch with postings', () => {
+    const corrupt = Buffer.from(validBuf)
+    const coreOff = corrupt.readUInt32LE(12)
+    corrupt.writeUInt32LE(999999, coreOff + 12)
+    corrupt.writeUInt32LE(crc32Buffer(corrupt, 68, corrupt.length), 8)
+    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/leaf index out of range|termCount/)
   })
 })
 

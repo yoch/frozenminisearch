@@ -9,6 +9,16 @@ const keyValues = terms.map((key, i) => [key, i])
 const map = SearchableMap.from(keyValues)
 const packed = PackedFrozenRadixTree.fromRadixTree(map.radixTree, map.size)
 
+test('fromRadixTreeWithLeaves matches fromRadixTree for numeric leaves', () => {
+  const m = SearchableMap.from(keyValues)
+  const viaLeaves = PackedFrozenRadixTree.fromRadixTreeWithLeaves(
+    m.radixTree,
+    m.size,
+    leaf => leaf,
+  )
+  expect(Array.from(viaLeaves.entries())).toEqual(Array.from(packed.entries()))
+})
+
 function expectPackedParity(entries, probes = {}) {
   const {
     gets = [],

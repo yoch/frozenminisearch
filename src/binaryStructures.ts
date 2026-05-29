@@ -28,7 +28,6 @@ export interface FrozenSnapshot {
   externalIds: unknown[]
   storedFields: (Record<string, unknown> | undefined)[]
   fieldLengthMatrix: Uint32Array
-  terms: string[]
   treeShape: TreeShape
   /** Populated on decode; legacy path when {@link packedTermIndex} is absent. */
   termTree?: RadixTree<number>
@@ -57,6 +56,10 @@ function validateTreeShape(shape: TreeShape, termCount: number): void {
   }
 }
 
+export function termCountOf(snap: { postings: FrozenPostingsLayout }): number {
+  return snap.postings.termCount
+}
+
 /**
  * Numeric/structural invariants shared by both the decode path (untrusted binary)
  * and the build path (trusted internal code).
@@ -68,7 +71,6 @@ export function validateFrozenSnapshotNumeric(snap: {
   postings: FrozenPostingsLayout
   fieldLengthMatrix: Uint32Array
   avgFieldLength: Float32Array
-  terms: string[]
   fieldIds: { [field: string]: number }
 }): void {
   if (snap.fieldCount <= 0) {
@@ -79,9 +81,6 @@ export function validateFrozenSnapshotNumeric(snap: {
   }
   if (snap.documentCount < 0 || snap.documentCount > snap.nextId) {
     throw invalidFrozenIndex('documentCount inconsistent with nextId')
-  }
-  if (snap.terms.length !== snap.postings.termCount) {
-    throw invalidFrozenIndex('terms length mismatch with postings.termCount')
   }
   if (snap.fieldLengthMatrix.length !== snap.nextId * snap.fieldCount) {
     throw invalidFrozenIndex('fieldLengthMatrix size mismatch')
@@ -181,12 +180,13 @@ export function readStoredFieldsSection(
 /** Validate structural invariants of a decoded or assembled frozen snapshot. */
 export function validateFrozenSnapshot(snap: FrozenSnapshot): void {
   validateFrozenSnapshotNumeric(snap)
+  const termCount = termCountOf(snap)
   if (snap.packedTermIndex != null) {
-    snap.packedTermIndex.validateLeaves(snap.terms.length)
+    snap.packedTermIndex.validateLeaves(termCount)
   } else if (snap.termTree != null) {
-    validateTermTreeLeaves(snap.termTree, snap.terms.length)
+    validateTermTreeLeaves(snap.termTree, termCount)
   } else {
-    validateTreeShape(snap.treeShape, snap.terms.length)
+    validateTreeShape(snap.treeShape, termCount)
   }
 }
 
@@ -196,11 +196,13 @@ export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): s
   return names
 }
 
-export function buildCoreSection(snap: FrozenSnapshot): Buffer {
-  const out = Buffer.alloc(12)
+/** Core with explicit {@link termCountOf} (MSv3/MSv4 on-disk; no dictionary section). */
+export function buildCoreSectionWithTermCount(snap: FrozenSnapshot): Buffer {
+  const out = Buffer.alloc(16)
   out.writeUInt32LE(snap.documentCount, 0)
   out.writeUInt32LE(snap.nextId, 4)
   out.writeUInt32LE(snap.fieldCount, 8)
+  out.writeUInt32LE(termCountOf(snap), 12)
   return out
 }
 
@@ -333,53 +335,6 @@ export function readTermTreeSection(buf: Buffer, offset: number, end: number): R
     throw invalidFrozenIndex('term tree section has trailing bytes')
   }
   return tree
-}
-
-export function buildDictionarySection(terms: string[]): Buffer {
-  const termBufs = terms.map(term => Buffer.from(term, 'utf8'))
-  const dictHeaderLen = 4 + terms.length * 4
-  const dictBodyLen = termBufs.reduce((sum, b) => sum + b.length, 0)
-  const out = Buffer.alloc(dictHeaderLen + dictBodyLen)
-  out.writeUInt32LE(terms.length, 0)
-  for (let i = 0; i < termBufs.length; i++) {
-    out.writeUInt32LE(termBufs[i].length, 4 + i * 4)
-  }
-  let bodyOff = dictHeaderLen
-  for (const termBuf of termBufs) {
-    termBuf.copy(out, bodyOff)
-    bodyOff += termBuf.length
-  }
-  return out
-}
-
-export function readDictionarySection(buf: Buffer, offset: number, end: number): string[] {
-  if (offset + 4 > end) {
-    throw invalidFrozenIndex('dictionary section truncated')
-  }
-  const termCount = buf.readUInt32LE(offset)
-  const dictLengthsOff = offset + 4
-  const dictBodyOff = dictLengthsOff + termCount * 4
-  if (dictBodyOff > end) {
-    throw invalidFrozenIndex('dictionary length table out of bounds')
-  }
-  const terms: string[] = []
-  let o = dictBodyOff
-  for (let i = 0; i < termCount; i++) {
-    const lenOff = dictLengthsOff + i * 4
-    if (lenOff + 4 > end) {
-      throw invalidFrozenIndex('dictionary length entry out of bounds')
-    }
-    const len = buf.readUInt32LE(lenOff)
-    if (o + len > end) {
-      throw invalidFrozenIndex('dictionary term bytes out of bounds')
-    }
-    terms.push(buf.toString('utf8', o, o + len))
-    o += len
-  }
-  if (o !== end) {
-    throw invalidFrozenIndex('dictionary section has trailing bytes')
-  }
-  return terms
 }
 
 export function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {

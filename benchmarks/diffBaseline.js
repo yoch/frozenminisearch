@@ -1,24 +1,36 @@
 /**
  * Compare benchmark results against benchmarks/baselines/reference.json.
  *
- *   yarn benchmark:diff           → run suite now, compare to reference
- *   yarn benchmark:diff --latest  → compare latest.json to reference (no re-run)
+ *   yarn benchmark:diff              → latest.json vs reference (no re-run)
+ *   yarn benchmark:diff --run          → run suite, write latest.json, then diff
+ *   yarn benchmark:diff --current=a.json --reference=b.json
  *
  * Exit code 1 if regressions exceed thresholds (for CI).
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectRunMetadata, parseRunsArg } from './benchmarkUtils.js'
+import {
+  collectRunMetadata,
+  parseBenchmarkArgs,
+  loadBenchmarkPayload,
+  argValue,
+  DEFAULT_BENCHMARK_RUNS,
+  DEFAULT_SEARCH_ITERATIONS,
+} from './benchmarkUtils.js'
+import { compareHeapFrozenMb, compareHeapSavingPct } from './regressionPolicy.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const REFERENCE_PATH = join(__dirname, 'baselines', 'reference.json')
-const LATEST_PATH = join(__dirname, 'baselines', 'latest.json')
+const BASELINES_DIR = join(__dirname, 'baselines')
+const REFERENCE_PATH = join(BASELINES_DIR, 'reference.json')
+const LATEST_PATH = join(BASELINES_DIR, 'latest.json')
 
-const useLatest = process.argv.includes('--latest')
-const strictSearch = process.argv.includes('--strict')
-const runs = parseRunsArg()
+const argv = process.argv.slice(2)
+const strictSearch = argv.includes('--strict')
+const forceRun = argv.includes('--run')
+
+const { runs, searchIterations } = parseBenchmarkArgs()
 
 /** Lower is better unless noted. */
 const THRESHOLDS = {
@@ -27,15 +39,15 @@ const THRESHOLDS = {
   saveBinaryMs: { warnPct: 15, failPct: 30 },
   freezeMs: { warnPct: 20, failPct: 40 },
   frozenSearchP50: { warnPct: 20, failPct: 50 },
-  heapFrozenSavingPct: { warnDrop: 5, failDrop: 10, higherIsBetter: true }
+  heapFrozenSavingPct: { warnDrop: 5, failDrop: 10, higherIsBetter: true },
 }
 
 function loadJson (path) {
   if (!existsSync(path)) {
-    console.error(`Missing ${path}. Run: yarn benchmark:baseline:update`)
+    console.error(`Missing ${path}. Run: yarn benchmark:record`)
     process.exit(1)
   }
-  return JSON.parse(readFileSync(path, 'utf8'))
+  return loadBenchmarkPayload(path)
 }
 
 function classifyRegression (metricKey, deltaPct, deltaPoints) {
@@ -75,7 +87,7 @@ function compareMetric (label, refVal, curVal, metricKey, higherIsBetter = false
   const deltaStr = higherIsBetter ? formatDelta(deltaPoints, ' pts') : formatDelta(deltaPct)
   const icon = status === 'fail' ? 'FAIL' : status === 'warn' ? 'warn' : 'ok  '
   console.log(
-    `  ${icon} ${label.padEnd(32)} ref=${String(refVal).padEnd(10)} cur=${String(curVal).padEnd(10)} Δ ${deltaStr}`
+    `  ${icon} ${label.padEnd(32)} ref=${String(refVal).padEnd(10)} cur=${String(curVal).padEnd(10)} Δ ${deltaStr}`,
   )
   return status
 }
@@ -92,8 +104,8 @@ function compareScenario (ref, cur) {
     else if (s === 'warn' && worst !== 'fail') worst = 'warn'
   }
 
-  bump(compareMetric('heap frozen (MB)', ref.heapMb.frozen, cur.heapMb.frozen, 'heapFrozenMb'))
-  bump(compareMetric('heap saving vs mutable (%)', ref.heapMb.frozenVsMutableSavingPct, cur.heapMb.frozenVsMutableSavingPct, 'heapFrozenSavingPct', true))
+  const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
+  compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
   bump(compareMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs'))
   bump(compareMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs'))
   bump(compareMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs'))
@@ -106,9 +118,10 @@ function compareScenario (ref, cur) {
     const prev = refSearch[row.label]
     if (!prev) continue
     const s = compareMetric(`search p50 ${row.label}`, prev.frozenP50, row.frozenP50, 'frozenSearchP50')
-    if (strictSearch) bump(s)
-    else if (s === 'warn') {
-      console.log(`       (search timing informational only; use --strict to fail on search)`)
+    if (strictSearch) {
+      bump(s)
+    } else if (s !== 'ok') {
+      console.log('       (search timing informational only; use --strict to fail on search)')
     }
   }
 
@@ -120,31 +133,41 @@ function mb (bytes) {
 }
 
 function main () {
-  const reference = loadJson(REFERENCE_PATH)
+  const referencePath = argValue('--reference', argv) ?? REFERENCE_PATH
+  const currentPath = argValue('--current', argv) ?? LATEST_PATH
+  const reference = loadJson(referencePath)
 
   let current
-  if (useLatest) {
-    current = loadJson(LATEST_PATH)
-    console.log('Comparing latest.json → reference.json\n')
-    if (runs > 1) {
-      console.log('Note: --runs is ignored with --latest (no re-run).')
-    }
-  } else {
-    console.log('Running benchmark suite and comparing to reference.json\n')
+  if (forceRun) {
+    console.log('Running benchmark suite → latest.json, then comparing to reference\n')
     if (!global.gc) {
       console.warn('Tip: use node --expose-gc for stable heap numbers.\n')
     }
     current = {
       ...collectRunMetadata(),
       runs,
-      scenarios: runBenchmarkSuite(undefined, runs)
+      searchIterations,
+      scenarios: runBenchmarkSuite(undefined, runs, searchIterations),
     }
+    mkdirSync(BASELINES_DIR, { recursive: true })
+    writeFileSync(LATEST_PATH, JSON.stringify(current, null, 2) + '\n')
+    console.log(`Wrote ${LATEST_PATH}\n`)
+  } else {
+    console.log(`Comparing ${currentPath} → ${referencePath} (no re-run; use --run to measure again)\n`)
+    if (runs !== DEFAULT_BENCHMARK_RUNS || searchIterations !== DEFAULT_SEARCH_ITERATIONS) {
+      console.log('Note: --runs / --iterations apply only with --run.\n')
+    }
+    current = loadJson(currentPath)
   }
 
   console.log(`Reference: ${reference.capturedAt} @ ${reference.git?.commitShort}`)
   console.log(`Current:   ${current.capturedAt} @ ${current.git?.commitShort}${current.git?.dirty ? ' (dirty)' : ''}`)
-  if (runs > 1 && !useLatest) {
-    console.log(`Runs per scenario: ${runs} (median aggregation)`)
+  const curRuns = current.runs ?? 1
+  const curIters = current.searchIterations ?? '(legacy)'
+  if (forceRun) {
+    console.log(`Measured:  ${runs} run(s)/scenario, ${searchIterations} search iterations`)
+  } else {
+    console.log(`Captured:  ${curRuns} run(s)/scenario, ${curIters} search iterations`)
   }
 
   const curById = Object.fromEntries(current.scenarios.map((s) => [s.id, s]))
@@ -153,7 +176,7 @@ function main () {
   for (const refScenario of reference.scenarios) {
     const curScenario = curById[refScenario.id]
     if (!curScenario) {
-      console.log(`\nMissing scenario in current run: ${refScenario.id}`)
+      console.log(`\nMissing scenario in current capture: ${refScenario.id}`)
       overall = 'fail'
       continue
     }
@@ -172,8 +195,8 @@ function main () {
   }
   console.log('='.repeat(72))
   console.log('\nThresholds (fail): heap frozen +10%; loadBinary +20%; heap saving −10 pts.')
-  console.log('Search p50: warn only (noisy); add --strict to treat search regressions as failures.')
-  console.log('Update reference after intentional wins: yarn benchmark:baseline:update\n')
+  console.log('Search p50: informational unless --strict.')
+  console.log('Workflow: benchmark:record once → benchmark:diff (or diff other JSON via --current).\n')
 
   if (overall === 'fail') process.exit(1)
 }

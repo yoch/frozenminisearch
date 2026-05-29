@@ -2,6 +2,21 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.0-beta1
+
+Completes the 8.2 frozen-index work started in beta0 (packed radix backend).
+
+  - **`freeze()`** packs the mutable radix tree in one pass (`fromRadixTreeWithLeaves`);
+    no clone to an intermediate `RadixTree<number>` and no resident `terms[]` on
+    `FrozenMiniSearch`
+  - **MSv3/MSv4** on-disk: no dictionary section (`termCount` in the 16-byte core);
+    terms only in the packed radix tree. **`saveBinary()`** still picks **MSv3** vs
+    **MSv4** as before
+  - [breaking change] Re-save binary snapshots written with **`8.2.0-beta0`** (dictionary
+    section layout)
+  - Benchmark harness: 3×50 defaults, `benchmark:diff` without re-run, heap-floor policy
+    for small frozen corpora
+
 ## v8.2.0-beta0
 
 Packed frozen term index beta focused on memory/runtime improvements for `FrozenMiniSearch`.

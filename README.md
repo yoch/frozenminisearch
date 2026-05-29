@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.1.0` · install with `npm install @yoch/minisearch`
+> **Current release:** `8.2.0` · install with `npm install @yoch/minisearch`
 
 ---
 
@@ -25,7 +25,6 @@ Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators —
 
 ```bash
 npm install @yoch/minisearch
-# pre-releases: npm install @yoch/minisearch@beta
 ```
 
 **One-shot frozen index** (no mutable step):
@@ -136,7 +135,7 @@ count on freeze if the hint was too large.
 
 ## FrozenMiniSearch in a bit more detail
 
-- **`freeze()`** — snapshot a mutable index into compact typed postings + a radix tree keyed by term index.
+- **`freeze()`** — snapshot a mutable index into compact typed postings + a packed radix term tree (numeric term indices at leaves).
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
 - **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
 - **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
@@ -191,7 +190,8 @@ TypeScript definitions: `dist/es/index.d.ts`.
 | **Format** | MSv3 replaces MSv1/MSv2 (breaking) | CRC32 payload check; binary field names, ids, stored fields, term tree |
 | **Format** | MSv4: sparse postings, `Uint16` doc ids when `nextId ≤ 65535` | Smaller on-disk + in-memory footprint for multi-field indexes |
 | **Format** | MSv3/MSv4 (8.2+): no dictionary section; terms only in packed tree | Smaller snapshots; same MSv3 vs MSv4 encode choice as before |
-| **Build** | `freeze()` packs radix tree directly from mutable leaves | Lower peak memory and faster freeze vs clone-then-pack |
+| **Term index** | Packed radix tree (`PackedRadixTree` internally) | Smaller footprint and cache-friendly term lookup vs `SearchableMap` at query time |
+| **Build** | `freeze()` packs radix tree in one pass from mutable leaves | Lower peak memory and faster freeze vs clone-then-pack |
 | **Build/Format** | No resident `_terms[]` on `FrozenMiniSearch` | Term strings live in the packed radix tree only |
 | **Build** | Adaptive external-id lookup (`identity` vs lazy `Map`) | Contiguous numeric ids cost no lookup table |
 | **Build/Search** | `freeze()` compacts discarded slots to a dense id range | No holes to skip; wildcard iterates only active docs |
@@ -258,6 +258,6 @@ npm run release:beta
 See [CHANGELOG.md](./CHANGELOG.md).
 
 - **MiniSearch** — [Luca Ongaro](https://github.com/lucaong/minisearch) (MIT)
-- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, MSv4/MSv3 binary snapshots, shared scoring refactor
+- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, packed radix term index (`PackedRadixTree`), MSv4/MSv3 binary snapshots, shared scoring refactor
 
 Upstream docs: [MiniSearch site](https://lucaong.github.io/minisearch/) · [intro article](https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html)

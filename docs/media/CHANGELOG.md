@@ -2,6 +2,116 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.0
+
+Stable release of the packed frozen term index and MSv3/MSv4 snapshots without a
+dictionary section.
+
+  - **Packed radix term index** for `FrozenMiniSearch`: exact, prefix, and fuzzy
+    lookups use a compact in-memory tree (`PackedRadixTree` internally) instead
+    of retaining the mutable `SearchableMap` radix tree at query time
+  - **`freeze()`** packs the mutable radix tree in one pass (`fromRadixTree`);
+    no clone to an intermediate `RadixTree<number>` and no resident `terms[]` on
+    `FrozenMiniSearch`
+  - **MSv3/MSv4** on-disk: no dictionary section (`termCount` in the 16-byte
+    core); terms only in the packed term tree. **`saveBinary()`** still picks
+    **MSv3** vs **MSv4** as before
+  - Encode/decode directly with packed term trees (no `Map` rebuild on the frozen
+    load path); iteration order matches `SearchableMap` (leaf slot among siblings)
+  - Benchmark harness: 3×50 defaults, `benchmark:diff` without re-run, heap-floor
+    policy for small frozen corpora
+  - [breaking change] Re-save binary snapshots from **8.1.x** or **8.2.0-beta0**
+    (dictionary section layout). MSv1/MSv2 remain unsupported
+
+## v8.2.0-beta1
+
+Completes the 8.2 frozen-index work started in beta0 (packed radix backend).
+
+  - **`freeze()`** packs the mutable radix tree in one pass (`fromRadixTreeWithLeaves`);
+    no clone to an intermediate `RadixTree<number>` and no resident `terms[]` on
+    `FrozenMiniSearch`
+  - **MSv3/MSv4** on-disk: no dictionary section (`termCount` in the 16-byte core);
+    terms only in the packed radix tree. **`saveBinary()`** still picks **MSv3** vs
+    **MSv4** as before
+  - [breaking change] Re-save binary snapshots written with **`8.2.0-beta0`** (dictionary
+    section layout)
+  - Benchmark harness: 3×50 defaults, `benchmark:diff` without re-run, heap-floor policy
+    for small frozen corpora
+
+## v8.2.0-beta0
+
+Packed frozen term index beta focused on memory/runtime improvements for `FrozenMiniSearch`.
+
+  - Add `PackedFrozenRadixTree` backend (`FrozenTermIndex`) for frozen exact/prefix/fuzzy lookups
+    while keeping mutable `MiniSearch` on `SearchableMap`
+  - Preserve observable iteration order parity (prefix/fuzzy/autoSuggest tie behavior) via packed
+    leaf-slot ordering
+  - **`freeze()`** packs the mutable radix tree in one pass (`fromRadixTreeWithLeaves`) without
+    cloning to an intermediate `RadixTree<number>` or building a resident `terms[]`
+  - **MSv3/MSv4** on-disk: no separate dictionary section (`termCount` in 16-byte core); terms
+    only in the packed radix tree. **`saveBinary()`** still picks **MSv3** (dense Uint32) vs
+    **MSv4** (sparse / Uint16) for the same efficiency trade-off as before
+  - Encode/decode directly with packed term trees (no `Map` rebuild on frozen load path)
+  - Extend parity and corruption-guard tests (UTF-16 edge cases, mid-edge prefixes, binary
+    malformed nodes, round-trip checks)
+  - Benchmarks now report packed radix metrics as `nodeCount`/`edgeCount` instead of legacy
+    `mapNodeCount`
+  - [breaking change] On-disk layout changed (dictionary section removed); re-save with
+    `saveBinary()` if you have snapshots from an earlier 8.2 beta with a dictionary section
+
+## v8.1.1
+
+Internal maintainability refactor with no intended public API or behaviour changes.
+
+  - Split `binaryFormat.ts` into `binaryIo`, `binaryStructures`, `binaryEncode`, and
+    `binaryDecode` (shared `assembleSections` for MSv3/MSv4 encode)
+  - Add `createQueryIndexView` factory in `queryEngine.ts` (deduplicate mutable/frozen adapters)
+  - Sparse frozen postings: sorted early-exit linear lookup per term (documented invariant)
+
+## v8.1.0
+
+Frozen index memory and on-disk format improvements (MSv4).
+
+  - **MSv4** binary snapshots: sparse postings for multi-field indexes, Uint16 doc ids when
+    `nextId ≤ 65535`, dynamic sparse field-id width (Uint8/Uint16). **MSv3** is still written
+    for single-field dense indexes that need Uint32 doc ids (>65 536 documents)
+  - Adaptive frozen postings (dense vs sparse), identity or lazy-map external-id lookup, term
+    dictionary rebuilt at `saveBinary()` instead of kept in memory
+  - Scoring fast path for `SegmentPostingList` (typed-array postings)
+  - [breaking change] Re-save indexes with `saveBinary()` after upgrade — most corpora now
+    serialize as MSv4 instead of MSv3
+  - Benchmark suite extended (13 scenarios); commit timeline in `benchmarks/perf-history.jsonl`
+    and `benchmarks/scripts/` for recording and analysis (frozen vs mutable MiniSearch)
+
+## v8.0.1
+
+Internal refactor with no intended public API or behaviour changes.
+
+  - Extract shared modules: `searchTypes`, `queryEngine`, `flatPostings`,
+    `frozenTypes`, and `suggestions` so `MiniSearch` and `FrozenMiniSearch` share
+    one search code path
+  - Pass `AggregateContext` directly into the query engine (remove redundant
+    `termResults` wrappers)
+  - Lazy prefix-match iteration in `QueryIndexView` (fewer intermediate `Map`s)
+  - Canonical `OptionsWithDefaults` type; single `clampFreq` on frozen postings build
+  - Restore public JSDoc on types moved to `searchTypes.ts`
+  - Parity test: `freeze()`, `fromDocuments()`, and `FrozenIndexBuilder`
+
+## v8.0.0
+
+First stable release of `@yoch/minisearch` (Node.js fork of MiniSearch).
+
+  - **`FrozenMiniSearch`**: read-only index with compact postings, `fromDocuments`,
+    `FrozenIndexBuilder`, `fromAsyncIterable`, and search parity with mutable `MiniSearch`
+    when built with the same options
+  - **MSv3 binary snapshots** (`saveBinary` / `loadBinary`): CRC-32 integrity, embedded field
+    names and stored fields; MSv1/MSv2 not supported (re-save with `saveBinary()`)
+  - **Mutable `MiniSearch`** retained for incremental indexing (`add`, `remove`, `discard`, JSON
+    serialize)
+  - Node-only ESM + CJS build; no browser UMD bundle in this package
+
+Consolidates changes shipped in `8.0.0-beta.0` through `8.0.0-beta.4`.
+
 ## v8.0.0-beta.4
 
 **Breaking:** binary snapshots use **MSv3** only. Files written with MSv1 or MSv2

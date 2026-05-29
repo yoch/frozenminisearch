@@ -4,7 +4,7 @@ This design document has the aim to explain the details of `MiniSearch`
 design and implementation to library developers that intend to contribute to
 this project, or that are simply curious about the internals.
 
-**Latest update: May 26, 2026**
+**Latest update: May 29, 2026**
 
 ## Goals (and non-goals)
 
@@ -252,12 +252,17 @@ expensive at rest: every `Map` and every entry carries object and pointer
 overhead, and the postings for a single term are scattered across the heap,
 which is unfriendly to the CPU cache during scoring.
 
-`FrozenMiniSearch` keeps the radix tree (it is still the right structure for
-exact, prefix, and fuzzy lookup — see the sections above), but changes two
-things:
+`FrozenMiniSearch` keeps a radix tree for term lookup (exact, prefix, and fuzzy —
+see the sections above), but changes how that tree and the postings are stored:
 
-  - **Leaves hold a numeric term index, not a posting structure.** The radix
-    tree becomes a compact map from term to a small integer.
+  - **Leaves hold a numeric term index, not a posting structure.** The tree maps
+    each term string to a small integer used to index the flat postings.
+  - **The term tree is packed in memory.** At runtime and on disk (MSv3/MSv4),
+    frozen indexes use `PackedRadixTree`, an internal module under
+    `src/PackedRadixTree/`: typed arrays for nodes and edges, a shared label heap,
+    and the same sibling/leaf traversal order as `SearchableMap` so prefix,
+    fuzzy, and `autoSuggest` parity are preserved. Mutable `MiniSearch` still uses
+    `SearchableMap`; only the frozen path uses the packed representation.
   - **Postings live in flat typed arrays shared by the whole index.** All
     document ids and all term frequencies are concatenated into two global
     arrays, and a side table records, for each `(term, field)` slot, the
@@ -331,16 +336,40 @@ views over the buffer rather than parsing.
 A snapshot begins with a fixed header (magic bytes, version, a CRC-32 checksum
 over the payload, and section offsets) followed by independently addressable
 sections: core counts, field names, external document ids, stored fields, the
-term tree, the field-length data, and the flat postings. **`termCount` is stored in
-the 16-byte core header** (no separate dictionary section).
+packed term tree, the field-length data, and the flat postings. **`termCount` is
+stored in the 16-byte core header** (no separate dictionary section; term strings
+live only in the term-tree section). Binary encode/decode for that section lives in
+`packedRadixBinary.ts` (MSv3/MSv4 node tags); leaf invariants for frozen indices
+are checked by `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts` at load,
+encode, and assembly time.
 On load, the reader verifies the checksum, the monotonicity of the section
-offsets, that posting windows stay within bounds, and that every radix leaf
-points at a valid term — any violation is rejected rather than silently
-mis-read.
+offsets, that posting windows stay within bounds, and that every leaf points at a
+valid term index — any violation is rejected rather than silently mis-read.
 
 **`saveBinary()`** chooses **MSv3** (dense Uint32 postings) or **MSv4** (sparse /
 Uint16 flags) as before; both omit the dictionary section. **`loadBinary()`**
 reads MSv3 and MSv4. MSv1/MSv2 are not supported and must be re-saved.
+
+### PackedRadixTree module (internal)
+
+The packed term tree is implemented as a focused module (`src/PackedRadixTree/`)
+rather than as part of the public package API. Responsibilities are split as
+follows:
+
+  - **`PackedRadixTree`** — in-memory structure and query traversal (exact,
+    prefix, fuzzy, `entries`).
+  - **`adapters/searchableMap.ts`** — build from a mutable `RadixTree` via
+    `fromRadixTree` (numeric leaves or custom `mapLeaf`).
+  - **`packedRadixBinary.ts`** (outside the module) — MSv3/MSv4 term-tree section
+    wire format.
+  - **`frozenTermIndex.ts`** — `FrozenTermIndex` type alias and
+    `validateFrozenTermIndexLeaves` (frozen-only invariants: leaf count, term-index
+    range, array bounds).
+
+`PackedRadixTree` is not re-exported from the package entry point; consumers use
+`FrozenMiniSearch` and binary snapshots. The module is structured so it could be
+extracted or published separately later without pulling in MiniSearch scoring or
+postings code.
 
 ### Design limits
 

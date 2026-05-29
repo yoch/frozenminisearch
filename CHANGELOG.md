@@ -2,7 +2,9 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v8.2.1
+
+Frozen builder batch indexing and async stream hints.
 
   - Add optional `hints` argument to `FrozenMiniSearch.fromAsyncIterable(iterable, options, hints?)` for `estimatedDocumentCount` pre-sizing
   - Add `FrozenIndexBuilder.addAll(documents)` and `addAllAsync(documents, { chunkSize? })` before freeze (parity with mutable `MiniSearch`)

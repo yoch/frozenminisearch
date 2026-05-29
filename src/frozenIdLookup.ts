@@ -27,7 +27,6 @@ function buildLazyMap(externalIds: readonly unknown[], nextId: number): Map<unkn
 export function createIdToShortIdLookup(
   externalIds: readonly unknown[],
   nextId: number,
-  eagerMap?: Map<unknown, number>,
 ): IdToShortIdLookup {
   if (detectIdentityNumericIds(externalIds, nextId)) {
     return {
@@ -45,7 +44,7 @@ export function createIdToShortIdLookup(
     }
   }
 
-  let map: Map<unknown, number> | undefined = eagerMap
+  let map: Map<unknown, number> | undefined
   const ensureMap = (): Map<unknown, number> => {
     if (map == null) map = buildLazyMap(externalIds, nextId)
     return map

@@ -1,10 +1,7 @@
 import { PACKED_NO_VALUE } from './packedRadixConstants'
 import { edgeOffsetAtSlot, packedNodeChildCount } from './packedRadixLayout'
 import type PackedFrozenRadixTree from './packedRadixTree'
-
-function labelSlice(heap: string, start: number, len: number): string {
-  return heap.slice(start, start + len)
-}
+import { labelSlice } from './packedRadixStrings'
 
 function buildTermFromSegments(heap: string, segments: Array<{ start: number, len: number }>): string {
   if (segments.length === 0) return ''
@@ -21,7 +18,7 @@ export function packedRadixFuzzyEntries(
   maxDistance: number,
 ): Iterable<[string, number, number]> {
   const results: Array<[string, number, number]> = []
-  if (query === undefined || maxDistance < 0) return results
+  if (maxDistance < 0) return results
 
   const n = query.length + 1
   const m = n + maxDistance

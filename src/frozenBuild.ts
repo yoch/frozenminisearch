@@ -1,5 +1,5 @@
 import SearchableMap from './SearchableMap/SearchableMap'
-import { frozenTermIndexFromRadixTree } from './packedRadixTree'
+import PackedFrozenRadixTree from './packedRadixTree'
 import type { Options } from './searchTypes'
 import type { FrozenAssembleParams } from './frozenTypes'
 import { materializeFrozenPostings } from './frozenPostings'
@@ -43,15 +43,13 @@ function appendPosting(
 ): void {
   const slot = termIndex * state.fieldCount + fieldId
   let docIds = state.postingsDocIds[slot]
-  let freqs = state.postingsFreqs[slot]
   if (docIds == null) {
     docIds = []
-    freqs = []
     state.postingsDocIds[slot] = docIds
-    state.postingsFreqs[slot] = freqs
+    state.postingsFreqs[slot] = []
   }
   docIds.push(docId)
-  freqs!.push(freq)
+  state.postingsFreqs[slot]!.push(freq)
 }
 
 function finalizeFlatPostings(state: PostingsBuildState, nextId: number) {
@@ -64,10 +62,10 @@ function finalizeFlatPostings(state: PostingsBuildState, nextId: number) {
     forEachPosting(ti, f, emit) {
       const slot = ti * fieldCount + f
       const docIds = state.postingsDocIds[slot]
-      const freqs = state.postingsFreqs[slot]
       if (docIds == null) return
+      const slotFreqs = state.postingsFreqs[slot]!
       for (let i = 0; i < docIds.length; i++) {
-        emit(docIds[i], freqs![i])
+        emit(docIds[i], slotFreqs[i])
       }
     },
   })
@@ -210,7 +208,7 @@ export class FrozenIndexBuilder<T> {
       storedFields,
       fieldLengthMatrix: new Uint32Array(this._fieldLengthData),
       avgFieldLength,
-      index: frozenTermIndexFromRadixTree(this._index.radixTree, this._terms.length),
+      index: PackedFrozenRadixTree.fromRadixTree(this._index.radixTree, this._terms.length),
       termCount: this._terms.length,
       postings,
     }

@@ -114,12 +114,15 @@ function buildFlatPostingsFromSource<T>(
   )
   const termCount = index.size
 
+  const remapDocId = shortIdRemap != null
+    ? (docId: number) => shortIdRemap[docId]
+    : undefined
   const postings = materializeFrozenPostings({
     fieldCount,
     termCount,
     nextId,
     clampFrequencies: true,
-    remapDocId: shortIdRemap != null ? (docId: number) => shortIdRemap![docId] : undefined,
+    remapDocId,
     forEachPosting(ti, f, emit) {
       const freqs = fieldIndexByTermIndex[ti].get(f)
       if (freqs == null) return

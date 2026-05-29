@@ -6,7 +6,7 @@ import {
   type DocIdArray,
 } from './compactPostings'
 import type { FieldTermDataLike } from './scoring'
-import { materializeFlatPostings, type FlatPostingsMaterializeParams } from './flatPostings'
+import { DISCARDED_DOC_ID, materializeFlatPostings, type FlatPostingsMaterializeParams } from './flatPostings'
 
 export type { DocIdArray } from './compactPostings'
 
@@ -86,7 +86,7 @@ export function materializeFrozenPostings(
       let count = 0
       forEachPosting(ti, f, (rawDocId) => {
         const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId !== 0xffffffff) count++
+        if (docId !== DISCARDED_DOC_ID) count++
       })
       if (count === 0) continue
       sparseFieldIdsScratch.push(f)
@@ -114,7 +114,7 @@ export function materializeFrozenPostings(
       const f = readFieldId(sparseFieldIds, s)
       forEachPosting(ti, f, (rawDocId, freq) => {
         const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId === 0xffffffff) return
+        if (docId === DISCARDED_DOC_ID) return
         if (docIdWidth === 16) {
           (allDocIds as Uint16Array)[write] = docId
         } else {
@@ -183,72 +183,65 @@ export function validateFrozenPostingsLayout(
   layout: FrozenPostingsLayout,
   documentCount: number,
   nextId: number,
+  fail: (detail: string) => never = detail => { throw new Error(detail) },
 ): void {
-  if (layout.fieldCount <= 0) throw new Error('fieldCount must be positive')
-  if (layout.nextId !== nextId) throw new Error('nextId mismatch')
-  if (layout.termCount < 0) throw new Error('termCount out of range')
+  if (layout.fieldCount <= 0) fail('fieldCount must be positive')
+  if (layout.nextId !== nextId) fail('nextId mismatch')
+  if (layout.termCount < 0) fail('termCount out of range')
   if (layout.allDocIds.length !== layout.allFreqs.length) {
-    throw new Error('allDocIds and allFreqs length mismatch')
+    fail('allDocIds and allFreqs length mismatch')
   }
   if (layout.layout === 'dense') {
     if (layout.sparseFieldIdWidth != null) {
-      throw new Error('dense layout must not have sparseFieldIdWidth')
+      fail('dense layout must not have sparseFieldIdWidth')
     }
     const slotCount = layout.termCount * layout.fieldCount
     if (layout.denseOffsets!.length !== slotCount || layout.denseLengths!.length !== slotCount) {
-      throw new Error('dense postings slot count mismatch')
+      fail('dense postings slot count mismatch')
     }
     for (let slot = 0; slot < slotCount; slot++) {
       const off = layout.denseOffsets![slot]
       const len = layout.denseLengths![slot]
       if (off + len > layout.allDocIds.length) {
-        throw new Error(`posting slot ${slot} exceeds allDocIds bounds`)
+        fail(`posting slot ${slot} exceeds allDocIds bounds`)
       }
       for (let i = 0; i < len; i++) {
         const docId = readDocId(layout.allDocIds, off + i)
-        if (docId >= nextId) throw new Error(`posting docId ${docId} >= nextId ${nextId}`)
+        if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
       }
     }
-    return
+  } else {
+    const expectedFieldIdWidth = chooseSparseFieldIdWidth(layout.fieldCount)
+    if (layout.sparseFieldIdWidth !== expectedFieldIdWidth) {
+      fail('sparseFieldIdWidth mismatch with fieldCount')
+    }
+
+    const starts = layout.sparseTermStarts!
+    if (starts.length !== layout.termCount + 1) fail('sparseTermStarts length mismatch')
+    const slotCount = layout.sparseFieldIds!.length
+    if (layout.sparseOffsets!.length !== slotCount || layout.sparseLengths!.length !== slotCount) {
+      fail('sparse slot count mismatch')
+    }
+    for (let slot = 0; slot < slotCount; slot++) {
+      const fieldId = readFieldId(layout.sparseFieldIds!, slot)
+      if (fieldId >= layout.fieldCount) {
+        fail(`sparse fieldId ${fieldId} >= fieldCount ${layout.fieldCount}`)
+      }
+      const off = layout.sparseOffsets![slot]
+      const len = layout.sparseLengths![slot]
+      if (off + len > layout.allDocIds.length) {
+        fail(`sparse slot ${slot} exceeds allDocIds bounds`)
+      }
+      for (let i = 0; i < len; i++) {
+        const docId = readDocId(layout.allDocIds, off + i)
+        if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
+      }
+    }
   }
 
-  const expectedFieldIdWidth = chooseSparseFieldIdWidth(layout.fieldCount)
-  if (layout.sparseFieldIdWidth !== expectedFieldIdWidth) {
-    throw new Error('sparseFieldIdWidth mismatch with fieldCount')
-  }
-
-  const starts = layout.sparseTermStarts!
-  if (starts.length !== layout.termCount + 1) throw new Error('sparseTermStarts length mismatch')
-  const slotCount = layout.sparseFieldIds!.length
-  if (layout.sparseOffsets!.length !== slotCount || layout.sparseLengths!.length !== slotCount) {
-    throw new Error('sparse slot count mismatch')
-  }
-  for (let slot = 0; slot < slotCount; slot++) {
-    const fieldId = readFieldId(layout.sparseFieldIds!, slot)
-    if (fieldId >= layout.fieldCount) {
-      throw new Error(`sparse fieldId ${fieldId} >= fieldCount ${layout.fieldCount}`)
-    }
-    const off = layout.sparseOffsets![slot]
-    const len = layout.sparseLengths![slot]
-    if (off + len > layout.allDocIds.length) {
-      throw new Error(`sparse slot ${slot} exceeds allDocIds bounds`)
-    }
-    for (let i = 0; i < len; i++) {
-      const docId = readDocId(layout.allDocIds, off + i)
-      if (docId >= nextId) throw new Error(`posting docId ${docId} >= nextId ${nextId}`)
-    }
-  }
   if (documentCount < 0 || documentCount > nextId) {
-    throw new Error('documentCount inconsistent with nextId')
+    fail('documentCount inconsistent with nextId')
   }
-}
-
-function postingListForSlot(
-  layout: FrozenPostingsLayout,
-  offset: number,
-  length: number,
-): SegmentPostingList {
-  return new SegmentPostingList(layout.allDocIds, layout.allFreqs, offset, length)
 }
 
 /**
@@ -301,7 +294,7 @@ export function fieldTermDataFromLayout(
       if (slot < 0) return undefined
       const len = lengths[slot]
       if (len === 0) return undefined
-      return postingListForSlot(layout, offsets[slot], len)
+      return new SegmentPostingList(layout.allDocIds, layout.allFreqs, offsets[slot], len)
     },
   }
 }

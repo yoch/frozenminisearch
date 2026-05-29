@@ -89,11 +89,9 @@ export function validateFrozenSnapshotNumeric(snap: {
     throw invalidFrozenIndex('avgFieldLength size mismatch')
   }
 
-  try {
-    validateFrozenPostingsLayout(snap.postings, snap.documentCount, snap.nextId)
-  } catch (e) {
-    throw invalidFrozenIndex((e as Error).message)
-  }
+  validateFrozenPostingsLayout(snap.postings, snap.documentCount, snap.nextId, detail => {
+    throw invalidFrozenIndex(detail)
+  })
 
   const indexedFields = Object.keys(snap.fieldIds)
   if (indexedFields.length !== snap.fieldCount) {

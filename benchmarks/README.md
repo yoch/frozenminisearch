@@ -13,6 +13,8 @@ Reproducible memory and CPU measurements for regression tracking.
 | `yarn benchmark:record` | Run suite → `baselines/latest.json` |
 | `yarn benchmark:diff` | `latest.json` vs `reference.json` (no re-run) |
 | `yarn benchmark:diff:run` | Re-run suite, update `latest.json`, then diff |
+| `yarn benchmark:targeted` | Run failure-prone scenarios only → stdout or `--out file.json` |
+| `yarn benchmark:targeted:compare` | Compare two targeted captures; fails only if **after** regresses vs **before** |
 | `yarn benchmark:baseline:update` | `record` + copy to `reference.json` |
 | `benchmarks/scripts/record-history.sh` | Append HEAD → `perf-history.jsonl` (clean tree) |
 | `benchmarks/scripts/analyze-history.sh` | Timeline, compare, CHANGELOG snippets, vs mutable |
@@ -86,3 +88,19 @@ Update `baselines/reference.json` only after intentional wins: `yarn benchmark:b
 **Warning only** — search p50 (noisy across runs). Add `--strict` to treat search regressions as failures.
 
 Comparing two local captures (`latest` vs `reference` from different moments) may show search warns without a real regression.
+
+### Targeted before/after (code change on same commit)
+
+For noisy extreme scenarios, compare two captures without treating stale `reference.json` as the gate:
+
+```bash
+# on baseline tree (e.g. git stash / detached HEAD)
+yarn benchmark:targeted --label before --out /tmp/targeted-before.json
+# on candidate tree
+yarn benchmark:targeted --label after --out /tmp/targeted-after.json
+yarn benchmark:targeted:compare --compare=/tmp/targeted-before.json,/tmp/targeted-after.json
+# optional context only (does not affect exit code):
+yarn benchmark:targeted:compare --compare=/tmp/targeted-before.json,/tmp/targeted-after.json --reference=benchmarks/baselines/reference.json
+```
+
+Exit code 1 only when **after** is worse than **before** on freeze / saveBinary / loadBinary (same thresholds as `benchmark:diff` for those metrics).

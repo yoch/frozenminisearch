@@ -4,6 +4,7 @@ import type { FrozenTermIndex } from './frozenTermIndex'
 import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './packedRadixConstants'
 import { edgeOffsetAtSlot, packedNodeChildCount } from './packedRadixLayout'
 import { packedRadixFuzzyEntries } from './packedRadixFuzzy'
+import { labelSlice } from './packedRadixStrings'
 
 export { PACKED_NO_VALUE } from './packedRadixConstants'
 
@@ -22,30 +23,11 @@ export interface PackedRadixTreeData {
   readonly edgeFirstChar: Uint16Array
 }
 
-function labelSlice(heap: string, start: number, len: number): string {
-  return heap.slice(start, start + len)
-}
-
 function labelsMatch(heap: string, start: number, len: number, key: string, keyOff: number): boolean {
   for (let i = 0; i < len; i++) {
     if (heap.charCodeAt(start + i) !== key.charCodeAt(keyOff + i)) return false
   }
   return true
-}
-
-export function frozenTermIndexFromRadixTree(
-  tree: RadixTree<number>,
-  termCount?: number,
-): PackedFrozenRadixTree {
-  return PackedFrozenRadixTree.fromRadixTree(tree, termCount)
-}
-
-export function frozenTermIndexFromRadixTreeWithLeaves<Leaf>(
-  tree: RadixTree<Leaf>,
-  termCount: number,
-  mapLeaf: (leaf: Leaf) => number,
-): PackedFrozenRadixTree {
-  return PackedFrozenRadixTree.fromRadixTreeWithLeaves(tree, termCount, mapLeaf)
 }
 
 export default class PackedFrozenRadixTree implements FrozenTermIndex, PackedRadixTreeData {

@@ -94,6 +94,8 @@
     "benchmark:record:reference": "npm run build && node --expose-gc benchmarks/captureBaseline.js --reference",
     "benchmark:diff": "node --expose-gc benchmarks/diffBaseline.js",
     "benchmark:diff:run": "npm run build && node --expose-gc benchmarks/diffBaseline.js --run",
+    "benchmark:targeted": "npm run build && node --expose-gc benchmarks/scripts/targeted-failures.mjs",
+    "benchmark:targeted:compare": "node benchmarks/scripts/targeted-failures.mjs --compare",
     "benchmark:baseline:update": "npm run benchmark:record:reference",
     "benchmark:history:analyze": "node benchmarks/scripts/analyze-history.mjs",
     "benchmark:history:vs-mutable": "node benchmarks/scripts/analyze-history.mjs --vs-mutable",

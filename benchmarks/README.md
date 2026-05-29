@@ -103,4 +103,9 @@ yarn benchmark:targeted:compare --compare=/tmp/targeted-before.json,/tmp/targete
 yarn benchmark:targeted:compare --compare=/tmp/targeted-before.json,/tmp/targeted-after.json --reference=benchmarks/baselines/reference.json
 ```
 
-Exit code 1 only when **after** is worse than **before** on freeze / saveBinary / loadBinary (same thresholds as `benchmark:diff` for those metrics).
+Exit code 1 only when **after** is worse than **before** on freeze / saveBinary / loadBinary.
+
+- Baseline ≥ 10 ms: % thresholds from `regressionPolicy.js` (freeze +40 %, saveBinary +30 %, loadBinary +20 %).
+- Baseline &lt; 10 ms: **both** absolute (+2 ms warn, +5 ms fail) **and** % cap (+20 % warn, +35 % fail when base ≥ 0.5 ms), since either alone is too loose on tiny timings.
+
+All structural timing rules live in `benchmarks/regressionPolicy.js` (shared by `benchmark:diff` and `benchmark:targeted:compare`).

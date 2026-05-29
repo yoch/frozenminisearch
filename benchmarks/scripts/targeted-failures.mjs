@@ -7,11 +7,8 @@
  *
  * Compare two captures (e.g. before/after on detached HEAD):
  *   node benchmarks/scripts/targeted-failures.mjs --compare=before.json,after.json
- *   node benchmarks/scripts/targeted-failures.mjs --compare=before.json,after.json --reference=benchmarks/baselines/reference.json
- *
- * Exit 1 on --compare only when the second capture regresses vs the first (not vs reference).
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { runScenario, buildScenarioList } from '../benchmarkSuite.js'
 import {
@@ -19,8 +16,8 @@ import {
   parseBenchmarkArgs,
   loadBenchmarkPayload,
   argValue,
-  DEFAULT_SEARCH_ITERATIONS,
 } from '../benchmarkUtils.js'
+import { compareTimingMetric, formatTimingDelta } from '../regressionPolicy.js'
 
 const FAIL_IDS = [
   'extreme-giantVocabulary',
@@ -32,13 +29,6 @@ const FAIL_IDS = [
   'saveBinaryAfterNoTerms',
 ]
 
-/** Same fail thresholds as benchmarks/diffBaseline.js (structural only). */
-const THRESHOLDS = {
-  freezeMs: { warnPct: 20, failPct: 40 },
-  saveBinaryMs: { warnPct: 15, failPct: 30 },
-  loadBinaryMs: { warnPct: 10, failPct: 20 },
-}
-
 function gitShort () {
   try {
     const head = execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
@@ -47,25 +37,6 @@ function gitShort () {
   } catch {
     return '?'
   }
-}
-
-function pctDelta (base, cur) {
-  if (base == null || cur == null || base === 0) return null
-  return ((cur - base) / base) * 100
-}
-
-function formatPct (deltaPct) {
-  if (deltaPct == null) return '—'
-  const sign = deltaPct > 0 ? '+' : ''
-  return `${sign}${deltaPct.toFixed(1)}%`
-}
-
-function classify (metricKey, deltaPct) {
-  const t = THRESHOLDS[metricKey]
-  if (t == null || deltaPct == null) return 'ok'
-  if (deltaPct >= t.failPct) return 'fail'
-  if (deltaPct >= t.warnPct) return 'warn'
-  return 'ok'
 }
 
 function scenariosById (payload) {
@@ -125,17 +96,6 @@ function runCapture () {
   console.log(json)
 }
 
-function printCompareRow (label, baseVal, curVal, metricKey, bump) {
-  const delta = pctDelta(baseVal, curVal)
-  const status = classify(metricKey, delta)
-  bump(status)
-  const icon = status === 'fail' ? 'FAIL' : status === 'warn' ? 'warn' : 'ok  '
-  console.log(
-    `  ${icon} ${label.padEnd(11)} base=${String(baseVal).padEnd(8)} cur=${String(curVal).padEnd(8)} Δ ${formatPct(delta).padEnd(8)}`,
-  )
-  return status
-}
-
 function runCompare () {
   const pair = argValue('--compare')
   if (pair == null) {
@@ -181,9 +141,9 @@ function runCompare () {
 
     console.log(`${'─'.repeat(72)}`)
     console.log(id)
-    printCompareRow('freeze', b.freezeMs, a.freezeMs, 'freezeMs', bump)
-    printCompareRow('saveBinary', b.saveBinaryMs, a.saveBinaryMs, 'saveBinaryMs', bump)
-    printCompareRow('loadBinary', b.loadBinaryMs, a.loadBinaryMs, 'loadBinaryMs', bump)
+    compareTimingMetric('freeze', b.freezeMs, a.freezeMs, 'freezeMs', bump, 11)
+    compareTimingMetric('saveBinary', b.saveBinaryMs, a.saveBinaryMs, 'saveBinaryMs', bump, 11)
+    compareTimingMetric('loadBinary', b.loadBinaryMs, a.loadBinaryMs, 'loadBinaryMs', bump, 11)
 
     if (b.binaryMb !== a.binaryMb || b.structuredMb !== a.structuredMb) {
       console.log(`  note binaryMb ${b.binaryMb} → ${a.binaryMb}, structuredMb ${b.structuredMb} → ${a.structuredMb}`)
@@ -191,13 +151,12 @@ function runCompare () {
 
     if (refBy?.[id] != null) {
       const r = refBy[id]
-      const drFreeze = formatPct(pctDelta(r.freezeMs ?? r.indexing?.freezeMs, a.freezeMs))
-      const drSave = formatPct(pctDelta(r.saveBinaryMs ?? r.indexing?.saveBinaryMs, a.saveBinaryMs))
-      const drLoad = formatPct(pctDelta(r.loadBinaryMs ?? r.loadMs?.binary, a.loadBinaryMs))
       const rf = r.freezeMs ?? r.indexing?.freezeMs
       const rs = r.saveBinaryMs ?? r.indexing?.saveBinaryMs
       const rl = r.loadBinaryMs ?? r.loadMs?.binary
-      console.log(`  ref→after (informational): freeze ${drFreeze}  save ${drSave}  load ${drLoad}  (ref ${rf}/${rs}/${rl} ms)`)
+      console.log(
+        `  ref→after (informational): freeze ${formatTimingDelta(rf, a.freezeMs)}  save ${formatTimingDelta(rs, a.saveBinaryMs)}  load ${formatTimingDelta(rl, a.loadBinaryMs)}  (ref ${rf}/${rs}/${rl} ms)`,
+      )
     }
   }
 

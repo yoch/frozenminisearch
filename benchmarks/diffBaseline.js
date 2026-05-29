@@ -18,7 +18,12 @@ import {
   DEFAULT_BENCHMARK_RUNS,
   DEFAULT_SEARCH_ITERATIONS,
 } from './benchmarkUtils.js'
-import { compareHeapFrozenMb, compareHeapSavingPct } from './regressionPolicy.js'
+import {
+  STRUCTURAL_TIMING_THRESHOLDS,
+  compareHeapFrozenMb,
+  compareHeapSavingPct,
+  compareTimingMetric,
+} from './regressionPolicy.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -35,9 +40,7 @@ const { runs, searchIterations } = parseBenchmarkArgs()
 /** Lower is better unless noted. */
 const THRESHOLDS = {
   heapFrozenMb: { warnPct: 5, failPct: 10 },
-  loadBinaryMs: { warnPct: 10, failPct: 20 },
-  saveBinaryMs: { warnPct: 15, failPct: 30 },
-  freezeMs: { warnPct: 20, failPct: 40 },
+  ...STRUCTURAL_TIMING_THRESHOLDS,
   frozenSearchP50: { warnPct: 20, failPct: 50 },
   heapFrozenSavingPct: { warnDrop: 5, failDrop: 10, higherIsBetter: true },
 }
@@ -106,9 +109,9 @@ function compareScenario (ref, cur) {
 
   const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
   compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
-  bump(compareMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs'))
-  bump(compareMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs'))
-  bump(compareMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs'))
+  compareTimingMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs', bump)
+  compareTimingMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs', bump)
+  compareTimingMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
   bump(compareMetric('disk binary (MB)', ref.diskMb.binary, cur.diskMb.binary, 'heapFrozenMb'))
   bump(compareMetric('postings typed (MB)', mb(ref.memoryBreakdown.postings.totalTypedBytes), mb(cur.memoryBreakdown.postings.totalTypedBytes), 'heapFrozenMb'))
   bump(compareMetric('radix est. (MB)', mb(ref.memoryBreakdown.radixTree.estimatedBytes), mb(cur.memoryBreakdown.radixTree.estimatedBytes), 'heapFrozenMb'))

@@ -1,4 +1,4 @@
-import { PACKED_NO_VALUE } from './packedRadixConstants'
+import { PACKED_NO_VALUE } from './constants'
 
 /**
  * Number of logical children for a node: radix edges plus optional leaf slot.

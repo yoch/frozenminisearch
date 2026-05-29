@@ -2,7 +2,8 @@ import { LEAF } from './SearchableMap/TreeIterator'
 import type { RadixTree } from './SearchableMap/types'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import { validateFrozenPostingsLayout } from './frozenPostings'
-import type PackedFrozenRadixTree from './packedRadixTree'
+import type { FrozenTermIndex } from './frozenTermIndex'
+import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import {
   TREE_NODE_EDGE,
   TREE_NODE_LEAF,
@@ -32,7 +33,7 @@ export interface FrozenSnapshot {
   /** Populated on decode; legacy path when {@link packedTermIndex} is absent. */
   termTree?: RadixTree<number>
   /** Preferred runtime term index after binary decode. */
-  packedTermIndex?: PackedFrozenRadixTree
+  packedTermIndex?: FrozenTermIndex
   postings: FrozenPostingsLayout
 }
 
@@ -180,7 +181,7 @@ export function validateFrozenSnapshot(snap: FrozenSnapshot): void {
   validateFrozenSnapshotNumeric(snap)
   const termCount = termCountOf(snap)
   if (snap.packedTermIndex != null) {
-    snap.packedTermIndex.validateLeaves(termCount)
+    validateFrozenTermIndexLeaves(snap.packedTermIndex, termCount)
   } else if (snap.termTree != null) {
     validateTermTreeLeaves(snap.termTree, termCount)
   } else {

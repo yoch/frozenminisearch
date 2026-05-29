@@ -1,7 +1,6 @@
-import { PACKED_NO_VALUE } from './packedRadixConstants'
-import { edgeOffsetAtSlot, packedNodeChildCount } from './packedRadixLayout'
-import type PackedFrozenRadixTree from './packedRadixTree'
-import { labelSlice } from './packedRadixStrings'
+import { edgeOffsetAtSlot, packedNodeChildCount } from './layout'
+import type PackedRadixTree from './PackedRadixTree'
+import { labelSlice } from './strings'
 
 function buildTermFromSegments(heap: string, segments: Array<{ start: number, len: number }>): string {
   if (segments.length === 0) return ''
@@ -13,7 +12,7 @@ function buildTermFromSegments(heap: string, segments: Array<{ start: number, le
 }
 
 export function packedRadixFuzzyEntries(
-  tree: PackedFrozenRadixTree,
+  tree: PackedRadixTree,
   query: string,
   maxDistance: number,
 ): Iterable<[string, number, number]> {
@@ -44,7 +43,7 @@ export function packedRadixFuzzyEntries(
 }
 
 function recurse(
-  tree: PackedFrozenRadixTree,
+  tree: PackedRadixTree,
   query: string,
   maxDistance: number,
   results: Array<[string, number, number]>,

@@ -1,6 +1,6 @@
 import MiniSearch from './MiniSearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
-import PackedFrozenRadixTree from './packedRadixTree'
+import PackedRadixTree from './PackedRadixTree'
 import CRC32 from 'crc-32'
 import { LEAF } from './SearchableMap/TreeIterator'
 import {
@@ -98,7 +98,7 @@ describe('binaryFormat MSv4', () => {
     const nodeValue = new Uint32Array(tree.nodeValue)
     const leafNode = nodeValue.findIndex(value => value !== 0xffffffff)
     nodeValue[leafNode] = 999
-    const bad = PackedFrozenRadixTree.fromData({
+    const bad = PackedRadixTree.fromData({
       size: tree.size,
       nodeCount: tree.nodeCount,
       edgeCount: tree.edgeCount,

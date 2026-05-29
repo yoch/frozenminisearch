@@ -1,6 +1,7 @@
 import type { RadixTree } from './SearchableMap/types'
 import type { FrozenTermIndex } from './frozenTermIndex'
-import PackedFrozenRadixTree from './packedRadixTree'
+import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
+import { fromRadixTree } from './PackedRadixTree'
 import {
   finalizeSearchResults,
   type AggregateContext,
@@ -85,7 +86,7 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
   if (params.avgFieldLength.length !== params.fieldCount) {
     throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
   }
-  params.index.validateLeaves(termCount)
+  validateFrozenTermIndexLeaves(params.index, termCount)
   return new FrozenMiniSearch(params)
 }
 
@@ -96,22 +97,21 @@ function buildFlatPostingsFromSource<T>(
   shortIdRemap: Uint32Array | null,
 ): {
   termCount: number
-  index: PackedFrozenRadixTree
+  index: FrozenTermIndex
   postings: FrozenPostingsLayout
 } {
   const fieldIndexByTermIndex: MutableFieldTermData[] = []
   const radixTree = source.index.radixTree as RadixTree<MutableFieldTermData>
 
-  const index = PackedFrozenRadixTree.fromRadixTreeWithLeaves(
-    radixTree,
-    0,
-    (leaf) => {
+  const index = fromRadixTree(radixTree, {
+    termCount: 0,
+    mapLeaf: (leaf) => {
       const ti = fieldIndexByTermIndex.length
       fieldIndexByTermIndex[ti] = leaf
       return ti
     },
-    true,
-  )
+    inferTermCountFromLeaves: true,
+  })
   const termCount = index.size
 
   const remapDocId = shortIdRemap != null
@@ -377,7 +377,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldLengthMatrix: this._fieldLengthMatrix,
       treeShape: [],
       postings: this._postings,
-    }, undefined, this._index as PackedFrozenRadixTree)
+    }, undefined, this._index)
   }
 
   static loadBinary<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {

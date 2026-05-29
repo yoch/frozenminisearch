@@ -3,12 +3,13 @@ import {
   TREE_NODE_LEAF,
 } from './binaryConstants'
 import { invalidFrozenIndex } from './binaryIo'
-import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './packedRadixConstants'
-import { edgeOffsetAtSlot, packedNodeChildCount } from './packedRadixLayout'
-import PackedFrozenRadixTree from './packedRadixTree'
-import type { PackedRadixTreeData } from './packedRadixTree'
+import PackedRadixTree from './PackedRadixTree'
+import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './PackedRadixTree/constants'
+import { edgeOffsetAtSlot, packedNodeChildCount } from './PackedRadixTree/layout'
+import type { PackedRadixTreeData } from './PackedRadixTree'
+import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 
-function writePackedNode(chunks: Buffer[], tree: PackedFrozenRadixTree, node: number): void {
+function writePackedNode(chunks: Buffer[], tree: PackedRadixTree, node: number): void {
   const edgeCount = tree.nodeEdgeCount[node]
   const leafOrder = tree.nodeLeafOrder[node]
   const childCount = packedNodeChildCount(edgeCount, tree.nodeValue[node])
@@ -49,7 +50,7 @@ function writePackedNode(chunks: Buffer[], tree: PackedFrozenRadixTree, node: nu
   }
 }
 
-export function buildTermTreeSectionFromPacked(tree: PackedFrozenRadixTree): Buffer {
+export function buildTermTreeSectionFromPacked(tree: PackedRadixTree): Buffer {
   const chunks: Buffer[] = []
   writePackedNode(chunks, tree, 0)
   return Buffer.concat(chunks)
@@ -174,14 +175,14 @@ export function readPackedTermTreeSection(
   offset: number,
   end: number,
   termCount: number,
-): PackedFrozenRadixTree {
+): PackedRadixTree {
   const nodes: DecodeNodeScratch[] = []
   const { next } = readPackedNode(buf, offset, end, nodes)
   if (next !== end) {
     throw invalidFrozenIndex('term tree section has trailing bytes')
   }
 
-  const tree = PackedFrozenRadixTree.fromData(flattenDecodedNodes(nodes, termCount))
-  tree.validateLeaves(termCount)
+  const tree = PackedRadixTree.fromData(flattenDecodedNodes(nodes, termCount))
+  validateFrozenTermIndexLeaves(tree, termCount)
   return tree
 }

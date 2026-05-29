@@ -1,22 +1,22 @@
-import SearchableMap from './SearchableMap/SearchableMap'
-import { TREE_NODE_EDGE, TREE_NODE_LEAF } from './binaryConstants'
-import { buildTermTreeSection } from './binaryStructures'
-import { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from './packedRadixBinary'
-import PackedFrozenRadixTree, { PACKED_NO_VALUE } from './packedRadixTree'
+import SearchableMap from '../SearchableMap/SearchableMap'
+import { TREE_NODE_EDGE, TREE_NODE_LEAF } from '../binaryConstants'
+import { buildTermTreeSection } from '../binaryStructures'
+import { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from '../packedRadixBinary'
+import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
+import PackedRadixTree, { PACKED_NO_VALUE, fromRadixTree } from './index'
 
 const terms = ['summer', 'acqua', 'aqua', 'acquire', 'poisson', 'qua']
 const keyValues = terms.map((key, i) => [key, i])
 const map = SearchableMap.from(keyValues)
-const packed = PackedFrozenRadixTree.fromRadixTree(map.radixTree, map.size)
+const packed = fromRadixTree(map.radixTree, map.size)
 
-test('fromRadixTreeWithLeaves matches fromRadixTree for numeric leaves', () => {
+test('fromRadixTree with mapLeaf options matches termCount form', () => {
   const m = SearchableMap.from(keyValues)
-  const viaLeaves = PackedFrozenRadixTree.fromRadixTreeWithLeaves(
-    m.radixTree,
-    m.size,
-    leaf => leaf,
-  )
-  expect(Array.from(viaLeaves.entries())).toEqual(Array.from(packed.entries()))
+  const viaOptions = fromRadixTree(m.radixTree, {
+    termCount: m.size,
+    mapLeaf: leaf => leaf,
+  })
+  expect(Array.from(viaOptions.entries())).toEqual(Array.from(packed.entries()))
 })
 
 function expectPackedParity(entries, probes = {}) {
@@ -28,7 +28,7 @@ function expectPackedParity(entries, probes = {}) {
   } = probes
 
   const m = SearchableMap.from(entries)
-  const p = PackedFrozenRadixTree.fromRadixTree(m.radixTree, m.size)
+  const p = fromRadixTree(m.radixTree, m.size)
   const packedBuf = buildTermTreeSectionFromPacked(p)
   const mapBuf = buildTermTreeSection(m.radixTree)
 
@@ -68,7 +68,7 @@ function allTerms(alphabet, maxLength) {
   return terms
 }
 
-describe('PackedFrozenRadixTree', () => {
+describe('PackedRadixTree module', () => {
   test('exact get matches SearchableMap', () => {
     for (const term of terms) {
       expect(packed.get(term)).toBe(map.get(term))
@@ -112,7 +112,7 @@ describe('PackedFrozenRadixTree', () => {
 
   test('get returns undefined for a strict prefix that ends mid-edge', () => {
     const m = SearchableMap.from([['acquire', 0]])
-    const p = PackedFrozenRadixTree.fromRadixTree(m.radixTree, m.size)
+    const p = fromRadixTree(m.radixTree, m.size)
     expect(p.get('acq')).toBeUndefined()
     expect(p.get('acquire')).toBe(0)
     expect(p.get('acquired')).toBeUndefined()
@@ -120,8 +120,8 @@ describe('PackedFrozenRadixTree', () => {
 
   test('empty index packs, validates and round-trips', () => {
     const m = SearchableMap.from([])
-    const p = PackedFrozenRadixTree.fromRadixTree(m.radixTree, m.size)
-    expect(() => p.validateLeaves(0)).not.toThrow()
+    const p = fromRadixTree(m.radixTree, m.size)
+    expect(() => validateFrozenTermIndexLeaves(p, 0)).not.toThrow()
     expect(Array.from(p.entries())).toEqual([])
     const buf = buildTermTreeSectionFromPacked(p)
     const back = readPackedTermTreeSection(buf, 0, buf.length, 0)
@@ -139,7 +139,7 @@ describe('PackedFrozenRadixTree', () => {
     for (const ordering of orderings) {
       const entries = ordering.map((term, i) => [term, i])
       const m = SearchableMap.from(entries)
-      const p = PackedFrozenRadixTree.fromRadixTree(m.radixTree, m.size)
+      const p = fromRadixTree(m.radixTree, m.size)
 
       for (const term of generatedTerms.concat(['d', 'aaad'])) {
         expect(p.get(term)).toBe(m.get(term))
@@ -179,16 +179,16 @@ describe('PackedFrozenRadixTree', () => {
 
   test('mid-edge prefix includes full terms', () => {
     const m = SearchableMap.from([['acquire', 3]])
-    const p = PackedFrozenRadixTree.fromRadixTree(m.radixTree, m.size)
+    const p = fromRadixTree(m.radixTree, m.size)
     expect(Array.from(p.prefixEntries('acq'))).toEqual([['acquire', 3]])
   })
 
-  test('validateLeaves rejects wrong leaf count', () => {
-    expect(() => packed.validateLeaves(map.size + 1)).toThrow(/leaf count/)
+  test('validateFrozenTermIndexLeaves rejects wrong leaf count', () => {
+    expect(() => validateFrozenTermIndexLeaves(packed, map.size + 1)).toThrow(/leaf count/)
   })
 
-  test('validateLeaves rejects malformed packed arrays', () => {
-    const malformed = PackedFrozenRadixTree.fromData({
+  test('validateFrozenTermIndexLeaves rejects malformed packed arrays', () => {
+    const malformed = PackedRadixTree.fromData({
       size: 0,
       nodeCount: 1,
       edgeCount: 1,
@@ -202,13 +202,13 @@ describe('PackedFrozenRadixTree', () => {
       edgeChild: new Uint32Array([9]),
       edgeFirstChar: new Uint16Array(['a'.charCodeAt(0)]),
     })
-    expect(() => malformed.validateLeaves(0)).toThrow(/child out of bounds/)
+    expect(() => validateFrozenTermIndexLeaves(malformed, 0)).toThrow(/child out of bounds/)
   })
 
   test('rejects edge labels that cannot fit the packed length array', () => {
     const longLabel = 'x'.repeat(0x10000)
     const m = SearchableMap.from([[longLabel, 0]])
-    expect(() => PackedFrozenRadixTree.fromRadixTree(m.radixTree, m.size)).toThrow(/edge label too long/)
+    expect(() => fromRadixTree(m.radixTree, m.size)).toThrow(/edge label too long/)
   })
 
   test('term tree section round-trips through binary', () => {

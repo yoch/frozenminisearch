@@ -1,6 +1,7 @@
 import type { RadixTree } from './SearchableMap/types'
 import { shouldEncodeBinaryAsMSv4 } from './frozenPostings'
-import type PackedFrozenRadixTree from './packedRadixTree'
+import type { FrozenTermIndex } from './frozenTermIndex'
+import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildTermTreeSectionFromPacked } from './packedRadixBinary'
 import {
   BINARY_MAGIC_V3,
@@ -64,13 +65,13 @@ function assembleSections(
 }
 
 type EncodeTreeSource =
-  | { kind: 'packed', tree: PackedFrozenRadixTree }
+  | { kind: 'packed', tree: FrozenTermIndex }
   | { kind: 'radix', tree: RadixTree<number> }
 
 function prepareEncodeSnapshot(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-  packedTermIndex?: PackedFrozenRadixTree,
+  packedTermIndex?: FrozenTermIndex,
 ): { snap: FrozenSnapshot, treeSource: EncodeTreeSource, fieldNames: string[] } {
   validateFrozenSnapshotNumeric(snap)
   const fieldNames = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
@@ -81,7 +82,7 @@ function prepareEncodeSnapshot(
   const termCount = termCountOf(snap)
   const packed = packedTermIndex ?? snap.packedTermIndex
   if (packed != null) {
-    packed.validateLeaves(termCount)
+    validateFrozenTermIndexLeaves(packed, termCount)
     return { snap, treeSource: { kind: 'packed', tree: packed }, fieldNames }
   }
 
@@ -101,7 +102,7 @@ function buildTermTreeSectionFromSource(source: EncodeTreeSource): Buffer {
 export function encodeFrozenSnapshotMSv3(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-  packedTermIndex?: PackedFrozenRadixTree,
+  packedTermIndex?: FrozenTermIndex,
 ): Buffer {
   return encodeMSv3(snap, termTree, packedTermIndex)
 }
@@ -110,7 +111,7 @@ export function encodeFrozenSnapshotMSv3(
 export function encodeFrozenSnapshotMSv4(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-  packedTermIndex?: PackedFrozenRadixTree,
+  packedTermIndex?: FrozenTermIndex,
 ): Buffer {
   return encodeMSv4(snap, termTree, packedTermIndex)
 }
@@ -118,7 +119,7 @@ export function encodeFrozenSnapshotMSv4(
 function encodeMSv3(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-  packedTermIndex?: PackedFrozenRadixTree,
+  packedTermIndex?: FrozenTermIndex,
 ): Buffer {
   const { snap: validated, treeSource, fieldNames } = prepareEncodeSnapshot(snap, termTree, packedTermIndex)
   const p = validated.postings
@@ -149,7 +150,7 @@ function encodeMSv3(
 function encodeMSv4(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-  packedTermIndex?: PackedFrozenRadixTree,
+  packedTermIndex?: FrozenTermIndex,
 ): Buffer {
   const { snap: validated, treeSource, fieldNames } = prepareEncodeSnapshot(snap, termTree, packedTermIndex)
 
@@ -197,7 +198,7 @@ function encodeMSv4(
 export function encodeFrozenSnapshot(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
-  packedTermIndex?: PackedFrozenRadixTree,
+  packedTermIndex?: FrozenTermIndex,
 ): Buffer {
   const packed = packedTermIndex ?? snap.packedTermIndex
   if (shouldEncodeBinaryAsMSv4(snap.postings)) {

@@ -316,7 +316,10 @@ starting points:
      flat representation directly from documents, without ever constructing the
      intermediate nested-`Map` postings. This is cheaper in both time and peak
      memory for the build-once case, and the async/iterator variants allow
-     streaming large corpora.
+     streaming large corpora. The builder supports `addAll` / `addAllAsync` (chunked,
+     non-blocking) like mutable `MiniSearch`; `fromAsyncIterable` accepts optional
+     `FrozenIndexBuilderHints` (e.g. `estimatedDocumentCount`) when the final size
+     is known upfront.
   3. **`saveBinary` / `loadBinary`** — persist and restore a frozen index
      to/from disk.
 

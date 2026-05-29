@@ -2,6 +2,11 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+  - Add optional `hints` argument to `FrozenMiniSearch.fromAsyncIterable(iterable, options, hints?)` for `estimatedDocumentCount` pre-sizing
+  - Add `FrozenIndexBuilder.addAll(documents)` and `addAllAsync(documents, { chunkSize? })` before freeze (parity with mutable `MiniSearch`)
+
 ## v8.2.0
 
 Stable release of the packed frozen term index and MSv3/MSv4 snapshots without a

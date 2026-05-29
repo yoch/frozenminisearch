@@ -26,7 +26,12 @@ import {
   validateFrozenPostingsLayout,
   type FrozenPostingsLayout,
 } from './frozenPostings'
-import { buildFrozenParamsFromDocuments, createFrozenIndexBuilder, type FrozenIndexBuilder } from './frozenBuild'
+import {
+  buildFrozenParamsFromDocuments,
+  createFrozenIndexBuilder,
+  type FrozenIndexBuilder,
+  type FrozenIndexBuilderHints,
+} from './frozenBuild'
 import {
   createFrozenQueryIndexView,
   executeQuery as runQuery,
@@ -435,12 +440,16 @@ export default class FrozenMiniSearch<T = any> {
   /**
    * Build a read-only index from an async stream of documents (e.g. CSV parser).
    * For sync iterables, use {@link createFrozenIndexBuilder} with `for...of` instead.
+   *
+   * @param hints  Optional builder hints; `estimatedDocumentCount` pre-allocates
+   *   per-document arrays when the final document count is known upfront.
    */
   static async fromAsyncIterable<T>(
     iterable: AsyncIterable<T>,
     options: Options<T>,
+    hints?: FrozenIndexBuilderHints,
   ): Promise<FrozenMiniSearch<T>> {
-    const builder = createFrozenIndexBuilder<T>(options)
+    const builder = createFrozenIndexBuilder<T>(options, hints)
     for await (const document of iterable) {
       builder.add(document)
     }

@@ -518,6 +518,76 @@ describe('FrozenMiniSearch.fromAsyncIterable', () => {
     expectSameResults(fromDocs, fromAsync, 'zen')
     expectSameResults(fromDocs, fromAsync, 'zen art', { combineWith: 'AND' })
   })
+
+  test('parity with estimatedDocumentCount hint', async () => {
+    async function* docStream() {
+      for (const doc of docs) yield doc
+    }
+    const fromDocs = buildFrozenDirect()
+    const fromAsync = await FrozenMiniSearch.fromAsyncIterable(docStream(), options, {
+      estimatedDocumentCount: docs.length,
+    })
+    expect(fromAsync.documentCount).toBe(fromDocs.documentCount)
+    expectSameResults(fromDocs, fromAsync, 'zen')
+  })
+
+  test('correct sizes with overestimated estimatedDocumentCount', async () => {
+    async function* docStream() {
+      for (const doc of docs) yield doc
+    }
+    const fromDocs = buildFrozenDirect()
+    const fromAsync = await FrozenMiniSearch.fromAsyncIterable(docStream(), options, {
+      estimatedDocumentCount: docs.length + 100,
+    })
+    expect(fromAsync.documentCount).toBe(fromDocs.documentCount)
+    expectSameResults(fromDocs, fromAsync, 'zen')
+    const breakdown = fromAsync.memoryBreakdown()
+    const directBreakdown = fromDocs.memoryBreakdown()
+    expect(breakdown.documentCount).toBe(directBreakdown.documentCount)
+    expect(breakdown.storedFieldsJsonBytes).toBe(directBreakdown.storedFieldsJsonBytes)
+  })
+})
+
+describe('FrozenIndexBuilder.addAll / addAllAsync', () => {
+  test('addAll parity with fromDocuments', () => {
+    const fromDocs = buildFrozenDirect()
+    const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: docs.length })
+    builder.addAll(docs)
+    const fromBuilder = freezeFrozenIndexBuilder(builder)
+    expect(fromBuilder.documentCount).toBe(fromDocs.documentCount)
+    expectSameResults(fromDocs, fromBuilder, 'zen')
+    expectSameResults(fromDocs, fromBuilder, 'zen art', { combineWith: 'AND' })
+  })
+
+  test('addAllAsync parity with fromDocuments', async () => {
+    const fromDocs = buildFrozenDirect()
+    const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: docs.length })
+    await builder.addAllAsync(docs)
+    const fromBuilder = freezeFrozenIndexBuilder(builder)
+    expect(fromBuilder.documentCount).toBe(fromDocs.documentCount)
+    expectSameResults(fromDocs, fromBuilder, 'zen')
+  })
+
+  test('addAllAsync accepts chunkSize option', async () => {
+    const builder = createFrozenIndexBuilder(options)
+    await builder.addAllAsync(docs, { chunkSize: 3 })
+    const frozen = freezeFrozenIndexBuilder(builder)
+    expect(frozen.documentCount).toBe(docs.length)
+  })
+
+  test('cannot addAll after freeze', () => {
+    const builder = createFrozenIndexBuilder(options)
+    builder.add(docs[0])
+    freezeFrozenIndexBuilder(builder)
+    expect(() => builder.addAll([docs[1]])).toThrow(/cannot add after freezeParams/i)
+  })
+
+  test('cannot addAllAsync after freeze', async () => {
+    const builder = createFrozenIndexBuilder(options)
+    builder.add(docs[0])
+    freezeFrozenIndexBuilder(builder)
+    await expect(builder.addAllAsync([docs[1]])).rejects.toThrow(/cannot add after freezeParams/i)
+  })
 })
 
 describe('frozenMemoryBreakdown', () => {

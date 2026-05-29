@@ -167,6 +167,48 @@ export class FrozenIndexBuilder<T> {
   }
 
   /**
+   * Adds all the given documents to the index.
+   *
+   * @param documents  An array of documents to be indexed
+   */
+  addAll(documents: readonly T[]): void {
+    for (const document of documents) this.add(document)
+  }
+
+  /**
+   * Adds all the given documents to the index asynchronously.
+   *
+   * Returns a promise that resolves (to `undefined`) when the indexing is done.
+   * This method is useful when indexing many documents, to avoid blocking the main
+   * thread. The indexing is performed asynchronously and in chunks. Finalize with
+   * {@link freezeFrozenIndexBuilder} when done.
+   *
+   * @param documents  An array of documents to be indexed
+   * @param options  Configuration options
+   * @return A promise resolving to `undefined` when the indexing is done
+   */
+  addAllAsync(documents: readonly T[], options: { chunkSize?: number } = {}): Promise<void> {
+    const { chunkSize = 10 } = options
+    const acc: { chunk: T[], promise: Promise<void> } = { chunk: [], promise: Promise.resolve() }
+
+    const { chunk, promise } = documents.reduce(({ chunk, promise }, document: T, i: number) => {
+      chunk.push(document)
+      if ((i + 1) % chunkSize === 0) {
+        return {
+          chunk: [],
+          promise: promise
+            .then(() => new Promise(resolve => setTimeout(resolve, 0)))
+            .then(() => this.addAll(chunk)),
+        }
+      } else {
+        return { chunk, promise }
+      }
+    }, acc)
+
+    return promise.then(() => this.addAll(chunk))
+  }
+
+  /**
    * Finalize this builder into assembly params. Call {@link assembleFrozen} or
    * {@link freezeFrozenIndexBuilder} to obtain a {@link FrozenMiniSearch} instance.
    */
@@ -230,8 +272,6 @@ export function buildFrozenParamsFromDocuments<T>(
   const builder = createFrozenIndexBuilder<T>(options, {
     estimatedDocumentCount: documents.length,
   })
-  for (let d = 0; d < documents.length; d++) {
-    builder.add(documents[d])
-  }
+  builder.addAll(documents)
   return builder.freezeParams()
 }

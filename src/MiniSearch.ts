@@ -326,6 +326,9 @@ export default class MiniSearch<T = any> {
    */
   addAllAsync(documents: readonly T[], options: { chunkSize?: number } = {}): Promise<void> {
     const { chunkSize = 10 } = options
+    if (!Number.isInteger(chunkSize) || chunkSize < 1) {
+      throw new Error('MiniSearch: chunkSize must be a positive integer')
+    }
     const acc: { chunk: T[], promise: Promise<void> } = { chunk: [], promise: Promise.resolve() }
 
     const { chunk, promise } = documents.reduce(({ chunk, promise }, document: T, i: number) => {

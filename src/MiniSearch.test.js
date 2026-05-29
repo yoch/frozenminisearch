@@ -955,6 +955,14 @@ describe('MiniSearch', () => {
         expect(ms.documentCount).toEqual(documents.length)
       })
     })
+
+    it('rejects non-positive chunkSize', () => {
+      const ms = new MiniSearch({ fields: ['text'] })
+      expect(() => ms.addAllAsync([{ id: 1, text: 'a' }], { chunkSize: 0 }))
+        .toThrow(/chunkSize must be a positive integer/)
+      expect(() => ms.addAllAsync([{ id: 1, text: 'a' }], { chunkSize: -1 }))
+        .toThrow(/chunkSize must be a positive integer/)
+    })
   })
 
   describe('has', () => {

@@ -6,6 +6,7 @@
 
   - Add optional `hints` argument to `FrozenMiniSearch.fromAsyncIterable(iterable, options, hints?)` for `estimatedDocumentCount` pre-sizing
   - Add `FrozenIndexBuilder.addAll(documents)` and `addAllAsync(documents, { chunkSize? })` before freeze (parity with mutable `MiniSearch`)
+  - Reject non-positive `chunkSize` in `addAllAsync` (mutable and frozen builder)
 
 ## v8.2.0
 

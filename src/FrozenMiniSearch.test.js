@@ -575,6 +575,14 @@ describe('FrozenIndexBuilder.addAll / addAllAsync', () => {
     expect(frozen.documentCount).toBe(docs.length)
   })
 
+  test('addAllAsync rejects non-positive chunkSize', () => {
+    const builder = createFrozenIndexBuilder(options)
+    expect(() => builder.addAllAsync(docs, { chunkSize: 0 }))
+      .toThrow(/chunkSize must be a positive integer/)
+    expect(() => builder.addAllAsync(docs, { chunkSize: -1 }))
+      .toThrow(/chunkSize must be a positive integer/)
+  })
+
   test('cannot addAll after freeze', () => {
     const builder = createFrozenIndexBuilder(options)
     builder.add(docs[0])

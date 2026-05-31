@@ -1,0 +1,196 @@
+{
+  "metadata": {
+    "role": "golden-post-phase1",
+    "recordKind": "import-dirty-worktree",
+    "note": "Mesure post-Phase 1 sur worktree dirty au commit ci-dessous. Ré-enregistrer avec yarn benchmark:packed-radix:record sur arbre propre.",
+    "baselineCommit": "067c99146e01a58435e879ef361535764b13dabc",
+    "capturedAt": "2026-05-31T19:54:49.491Z",
+    "node": "v22.22.0",
+    "packageVersion": "8.2.1",
+    "gcExposed": true,
+    "git": {
+      "commit": "067c99146e01a58435e879ef361535764b13dabc",
+      "commitShort": "067c991",
+      "branch": "master",
+      "dirty": true,
+      "trackedDirty": true,
+      "commitDate": "2026-05-29T17:05:14+03:00",
+      "subject": "Prepare 8.2.1 stable release metadata.",
+      "parentCommit": "d7185c73e47afa57b52894d00f6b1edc7c6853b8"
+    }
+  },
+  "corpora": {
+    "small": {
+      "size": 6,
+      "nodeCount": 9,
+      "edgeCount": 8,
+      "bytes": {
+        "nodeBytes": 144,
+        "edgeBytes": 80,
+        "labelBytesUtf16Estimate": 54,
+        "labelCodeUnits": 27,
+        "totalStructuredBytes": 278,
+        "packedByteLength": 278
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 4416,
+        "externalBytes": 0,
+        "arrayBuffersBytes": 0,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 4416
+      },
+      "timings": null
+    },
+    "dense-prefix": {
+      "size": 39,
+      "nodeCount": 40,
+      "edgeCount": 39,
+      "bytes": {
+        "nodeBytes": 640,
+        "edgeBytes": 390,
+        "labelBytesUtf16Estimate": 78,
+        "labelCodeUnits": 39,
+        "totalStructuredBytes": 1108,
+        "packedByteLength": 1108
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 4000,
+        "externalBytes": 1030,
+        "arrayBuffersBytes": 1030,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 5030
+      },
+      "timings": null
+    },
+    "scale": {
+      "size": 2000,
+      "nodeCount": 2652,
+      "edgeCount": 2651,
+      "bytes": {
+        "nodeBytes": 42432,
+        "edgeBytes": 26510,
+        "labelBytesUtf16Estimate": 23452,
+        "labelCodeUnits": 11726,
+        "totalStructuredBytes": 92394,
+        "packedByteLength": 92394
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 150616,
+        "externalBytes": 68942,
+        "arrayBuffersBytes": 68942,
+        "rssBytes": 1179648,
+        "totalResidentApproxBytes": 219558
+      },
+      "timings": {
+        "get(hit)": {
+          "hz": 5157276.573369413,
+          "meanMs": 0.00019390078964616556
+        },
+        "get(miss)": {
+          "hz": 3178773.9732140326,
+          "meanMs": 0.00031458669550792507
+        },
+        "prefix(short)": {
+          "hz": 18687.867638721753,
+          "meanMs": 0.05351065297187645
+        }
+      }
+    },
+    "prefix-suffix-5k": {
+      "size": 5000,
+      "nodeCount": 6564,
+      "edgeCount": 6563,
+      "bytes": {
+        "nodeBytes": 105024,
+        "edgeBytes": 65630,
+        "labelBytesUtf16Estimate": 144152,
+        "labelCodeUnits": 72076,
+        "totalStructuredBytes": 314806,
+        "packedByteLength": 314806
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 329088,
+        "externalBytes": 170654,
+        "arrayBuffersBytes": 170654,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 499742
+      },
+      "timings": null,
+      "meta": {
+        "kind": "prefix-suffix",
+        "keyCount": 5000,
+        "prefixCount": 5,
+        "prefixLengths": "5-15",
+        "suffixLengths": "2-30",
+        "samplePrefixes": [
+          "sugdnfjdusqzje",
+          "bhmyj",
+          "vfzqtyyzmdh",
+          "vqggzcro",
+          "prhtonhhocwobb"
+        ]
+      }
+    },
+    "numeric-10k": {
+      "size": 10000,
+      "nodeCount": 13383,
+      "edgeCount": 13382,
+      "bytes": {
+        "nodeBytes": 214128,
+        "edgeBytes": 133820,
+        "labelBytesUtf16Estimate": 114846,
+        "labelCodeUnits": 57423,
+        "totalStructuredBytes": 462794,
+        "packedByteLength": 462794
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 634272,
+        "externalBytes": 347948,
+        "arrayBuffersBytes": 347948,
+        "rssBytes": 262144,
+        "totalResidentApproxBytes": 982220
+      },
+      "timings": null,
+      "meta": {
+        "kind": "numeric",
+        "keyCount": 10000,
+        "alphabet": "0-9",
+        "keyLengths": "4-14"
+      }
+    },
+    "short5-alphabet800-10k": {
+      "size": 10000,
+      "nodeCount": 10893,
+      "edgeCount": 10892,
+      "bytes": {
+        "nodeBytes": 174288,
+        "edgeBytes": 108920,
+        "labelBytesUtf16Estimate": 81412,
+        "labelCodeUnits": 40706,
+        "totalStructuredBytes": 364620,
+        "packedByteLength": 364620
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 642272,
+        "externalBytes": 283208,
+        "arrayBuffersBytes": 283208,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 862712
+      },
+      "timings": null,
+      "meta": {
+        "kind": "short-fixed-wide-alphabet",
+        "keyCount": 10000,
+        "keyLength": 5,
+        "alphabetSize": 800,
+        "alphabetStartCodePoint": 256
+      }
+    }
+  }
+}

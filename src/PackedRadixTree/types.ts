@@ -22,5 +22,4 @@ export interface PackedRadixTreeData {
   readonly edgeLabelStart: Uint32Array
   readonly edgeLabelLength: Uint16Array
   readonly edgeChild: Uint32Array
-  readonly edgeFirstChar: Uint16Array
 }

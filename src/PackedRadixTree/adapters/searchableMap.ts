@@ -72,7 +72,6 @@ function packRadixTreeFromRadix<Leaf>(
   const edgeLabelStart = new Uint32Array(edgeCount)
   const edgeLabelLength = new Uint16Array(edgeCount)
   const edgeChild = new Uint32Array(edgeCount)
-  const edgeFirstChar = new Uint16Array(edgeCount)
   let labelHeap = ''
   let edgeIndex = 0
 
@@ -90,7 +89,6 @@ function packRadixTreeFromRadix<Leaf>(
       labelHeap += edge.label
       edgeLabelStart[edgeIndex] = start
       edgeLabelLength[edgeIndex] = edge.label.length
-      edgeFirstChar[edgeIndex] = edge.label.charCodeAt(0)
       edgeChild[edgeIndex] = edge.child
       edgeIndex++
     }
@@ -108,6 +106,5 @@ function packRadixTreeFromRadix<Leaf>(
     edgeLabelStart,
     edgeLabelLength,
     edgeChild,
-    edgeFirstChar,
   })
 }

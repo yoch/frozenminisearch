@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "capturedAt": "2026-05-31T19:00:00.000Z",
+    "note": "Baseline Phase 0 avant suppression edgeFirstChar (Uint16, 2 B/arête). small/dense-prefix/scale : mesures du premier run ; corpus 5k/10k : même arbre qu’aujourd’hui + edgeFirstChar extrapolé.",
+    "packageVersion": "8.2.1"
+  },
+  "corpora": {
+    "small": {
+      "edgeCount": 8,
+      "bytes": {
+        "nodeBytes": 144,
+        "edgeBytes": 96,
+        "labelBytesUtf16Estimate": 54,
+        "totalStructuredBytes": 294,
+        "packedByteLength": 294
+      }
+    },
+    "dense-prefix": {
+      "edgeCount": 39,
+      "bytes": {
+        "nodeBytes": 640,
+        "edgeBytes": 468,
+        "labelBytesUtf16Estimate": 78,
+        "totalStructuredBytes": 1186,
+        "packedByteLength": 1186
+      }
+    },
+    "scale": {
+      "edgeCount": 2651,
+      "bytes": {
+        "nodeBytes": 42432,
+        "edgeBytes": 31812,
+        "labelBytesUtf16Estimate": 23452,
+        "totalStructuredBytes": 97696,
+        "packedByteLength": 97696
+      }
+    },
+    "prefix-suffix-5k": {
+      "edgeCount": 6563,
+      "bytes": {
+        "nodeBytes": 105024,
+        "edgeBytes": 78756,
+        "labelBytesUtf16Estimate": 144152,
+        "totalStructuredBytes": 327932,
+        "packedByteLength": 327932
+      }
+    },
+    "numeric-10k": {
+      "edgeCount": 13382,
+      "bytes": {
+        "nodeBytes": 214128,
+        "edgeBytes": 160584,
+        "labelBytesUtf16Estimate": 114846,
+        "totalStructuredBytes": 489558,
+        "packedByteLength": 489558
+      }
+    },
+    "short5-alphabet800-10k": {
+      "edgeCount": 10892,
+      "bytes": {
+        "nodeBytes": 174288,
+        "edgeBytes": 130704,
+        "labelBytesUtf16Estimate": 81412,
+        "totalStructuredBytes": 386404,
+        "packedByteLength": 386404
+      }
+    }
+  }
+}

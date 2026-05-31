@@ -200,7 +200,6 @@ describe('PackedRadixTree module', () => {
       edgeLabelStart: new Uint32Array([0]),
       edgeLabelLength: new Uint16Array([1]),
       edgeChild: new Uint32Array([9]),
-      edgeFirstChar: new Uint16Array(['a'.charCodeAt(0)]),
     })
     expect(() => validateFrozenTermIndexLeaves(malformed, 0)).toThrow(/child out of bounds/)
   })

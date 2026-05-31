@@ -14,7 +14,6 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
     || tree.edgeLabelStart.length !== tree.edgeCount
     || tree.edgeLabelLength.length !== tree.edgeCount
     || tree.edgeChild.length !== tree.edgeCount
-    || tree.edgeFirstChar.length !== tree.edgeCount
   ) {
     throw new Error('FrozenTermIndex: array length mismatch')
   }
@@ -51,9 +50,6 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
     const len = tree.edgeLabelLength[edge]
     if (len === 0 || len > MAX_PACKED_EDGE_LABEL_LENGTH || start + len > tree.labelHeap.length) {
       throw new Error(`FrozenTermIndex: edge ${edge} label range out of bounds`)
-    }
-    if (tree.edgeFirstChar[edge] !== tree.labelHeap.charCodeAt(start)) {
-      throw new Error(`FrozenTermIndex: edge ${edge} first char mismatch`)
     }
     if (tree.edgeChild[edge] >= tree.nodeCount) {
       throw new Error(`FrozenTermIndex: edge ${edge} child out of bounds`)

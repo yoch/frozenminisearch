@@ -1,7 +1,7 @@
 import { PACKED_NO_VALUE } from './constants'
 import { packedRadixFuzzyEntries } from './fuzzy'
 import { edgeOffsetAtSlot, packedNodeChildCount } from './layout'
-import { labelSlice } from './strings'
+import { buildTermFromSegments, type LabelSegment } from './strings'
 import type { PackedRadixTreeData, PackedStringRadixMap } from './types'
 
 function labelsMatch(heap: string, start: number, len: number, key: string, keyOff: number): boolean {
@@ -23,7 +23,6 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   readonly edgeLabelStart: Uint32Array
   readonly edgeLabelLength: Uint16Array
   readonly edgeChild: Uint32Array
-  readonly edgeFirstChar: Uint16Array
 
   private constructor(data: PackedRadixTreeData) {
     this.size = data.size
@@ -37,7 +36,6 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     this.edgeLabelStart = data.edgeLabelStart
     this.edgeLabelLength = data.edgeLabelLength
     this.edgeChild = data.edgeChild
-    this.edgeFirstChar = data.edgeFirstChar
   }
 
   static fromData(data: PackedRadixTreeData): PackedRadixTree {
@@ -47,9 +45,10 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   private findEdge(node: number, firstChar: number): number {
     const first = this.nodeFirstEdge[node]
     const count = this.nodeEdgeCount[node]
+    const heap = this.labelHeap
     for (let e = 0; e < count; e++) {
       const ei = first + e
-      if (this.edgeFirstChar[ei] === firstChar) return ei
+      if (heap.charCodeAt(this.edgeLabelStart[ei]) === firstChar) return ei
     }
     return -1
   }
@@ -76,7 +75,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   }
 
   * entries(): IterableIterator<[string, number]> {
-    yield *this.emitSubtree(0, '')
+    yield *this.emitSubtree(0, [])
   }
 
   * prefixEntries(prefix: string): IterableIterator<[string, number]> {
@@ -86,7 +85,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     }
 
     let node = 0
-    let base = ''
+    const segments: LabelSegment[] = []
     let pos = 0
     const heap = this.labelHeap
     const n = prefix.length
@@ -101,19 +100,19 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
 
       if (remaining < len) {
         if (!labelsMatch(heap, start, remaining, prefix, pos)) return
-        base += labelSlice(heap, start, len)
+        segments.push({ start, len })
         node = this.edgeChild[ei]
-        yield *this.emitSubtree(node, base)
+        yield *this.emitSubtree(node, segments)
         return
       }
 
       if (!labelsMatch(heap, start, len, prefix, pos)) return
-      base += labelSlice(heap, start, len)
+      segments.push({ start, len })
       pos += len
       node = this.edgeChild[ei]
     }
 
-    yield *this.emitSubtree(node, base)
+    yield *this.emitSubtree(node, segments)
   }
 
   /**
@@ -122,7 +121,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
    * any, sits at `nodeLeafOrder` among the original sibling slots; everything else
    * is an edge. Exact order matters for prefix iteration and autoSuggest parity.
    */
-  private * emitSubtree(node: number, basePrefix: string): IterableIterator<[string, number]> {
+  private * emitSubtree(node: number, segments: LabelSegment[]): IterableIterator<[string, number]> {
     const first = this.nodeFirstEdge[node]
     const edgeCount = this.nodeEdgeCount[node]
     const leafOrder = this.nodeLeafOrder[node]
@@ -132,12 +131,16 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     for (let slot = totalCount - 1; slot >= 0; slot--) {
       const edgeOffset = edgeOffsetAtSlot(slot, leafOrder)
       if (edgeOffset < 0) {
-        yield [basePrefix, this.nodeValue[node]]
+        yield [buildTermFromSegments(heap, segments), this.nodeValue[node]]
         continue
       }
       const ei = first + edgeOffset
-      const childPrefix = basePrefix + labelSlice(heap, this.edgeLabelStart[ei], this.edgeLabelLength[ei])
-      yield *this.emitSubtree(this.edgeChild[ei], childPrefix)
+      segments.push({
+        start: this.edgeLabelStart[ei],
+        len: this.edgeLabelLength[ei],
+      })
+      yield *this.emitSubtree(this.edgeChild[ei], segments)
+      segments.pop()
     }
   }
 
@@ -154,7 +157,6 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
       + this.edgeLabelStart.byteLength
       + this.edgeLabelLength.byteLength
       + this.edgeChild.byteLength
-      + this.edgeFirstChar.byteLength
       + this.labelHeap.length * 2
     )
   }

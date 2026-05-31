@@ -7,26 +7,45 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { collectRunMetadata, parseBenchmarkArgs } from './benchmarkUtils.js'
+import {
+  assertCleanTrackedTree,
+  collectRunMetadata,
+  enrichGitForBaseline,
+  parseBenchmarkArgs,
+} from './benchmarkUtils.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BASELINES_DIR = join(__dirname, 'baselines')
 
 const useReference = process.argv.includes('--reference')
+const force = process.argv.includes('--force')
 const outFile = join(BASELINES_DIR, useReference ? 'reference.json' : 'latest.json')
 const { runs, searchIterations } = parseBenchmarkArgs()
+
+if (useReference) {
+  assertCleanTrackedTree({ force, context: 'MiniSearch reference.json' })
+}
 
 console.log('Running benchmark suite (requires --expose-gc for stable heap)...\n')
 if (!global.gc) {
   console.warn('Warning: run with NODE_OPTIONS=--expose-gc or node --expose-gc for accurate heap.\n')
 }
 
+const meta = collectRunMetadata()
 const payload = {
-  ...collectRunMetadata(),
+  ...meta,
+  recordKind: useReference
+    ? (force ? 'forced-dirty' : 'clean-commit')
+    : 'local-latest',
   runs,
   searchIterations,
   scenarios: runBenchmarkSuite(undefined, runs, searchIterations),
+}
+
+if (useReference && !force) {
+  payload.git = enrichGitForBaseline(meta.git)
+  payload.baselineCommit = payload.git.commit
 }
 
 mkdirSync(BASELINES_DIR, { recursive: true })
@@ -34,8 +53,11 @@ writeFileSync(outFile, JSON.stringify(payload, null, 2) + '\n')
 
 console.log(`Wrote ${outFile}`)
 console.log(`  commit: ${payload.git.commitShort}${payload.git.dirty ? ' (dirty)' : ''}`)
-if (payload.git.dirty) {
-  console.warn('  warning: working tree is dirty; baseline may be harder to reproduce')
+if (useReference) {
+  console.log(`  baselineCommit: ${payload.baselineCommit ?? payload.git.commit}`)
+}
+if (payload.git.dirty && !useReference) {
+  console.warn('  warning: working tree is dirty; latest.json may be harder to reproduce')
 }
 console.log(`  runs: ${runs}, search iterations: ${searchIterations} (median per scenario)`)
 console.log(`  scenarios: ${payload.scenarios.length}`)

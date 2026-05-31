@@ -1,15 +1,6 @@
 import { edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'
-import { labelSlice } from './strings'
-
-function buildTermFromSegments(heap: string, segments: Array<{ start: number, len: number }>): string {
-  if (segments.length === 0) return ''
-  let out = ''
-  for (const seg of segments) {
-    out += labelSlice(heap, seg.start, seg.len)
-  }
-  return out
-}
+import { buildTermFromSegments, type LabelSegment } from './strings'
 
 export function packedRadixFuzzyEntries(
   tree: PackedRadixTree,
@@ -25,7 +16,7 @@ export function packedRadixFuzzyEntries(
   for (let j = 0; j < n; ++j) matrix[j] = j
   for (let i = 1; i < m; ++i) matrix[i * n] = i
 
-  const segments: Array<{ start: number, len: number }> = []
+  const segments: LabelSegment[] = []
 
   recurse(
     tree,
@@ -51,7 +42,7 @@ function recurse(
   rowStart: number,
   n: number,
   node: number,
-  segments: Array<{ start: number, len: number }>,
+  segments: LabelSegment[],
 ): void {
   const heap = tree.labelHeap
   const offset = rowStart * n

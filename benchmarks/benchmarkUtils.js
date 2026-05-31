@@ -1,9 +1,23 @@
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+function findRepoRoot () {
+  const starts = [process.cwd(), dirname(fileURLToPath(import.meta.url))]
+  for (const start of starts) {
+    let dir = start
+    for (;;) {
+      if (existsSync(join(dir, 'package.json'))) return dir
+      const parent = dirname(dir)
+      if (parent === dir) break
+      dir = parent
+    }
+  }
+  return join(dirname(fileURLToPath(import.meta.url)), '..')
+}
+
+const REPO_ROOT = findRepoRoot()
 
 export const gc = () => { if (global.gc) global.gc() }
 
@@ -189,11 +203,133 @@ function gitCommand (args) {
   }
 }
 
+/** Modified tracked files only (untracked files ignored). */
+export function trackedTreePorcelain () {
+  return gitCommand('status --porcelain --untracked-files=no') ?? ''
+}
+
+export function isTrackedTreeClean () {
+  return trackedTreePorcelain() === ''
+}
+
+/**
+ * Refuse baseline capture when tracked files differ from HEAD.
+ * @param {{ force?: boolean, context?: string }} [options]
+ */
+export function assertCleanTrackedTree (options = {}) {
+  const { force = false, context = 'baseline' } = options
+  if (force) return
+  const dirty = trackedTreePorcelain()
+  if (!dirty) return
+  console.error(`Refus : l’arborescence suivie n’est pas propre (${context}).`)
+  console.error('Modifications sur fichiers suivis :')
+  for (const line of dirty.split('\n')) {
+    if (line) console.error(`  ${line}`)
+  }
+  console.error('\nCommitez ou restaurez ces fichiers, puis relancez.')
+  console.error('Pour forcer malgré tout : ajoutez --force (baseline non reproductible au commit HEAD).')
+  process.exit(1)
+}
+
+/** Git fields stored with a golden baseline (commit = état du code mesuré). */
+export function enrichGitForBaseline (git) {
+  const commit = git?.commit ?? gitCommand('rev-parse HEAD')
+  return {
+    ...git,
+    commit,
+    commitShort: git?.commitShort ?? gitCommand('rev-parse --short HEAD'),
+    branch: git?.branch ?? gitCommand('rev-parse --abbrev-ref HEAD'),
+    dirty: false,
+    commitDate: gitCommand('log -1 --format=%cI'),
+    subject: gitCommand('log -1 --format=%s'),
+    parentCommit: gitCommand('rev-parse HEAD^'),
+  }
+}
+
+export const PACKED_RADIX_HISTORY_PATH = join(REPO_ROOT, 'benchmarks/packed-radix-history.jsonl')
+
+/** Compact row for packed-radix-history.jsonl. */
+export function packedRadixHistoryEntry (payload) {
+  const corpora = {}
+  for (const [id, row] of Object.entries(payload.corpora ?? {})) {
+    const summary = {
+      structuredBytes: row.bytes?.totalStructuredBytes,
+      packedByteLength: row.bytes?.packedByteLength,
+      edgeCount: row.edgeCount,
+      runtimeApproxBytes: row.runtime?.totalResidentApproxBytes,
+    }
+    if (row.timings?.['get(hit)']?.hz != null) {
+      summary.getHitHz = Math.round(row.timings['get(hit)'].hz)
+      summary.prefixShortHz = Math.round(row.timings['prefix(short)']?.hz ?? 0)
+    }
+    corpora[id] = summary
+  }
+  return {
+    protocolVersion: 1,
+    recordKind: payload.metadata?.recordKind ?? 'clean-commit',
+    capturedAt: payload.metadata?.capturedAt,
+    packageVersion: payload.metadata?.packageVersion,
+    git: payload.metadata?.git,
+    baselineCommit: payload.metadata?.baselineCommit ?? payload.metadata?.git?.commit,
+    suiteFingerprint: Object.keys(corpora),
+    corpora,
+  }
+}
+
+/**
+ * Append one packed-radix snapshot (clean tree required unless force).
+ * @returns {'appended' | 'skipped-duplicate'}
+ */
+export function appendPackedRadixHistory (payload, options = {}) {
+  const {
+    historyPath = PACKED_RADIX_HISTORY_PATH,
+    force = false,
+  } = options
+  const entry = packedRadixHistoryEntry(payload)
+  const headSha = entry.baselineCommit
+  if (!headSha) {
+    console.warn('appendPackedRadixHistory: pas de commit, historique non écrit')
+    return 'skipped-duplicate'
+  }
+
+  if (existsSync(historyPath) && !force) {
+    for (const line of readFileSync(historyPath, 'utf8').split('\n')) {
+      if (!line.trim()) continue
+      try {
+        const e = JSON.parse(line)
+        if (e.baselineCommit === headSha || e.git?.commit === headSha) {
+          console.log(`Historique : déjà enregistré pour ${e.git?.commitShort ?? headSha.slice(0, 7)}`)
+          return 'skipped-duplicate'
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  if (force && existsSync(historyPath)) {
+    const kept = readFileSync(historyPath, 'utf8').split('\n').filter((line) => {
+      if (!line.trim()) return false
+      try {
+        const e = JSON.parse(line)
+        return e.baselineCommit !== headSha && e.git?.commit !== headSha
+      } catch {
+        return true
+      }
+    })
+    writeFileSync(historyPath, kept.join('\n') + (kept.length ? '\n' : ''), 'utf8')
+  }
+
+  appendFileSync(historyPath, `${JSON.stringify(entry)}\n`)
+  return 'appended'
+}
+
 export function collectRunMetadata () {
   let version = null
   try {
     version = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')).version
   } catch { /* ignore */ }
+
+  const trackedDirty = trackedTreePorcelain() !== ''
+  const allDirty = gitCommand('status --porcelain') !== ''
 
   return {
     capturedAt: new Date().toISOString(),
@@ -204,7 +340,8 @@ export function collectRunMetadata () {
       commit: gitCommand('rev-parse HEAD'),
       commitShort: gitCommand('rev-parse --short HEAD'),
       branch: gitCommand('rev-parse --abbrev-ref HEAD'),
-      dirty: gitCommand('status --porcelain') !== ''
+      dirty: allDirty,
+      trackedDirty,
     }
   }
 }

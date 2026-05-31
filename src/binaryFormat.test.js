@@ -110,7 +110,6 @@ describe('binaryFormat MSv4', () => {
       edgeLabelStart: tree.edgeLabelStart,
       edgeLabelLength: tree.edgeLabelLength,
       edgeChild: tree.edgeChild,
-      edgeFirstChar: tree.edgeFirstChar,
     })
     snap.packedTermIndex = bad
     expect(() => validateFrozenSnapshot(snap)).toThrow(/leaf index out of range/)

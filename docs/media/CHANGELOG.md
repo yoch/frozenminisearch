@@ -2,6 +2,14 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.5
+
+FrozenMiniSearch in-memory compaction for the per-document field length matrix (no API or search-semantics change).
+
+  - Store `fieldLengthMatrix` in the narrowest unsigned width at build time (`Uint8` / `Uint16` / `Uint32` from max unique terms per field), reusing `packedIndexArray`
+  - MSv3/MSv4 binary snapshots unchanged on disk (`Uint32` cells); adaptive width applies to `freeze()` / `fromDocuments` in memory only until a future wire flag
+  - `fieldLengthMatrixBytes` down ~75% when max field length ≤ 255 (typical corpora); golden baseline at `5ddc620`
+
 ## v8.2.4
 
 Further PackedRadixTree in-memory compaction (no API or search-semantics change).

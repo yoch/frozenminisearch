@@ -46,6 +46,11 @@ import type {
   SearchResult,
   Suggestion,
 } from './searchTypes'
+import {
+  fieldLengthMatrixForWire,
+  materializeFieldLengthMatrix,
+  type FieldLengthArray,
+} from './fieldLengthMatrix'
 import type {
   FreezeSource,
   FrozenAssembleParams,
@@ -170,14 +175,16 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
   const idLookup = createIdToShortIdLookup(externalIds, resolvedNextId)
 
   const matrixRows = useDense ? documentCount : nextId
-  const fieldLengthMatrix = new Uint32Array(matrixRows * fieldCount)
+  const matrixCells = matrixRows * fieldCount
+  const fieldLengthScratch: number[] = new Array(matrixCells).fill(0)
   for (const [shortId, lengths] of source.fieldLength) {
     const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
     if (row === DISCARDED_DOC_ID) continue
     for (let f = 0; f < fieldCount; f++) {
-      fieldLengthMatrix[row * fieldCount + f] = lengths[f] ?? 0
+      fieldLengthScratch[row * fieldCount + f] = lengths[f] ?? 0
     }
   }
+  const fieldLengthMatrix = materializeFieldLengthMatrix(fieldLengthScratch)
 
   const avgFieldLength = new Float32Array(source.avgFieldLength.length)
   for (let i = 0; i < source.avgFieldLength.length; i++) {
@@ -221,7 +228,7 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _idLookup: IdToShortIdLookup
   private readonly _fieldIds: { [field: string]: number }
   private readonly _fieldCount: number
-  private readonly _fieldLengthMatrix: Uint32Array
+  private readonly _fieldLengthMatrix: FieldLengthArray
   private readonly _avgFieldLength: Float32Array
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
   private readonly _termCount: number
@@ -379,7 +386,7 @@ export default class FrozenMiniSearch<T = any> {
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
       storedFields: this._storedFields,
-      fieldLengthMatrix: this._fieldLengthMatrix,
+      fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
     }, undefined, this._index)

@@ -1,6 +1,7 @@
 import SearchableMap from './SearchableMap/SearchableMap'
 import { fromRadixTree } from './PackedRadixTree'
 import type { Options } from './searchTypes'
+import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
 import { materializeFrozenPostings } from './frozenPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
@@ -251,7 +252,7 @@ export class FrozenIndexBuilder<T> {
       externalIds,
       idLookup,
       storedFields,
-      fieldLengthMatrix: new Uint32Array(this._fieldLengthData),
+      fieldLengthMatrix: materializeFieldLengthMatrix(this._fieldLengthData, documentCount * this._fieldCount),
       avgFieldLength,
       index: fromRadixTree(this._index.radixTree, this._terms.length),
       termCount: this._terms.length,

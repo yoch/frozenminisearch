@@ -2,9 +2,11 @@ import type SearchableMap from './SearchableMap/SearchableMap'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import type { FrozenPostingsLayout } from './frozenPostings'
+import type { FieldLengthArray } from './fieldLengthMatrix'
 import type { OptionsWithDefaults } from './searchTypes'
 
 export type { OptionsWithDefaults } from './searchTypes'
+export type { FieldLengthArray } from './fieldLengthMatrix'
 
 /** Snapshot of a mutable {@link MiniSearch} index for {@link freezeFromMiniSearch}. */
 export interface FreezeSource<T = any> {
@@ -59,7 +61,7 @@ export interface FrozenAssembleParams<T = any> {
   externalIds: unknown[]
   idLookup: IdToShortIdLookup
   storedFields: (Record<string, unknown> | undefined)[]
-  fieldLengthMatrix: Uint32Array
+  fieldLengthMatrix: FieldLengthArray
   avgFieldLength: Float32Array
   index: FrozenTermIndex
   termCount: number

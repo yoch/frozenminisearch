@@ -610,3 +610,58 @@ describe('frozenMemoryBreakdown', () => {
     expect(b.estimatedStructuredBytes).toBeGreaterThan(0)
   })
 })
+
+describe('fieldLengthMatrix adaptive width', () => {
+  test('uses Uint8 for typical multi-field corpus', () => {
+    const frozen = buildFrozenDirect()
+    const params = frozen.memoryBreakdown()
+    // 4 docs × 2 fields × 1 byte
+    expect(params.documents.fieldLengthMatrixBytes).toBe(8)
+  })
+
+  test('uses Uint16 when a field exceeds 255 unique terms', () => {
+    const corpus = [{ id: 1, text: Array.from({ length: 300 }, (_, i) => `term${i}`).join(' ') }]
+    const opts = { fields: ['text'] }
+    const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
+    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(2)
+    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), opts)
+    expect(loaded.search('term0')).toEqual(frozen.search('term0'))
+    // Wire format is always Uint32 per cell; adaptive width is not preserved after load.
+    expect(loaded.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+  })
+
+  test('uses Uint32 when a field exceeds 65535 unique terms', () => {
+    const corpus = [{ id: 1, text: Array.from({ length: 70000 }, (_, i) => `term${i}`).join(' ') }]
+    const opts = { fields: ['text'] }
+    const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
+    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), opts)
+    expect(loaded.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    expect(loaded.search('term0')).toEqual(frozen.search('term0'))
+  })
+
+  test('freezeFromMiniSearch uses Uint32 for extreme field lengths', () => {
+    const corpus = [{ id: 1, text: Array.from({ length: 70000 }, (_, i) => `term${i}`).join(' ') }]
+    const opts = { fields: ['text'] }
+    const mutable = new MiniSearch(opts)
+    mutable.addAll(corpus)
+    const frozen = mutable.freeze()
+    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+  })
+
+  test('saveBinary round-trip preserves search with Uint8 matrix', () => {
+    const frozen = buildFrozenDirect()
+    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), options)
+    expectSameResults(frozen, loaded, 'zen')
+    expectSameResults(frozen, loaded, 'neur', { prefix: true })
+  })
+
+  test('freeze after discard keeps adaptive matrix', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    mutable.discard(3)
+    const frozen = mutable.freeze()
+    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(6)
+    expectSameResults(mutable, frozen, 'zen')
+  })
+})

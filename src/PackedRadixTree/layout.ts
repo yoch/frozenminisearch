@@ -1,4 +1,3 @@
-import { PACKED_NO_VALUE } from './constants'
 import type { PackedIndexArray } from './types'
 
 /**
@@ -14,18 +13,28 @@ export function packedIndexArray(length: number, maxValue: number): PackedIndexA
 }
 
 /**
+ * Decode a stored `nodeLeafOrder` cell into a sibling slot: `-1` when the node
+ * has no leaf, otherwise the leaf's slot among its siblings. The stored value
+ * is `slot + 1` (0 = no leaf), so plain subtraction recovers both cases.
+ */
+export function decodeLeafSlot(storedLeafOrder: number): number {
+  return storedLeafOrder - 1
+}
+
+/**
  * Number of logical children for a node: radix edges plus optional leaf slot.
  */
-export function packedNodeChildCount(edgeCount: number, nodeValue: number): number {
-  return edgeCount + (nodeValue === PACKED_NO_VALUE ? 0 : 1)
+export function packedNodeChildCount(edgeCount: number, hasLeaf: boolean): number {
+  return edgeCount + (hasLeaf ? 1 : 0)
 }
 
 /**
  * Map a logical child slot (including optional leaf) to the edge offset.
+ * `leafSlot` is the decoded slot (`-1` when the node has no leaf).
  *
  * Returns `-1` when `slot` points to the leaf.
  */
-export function edgeOffsetAtSlot(slot: number, leafOrder: number): number {
-  if (slot === leafOrder) return -1
-  return slot - (leafOrder !== PACKED_NO_VALUE && leafOrder < slot ? 1 : 0)
+export function edgeOffsetAtSlot(slot: number, leafSlot: number): number {
+  if (slot === leafSlot) return -1
+  return slot - (leafSlot >= 0 && leafSlot < slot ? 1 : 0)
 }

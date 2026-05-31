@@ -67,24 +67,37 @@ function packRadixTreeFromRadix<Leaf>(
   const nodeCount = nodes.length
   let edgeCount = 0
   let totalLabelLength = 0
+  let maxLabelLength = 0
+  let maxNodeValue = 0
+  let maxLeafOrderEncoded = 0
   for (const node of nodes) {
     edgeCount += node.edges.length
-    for (const edge of node.edges) totalLabelLength += edge.label.length
+    for (const edge of node.edges) {
+      totalLabelLength += edge.label.length
+      if (edge.label.length > maxLabelLength) maxLabelLength = edge.label.length
+    }
+    if (node.value !== PACKED_NO_VALUE) {
+      if (node.value > maxNodeValue) maxNodeValue = node.value
+      if (node.leafOrder + 1 > maxLeafOrderEncoded) maxLeafOrderEncoded = node.leafOrder + 1
+    }
   }
 
   const nodeEdgeOffset = packedIndexArray(nodeCount + 1, edgeCount)
-  const nodeValue = new Uint32Array(nodeCount)
-  const nodeLeafOrder = new Uint32Array(nodeCount)
+  const nodeValue = packedIndexArray(nodeCount, maxNodeValue)
+  const nodeLeafOrder = packedIndexArray(nodeCount, maxLeafOrderEncoded)
   const edgeLabelStart = packedIndexArray(edgeCount, totalLabelLength)
-  const edgeLabelLength = new Uint16Array(edgeCount)
+  const edgeLabelLength = packedIndexArray(edgeCount, maxLabelLength)
   const edgeChild = packedIndexArray(edgeCount, Math.max(nodeCount - 1, 0))
   let labelHeap = ''
   let edgeIndex = 0
 
   for (let nodeId = 0; nodeId < nodeCount; nodeId++) {
     const node = nodes[nodeId]
-    nodeValue[nodeId] = node.value
-    nodeLeafOrder[nodeId] = node.leafOrder
+    // nodeLeafOrder: 0 = no leaf, slot + 1 otherwise; nodeValue unused when no leaf.
+    if (node.value !== PACKED_NO_VALUE) {
+      nodeValue[nodeId] = node.value
+      nodeLeafOrder[nodeId] = node.leafOrder + 1
+    }
     nodeEdgeOffset[nodeId] = edgeIndex
     for (const edge of node.edges) {
       if (edge.label.length > MAX_PACKED_EDGE_LABEL_LENGTH) {

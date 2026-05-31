@@ -5,15 +5,15 @@ import {
 import { invalidFrozenIndex } from './binaryIo'
 import PackedRadixTree from './PackedRadixTree'
 import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './PackedRadixTree/constants'
-import { edgeOffsetAtSlot, packedIndexArray, packedNodeChildCount } from './PackedRadixTree/layout'
+import { decodeLeafSlot, edgeOffsetAtSlot, packedIndexArray, packedNodeChildCount } from './PackedRadixTree/layout'
 import type { PackedRadixTreeData } from './PackedRadixTree'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 
 function writePackedNode(chunks: Buffer[], tree: PackedRadixTree, node: number): void {
   const first = tree.nodeEdgeOffset[node]
   const edgeCount = tree.nodeEdgeOffset[node + 1] - first
-  const leafOrder = tree.nodeLeafOrder[node]
-  const childCount = packedNodeChildCount(edgeCount, tree.nodeValue[node])
+  const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
+  const childCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
   if (childCount > 0xffff) {
     throw invalidFrozenIndex('term tree node has too many children')
   }
@@ -24,7 +24,7 @@ function writePackedNode(chunks: Buffer[], tree: PackedRadixTree, node: number):
 
   const heap = tree.labelHeap
   for (let slot = 0; slot < childCount; slot++) {
-    const edgeOffset = edgeOffsetAtSlot(slot, leafOrder)
+    const edgeOffset = edgeOffsetAtSlot(slot, leafSlot)
     if (edgeOffset < 0) {
       const leafBuf = Buffer.alloc(1 + 4)
       leafBuf.writeUInt8(TREE_NODE_LEAF, 0)
@@ -124,24 +124,37 @@ function flattenDecodedNodes(nodes: DecodeNodeScratch[], termCount: number): Pac
   const nodeCount = nodes.length
   let edgeCount = 0
   let totalLabelLength = 0
+  let maxLabelLength = 0
+  let maxNodeValue = 0
+  let maxLeafOrderEncoded = 0
   for (const node of nodes) {
     edgeCount += node.edges.length
-    for (const edge of node.edges) totalLabelLength += edge.label.length
+    for (const edge of node.edges) {
+      totalLabelLength += edge.label.length
+      if (edge.label.length > maxLabelLength) maxLabelLength = edge.label.length
+    }
+    if (node.value !== PACKED_NO_VALUE) {
+      if (node.value > maxNodeValue) maxNodeValue = node.value
+      if (node.leafOrder + 1 > maxLeafOrderEncoded) maxLeafOrderEncoded = node.leafOrder + 1
+    }
   }
 
   const nodeEdgeOffset = packedIndexArray(nodeCount + 1, edgeCount)
-  const nodeValue = new Uint32Array(nodeCount)
-  const nodeLeafOrder = new Uint32Array(nodeCount)
+  const nodeValue = packedIndexArray(nodeCount, maxNodeValue)
+  const nodeLeafOrder = packedIndexArray(nodeCount, maxLeafOrderEncoded)
   const edgeLabelStart = packedIndexArray(edgeCount, totalLabelLength)
-  const edgeLabelLength = new Uint16Array(edgeCount)
+  const edgeLabelLength = packedIndexArray(edgeCount, maxLabelLength)
   const edgeChild = packedIndexArray(edgeCount, Math.max(nodeCount - 1, 0))
   let labelHeap = ''
   let edgeIndex = 0
 
   for (let nodeId = 0; nodeId < nodeCount; nodeId++) {
     const node = nodes[nodeId]
-    nodeValue[nodeId] = node.value
-    nodeLeafOrder[nodeId] = node.leafOrder
+    // nodeLeafOrder: 0 = no leaf, slot + 1 otherwise; nodeValue unused when no leaf.
+    if (node.value !== PACKED_NO_VALUE) {
+      nodeValue[nodeId] = node.value
+      nodeLeafOrder[nodeId] = node.leafOrder + 1
+    }
     nodeEdgeOffset[nodeId] = edgeIndex
     for (const edge of node.edges) {
       if (edge.label.length > MAX_PACKED_EDGE_LABEL_LENGTH) {

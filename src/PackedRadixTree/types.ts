@@ -30,9 +30,19 @@ export interface PackedRadixTreeData {
    * the prefix sum of the counts and need not be stored separately.
    */
   readonly nodeEdgeOffset: PackedIndexArray
-  readonly nodeValue: Uint32Array
-  readonly nodeLeafOrder: Uint32Array
+  /**
+   * Leaf payload per node (term index for a frozen index). Meaningful only when
+   * the node has a leaf, i.e. `nodeLeafOrder[n] !== 0`; otherwise the cell is
+   * unused (stored as `0`). Width adapts to the largest payload.
+   */
+  readonly nodeValue: PackedIndexArray
+  /**
+   * Leaf slot among a node's siblings, encoded as `slot + 1` with `0` meaning
+   * "no leaf". This avoids a wide sentinel: the column adapts to the largest
+   * child count instead of forcing `Uint32`. Decode with {@link decodeLeafSlot}.
+   */
+  readonly nodeLeafOrder: PackedIndexArray
   readonly edgeLabelStart: PackedIndexArray
-  readonly edgeLabelLength: Uint16Array
+  readonly edgeLabelLength: PackedIndexArray
   readonly edgeChild: PackedIndexArray
 }

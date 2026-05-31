@@ -1,5 +1,6 @@
 import PackedRadixTree from './PackedRadixTree'
-import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './PackedRadixTree/constants'
+import { MAX_PACKED_EDGE_LABEL_LENGTH } from './PackedRadixTree/constants'
+import { decodeLeafSlot } from './PackedRadixTree/layout'
 
 /** Frozen term index used by {@link FrozenMiniSearch} (packed radix tree). */
 export type FrozenTermIndex = PackedRadixTree
@@ -23,6 +24,7 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
     throw new Error('FrozenTermIndex: edge offsets not bounded by [0, edgeCount]')
   }
 
+  const seenLeaves = new Uint8Array(termCount)
   let leafCount = 0
   for (let node = 0; node < tree.nodeCount; node++) {
     const first = tree.nodeEdgeOffset[node]
@@ -31,21 +33,25 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
       throw new Error(`FrozenTermIndex: node ${node} edge offsets not monotonic`)
     }
 
-    const v = tree.nodeValue[node]
-    const leafOrder = tree.nodeLeafOrder[node]
-    if (v === PACKED_NO_VALUE) {
-      if (leafOrder !== PACKED_NO_VALUE) {
-        throw new Error(`FrozenTermIndex: node ${node} has leaf order without leaf`)
+    const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
+    if (leafSlot < 0) {
+      if (tree.nodeValue[node] !== 0) {
+        throw new Error(`FrozenTermIndex: node ${node} has value without leaf`)
       }
       continue
     }
-    if (leafOrder >= count + 1) {
+    if (leafSlot >= count + 1) {
       throw new Error(`FrozenTermIndex: node ${node} leaf order out of bounds`)
     }
     leafCount++
+    const v = tree.nodeValue[node]
     if (!Number.isInteger(v) || v < 0 || v >= termCount) {
       throw new Error(`FrozenTermIndex: leaf index out of range: ${v}`)
     }
+    if (seenLeaves[v] !== 0) {
+      throw new Error(`FrozenTermIndex: duplicate leaf index: ${v}`)
+    }
+    seenLeaves[v] = 1
   }
   for (let edge = 0; edge < tree.edgeCount; edge++) {
     const start = tree.edgeLabelStart[edge]

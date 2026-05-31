@@ -3,7 +3,7 @@ import { TREE_NODE_EDGE, TREE_NODE_LEAF } from '../binaryConstants'
 import { buildTermTreeSection } from '../binaryStructures'
 import { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from '../packedRadixBinary'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
-import PackedRadixTree, { PACKED_NO_VALUE, fromRadixTree } from './index'
+import PackedRadixTree, { fromRadixTree } from './index'
 
 const terms = ['summer', 'acqua', 'aqua', 'acquire', 'poisson', 'qua']
 const keyValues = terms.map((key, i) => [key, i])
@@ -187,6 +187,27 @@ describe('PackedRadixTree module', () => {
     expect(() => validateFrozenTermIndexLeaves(packed, map.size + 1)).toThrow(/leaf count/)
   })
 
+  test('validateFrozenTermIndexLeaves rejects duplicate leaf indices', () => {
+    const nodeValue = new Uint32Array(packed.nodeValue)
+    const leafNodes = Array.from(packed.nodeLeafOrder)
+      .map((order, node) => order === 0 ? -1 : node)
+      .filter((node) => node >= 0)
+    nodeValue[leafNodes[1]] = nodeValue[leafNodes[0]]
+    const duplicate = PackedRadixTree.fromData({
+      size: packed.size,
+      nodeCount: packed.nodeCount,
+      edgeCount: packed.edgeCount,
+      labelHeap: packed.labelHeap,
+      nodeEdgeOffset: packed.nodeEdgeOffset,
+      nodeValue,
+      nodeLeafOrder: packed.nodeLeafOrder,
+      edgeLabelStart: packed.edgeLabelStart,
+      edgeLabelLength: packed.edgeLabelLength,
+      edgeChild: packed.edgeChild,
+    })
+    expect(() => validateFrozenTermIndexLeaves(duplicate, map.size)).toThrow(/duplicate leaf index/)
+  })
+
   test('validateFrozenTermIndexLeaves rejects malformed packed arrays', () => {
     const malformed = PackedRadixTree.fromData({
       size: 0,
@@ -194,8 +215,8 @@ describe('PackedRadixTree module', () => {
       edgeCount: 1,
       labelHeap: 'a',
       nodeEdgeOffset: new Uint32Array([0, 1]),
-      nodeValue: new Uint32Array([PACKED_NO_VALUE]),
-      nodeLeafOrder: new Uint32Array([PACKED_NO_VALUE]),
+      nodeValue: new Uint32Array([0]),
+      nodeLeafOrder: new Uint32Array([0]),
       edgeLabelStart: new Uint32Array([0]),
       edgeLabelLength: new Uint16Array([1]),
       edgeChild: new Uint32Array([9]),

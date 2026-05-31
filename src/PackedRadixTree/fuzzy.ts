@@ -1,4 +1,4 @@
-import { edgeOffsetAtSlot, packedNodeChildCount } from './layout'
+import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'
 import { buildTermFromSegments, type LabelSegment } from './strings'
 
@@ -49,11 +49,11 @@ function recurse(
 
   const first = tree.nodeEdgeOffset[node]
   const edgeCount = tree.nodeEdgeOffset[node + 1] - first
-  const leafOrder = tree.nodeLeafOrder[node]
-  const totalCount = packedNodeChildCount(edgeCount, tree.nodeValue[node])
+  const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
+  const totalCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
 
   edge: for (let slot = 0; slot < totalCount; slot++) {
-    const edgeOffset = edgeOffsetAtSlot(slot, leafOrder)
+    const edgeOffset = edgeOffsetAtSlot(slot, leafSlot)
     if (edgeOffset < 0) {
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {

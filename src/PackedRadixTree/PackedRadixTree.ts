@@ -1,6 +1,5 @@
-import { PACKED_NO_VALUE } from './constants'
 import { packedRadixFuzzyEntries } from './fuzzy'
-import { edgeOffsetAtSlot, packedNodeChildCount } from './layout'
+import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import { buildTermFromSegments, type LabelSegment } from './strings'
 import type { PackedIndexArray, PackedRadixTreeData, PackedStringRadixMap } from './types'
 
@@ -17,10 +16,10 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   readonly edgeCount: number
   readonly labelHeap: string
   readonly nodeEdgeOffset: PackedIndexArray
-  readonly nodeValue: Uint32Array
-  readonly nodeLeafOrder: Uint32Array
+  readonly nodeValue: PackedIndexArray
+  readonly nodeLeafOrder: PackedIndexArray
   readonly edgeLabelStart: PackedIndexArray
-  readonly edgeLabelLength: Uint16Array
+  readonly edgeLabelLength: PackedIndexArray
   readonly edgeChild: PackedIndexArray
 
   private constructor(data: PackedRadixTreeData) {
@@ -66,8 +65,8 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
       node = this.edgeChild[ei]
     }
 
-    const v = this.nodeValue[node]
-    return v === PACKED_NO_VALUE ? undefined : v
+    if (this.nodeLeafOrder[node] === 0) return undefined
+    return this.nodeValue[node]
   }
 
   * entries(): IterableIterator<[string, number]> {
@@ -120,12 +119,12 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   private * emitSubtree(node: number, segments: LabelSegment[]): IterableIterator<[string, number]> {
     const first = this.nodeEdgeOffset[node]
     const edgeCount = this.nodeEdgeOffset[node + 1] - first
-    const leafOrder = this.nodeLeafOrder[node]
-    const totalCount = packedNodeChildCount(edgeCount, this.nodeValue[node])
+    const leafSlot = decodeLeafSlot(this.nodeLeafOrder[node])
+    const totalCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
     const heap = this.labelHeap
 
     for (let slot = totalCount - 1; slot >= 0; slot--) {
-      const edgeOffset = edgeOffsetAtSlot(slot, leafOrder)
+      const edgeOffset = edgeOffsetAtSlot(slot, leafSlot)
       if (edgeOffset < 0) {
         yield [buildTermFromSegments(heap, segments), this.nodeValue[node]]
         continue

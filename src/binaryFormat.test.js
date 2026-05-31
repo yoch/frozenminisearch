@@ -96,7 +96,7 @@ describe('binaryFormat MSv4', () => {
     const snap = buildSnapshotFromFrozen()
     const tree = snap.packedTermIndex
     const nodeValue = new Uint32Array(tree.nodeValue)
-    const leafNode = nodeValue.findIndex(value => value !== 0xffffffff)
+    const leafNode = Array.from(tree.nodeLeafOrder).findIndex(order => order !== 0)
     nodeValue[leafNode] = 999
     const bad = PackedRadixTree.fromData({
       size: tree.size,

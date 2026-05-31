@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.2.2` · install with `npm install @yoch/minisearch`
+> **Current release:** `8.2.3` · install with `npm install @yoch/minisearch`
 
 ---
 

@@ -1,22 +1,22 @@
 {
   "metadata": {
-    "capturedAt": "2026-05-31T20:07:29.206Z",
+    "capturedAt": "2026-05-31T20:46:02.135Z",
     "node": "v22.22.0",
-    "packageVersion": "8.2.1",
+    "packageVersion": "8.2.2",
     "gcExposed": true,
     "git": {
-      "commit": "aa82e8ab0e866b83af4ffc91c2896f5c054b7e00",
-      "commitShort": "aa82e8a",
+      "commit": "ad16dce00960e59c025a6e73ccc5821c14b79ad0",
+      "commitShort": "ad16dce",
       "branch": "master",
       "dirty": false,
       "trackedDirty": false,
-      "commitDate": "2026-05-31T23:06:02+03:00",
-      "subject": "PackedRadixTree: drop edgeFirstChar, segment emit, benchmark harness.",
-      "parentCommit": "067c99146e01a58435e879ef361535764b13dabc"
+      "commitDate": "2026-05-31T23:44:42+03:00",
+      "subject": "PackedRadixTree: CSR edge offsets, adaptive index widths, benchmark cleanup.",
+      "parentCommit": "e84dbb9ed85ec09d1d12652175e403a633f44ef7"
     },
     "recordKind": "clean-commit",
-    "role": "golden-post-phase1",
-    "baselineCommit": "aa82e8ab0e866b83af4ffc91c2896f5c054b7e00"
+    "role": "golden",
+    "baselineCommit": "ad16dce00960e59c025a6e73ccc5821c14b79ad0"
   },
   "corpora": {
     "small": {
@@ -24,20 +24,20 @@
       "nodeCount": 9,
       "edgeCount": 8,
       "bytes": {
-        "nodeBytes": 144,
-        "edgeBytes": 80,
+        "nodeBytes": 82,
+        "edgeBytes": 32,
         "labelBytesUtf16Estimate": 54,
         "labelCodeUnits": 27,
-        "totalStructuredBytes": 278,
-        "packedByteLength": 278
+        "totalStructuredBytes": 168,
+        "packedByteLength": 168
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 4656,
+        "heapBytes": 3936,
         "externalBytes": 0,
         "arrayBuffersBytes": 0,
-        "rssBytes": 0,
-        "totalResidentApproxBytes": 4656
+        "rssBytes": 131072,
+        "totalResidentApproxBytes": 3936
       },
       "timings": null
     },
@@ -46,20 +46,20 @@
       "nodeCount": 40,
       "edgeCount": 39,
       "bytes": {
-        "nodeBytes": 640,
-        "edgeBytes": 390,
+        "nodeBytes": 361,
+        "edgeBytes": 156,
         "labelBytesUtf16Estimate": 78,
         "labelCodeUnits": 39,
-        "totalStructuredBytes": 1108,
-        "packedByteLength": 1108
+        "totalStructuredBytes": 595,
+        "packedByteLength": 595
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 4016,
-        "externalBytes": 1030,
-        "arrayBuffersBytes": 1030,
+        "heapBytes": 3896,
+        "externalBytes": 398,
+        "arrayBuffersBytes": 398,
         "rssBytes": 0,
-        "totalResidentApproxBytes": 5046
+        "totalResidentApproxBytes": 4294
       },
       "timings": null
     },
@@ -68,33 +68,33 @@
       "nodeCount": 2652,
       "edgeCount": 2651,
       "bytes": {
-        "nodeBytes": 42432,
-        "edgeBytes": 26510,
+        "nodeBytes": 26522,
+        "edgeBytes": 15906,
         "labelBytesUtf16Estimate": 23452,
         "labelCodeUnits": 11726,
-        "totalStructuredBytes": 92394,
-        "packedByteLength": 92394
+        "totalStructuredBytes": 65880,
+        "packedByteLength": 65880
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 679352,
-        "externalBytes": 68942,
-        "arrayBuffersBytes": 68942,
-        "rssBytes": 1966080,
-        "totalResidentApproxBytes": 748294
+        "heapBytes": 140704,
+        "externalBytes": 42428,
+        "arrayBuffersBytes": 42428,
+        "rssBytes": 786432,
+        "totalResidentApproxBytes": 183132
       },
       "timings": {
         "get(hit)": {
-          "hz": 5142213.469888578,
-          "meanMs": 0.000194468783891554
+          "hz": 6028282.591228224,
+          "meanMs": 0.0001658847250218667
         },
         "get(miss)": {
-          "hz": 3187507.012363962,
-          "meanMs": 0.00031372480001490776
+          "hz": 4128059.2324201893,
+          "meanMs": 0.00024224458606271552
         },
         "prefix(short)": {
-          "hz": 18195.67001054798,
-          "meanMs": 0.05495813011668726
+          "hz": 19462.69272675068,
+          "meanMs": 0.05138035183721216
         }
       }
     },
@@ -103,20 +103,20 @@
       "nodeCount": 6564,
       "edgeCount": 6563,
       "bytes": {
-        "nodeBytes": 105024,
-        "edgeBytes": 65630,
+        "nodeBytes": 65642,
+        "edgeBytes": 52504,
         "labelBytesUtf16Estimate": 144152,
         "labelCodeUnits": 72076,
-        "totalStructuredBytes": 314806,
-        "packedByteLength": 314806
+        "totalStructuredBytes": 262298,
+        "packedByteLength": 262298
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 337544,
-        "externalBytes": 170654,
-        "arrayBuffersBytes": 170654,
-        "rssBytes": 262144,
-        "totalResidentApproxBytes": 508198
+        "heapBytes": 316320,
+        "externalBytes": 118146,
+        "arrayBuffersBytes": 118146,
+        "rssBytes": 786432,
+        "totalResidentApproxBytes": 434466
       },
       "timings": null,
       "meta": {
@@ -139,20 +139,20 @@
       "nodeCount": 13383,
       "edgeCount": 13382,
       "bytes": {
-        "nodeBytes": 214128,
-        "edgeBytes": 133820,
+        "nodeBytes": 133832,
+        "edgeBytes": 80292,
         "labelBytesUtf16Estimate": 114846,
         "labelCodeUnits": 57423,
-        "totalStructuredBytes": 462794,
-        "packedByteLength": 462794
+        "totalStructuredBytes": 328970,
+        "packedByteLength": 328970
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 648936,
-        "externalBytes": 347948,
-        "arrayBuffersBytes": 347948,
-        "rssBytes": 262144,
-        "totalResidentApproxBytes": 996884
+        "heapBytes": 638680,
+        "externalBytes": 214124,
+        "arrayBuffersBytes": 214124,
+        "rssBytes": 524288,
+        "totalResidentApproxBytes": 852804
       },
       "timings": null,
       "meta": {
@@ -167,20 +167,20 @@
       "nodeCount": 10893,
       "edgeCount": 10892,
       "bytes": {
-        "nodeBytes": 174288,
-        "edgeBytes": 108920,
+        "nodeBytes": 108932,
+        "edgeBytes": 65352,
         "labelBytesUtf16Estimate": 81412,
         "labelCodeUnits": 40706,
-        "totalStructuredBytes": 364620,
-        "packedByteLength": 364620
+        "totalStructuredBytes": 255696,
+        "packedByteLength": 255696
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 635592,
-        "externalBytes": 283208,
-        "arrayBuffersBytes": 283208,
-        "rssBytes": 131072,
-        "totalResidentApproxBytes": 867872
+        "heapBytes": 612856,
+        "externalBytes": 174284,
+        "arrayBuffersBytes": 174284,
+        "rssBytes": 786432,
+        "totalResidentApproxBytes": 758484
       },
       "timings": null,
       "meta": {

@@ -2,6 +2,15 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.3
+
+Further PackedRadixTree memory layout improvements (no API or search-semantics change).
+
+  - Replace `nodeFirstEdge` / `nodeEdgeCount` with a CSR `nodeEdgeOffset` table (better cache locality on lookup)
+  - Pick the narrowest unsigned typed arrays at build time for index columns (`Uint8` / `Uint16` / `Uint32`)
+  - Structured bytes down ~17–46% on benchmark corpora vs 8.2.2; golden baseline at `ad16dce`
+  - Consolidate packed-radix benchmark scripts (`diff:run` on a dirty tree without touching the golden)
+
 ## v8.2.2
 
 PackedRadixTree memory optimizations (no API or search-semantics change).

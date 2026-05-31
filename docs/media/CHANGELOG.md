@@ -2,6 +2,15 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.4
+
+Further PackedRadixTree in-memory compaction (no API or search-semantics change).
+
+  - Drop the `Uint32` leaf sentinel: `nodeLeafOrder` encodes `slot + 1` (`0` = no leaf), freeing `nodeValue` and `nodeLeafOrder` for adaptive widths
+  - Make `edgeLabelLength` adaptive (`Uint8` when all labels ≤ 255 chars)
+  - Tighten frozen leaf validation (duplicate term indices, value without leaf)
+  - Structured bytes down ~15–25% vs 8.2.3 on benchmark corpora (~46% vs 8.2.2); golden baseline at `fe59f5d`
+
 ## v8.2.3
 
 Further PackedRadixTree memory layout improvements (no API or search-semantics change).

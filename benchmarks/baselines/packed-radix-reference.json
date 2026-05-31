@@ -1,23 +1,22 @@
 {
   "metadata": {
-    "role": "golden-post-phase1",
-    "recordKind": "import-dirty-worktree",
-    "note": "Mesure post-Phase 1 sur worktree dirty au commit ci-dessous. Ré-enregistrer avec yarn benchmark:packed-radix:record sur arbre propre.",
-    "baselineCommit": "067c99146e01a58435e879ef361535764b13dabc",
-    "capturedAt": "2026-05-31T19:54:49.491Z",
+    "capturedAt": "2026-05-31T20:07:29.206Z",
     "node": "v22.22.0",
     "packageVersion": "8.2.1",
     "gcExposed": true,
     "git": {
-      "commit": "067c99146e01a58435e879ef361535764b13dabc",
-      "commitShort": "067c991",
+      "commit": "aa82e8ab0e866b83af4ffc91c2896f5c054b7e00",
+      "commitShort": "aa82e8a",
       "branch": "master",
-      "dirty": true,
-      "trackedDirty": true,
-      "commitDate": "2026-05-29T17:05:14+03:00",
-      "subject": "Prepare 8.2.1 stable release metadata.",
-      "parentCommit": "d7185c73e47afa57b52894d00f6b1edc7c6853b8"
-    }
+      "dirty": false,
+      "trackedDirty": false,
+      "commitDate": "2026-05-31T23:06:02+03:00",
+      "subject": "PackedRadixTree: drop edgeFirstChar, segment emit, benchmark harness.",
+      "parentCommit": "067c99146e01a58435e879ef361535764b13dabc"
+    },
+    "recordKind": "clean-commit",
+    "role": "golden-post-phase1",
+    "baselineCommit": "aa82e8ab0e866b83af4ffc91c2896f5c054b7e00"
   },
   "corpora": {
     "small": {
@@ -34,11 +33,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 4416,
+        "heapBytes": 4656,
         "externalBytes": 0,
         "arrayBuffersBytes": 0,
         "rssBytes": 0,
-        "totalResidentApproxBytes": 4416
+        "totalResidentApproxBytes": 4656
       },
       "timings": null
     },
@@ -56,11 +55,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 4000,
+        "heapBytes": 4016,
         "externalBytes": 1030,
         "arrayBuffersBytes": 1030,
         "rssBytes": 0,
-        "totalResidentApproxBytes": 5030
+        "totalResidentApproxBytes": 5046
       },
       "timings": null
     },
@@ -78,24 +77,24 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 150616,
+        "heapBytes": 679352,
         "externalBytes": 68942,
         "arrayBuffersBytes": 68942,
-        "rssBytes": 1179648,
-        "totalResidentApproxBytes": 219558
+        "rssBytes": 1966080,
+        "totalResidentApproxBytes": 748294
       },
       "timings": {
         "get(hit)": {
-          "hz": 5157276.573369413,
-          "meanMs": 0.00019390078964616556
+          "hz": 5142213.469888578,
+          "meanMs": 0.000194468783891554
         },
         "get(miss)": {
-          "hz": 3178773.9732140326,
-          "meanMs": 0.00031458669550792507
+          "hz": 3187507.012363962,
+          "meanMs": 0.00031372480001490776
         },
         "prefix(short)": {
-          "hz": 18687.867638721753,
-          "meanMs": 0.05351065297187645
+          "hz": 18195.67001054798,
+          "meanMs": 0.05495813011668726
         }
       }
     },
@@ -113,11 +112,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 329088,
+        "heapBytes": 337544,
         "externalBytes": 170654,
         "arrayBuffersBytes": 170654,
-        "rssBytes": 0,
-        "totalResidentApproxBytes": 499742
+        "rssBytes": 262144,
+        "totalResidentApproxBytes": 508198
       },
       "timings": null,
       "meta": {
@@ -149,11 +148,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 634272,
+        "heapBytes": 648936,
         "externalBytes": 347948,
         "arrayBuffersBytes": 347948,
         "rssBytes": 262144,
-        "totalResidentApproxBytes": 982220
+        "totalResidentApproxBytes": 996884
       },
       "timings": null,
       "meta": {
@@ -177,11 +176,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 642272,
+        "heapBytes": 635592,
         "externalBytes": 283208,
         "arrayBuffersBytes": 283208,
-        "rssBytes": 0,
-        "totalResidentApproxBytes": 862712
+        "rssBytes": 131072,
+        "totalResidentApproxBytes": 867872
       },
       "timings": null,
       "meta": {

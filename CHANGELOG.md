@@ -2,6 +2,15 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.2.2
+
+PackedRadixTree memory optimizations (no API or search-semantics change).
+
+  - Drop `edgeFirstChar` (~2 B per edge); first edge character from `labelHeap` at lookup time
+  - `emitSubtree` / `prefixEntries` use label segment stacks (iteration order unchanged)
+  - Dev-only `benchmark:packed-radix` harness (not shipped on npm); golden baseline at `aa82e8a`
+  - `prepublishOnly` runs `verify-npm-pack` so benchmarks never enter the published tarball
+
 ## v8.2.1
 
 Frozen builder batch indexing and async stream hints.

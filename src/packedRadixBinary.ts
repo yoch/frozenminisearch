@@ -5,12 +5,13 @@ import {
 import { invalidFrozenIndex } from './binaryIo'
 import PackedRadixTree from './PackedRadixTree'
 import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './PackedRadixTree/constants'
-import { edgeOffsetAtSlot, packedNodeChildCount } from './PackedRadixTree/layout'
+import { edgeOffsetAtSlot, packedIndexArray, packedNodeChildCount } from './PackedRadixTree/layout'
 import type { PackedRadixTreeData } from './PackedRadixTree'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 
 function writePackedNode(chunks: Buffer[], tree: PackedRadixTree, node: number): void {
-  const edgeCount = tree.nodeEdgeCount[node]
+  const first = tree.nodeEdgeOffset[node]
+  const edgeCount = tree.nodeEdgeOffset[node + 1] - first
   const leafOrder = tree.nodeLeafOrder[node]
   const childCount = packedNodeChildCount(edgeCount, tree.nodeValue[node])
   if (childCount > 0xffff) {
@@ -21,7 +22,6 @@ function writePackedNode(chunks: Buffer[], tree: PackedRadixTree, node: number):
   countBuf.writeUInt16LE(childCount, 0)
   chunks.push(countBuf)
 
-  const first = tree.nodeFirstEdge[node]
   const heap = tree.labelHeap
   for (let slot = 0; slot < childCount; slot++) {
     const edgeOffset = edgeOffsetAtSlot(slot, leafOrder)
@@ -122,14 +122,19 @@ function readPackedNode(
 
 function flattenDecodedNodes(nodes: DecodeNodeScratch[], termCount: number): PackedRadixTreeData {
   const nodeCount = nodes.length
-  const edgeCount = nodes.reduce((sum, n) => sum + n.edges.length, 0)
-  const nodeFirstEdge = new Uint32Array(nodeCount)
-  const nodeEdgeCount = new Uint32Array(nodeCount)
+  let edgeCount = 0
+  let totalLabelLength = 0
+  for (const node of nodes) {
+    edgeCount += node.edges.length
+    for (const edge of node.edges) totalLabelLength += edge.label.length
+  }
+
+  const nodeEdgeOffset = packedIndexArray(nodeCount + 1, edgeCount)
   const nodeValue = new Uint32Array(nodeCount)
   const nodeLeafOrder = new Uint32Array(nodeCount)
-  const edgeLabelStart = new Uint32Array(edgeCount)
+  const edgeLabelStart = packedIndexArray(edgeCount, totalLabelLength)
   const edgeLabelLength = new Uint16Array(edgeCount)
-  const edgeChild = new Uint32Array(edgeCount)
+  const edgeChild = packedIndexArray(edgeCount, Math.max(nodeCount - 1, 0))
   let labelHeap = ''
   let edgeIndex = 0
 
@@ -137,8 +142,7 @@ function flattenDecodedNodes(nodes: DecodeNodeScratch[], termCount: number): Pac
     const node = nodes[nodeId]
     nodeValue[nodeId] = node.value
     nodeLeafOrder[nodeId] = node.leafOrder
-    nodeFirstEdge[nodeId] = edgeIndex
-    nodeEdgeCount[nodeId] = node.edges.length
+    nodeEdgeOffset[nodeId] = edgeIndex
     for (const edge of node.edges) {
       if (edge.label.length > MAX_PACKED_EDGE_LABEL_LENGTH) {
         throw invalidFrozenIndex('term tree edge key too long')
@@ -151,14 +155,14 @@ function flattenDecodedNodes(nodes: DecodeNodeScratch[], termCount: number): Pac
       edgeIndex++
     }
   }
+  nodeEdgeOffset[nodeCount] = edgeIndex
 
   return {
     size: termCount,
     nodeCount,
     edgeCount,
     labelHeap,
-    nodeFirstEdge,
-    nodeEdgeCount,
+    nodeEdgeOffset,
     nodeValue,
     nodeLeafOrder,
     edgeLabelStart,

@@ -47,8 +47,8 @@ function recurse(
   const heap = tree.labelHeap
   const offset = rowStart * n
 
-  const first = tree.nodeFirstEdge[node]
-  const edgeCount = tree.nodeEdgeCount[node]
+  const first = tree.nodeEdgeOffset[node]
+  const edgeCount = tree.nodeEdgeOffset[node + 1] - first
   const leafOrder = tree.nodeLeafOrder[node]
   const totalCount = packedNodeChildCount(edgeCount, tree.nodeValue[node])
 

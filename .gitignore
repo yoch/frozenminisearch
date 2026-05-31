@@ -11,3 +11,4 @@ package-lock.json
 yarn-error.log
 FORK_NOTES.md
 benchmarks/baselines/latest.json
+benchmarks/baselines/packed-radix-latest.json

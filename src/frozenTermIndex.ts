@@ -7,8 +7,7 @@ export type FrozenTermIndex = PackedRadixTree
 /** Validate packed-tree invariants for a frozen index (term indices in `[0, termCount)`). */
 export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: number): void {
   if (
-    tree.nodeFirstEdge.length !== tree.nodeCount
-    || tree.nodeEdgeCount.length !== tree.nodeCount
+    tree.nodeEdgeOffset.length !== tree.nodeCount + 1
     || tree.nodeValue.length !== tree.nodeCount
     || tree.nodeLeafOrder.length !== tree.nodeCount
     || tree.edgeLabelStart.length !== tree.edgeCount
@@ -20,13 +19,16 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
   if (tree.nodeCount === 0) {
     throw new Error('FrozenTermIndex: missing root node')
   }
+  if (tree.nodeEdgeOffset[0] !== 0 || tree.nodeEdgeOffset[tree.nodeCount] !== tree.edgeCount) {
+    throw new Error('FrozenTermIndex: edge offsets not bounded by [0, edgeCount]')
+  }
 
   let leafCount = 0
   for (let node = 0; node < tree.nodeCount; node++) {
-    const first = tree.nodeFirstEdge[node]
-    const count = tree.nodeEdgeCount[node]
-    if (first + count > tree.edgeCount) {
-      throw new Error(`FrozenTermIndex: node ${node} edge range out of bounds`)
+    const first = tree.nodeEdgeOffset[node]
+    const count = tree.nodeEdgeOffset[node + 1] - first
+    if (count < 0) {
+      throw new Error(`FrozenTermIndex: node ${node} edge offsets not monotonic`)
     }
 
     const v = tree.nodeValue[node]

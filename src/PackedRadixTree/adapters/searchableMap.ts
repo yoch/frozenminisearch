@@ -1,6 +1,7 @@
 import { LEAF } from '../../SearchableMap/TreeIterator'
 import type { RadixTree } from '../../SearchableMap/types'
 import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from '../constants'
+import { packedIndexArray } from '../layout'
 import PackedRadixTree from '../PackedRadixTree'
 
 export type PackRadixLeavesOptions<Leaf> = {
@@ -64,14 +65,19 @@ function packRadixTreeFromRadix<Leaf>(
   const size = inferTermCountFromLeaves ? leafCount : termCount
 
   const nodeCount = nodes.length
-  const edgeCount = nodes.reduce((sum, n) => sum + n.edges.length, 0)
-  const nodeFirstEdge = new Uint32Array(nodeCount)
-  const nodeEdgeCount = new Uint32Array(nodeCount)
+  let edgeCount = 0
+  let totalLabelLength = 0
+  for (const node of nodes) {
+    edgeCount += node.edges.length
+    for (const edge of node.edges) totalLabelLength += edge.label.length
+  }
+
+  const nodeEdgeOffset = packedIndexArray(nodeCount + 1, edgeCount)
   const nodeValue = new Uint32Array(nodeCount)
   const nodeLeafOrder = new Uint32Array(nodeCount)
-  const edgeLabelStart = new Uint32Array(edgeCount)
+  const edgeLabelStart = packedIndexArray(edgeCount, totalLabelLength)
   const edgeLabelLength = new Uint16Array(edgeCount)
-  const edgeChild = new Uint32Array(edgeCount)
+  const edgeChild = packedIndexArray(edgeCount, Math.max(nodeCount - 1, 0))
   let labelHeap = ''
   let edgeIndex = 0
 
@@ -79,8 +85,7 @@ function packRadixTreeFromRadix<Leaf>(
     const node = nodes[nodeId]
     nodeValue[nodeId] = node.value
     nodeLeafOrder[nodeId] = node.leafOrder
-    nodeFirstEdge[nodeId] = edgeIndex
-    nodeEdgeCount[nodeId] = node.edges.length
+    nodeEdgeOffset[nodeId] = edgeIndex
     for (const edge of node.edges) {
       if (edge.label.length > MAX_PACKED_EDGE_LABEL_LENGTH) {
         throw new Error('PackedRadixTree: edge label too long')
@@ -93,14 +98,14 @@ function packRadixTreeFromRadix<Leaf>(
       edgeIndex++
     }
   }
+  nodeEdgeOffset[nodeCount] = edgeIndex
 
   return PackedRadixTree.fromData({
     size,
     nodeCount,
     edgeCount,
     labelHeap,
-    nodeFirstEdge,
-    nodeEdgeCount,
+    nodeEdgeOffset,
     nodeValue,
     nodeLeafOrder,
     edgeLabelStart,

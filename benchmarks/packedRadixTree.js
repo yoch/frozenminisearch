@@ -1,5 +1,5 @@
 import Benchmark from 'benchmark'
-import { writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import SearchableMap from '../src/SearchableMap/SearchableMap.js'
@@ -7,12 +7,17 @@ import { fromRadixTree } from '../src/PackedRadixTree/index.js'
 import { corpora } from './packedRadixCorpora.js'
 import {
   appendPackedRadixHistory,
-  argValue,
   assertCleanTrackedTree,
   collectRunMetadata,
   enrichGitForBaseline,
   medianMeasureHeap,
 } from './benchmarkUtils.js'
+
+// The bench is run as the rollup-compiled CJS under benchmarks/dist/, so the
+// versioned baselines live one level up (benchmarks/baselines).
+const BASELINES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'baselines')
+const REFERENCE_PATH = join(BASELINES_DIR, 'packed-radix-reference.json')
+const LATEST_PATH = join(BASELINES_DIR, 'packed-radix-latest.json')
 
 /** CPU smoke only — structured bytes remain the primary metric. */
 const BENCH_OPTS = { minSamples: 12, minTime: 0.15 }
@@ -20,8 +25,7 @@ const HEAP_RUNS = 3
 
 export function measureStructuredBytes (tree) {
   const nodeBytes = (
-    tree.nodeFirstEdge.byteLength
-    + tree.nodeEdgeCount.byteLength
+    tree.nodeEdgeOffset.byteLength
     + tree.nodeValue.byteLength
     + tree.nodeLeafOrder.byteLength
   )
@@ -111,7 +115,12 @@ async function runCorpus (corpus) {
 }
 
 async function main () {
-  const recordPath = argValue('--record')
+  // --reference: write the versioned golden (clean tree required unless --force).
+  // --record:    write the local latest.json scratch (no clean-tree guard).
+  // neither:     run and print only.
+  const writeReference = process.argv.includes('--reference')
+  const writeLatest = process.argv.includes('--record')
+  const force = process.argv.includes('--force')
   const payload = { metadata: collectRunMetadata(), corpora: {} }
 
   const gcNote = payload.metadata.gcExposed ? '' : ' (warn: run with --expose-gc for reliable runtime heap)'
@@ -121,9 +130,8 @@ async function main () {
     payload.corpora[corpus.id] = await runCorpus(corpus)
   }
 
-  if (recordPath != null) {
-    const force = process.argv.includes('--force')
-    assertCleanTrackedTree({ force, context: 'packed-radix baseline' })
+  if (writeReference) {
+    assertCleanTrackedTree({ force, context: 'packed-radix reference' })
 
     const git = force
       ? { ...payload.metadata.git, dirty: true }
@@ -132,15 +140,14 @@ async function main () {
     payload.metadata = {
       ...payload.metadata,
       recordKind: force ? 'forced-dirty' : 'clean-commit',
-      role: 'golden-post-phase1',
+      role: 'golden',
       baselineCommit: git.commit,
       git,
     }
 
-    const benchmarksDir = join(dirname(fileURLToPath(import.meta.url)), '..')
-    const out = join(benchmarksDir, recordPath)
-    writeFileSync(out, `${JSON.stringify(payload, null, 2)}\n`)
-    console.log(`\nWrote ${out}`)
+    mkdirSync(BASELINES_DIR, { recursive: true })
+    writeFileSync(REFERENCE_PATH, `${JSON.stringify(payload, null, 2)}\n`)
+    console.log(`\nWrote ${REFERENCE_PATH}`)
     console.log(`  baselineCommit: ${git.commit}`)
     console.log(`  ${git.commitShort} — ${git.subject ?? '(no subject)'}`)
 
@@ -148,6 +155,11 @@ async function main () {
     if (hist === 'appended') {
       console.log('  historique → benchmarks/packed-radix-history.jsonl')
     }
+  } else if (writeLatest) {
+    payload.metadata = { ...payload.metadata, recordKind: 'local-latest' }
+    mkdirSync(BASELINES_DIR, { recursive: true })
+    writeFileSync(LATEST_PATH, `${JSON.stringify(payload, null, 2)}\n`)
+    console.log(`\nWrote ${LATEST_PATH}`)
   }
 }
 

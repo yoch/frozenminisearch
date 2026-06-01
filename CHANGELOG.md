@@ -2,15 +2,16 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v8.3.0
 
-**`saveBinarySync()` / `loadBinarySync()` / `loadBinaryAsync()` — explicit sync/async binary APIs on MSv5**.
+MSv5 frozen binary snapshots by default, with explicit sync/async save/load APIs.
 
-  - **`saveBinarySync()` writes MSv5** — single postings wire layout (dense or sparse via flags, same rules as MSv4), columnar packed radix tree (no recursive DFS parse on load), adaptive `fieldLengthMatrix` width on disk (`Uint8` / `Uint16` / `Uint32`)
-  - **Single zstd payload** (`node:zlib`, niveau 9) : 12 sections logiques en clair dans un seul flux compressé (meilleur ratio qu’une compression par section). Raw si &lt; 64 o ou si zstd n’apporte pas ≥ ~10 % **ou** ≥ 10 KiB absolus. Catalogue = offsets non compressés + CRC par section. **Load async** : `loadBinaryAsync()` décompresse le flux zstd avec les streams Node et matérialise une section à la fois (RAM bornée) ; limite hard‑cap à 1 GiB de payload décompressé
-  - **`saveBinary()` / `loadBinary()` are deprecated aliases** — they still route to sync methods and emit a one-time `DeprecationWarning`; use `saveBinarySync()` plus `loadBinarySync()` or `loadBinaryAsync()` explicitly
-  - **MSv3 and MSv4 deprecated** — still readable via `loadBinarySync()` (one-time `DeprecationWarning` per format); re-save with `saveBinarySync()`. Legacy encoders (`encodeFrozenSnapshotMSv3` / `MSv4`) remain for tests only
-  - **Implementation** in `src/msv5/`; **`loadBinaryAsync()`** uses streaming zstd for memory-sensitive MSv5 loads
+  - **`saveBinarySync()` writes MSv5** — unified postings wire (dense/sparse flags as MSv4), columnar packed radix tree, adaptive `fieldLengthMatrix` on disk (`Uint8` / `Uint16` / `Uint32`)
+  - **Single zstd payload** (`node:zlib`, level 9, `pledgedSrcSize`, no frame checksum) — 12 logical sections in one compressed stream (better ratio than per-section compression). Raw when &lt; 64 B or when zstd does not strictly shrink the payload. Uncompressed section directory + per-section CRC-32. Hard cap at 1 GiB decompressed payload
+  - **`saveBinaryAsync()` / `loadBinaryAsync()`** — non-blocking zstd compress on save; streaming zstd decompress on load (one section at a time, bounded RAM). Sync load caps decompression at the same 1 GiB trust boundary
+  - **`saveBinary()` / `loadBinary()` deprecated** — aliases to sync paths with a one-time `DeprecationWarning`; use `*Sync()` or `*Async()` explicitly
+  - **MSv3 / MSv4 deprecated** — still readable via `loadBinarySync()` (one-time warning per format); re-save with `saveBinarySync()` for MSv5. MSv1/MSv2 rejected. Legacy encoders remain for tests only
+  - **Node.js 22+** recommended for MSv5 zstd (`node:zlib`); ES2018+ otherwise. Re-save existing snapshots with `saveBinarySync()` to benefit from MSv5; golden baseline at `34a47bf`
 
 ## v8.2.5
 

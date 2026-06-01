@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.2.5` · install with `npm install @yoch/minisearch`
+> **Current release:** `8.3.0` · install with `npm install @yoch/minisearch`
 
 ---
 
@@ -250,7 +250,7 @@ npm run release:stable
 npm run release:beta
 ```
 
-**Requirements:** Node.js **ES2018+**. No browser UMD/CDN build in this fork (Node-only ESM + CJS).
+**Requirements:** Node.js **ES2018+**; **Node.js 22+** for MSv5 zstd snapshots (`node:zlib`). No browser UMD/CDN build in this fork (Node-only ESM + CJS).
 
 ---
 

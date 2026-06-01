@@ -348,8 +348,7 @@ radix tree (`packedRadixBinaryMsv5.ts`), unified postings wire (dense or sparse 
 flags, same semantics as MSv4), adaptive `fieldLengthMatrix` width on disk, and
 optional **single-payload zstd** (`node:zlib`): the 12 logical sections are
 concatenated (with 4-byte alignment gaps), then compressed as **one** stream for a
-better ratio than per-section compression. Raw payload when &lt; 64 B or when zstd
-does not save ≥ ~10 % relative **or** ≥ 10 KiB absolute. The catalogue stores
+better ratio than per-section compression. Raw payload when &lt; 64 B or when zstd does not strictly shrink the payload. The catalogue stores
 uncompressed offsets and per-section CRC-32. `loadBinaryAsync()` feeds the zstd payload through Node streams and materializes
 **one section at a time** (bounded JS heap).
 Snapshots larger than 1 GiB (uncompressed payload) are rejected to avoid oversized allocations.

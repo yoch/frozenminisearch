@@ -13,9 +13,7 @@ import {
   CODEC_ZSTD,
   MSV5_FORMAT_REV_PAYLOAD,
   MSV5_HEADER_SIZE,
-  MSV5_PAYLOAD_CODEC_OFFSET,
   MSV5_PAYLOAD_CRC_OFFSET,
-  MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
   MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET,
   MSV5_SECTION_DIR_OFFSET,
@@ -51,25 +49,6 @@ function msv5ComparableHeaderMeta(buf) {
     payloadOffset: buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_OFFSET),
     sections: meta.sections,
   }
-}
-
-function msv5PayloadHeaderMeta(buf) {
-  return {
-    codec: buf.readUInt8(MSV5_PAYLOAD_CODEC_OFFSET),
-    compressedLength: buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET),
-    uncompressedLength: buf.readUInt32LE(MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET),
-    payloadCrc32: buf.readUInt32LE(MSV5_PAYLOAD_CRC_OFFSET),
-  }
-}
-
-/** Corpus large enough that MSv5 keeps a zstd payload (not raw). */
-function zstdMsv5Fixture() {
-  const mutable = new MiniSearch({ fields: ['text'] })
-  mutable.addAll(Array.from({ length: 200 }, (_, i) => ({
-    id: i,
-    text: `payload ${'z'.repeat(120)} ${i}`,
-  })))
-  return mutable.freeze()
 }
 
 describe('binaryMsv5', () => {

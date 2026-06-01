@@ -334,7 +334,6 @@ export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
  */
 export async function decodeFrozenSnapshotAsync(buf: Buffer): Promise<FrozenSnapshot> {
   assertBufferLength(buf, 8)
-  const magic = buf.toString('ascii', 0, 4)
   const version = buf.readUInt16LE(4)
 
   if (isMsv5Buffer(buf) && version === 5) {

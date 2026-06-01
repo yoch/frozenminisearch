@@ -10,7 +10,6 @@ export {
   BINARY_VERSION_V5,
   CODEC_RAW,
   CODEC_ZSTD,
-  zstdCompressionWorthKeeping,
   MSV5_FORMAT_REV_PAYLOAD,
   MSV5_ZSTD_LEVEL,
 } from './msv5/binaryMsv5Constants'

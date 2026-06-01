@@ -18,20 +18,8 @@ export const MSV5_FORMAT_REV_PAYLOAD = 1
 
 /** Do not compress payloads smaller than this (bytes). */
 export const MSV5_MIN_COMPRESS_BYTES = 64
-/** Keep zstd if compressed ≤ (1 − 10 %) × raw (relative gain ≥ ~10 %). */
-export const MSV5_COMPRESS_MAX_RELATIVE_SIZE = 0.90
-/** Keep zstd if raw − compressed ≥ 10 KiB (absolute gain), even below 10 % relative. */
-export const MSV5_COMPRESS_MIN_ABSOLUTE_SAVED_BYTES = 10 * 1024
 /** Fixed zstd compression level for the whole payload. */
 export const MSV5_ZSTD_LEVEL = 9
-
-/** True when zstd is worth storing instead of raw for this payload. */
-export function zstdCompressionWorthKeeping(compressedSize: number, rawSize: number): boolean {
-  if (compressedSize >= rawSize) return false
-  const savedBytes = rawSize - compressedSize
-  return compressedSize <= rawSize * MSV5_COMPRESS_MAX_RELATIVE_SIZE
-    || savedBytes >= MSV5_COMPRESS_MIN_ABSOLUTE_SAVED_BYTES
-}
 
 export const MSV5_SECTION_COUNT = 12
 /** Per-section catalogue entry: fileOffset(4) + uncompressedLength(4) + crc32(4) + reserved(8). */

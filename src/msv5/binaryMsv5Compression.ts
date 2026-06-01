@@ -24,10 +24,7 @@ import {
   MSV5_SECTION_ENTRY_BYTES,
   MSV5_ZSTD_LEVEL,
   MSV5_ZSTD_LEVEL_OFFSET,
-  zstdCompressionWorthKeeping,
 } from './binaryMsv5Constants'
-
-export { zstdCompressionWorthKeeping } from './binaryMsv5Constants'
 
 export interface Msv5SectionEntry {
   /** Offset of this section inside the uncompressed payload (4-byte aligned). */
@@ -139,9 +136,9 @@ interface PayloadCodecChoice {
   zstdLevel: number
 }
 
-/** Raw if below {@link MSV5_MIN_COMPRESS_BYTES}; else zstd when worthwhile, else raw. */
+/** Raw if below {@link MSV5_MIN_COMPRESS_BYTES}; else zstd when strictly smaller than raw. */
 function pickPayloadCodec(uncompressed: Buffer, compressed: Buffer): PayloadCodecChoice {
-  if (zstdCompressionWorthKeeping(compressed.length, uncompressed.length)) {
+  if (compressed.length < uncompressed.length) {
     return { payload: compressed, codec: CODEC_ZSTD, zstdLevel: MSV5_ZSTD_LEVEL }
   }
   return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }

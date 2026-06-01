@@ -18,7 +18,6 @@ import {
   MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET,
   MSV5_SECTION_DIR_OFFSET,
   Msv5SectionId,
-  zstdCompressionWorthKeeping,
 } from './binaryMsv5Constants'
 import { encodeFrozenSnapshotMsv5 } from './binaryMsv5Encode'
 import {
@@ -137,13 +136,6 @@ describe('binaryMsv5', () => {
     expect(asyncMeta).toEqual(syncMeta)
   })
 
-  test('zstdCompressionWorthKeeping: 10% relative or 10 KiB absolute', () => {
-    expect(zstdCompressionWorthKeeping(90, 100)).toBe(true)
-    expect(zstdCompressionWorthKeeping(91, 100)).toBe(false)
-    expect(zstdCompressionWorthKeeping(99_000, 110_000)).toBe(true)
-    expect(zstdCompressionWorthKeeping(100_500, 110_000)).toBe(false)
-  })
-
   test('single payload zstd stream with per-section catalogue offsets', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
@@ -153,7 +145,7 @@ describe('binaryMsv5', () => {
     expect(meta.sections.length).toBe(12)
   })
 
-  test('large index uses one zstd payload when worthwhile', () => {
+  test('large index uses zstd when payload shrinks', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(Array.from({ length: 200 }, (_, i) => ({
       id: i,

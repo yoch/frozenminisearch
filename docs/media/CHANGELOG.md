@@ -2,6 +2,16 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.3.1
+
+Document and harden MSv5 zstd requirements for Node.js 22.15.0+.
+
+  - Add **`engines.node`: `>=22.15.0`** (when `node:zlib` gained zstd)
+  - **Graceful degradation** on older runtimes: `saveBinarySync()` / `saveBinaryAsync()` write a raw (uncompressed) payload with a one-time `MINISEARCH_MSV5_ZSTD_UNAVAILABLE` warning; loading a zstd snapshot throws a clear upgrade error instead of crashing
+  - **Safe `node:zlib` imports** — default import + property access so the module loads on runtimes without `crc32` / zstd named exports; CRC-32 still falls back to pure JS when needed
+  - Rollup: declare `node:` builtins as **external** (no spurious unresolved-dependency warning)
+  - Tests simulate a zstd-unavailable runtime (stub `zstdCompressSync`)
+
 ## v8.3.0
 
 MSv5 frozen binary snapshots by default, with explicit sync/async save/load APIs.
@@ -11,7 +21,7 @@ MSv5 frozen binary snapshots by default, with explicit sync/async save/load APIs
   - **`saveBinaryAsync()` / `loadBinaryAsync()`** — non-blocking zstd compress on save; streaming zstd decompress on load (one section at a time, bounded RAM). Sync load caps decompression at the same 1 GiB trust boundary
   - **`saveBinary()` / `loadBinary()` deprecated** — aliases to sync paths with a one-time `DeprecationWarning`; use `*Sync()` or `*Async()` explicitly
   - **MSv3 / MSv4 deprecated** — still readable via `loadBinarySync()` (one-time warning per format); re-save with `saveBinarySync()` for MSv5. MSv1/MSv2 rejected. Legacy encoders remain for tests only
-  - **Node.js 22+** recommended for MSv5 zstd (`node:zlib`); ES2018+ otherwise. Re-save existing snapshots with `saveBinarySync()` to benefit from MSv5; golden baseline at `34a47bf`
+  - **Node.js 22.15.0+** recommended for MSv5 zstd (`node:zlib`). Re-save existing snapshots with `saveBinarySync()` to benefit from MSv5; golden baseline at `34a47bf` (see **8.3.1** for `engines` and graceful fallback on older runtimes)
 
 ## v8.2.5
 

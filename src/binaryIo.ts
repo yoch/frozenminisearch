@@ -1,4 +1,4 @@
-import { crc32 as zlibCrc32 } from 'node:zlib'
+import zlib from 'node:zlib'
 import type { FieldIdArray } from './frozenPostings'
 import {
   ID_TAG_EMPTY,
@@ -6,6 +6,12 @@ import {
   ID_TAG_NUMBER,
   ID_TAG_STRING,
 } from './binaryConstants'
+
+// Default import (not `{ crc32 }`): `zlib.crc32` landed in Node 22.2.0 / 20.15.0. A named ESM
+// import would throw at module load on older runtimes; property access is safe and lets
+// `crc32Update` fall back to the pure-JS table below.
+const zlibCrc32: typeof zlib.crc32 | undefined =
+  typeof zlib.crc32 === 'function' ? zlib.crc32 : undefined
 
 export function invalidFrozenIndex(detail: string): Error {
   return new Error(`Invalid frozen index: ${detail}`)

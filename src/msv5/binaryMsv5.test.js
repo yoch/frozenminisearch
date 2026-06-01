@@ -1,3 +1,4 @@
+import zlib from 'node:zlib'
 import MiniSearch from '../MiniSearch'
 import FrozenMiniSearch from '../FrozenMiniSearch'
 import {
@@ -23,6 +24,7 @@ import { encodeFrozenSnapshotMsv5 } from './binaryMsv5Encode'
 import {
   loadMsv5SectionsFromZstdStream,
   readMsv5SectionDirectory,
+  resetMsv5ZstdWarningForTests,
 } from './binaryMsv5Compression'
 
 const options = { fields: ['title', 'text'] }
@@ -242,6 +244,88 @@ describe('binaryMsv5', () => {
       }),
     )
     emitWarning.mockRestore()
+  })
+})
+
+/** Simulate a runtime without node:zlib zstd (Node < 22.15.0); returns a restore callback.
+ *  Stubs only `zstdCompressSync`, the single member `zstdAvailable()` probes (all zstd APIs
+ *  land together in 22.15.0). Some `zlib` exports are read-only, but this one is assignable. */
+function stubMissingZstd() {
+  const saved = zlib.zstdCompressSync
+  zlib.zstdCompressSync = undefined
+  return () => {
+    zlib.zstdCompressSync = saved
+  }
+}
+
+function bigCompressibleIndex() {
+  const mutable = new MiniSearch({ fields: ['text'] })
+  mutable.addAll(Array.from({ length: 200 }, (_, i) => ({
+    id: i,
+    text: `payload ${'z'.repeat(120)} ${i}`,
+  })))
+  return mutable.freeze()
+}
+
+describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
+  test('saveBinarySync falls back to a raw payload and warns once', () => {
+    resetMsv5ZstdWarningForTests()
+    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
+    const frozen = bigCompressibleIndex()
+    const restore = stubMissingZstd()
+    try {
+      const buf = frozen.saveBinarySync()
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_RAW)
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining('raw (uncompressed) payload'),
+        expect.objectContaining({ code: 'MINISEARCH_MSV5_ZSTD_UNAVAILABLE' }),
+      )
+      expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('payload').length)
+        .toBeGreaterThan(0)
+    } finally {
+      restore()
+      emitWarning.mockRestore()
+    }
+  })
+
+  test('saveBinaryAsync falls back to a raw payload', async () => {
+    resetMsv5ZstdWarningForTests()
+    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
+    const frozen = bigCompressibleIndex()
+    const restore = stubMissingZstd()
+    try {
+      const buf = await frozen.saveBinaryAsync()
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_RAW)
+      expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('payload').length)
+        .toBeGreaterThan(0)
+    } finally {
+      restore()
+      emitWarning.mockRestore()
+    }
+  })
+
+  test('loadBinarySync throws a clear error on a zstd snapshot', () => {
+    const buf = bigCompressibleIndex().saveBinarySync()
+    expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_ZSTD)
+    const restore = stubMissingZstd()
+    try {
+      expect(() => FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }))
+        .toThrow(/lacks node:zlib zstd support/)
+    } finally {
+      restore()
+    }
+  })
+
+  test('loadBinaryAsync throws a clear error on a zstd snapshot', async () => {
+    const buf = bigCompressibleIndex().saveBinarySync()
+    expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_ZSTD)
+    const restore = stubMissingZstd()
+    try {
+      await expect(FrozenMiniSearch.loadBinaryAsync(buf, { fields: ['text'] }))
+        .rejects.toThrow(/lacks node:zlib zstd support/)
+    } finally {
+      restore()
+    }
   })
 })
 

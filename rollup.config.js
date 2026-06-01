@@ -10,6 +10,9 @@ const config = ({ format, input, output, dir, extension = 'js', exports = undefi
 
   return {
     input,
+    // Node builtins (e.g. node:zlib) stay external: they are resolved by the Node runtime,
+    // never bundled. Declaring them silences Rollup's "Unresolved dependencies" warning.
+    external: [/^node:/],
     output: {
       sourcemap: !production,
       dir: `dist/${dir || format}`,

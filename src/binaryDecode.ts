@@ -28,6 +28,11 @@ import {
   validateFrozenSnapshot,
   type FrozenSnapshot,
 } from './binaryStructures'
+import {
+  decodeFrozenSnapshotMsv5,
+  decodeFrozenSnapshotMsv5Async,
+  isMsv5Buffer,
+} from './msv5/binaryMsv5Decode'
 import { readPackedTermTreeSection } from './packedRadixBinary'
 
 function denseLayoutFromMSv3(
@@ -297,6 +302,9 @@ export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
   const magic = buf.toString('ascii', 0, 4)
   const version = buf.readUInt16LE(4)
 
+  if (isMsv5Buffer(buf) && version === 5) {
+    return decodeFrozenSnapshotMsv5(buf)
+  }
   if (magic === BINARY_MAGIC_V4 && version === BINARY_VERSION_V4) {
     return decodeMSv4(buf)
   }
@@ -309,4 +317,15 @@ export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
     )
   }
   throw invalidFrozenIndex(`magic=${magic} version=${version}`)
+}
+
+export async function decodeFrozenSnapshotAsync(buf: Buffer): Promise<FrozenSnapshot> {
+  assertBufferLength(buf, 8)
+  const magic = buf.toString('ascii', 0, 4)
+  const version = buf.readUInt16LE(4)
+
+  if (isMsv5Buffer(buf) && version === 5) {
+    return decodeFrozenSnapshotMsv5Async(buf)
+  }
+  return decodeFrozenSnapshot(buf)
 }

@@ -1,3 +1,4 @@
+import { crc32 as zlibCrc32 } from 'node:zlib'
 import type { FieldIdArray } from './frozenPostings'
 import {
   ID_TAG_EMPTY,
@@ -36,13 +37,26 @@ for (let i = 0; i < 256; i++) {
   CRC_TABLE[i] = c
 }
 
-/** CRC-32 IEEE (same polynomial as zlib / Ethernet). */
-export function crc32Buffer(buf: Buffer, start = 0, end = buf.length): number {
-  let crc = 0xffffffff
+function crc32BufferFallback(buf: Buffer, start: number, end: number, seed = 0): number {
+  let crc = (seed ^ 0xffffffff) >>> 0
   for (let i = start; i < end; i++) {
     crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 0xff]
   }
   return (crc ^ 0xffffffff) >>> 0
+}
+
+/** Incremental CRC-32 IEEE update; pass the previous return value as `seed`. */
+export function crc32Update(seed: number, buf: Buffer, start = 0, end = buf.length): number {
+  if (typeof zlibCrc32 === 'function') {
+    const slice = start === 0 && end === buf.length ? buf : buf.subarray(start, end)
+    return zlibCrc32(slice, seed) >>> 0
+  }
+  return crc32BufferFallback(buf, start, end, seed)
+}
+
+/** CRC-32 IEEE (zlib polynomial); uses `zlib.crc32` when available. */
+export function crc32Buffer(buf: Buffer, start = 0, end = buf.length): number {
+  return crc32Update(0, buf, start, end)
 }
 
 export function readUint32Array(buf: Buffer, offset: number, byteLength: number): Uint32Array {

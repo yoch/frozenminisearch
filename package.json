@@ -41,8 +41,8 @@
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^1.0.0",
-    "@stylistic/eslint-plugin": "^5.10.0",
     "@rollup/plugin-typescript": "^12.3.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/benchmark": "^2.1.1",
     "benchmark": "^2.1.4",
     "core-js": "^3.1.4",
@@ -115,5 +115,6 @@
     "release:beta": "node scripts/publish-beta.cjs",
     "release:stable": "node scripts/publish-stable.cjs"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "dependencies": {}
 }

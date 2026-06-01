@@ -1,5 +1,6 @@
 import { LEAF } from './SearchableMap/TreeIterator'
 import type { RadixTree } from './SearchableMap/types'
+import type { FieldLengthArray } from './fieldLengthMatrix'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import { validateFrozenPostingsLayout } from './frozenPostings'
 import type { FrozenTermIndex } from './frozenTermIndex'
@@ -28,7 +29,7 @@ export interface FrozenSnapshot {
   avgFieldLength: Float32Array
   externalIds: unknown[]
   storedFields: (Record<string, unknown> | undefined)[]
-  fieldLengthMatrix: Uint32Array
+  fieldLengthMatrix: FieldLengthArray
   treeShape: TreeShape
   /** Populated on decode; legacy path when {@link packedTermIndex} is absent. */
   termTree?: RadixTree<number>
@@ -70,7 +71,7 @@ export function validateFrozenSnapshotNumeric(snap: {
   nextId: number
   documentCount: number
   postings: FrozenPostingsLayout
-  fieldLengthMatrix: Uint32Array
+  fieldLengthMatrix: FieldLengthArray
   avgFieldLength: Float32Array
   fieldIds: { [field: string]: number }
 }): void {

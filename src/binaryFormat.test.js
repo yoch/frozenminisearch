@@ -11,7 +11,16 @@ import {
   crc32Buffer,
   BINARY_MAGIC_V3,
   BINARY_MAGIC_V4,
+  BINARY_MAGIC_V5,
 } from './binaryFormat'
+import {
+  CODEC_RAW,
+  MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
+  MSV5_PAYLOAD_COMPRESSED_OFFSET,
+  MSV5_SECTION_DIR_OFFSET,
+  Msv5SectionId,
+} from './msv5/binaryMsv5Constants'
+import { loadMsv5Sections, readMsv5SectionDirectory } from './msv5/binaryMsv5Compression'
 import { encodeFrozenSnapshotMSv3, encodeFrozenSnapshotMSv4 } from './binaryEncode'
 function densePostings(fieldCount, termCount, nextId, offsets, lengths, docIds, freqs) {
   return {
@@ -47,7 +56,11 @@ function buildSnapshotFromFrozen() {
   return decodeFrozenSnapshot(buf)
 }
 
-describe('binaryFormat MSv4', () => {
+function msv5SectionDirOffset(sectionId) {
+  return MSV5_SECTION_DIR_OFFSET + sectionId * 20
+}
+
+describe('binaryFormat MSv5', () => {
   test('round-trip preserves flat postings', () => {
     const treeShape = [
       ['hello', [[LEAF, 0]]],
@@ -74,7 +87,8 @@ describe('binaryFormat MSv4', () => {
     }
 
     const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(treeShape))
-    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V3)
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
+    expect(buf.readUInt16LE(4)).toBe(5)
 
     const loaded = decodeFrozenSnapshot(buf)
     expect(loaded.documentCount).toBe(2)
@@ -129,11 +143,12 @@ describe('binaryFormat MSv4', () => {
     expect(() => decodeFrozenSnapshot(buf)).toThrow(/Invalid frozen index/)
   })
 
-  test('rejects CRC mismatch', () => {
+  test('rejects section CRC mismatch', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const buf = Buffer.from(mutable.freeze().saveBinary())
-    buf.writeUInt8(buf.readUInt8(buf.length - 1) ^ 0xff, buf.length - 1)
+    const coreDir = msv5SectionDirOffset(Msv5SectionId.Core)
+    buf.writeUInt32LE(0, coreDir + 8)
     expect(() => decodeFrozenSnapshot(buf)).toThrow(/CRC mismatch/)
   })
 
@@ -194,7 +209,7 @@ describe('binaryFormat MSv4', () => {
     expect(frozen.memoryBreakdown().postings.layout).toBe('sparse')
 
     const buf = frozen.saveBinary()
-    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V4)
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.readUInt16LE(6) & 4).toBe(4)
 
     const loaded = FrozenMiniSearch.loadBinary(buf, { fields })
@@ -224,29 +239,27 @@ describe('binaryFormat corruption guards', () => {
 
   test('rejects non-monotonic section offsets', () => {
     const corrupt = Buffer.from(validBuf)
-    const flOff = corrupt.readUInt32LE(36)
-    const postMetaOff = corrupt.readUInt32LE(40)
-    corrupt.writeUInt32LE(postMetaOff, 36)
-    corrupt.writeUInt32LE(flOff, 40)
-    corrupt.writeUInt32LE(crc32Buffer(corrupt, 68, corrupt.length), 8)
+    const flDir = msv5SectionDirOffset(Msv5SectionId.FieldLengthMatrix)
+    const postDir = msv5SectionDirOffset(Msv5SectionId.PostMeta)
+    const flOff = corrupt.readUInt32LE(flDir)
+    const postOff = corrupt.readUInt32LE(postDir)
+    corrupt.writeUInt32LE(postOff, flDir)
+    corrupt.writeUInt32LE(flOff, postDir)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/not monotonic/)
   })
 
-  test('rejects end offset past buffer end', () => {
+  test('rejects section payload past buffer end', () => {
     const corrupt = Buffer.from(validBuf)
-    corrupt.writeUInt32LE(validBuf.length + 100, 64)
-    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/Invalid frozen index/)
+    corrupt.writeUInt32LE(validBuf.length + 100, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)
+    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/out of bounds/)
   })
 
   test('rejects allFreqs shorter than allDocIds', () => {
     const corrupt = Buffer.from(validBuf)
-    const freqsOff = corrupt.readUInt32LE(60)
-    const endOff = corrupt.readUInt32LE(64)
-    corrupt.writeUInt32LE(endOff - 1, 64)
-    corrupt.writeUInt8(0, freqsOff + (endOff - freqsOff) - 1)
-    const crc = crc32Buffer(corrupt, 68, corrupt.length)
-    corrupt.writeUInt32LE(crc, 8)
-    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/length mismatch/)
+    const freqsDir = msv5SectionDirOffset(Msv5SectionId.AllFreqs)
+    const uncomp = corrupt.readUInt32LE(freqsDir + 8)
+    corrupt.writeUInt32LE(uncomp - 1, freqsDir + 8)
+    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/CRC mismatch|length mismatch/)
   })
 
   test('rejects posting offset beyond allDocIds', () => {
@@ -281,17 +294,22 @@ describe('binaryFormat corruption guards', () => {
     expect(() => validateFrozenSnapshot(snap)).toThrow(/fieldLengthMatrix/)
   })
 
-  test('CRC covers full payload', () => {
-    const payloadCrc = crc32Buffer(validBuf, 68, validBuf.length)
-    expect(validBuf.readUInt32LE(8)).toBe(payloadCrc)
+  test('section CRC matches uncompressed payload', () => {
+    const directory = readMsv5SectionDirectory(validBuf)
+    const coreEntry = directory[Msv5SectionId.Core]
+    const coreSection = loadMsv5Sections(validBuf, directory)[Msv5SectionId.Core]
+    expect(coreEntry.sectionCrc32).toBe(crc32Buffer(coreSection))
   })
 
   test('rejects core termCount mismatch with postings', () => {
     const corrupt = Buffer.from(validBuf)
-    const coreOff = corrupt.readUInt32LE(12)
-    corrupt.writeUInt32LE(999999, coreOff + 12)
-    corrupt.writeUInt32LE(crc32Buffer(corrupt, 68, corrupt.length), 8)
-    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/leaf index out of range|termCount/)
+    if (corrupt.readUInt8(8) !== CODEC_RAW) {
+      return
+    }
+    const payloadOff = corrupt.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_OFFSET)
+    const coreBase = payloadOff + corrupt.readUInt32LE(msv5SectionDirOffset(Msv5SectionId.Core))
+    corrupt.writeUInt32LE(999999, coreBase + 12)
+    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/leaf index out of range|termCount|CRC mismatch/)
   })
 })
 

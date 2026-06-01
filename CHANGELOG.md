@@ -2,6 +2,15 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+**`saveBinary()` / `loadBinary()` / `loadBinaryAsync()` — MSv5 unified binary snapshots** (MSv3/MSv4 remain readable).
+
+  - **`saveBinary()` writes MSv5** — single postings wire layout (dense or sparse via flags, same rules as MSv4), columnar packed radix tree (no recursive DFS parse on load), adaptive `fieldLengthMatrix` width on disk (`Uint8` / `Uint16` / `Uint32`)
+  - **Single zstd payload** (`node:zlib`, niveau 9) : 12 sections logiques en clair dans un seul flux compressé (meilleur ratio qu’une compression par section). Raw si &lt; 64 o ou si zstd n’apporte pas ≥ ~10 % **ou** ≥ 10 KiB absolus. Catalogue = offsets non compressés + CRC par section. **Load async** : `loadBinaryAsync()` décompresse le flux zstd avec les streams Node et matérialise une section à la fois (RAM bornée) ; limite hard‑cap à 1 GiB de payload décompressé
+  - **Implementation** in `src/msv5/`; legacy encoders/decoders unchanged (`encodeFrozenSnapshotMSv3` / `MSv4` for tests)
+  - **`loadBinary()`** reads MSv5, MSv4, and MSv3; **`loadBinaryAsync()`** uses streaming zstd for memory-sensitive MSv5 loads
+
 ## v8.2.5
 
 FrozenMiniSearch in-memory compaction for the per-document field length matrix (no API or search-semantics change).

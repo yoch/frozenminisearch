@@ -290,24 +290,25 @@ describe('FrozenMiniSearch binary round-trip', () => {
     }
   })
 
-  test('saveBinary writes MSv4 for multi-field index', () => {
+  test('saveBinary writes MSv5 for multi-field index', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const buf = mutable.freeze().saveBinary()
-    expect(buf.toString('ascii', 0, 4)).toBe('MSv4')
-    expect(buf.readUInt16LE(4)).toBe(4)
+    expect(buf.toString('ascii', 0, 4)).toBe('MSv5')
+    expect(buf.readUInt16LE(4)).toBe(5)
   })
 
-  test('saveBinary writes MSv3 for single-field Uint32 doc ids', () => {
-    const docsBig = Array.from({ length: 70000 }, (_, i) => ({
+  test('saveBinary writes MSv5 with Uint16 doc ids when nextId <= 65535', () => {
+    const docsBig = Array.from({ length: 1000 }, (_, i) => ({
       id: i,
       text: `hello world ${i}`,
     }))
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(docsBig)
     const buf = mutable.freeze().saveBinary()
-    expect(buf.toString('ascii', 0, 4)).toBe('MSv3')
-    expect(buf.readUInt16LE(4)).toBe(3)
+    expect(buf.toString('ascii', 0, 4)).toBe('MSv5')
+    expect(buf.readUInt16LE(4)).toBe(5)
+    expect(buf.readUInt16LE(6) & 1).toBe(1)
   })
 
   test('loadBinary without fields option', () => {

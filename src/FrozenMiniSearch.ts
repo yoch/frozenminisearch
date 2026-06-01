@@ -15,6 +15,7 @@ import {
 } from './searchDefaults'
 import {
   decodeFrozenSnapshot,
+  decodeFrozenSnapshotAsync,
   encodeFrozenSnapshot,
   fieldNamesFromFieldIds,
 } from './binaryFormat'
@@ -394,6 +395,21 @@ export default class FrozenMiniSearch<T = any> {
 
   static loadBinary<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     const snap = decodeFrozenSnapshot(buffer)
+    return FrozenMiniSearch.fromBinarySnapshot(snap, options)
+  }
+
+  static async loadBinaryAsync<T>(
+    buffer: Buffer,
+    options: Options<T> = {} as Options<T>,
+  ): Promise<FrozenMiniSearch<T>> {
+    const snap = await decodeFrozenSnapshotAsync(buffer)
+    return FrozenMiniSearch.fromBinarySnapshot(snap, options)
+  }
+
+  private static fromBinarySnapshot<T>(
+    snap: ReturnType<typeof decodeFrozenSnapshot>,
+    options: Options<T>,
+  ): FrozenMiniSearch<T> {
     const snapshotFields = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
     if (options.fields != null) {
       assertFieldsMatchSnapshot(options.fields, snap.fieldIds)

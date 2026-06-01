@@ -1,5 +1,5 @@
 import type { RadixTree } from './SearchableMap/types'
-import { shouldEncodeBinaryAsMSv4 } from './frozenPostings'
+import { encodeFrozenSnapshotMsv5 } from './msv5/binaryMsv5Encode'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildTermTreeSectionFromPacked } from './packedRadixBinary'
@@ -200,9 +200,5 @@ export function encodeFrozenSnapshot(
   termTree?: RadixTree<number>,
   packedTermIndex?: FrozenTermIndex,
 ): Buffer {
-  const packed = packedTermIndex ?? snap.packedTermIndex
-  if (shouldEncodeBinaryAsMSv4(snap.postings)) {
-    return encodeMSv4(snap, termTree, packed)
-  }
-  return encodeMSv3(snap, termTree, packed)
+  return encodeFrozenSnapshotMsv5(snap, termTree, packedTermIndex)
 }

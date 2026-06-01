@@ -104,6 +104,7 @@
     "benchmark:packed-radix:diff": "node benchmarks/diffPackedRadixBaseline.js",
     "benchmark:packed-radix:diff:run": "node benchmarks/diffPackedRadixBaseline.js --run",
     "benchmark:packed-radix:history": "node benchmarks/scripts/analyze-packed-radix-history.mjs",
+    "benchmark:binary-format": "npm run build && NODE_OPTIONS='--expose-gc' npx --yes tsx benchmarks/binaryFormatCompare.ts",
     "build": "npm run clean-build && NODE_ENV=production rollup -c && node scripts/postbuild-cjs.cjs",
     "clean-build": "rm -rf dist",
     "build-minified": "MINIFY=true npm run build",

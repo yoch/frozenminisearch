@@ -26,4 +26,4 @@ fromRadixTree(radixTree, {
 })
 ```
 
-Binary encode/decode for frozen MiniSearch indices lives in `packedRadixBinary.ts` (minisearch-specific MSv3/MSv4 section format). Leaf validation for frozen indices is in `frozenTermIndex.ts`.
+Binary encode/decode for frozen MiniSearch indices: **MSv5** columnar wire in `src/msv5/packedRadixBinaryMsv5.ts`; **deprecated** MSv3/MSv4 recursive DFS in `packedRadixBinary.ts`. Leaf validation is in `frozenTermIndex.ts`.

@@ -299,7 +299,9 @@ export function fieldTermDataFromLayout(
   }
 }
 
-/** MSv4 required when sparse layout or doc ids do not fit Uint16 on disk. */
+/**
+ * @deprecated MSv4 selection heuristic; {@link encodeFrozenSnapshot} always writes MSv5.
+ */
 export function shouldEncodeBinaryAsMSv4(postings: FrozenPostingsLayout): boolean {
   if (postings.layout === 'sparse') return true
   return postings.docIdWidth === 16

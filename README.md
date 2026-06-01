@@ -14,7 +14,7 @@
 |---|---------------------|-------------------|
 | **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed, or you reload from disk |
 | **Memory** | Maps and nested objects per posting | Flat `Uint32Array` / `Uint8Array` postings |
-| **On disk** | `toJSON` / `loadJSON` | **`saveBinary` / `loadBinary`** (MSv3 or MSv4, no dictionary section) |
+| **On disk** | `toJSON` / `loadJSON` | **`saveBinarySync` / `loadBinarySync`** (MSv5) |
 | **Typical search** | Baseline | Often **~20–35% faster** p50 on the same corpus (see benchmarks) |
 
 Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies are stored as `Uint8` (max **255** per document/field); extreme repetition can cause a small score drift versus the mutable index.
@@ -39,8 +39,8 @@ index.search('ishmael', { prefix: true })
 index.autoSuggest('zen')
 
 // Persist and reload
-const buf = index.saveBinary()
-const loaded = FrozenMiniSearch.loadBinary(buf, options)
+const buf = index.saveBinarySync()
+const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
 ```
 
 **Mutable index, then freeze** (incremental build):
@@ -52,7 +52,7 @@ const ms = new MiniSearch({ fields: ['title', 'text'] })
 ms.addAll(documents)
 
 const frozen = ms.freeze()   // immutable snapshot
-const buf = frozen.saveBinary()
+const buf = frozen.saveBinarySync()
 ```
 
 ```javascript
@@ -74,7 +74,8 @@ const { FrozenMiniSearch } = require('@yoch/minisearch')
 | Fixed corpus, build frozen directly | **`FrozenMiniSearch.fromDocuments(documents, options)`** |
 | Build doc-by-doc (no `documents[]` buffer) | **`createFrozenIndexBuilder(options)`** → `.add(doc)` → **`freezeFrozenIndexBuilder(builder)`** |
 | Async stream of documents | **`FrozenMiniSearch.fromAsyncIterable(iterable, options)`** |
-| Load a snapshot from disk | `FrozenMiniSearch.loadBinary(buffer, options)` |
+| Load a snapshot from disk (sync) | `FrozenMiniSearch.loadBinarySync(buffer, options)` |
+| Load a snapshot from disk (async, bounded memory on zstd payloads) | `FrozenMiniSearch.loadBinaryAsync(buffer, options)` |
 | Custom assembly pipeline | `buildFrozenFromDocuments`, `assembleFrozen`, `freezeFromMiniSearch` |
 
 `fromDocuments` matches `new MiniSearch(opts).addAll(docs).freeze()` for search ranking on the same corpus and options (`fields`, `tokenize`, `processTerm`, …). Frozen indexes do not support `add` / `remove`.
@@ -139,7 +140,8 @@ count on freeze if the hint was too large.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
 - **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
 - **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
-- **`saveBinary()` / `loadBinary()`** — **`saveBinary()` writes MSv3** (single-field dense, Uint32 doc ids) or **MSv4** (sparse multi-field, Uint16 doc ids when possible). No separate dictionary section (terms live in the packed term tree; `termCount` in core). **MSv1/MSv2 are not supported** — re-save older snapshots. Field names are stored in the snapshot; `fields` in `loadBinary` options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
+- **`saveBinarySync()` / `loadBinarySync()` / `loadBinaryAsync()`** — `saveBinarySync()` writes **MSv5** (single postings wire, packed columnar radix tree, optional single-payload zstd). `loadBinaryAsync()` streams zstd decompression and materializes one section at a time (bounded memory), while `loadBinarySync()` is the synchronous path. **MSv1/MSv2 are not supported**; **MSv3/MSv4 remain readable but deprecated**. Field names are stored in the snapshot; `fields` in load options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
+- **Deprecated aliases** — `saveBinary()` and `loadBinary()` still point to the sync implementations and emit a one-time `DeprecationWarning` asking to choose `*Sync()` or `*Async()` explicitly.
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).
 
@@ -196,8 +198,8 @@ TypeScript definitions: `dist/es/index.d.ts`.
 | **Build** | Adaptive external-id lookup (`identity` vs lazy `Map`) | Contiguous numeric ids cost no lookup table |
 | **Build/Search** | `freeze()` compacts discarded slots to a dense id range | No holes to skip; wildcard iterates only active docs |
 | **Binary load** | Structural validation in `decodeFrozenSnapshot` / `validateFrozenSnapshot` | Corrupt snapshots fail fast with `Invalid frozen index: …` |
-| **`loadBinary`** | `fields` optional (embedded in snapshot); if provided, must match exactly | Simpler reload; no silent field subset |
-| **`saveBinary`** | Single pre-allocated buffer | Lower peak memory while serializing |
+| **`loadBinarySync`** | `fields` optional (embedded in snapshot); if provided, must match exactly | Simpler reload; no silent field subset |
+| **`saveBinarySync`** | Single pre-allocated buffer | Lower peak memory while serializing |
 | **Search** | Per-query cache for `fieldTermDataFor(termIndex)` | Fewer allocations on prefix/fuzzy queries |
 
 Measure regressions with [`benchmarks/`](benchmarks/README.md) (`freezeMs`, `saveBinary`, `loadBinary`, search p50, heap frozen).
@@ -206,8 +208,7 @@ Measure regressions with [`benchmarks/`](benchmarks/README.md) (`freezeMs`, `sav
 
 | Priority | Topic | Idea | Trade-off |
 |----------|-------|------|-----------|
-| **API** | `loadBinaryAsync` | Chunked/async load like `loadJSONAsync` | Better cold start on huge indexes |
-| **API** | Input types | Accept `Uint8Array` as well as `Buffer` on `loadBinary` | Broader runtime support |
+| **API** | Input types | Accept `Uint8Array` as well as `Buffer` on `loadBinarySync` / `loadBinaryAsync` | Broader runtime support |
 | **Search** | Hot path | Direct subarray posting access in `aggregateTerm` | Lower GC; invasive |
 
 **Intentionally deferred:** embedding `tokenize` / `processTerm` in the snapshot. Raising the `Uint8` term-frequency cap needs a new postings encoding.
@@ -258,6 +259,6 @@ npm run release:beta
 See [CHANGELOG.md](./CHANGELOG.md).
 
 - **MiniSearch** — [Luca Ongaro](https://github.com/lucaong/minisearch) (MIT)
-- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, packed radix term index (`PackedRadixTree`), MSv4/MSv3 binary snapshots, shared scoring refactor
+- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, packed radix term index (`PackedRadixTree`), MSv5 binary snapshots (+ MSv3/MSv4 read-compat), shared scoring refactor
 
 Upstream docs: [MiniSearch site](https://lucaong.github.io/minisearch/) · [intro article](https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html)

@@ -10,6 +10,7 @@ import {
   HEADER_SIZE_V3,
   HEADER_SIZE_V4,
 } from './binaryConstants'
+import { warnDeprecatedBinaryFormat } from './binaryDeprecation'
 import {
   assertBufferLength,
   assertSectionOffsets,
@@ -62,7 +63,9 @@ function denseLayoutFromMSv3(
   }
 }
 
+/** @deprecated MSv3 decode path; still used by {@link decodeFrozenSnapshot}. */
 function decodeMSv3(buf: Buffer): FrozenSnapshot {
+  warnDeprecatedBinaryFormat('MSv3')
   assertBufferLength(buf, HEADER_SIZE_V3)
 
   const magic = buf.toString('ascii', 0, 4)
@@ -156,7 +159,9 @@ function decodeMSv3(buf: Buffer): FrozenSnapshot {
   return snap
 }
 
+/** @deprecated MSv4 decode path; still used by {@link decodeFrozenSnapshot}. */
 function decodeMSv4(buf: Buffer): FrozenSnapshot {
+  warnDeprecatedBinaryFormat('MSv4')
   assertBufferLength(buf, HEADER_SIZE_V4)
 
   const magic = buf.toString('ascii', 0, 4)
@@ -297,6 +302,10 @@ function decodeMSv4(buf: Buffer): FrozenSnapshot {
   return snap
 }
 
+/**
+ * Decode a frozen snapshot buffer (MSv5, or deprecated MSv4 / MSv3).
+ * Loading MSv3/MSv4 emits a one-time {@link process.emitWarning} `DeprecationWarning`.
+ */
 export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
   assertBufferLength(buf, 8)
   const magic = buf.toString('ascii', 0, 4)
@@ -313,12 +322,16 @@ export function decodeFrozenSnapshot(buf: Buffer): FrozenSnapshot {
   }
   if (magic === 'MSv1' || magic === 'MSv2') {
     throw invalidFrozenIndex(
-      `${magic} is no longer supported; re-save with MSv3/MSv4`,
+      `${magic} is no longer supported; re-save with saveBinarySync() (MSv5)`,
     )
   }
   throw invalidFrozenIndex(`magic=${magic} version=${version}`)
 }
 
+/**
+ * Async decode (streaming zstd for MSv5). Non-MSv5 buffers use {@link decodeFrozenSnapshot}
+ * (deprecated MSv3/MSv4 included).
+ */
 export async function decodeFrozenSnapshotAsync(buf: Buffer): Promise<FrozenSnapshot> {
   assertBufferLength(buf, 8)
   const magic = buf.toString('ascii', 0, 4)

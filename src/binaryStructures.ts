@@ -18,7 +18,7 @@ import {
 
 export type TreeShape = Array<[string, number | TreeShape]>
 
-/** Flat frozen snapshot (runtime + MSv3 on disk). */
+/** Flat frozen snapshot (runtime; on disk use MSv5 via {@link encodeFrozenSnapshot}). */
 export interface FrozenSnapshot {
   documentCount: number
   nextId: number
@@ -196,7 +196,7 @@ export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): s
   return names
 }
 
-/** Core with explicit {@link termCountOf} (MSv3/MSv4 on-disk; no dictionary section). */
+/** Core with explicit {@link termCountOf} (legacy MSv3/MSv4 and MSv5; no dictionary section). */
 export function buildCoreSectionWithTermCount(snap: FrozenSnapshot): Buffer {
   const out = Buffer.alloc(16)
   out.writeUInt32LE(snap.documentCount, 0)
@@ -280,6 +280,7 @@ function writeTermTreeNode(chunks: Buffer[], tree: RadixTree<number>): void {
   }
 }
 
+/** @deprecated MSv3/MSv4 recursive DFS term-tree section; MSv5 uses columnar wire. */
 export function buildTermTreeSection(tree: RadixTree<number>): Buffer {
   const chunks: Buffer[] = []
   writeTermTreeNode(chunks, tree)

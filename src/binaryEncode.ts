@@ -1,5 +1,5 @@
 import type { RadixTree } from './SearchableMap/types'
-import { encodeFrozenSnapshotMsv5 } from './msv5/binaryMsv5Encode'
+import { encodeFrozenSnapshotMsv5, encodeFrozenSnapshotMsv5Async } from './msv5/binaryMsv5Encode'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildTermTreeSectionFromPacked } from './packedRadixBinary'
@@ -98,7 +98,10 @@ function buildTermTreeSectionFromSource(source: EncodeTreeSource): Buffer {
   return buildTermTreeSection(source.tree)
 }
 
-/** @internal Force MSv3 wire format (tests). */
+/**
+ * @deprecated MSv3 wire format; {@link encodeFrozenSnapshot} writes MSv5. For tests and migration tooling only.
+ * @internal
+ */
 export function encodeFrozenSnapshotMSv3(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
@@ -107,7 +110,10 @@ export function encodeFrozenSnapshotMSv3(
   return encodeMSv3(snap, termTree, packedTermIndex)
 }
 
-/** @internal Force MSv4 wire format (tests). */
+/**
+ * @deprecated MSv4 wire format; {@link encodeFrozenSnapshot} writes MSv5. For tests and migration tooling only.
+ * @internal
+ */
 export function encodeFrozenSnapshotMSv4(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
@@ -195,10 +201,20 @@ function encodeMSv4(
   return assembleSections(BINARY_MAGIC_V4, BINARY_VERSION_V4, HEADER_SIZE_V4, flags, sections)
 }
 
+/** Encode a frozen snapshot as **MSv5** (the only supported write format). */
 export function encodeFrozenSnapshot(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
   packedTermIndex?: FrozenTermIndex,
 ): Buffer {
   return encodeFrozenSnapshotMsv5(snap, termTree, packedTermIndex)
+}
+
+/** Async MSv5 encoder; uses non-blocking zstd compression for large payloads. */
+export function encodeFrozenSnapshotAsync(
+  snap: FrozenSnapshot,
+  termTree?: RadixTree<number>,
+  packedTermIndex?: FrozenTermIndex,
+): Promise<Buffer> {
+  return encodeFrozenSnapshotMsv5Async(snap, termTree, packedTermIndex)
 }

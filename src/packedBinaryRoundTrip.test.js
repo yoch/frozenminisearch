@@ -15,12 +15,12 @@ describe('packed binary round-trip', () => {
     const frozen = mutable.freeze()
     expect(frozen.search('zen').length).toBeGreaterThan(0)
 
-    const buf = frozen.saveBinary()
+    const buf = frozen.saveBinarySync()
     const snap = decodeFrozenSnapshot(buf)
     expect(snap.packedTermIndex).toBeDefined()
     expect(snap.packedTermIndex.get('zen')).not.toBeUndefined()
 
-    const loaded = FrozenMiniSearch.loadBinary(buf, options)
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
     expect(loaded.search('zen').length).toBeGreaterThan(0)
   })
 })

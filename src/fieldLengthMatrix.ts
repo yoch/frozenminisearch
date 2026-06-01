@@ -30,8 +30,8 @@ export function materializeFieldLengthMatrix(data: ArrayLike<number>, length?: n
 }
 
 /**
- * MSv3/MSv4 wire format always stores field length cells as Uint32.
- * {@link FrozenMiniSearch.loadBinary} materializes the same width, so adaptive
+ * Deprecated MSv3/MSv4 wire format stored field length cells as Uint32; MSv5 uses adaptive width.
+ * {@link FrozenMiniSearch.loadBinarySync} materializes the same width, so adaptive
  * in-memory savings (Uint8/Uint16) are not preserved after a binary round-trip.
  */
 export function fieldLengthMatrixForWire(matrix: FieldLengthArray): Uint32Array {

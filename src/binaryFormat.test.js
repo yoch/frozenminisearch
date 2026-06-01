@@ -52,7 +52,7 @@ function buildSnapshotFromFrozen() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
   const frozen = mutable.freeze()
-  const buf = frozen.saveBinary()
+  const buf = frozen.saveBinarySync()
   return decodeFrozenSnapshot(buf)
 }
 
@@ -146,7 +146,7 @@ describe('binaryFormat MSv5', () => {
   test('rejects section CRC mismatch', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = Buffer.from(mutable.freeze().saveBinary())
+    const buf = Buffer.from(mutable.freeze().saveBinarySync())
     const coreDir = msv5SectionDirOffset(Msv5SectionId.Core)
     buf.writeUInt32LE(0, coreDir + 8)
     expect(() => decodeFrozenSnapshot(buf)).toThrow(/CRC mismatch/)
@@ -156,7 +156,7 @@ describe('binaryFormat MSv5', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: 'alpha', text: 'one' })
     mutable.add({ id: 42, text: 'two' })
-    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinary())
+    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinarySync())
     expect(snap.externalIds[0]).toBe('alpha')
     expect(snap.externalIds[1]).toBe(42)
   })
@@ -208,18 +208,18 @@ describe('binaryFormat MSv5', () => {
     const frozen = mutable.freeze()
     expect(frozen.memoryBreakdown().postings.layout).toBe('sparse')
 
-    const buf = frozen.saveBinary()
+    const buf = frozen.saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.readUInt16LE(6) & 4).toBe(4)
 
-    const loaded = FrozenMiniSearch.loadBinary(buf, { fields })
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields })
     expect(loaded.search('value').length).toBeGreaterThan(0)
   })
 
   test('external id JSON blob round-trip', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: { k: 'complex' }, text: 'data' })
-    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinary())
+    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinarySync())
     expect(snap.externalIds[0]).toEqual({ k: 'complex' })
   })
 })
@@ -230,7 +230,7 @@ describe('binaryFormat corruption guards', () => {
   beforeEach(() => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    validBuf = mutable.freeze().saveBinary()
+    validBuf = mutable.freeze().saveBinarySync()
   })
 
   test('rejects buffer shorter than header', () => {
@@ -318,8 +318,8 @@ describe('FrozenMiniSearch loadBinary fields', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const frozen = mutable.freeze()
-    const buf = frozen.saveBinary()
-    const loaded = FrozenMiniSearch.loadBinary(buf, {})
+    const buf = frozen.saveBinarySync()
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, {})
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
   })
 })

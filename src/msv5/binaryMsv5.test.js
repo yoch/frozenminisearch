@@ -7,12 +7,15 @@ import {
   MSV5_ZSTD_LEVEL,
 } from '../binaryFormat'
 import { encodeFrozenSnapshotMSv4 } from '../binaryEncode'
+import { resetDeprecatedBinaryWarningsForTests } from '../binaryDeprecation'
 import {
   CODEC_RAW,
   CODEC_ZSTD,
   MSV5_FORMAT_REV_PAYLOAD,
   MSV5_HEADER_SIZE,
+  MSV5_PAYLOAD_CODEC_OFFSET,
   MSV5_PAYLOAD_CRC_OFFSET,
+  MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
   MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET,
   MSV5_SECTION_DIR_OFFSET,
@@ -35,11 +38,45 @@ function msv5SectionDirOffset(sectionId) {
   return MSV5_SECTION_DIR_OFFSET + sectionId * 20
 }
 
+/** Header fields that must match between saveBinarySync and saveBinaryAsync (not compressed bytes). */
+function msv5ComparableHeaderMeta(buf) {
+  const meta = readMsv5SnapshotCompressionMeta(buf)
+  return {
+    globalFlags: buf.readUInt16LE(6),
+    formatRev: meta.formatRev,
+    payloadCodec: meta.payloadCodec,
+    zstdLevel: meta.zstdLevel,
+    uncompressedLength: meta.uncompressedLength,
+    payloadCrc32: meta.payloadCrc32,
+    payloadOffset: buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_OFFSET),
+    sections: meta.sections,
+  }
+}
+
+function msv5PayloadHeaderMeta(buf) {
+  return {
+    codec: buf.readUInt8(MSV5_PAYLOAD_CODEC_OFFSET),
+    compressedLength: buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET),
+    uncompressedLength: buf.readUInt32LE(MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET),
+    payloadCrc32: buf.readUInt32LE(MSV5_PAYLOAD_CRC_OFFSET),
+  }
+}
+
+/** Corpus large enough that MSv5 keeps a zstd payload (not raw). */
+function zstdMsv5Fixture() {
+  const mutable = new MiniSearch({ fields: ['text'] })
+  mutable.addAll(Array.from({ length: 200 }, (_, i) => ({
+    id: i,
+    text: `payload ${'z'.repeat(120)} ${i}`,
+  })))
+  return mutable.freeze()
+}
+
 describe('binaryMsv5', () => {
   test('encodeFrozenSnapshot uses MSv5 by default', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = mutable.freeze().saveBinary()
+    const buf = mutable.freeze().saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.length).toBeGreaterThan(MSV5_HEADER_SIZE)
   })
@@ -48,7 +85,7 @@ describe('binaryMsv5', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const frozen = mutable.freeze()
-    const loaded = FrozenMiniSearch.loadBinary(frozen.saveBinary(), options)
+    const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
   })
 
@@ -56,8 +93,69 @@ describe('binaryMsv5', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const frozen = mutable.freeze()
-    const loaded = await FrozenMiniSearch.loadBinaryAsync(frozen.saveBinary(), options)
+    const loaded = await FrozenMiniSearch.loadBinaryAsync(frozen.saveBinarySync(), options)
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
+  })
+
+  test('saveBinary and loadBinary emit DeprecationWarning', () => {
+    resetDeprecatedBinaryWarningsForTests()
+    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    const buf = frozen.saveBinary()
+    FrozenMiniSearch.loadBinary(buf, options)
+    expect(emitWarning).toHaveBeenCalledWith(
+      expect.stringContaining('saveBinary() is deprecated'),
+      expect.objectContaining({
+        type: 'DeprecationWarning',
+        code: 'MINISEARCH_SAVEBINARY_DEPRECATED',
+      }),
+    )
+    expect(emitWarning).toHaveBeenCalledWith(
+      expect.stringContaining('loadBinary() is deprecated'),
+      expect.objectContaining({
+        type: 'DeprecationWarning',
+        code: 'MINISEARCH_LOADBINARY_DEPRECATED',
+      }),
+    )
+    emitWarning.mockRestore()
+  })
+
+  test('MSv5 async save uses same format and preserves search', async () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    const buf = await frozen.saveBinaryAsync()
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
+    const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
+    expect(loaded.search('zen')).toEqual(frozen.search('zen'))
+  })
+
+  test('saveBinarySync and saveBinaryAsync agree on payload CRC and header metadata', async () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    const syncBuf = frozen.saveBinarySync()
+    const asyncBuf = await frozen.saveBinaryAsync()
+    const syncMeta = msv5ComparableHeaderMeta(syncBuf)
+    const asyncMeta = msv5ComparableHeaderMeta(asyncBuf)
+    expect(asyncMeta).toEqual(syncMeta)
+  })
+
+  test('saveBinarySync vs async: same CRC/metadata on zstd-sized index', async () => {
+    const mutable = new MiniSearch({ fields: ['text'] })
+    mutable.addAll(Array.from({ length: 200 }, (_, i) => ({
+      id: i,
+      text: `payload ${'z'.repeat(120)} ${i}`,
+    })))
+    const frozen = mutable.freeze()
+    const syncBuf = frozen.saveBinarySync()
+    const asyncBuf = await frozen.saveBinaryAsync()
+    expect(readMsv5SnapshotCompressionMeta(syncBuf).payloadCodec).toBe(CODEC_ZSTD)
+    const syncMeta = msv5ComparableHeaderMeta(syncBuf)
+    const asyncMeta = msv5ComparableHeaderMeta(asyncBuf)
+    expect(asyncMeta).toEqual(syncMeta)
   })
 
   test('zstdCompressionWorthKeeping: 10% relative or 10 KiB absolute', () => {
@@ -70,7 +168,7 @@ describe('binaryMsv5', () => {
   test('single payload zstd stream with per-section catalogue offsets', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = mutable.freeze().saveBinary()
+    const buf = mutable.freeze().saveBinarySync()
     const meta = readMsv5SnapshotCompressionMeta(buf)
     expect(meta.formatRev).toBe(MSV5_FORMAT_REV_PAYLOAD)
     expect(meta.sections.length).toBe(12)
@@ -82,7 +180,7 @@ describe('binaryMsv5', () => {
       id: i,
       text: `payload ${'z'.repeat(120)} ${i}`,
     })))
-    const buf = mutable.freeze().saveBinary()
+    const buf = mutable.freeze().saveBinarySync()
     const meta = readMsv5SnapshotCompressionMeta(buf)
     expect(meta.formatRev).toBe(MSV5_FORMAT_REV_PAYLOAD)
     expect(meta.payloadCodec === CODEC_ZSTD || meta.payloadCodec === CODEC_RAW).toBe(true)
@@ -92,7 +190,7 @@ describe('binaryMsv5', () => {
     }
     const payloadOff = buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_OFFSET)
     expect(payloadOff).toBe(MSV5_HEADER_SIZE)
-    expect(FrozenMiniSearch.loadBinary(buf, { fields: ['text'] }).search('payload').length)
+    expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('payload').length)
       .toBeGreaterThan(0)
   })
 
@@ -102,12 +200,12 @@ describe('binaryMsv5', () => {
       id: i,
       text: `payload ${'z'.repeat(120)} ${i}`,
     })))
-    const buf = Buffer.from(mutable.freeze().saveBinary())
+    const buf = Buffer.from(mutable.freeze().saveBinarySync())
     const meta = readMsv5SnapshotCompressionMeta(buf)
     expect(meta.payloadCodec).toBe(CODEC_ZSTD)
     const stored = buf.readUInt32LE(MSV5_PAYLOAD_CRC_OFFSET)
     buf.writeUInt32LE((stored ^ 1) >>> 0, MSV5_PAYLOAD_CRC_OFFSET)
-    expect(() => FrozenMiniSearch.loadBinary(buf, { fields: ['text'] }))
+    expect(() => FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }))
       .toThrow(/payload CRC mismatch/)
   })
 
@@ -117,7 +215,7 @@ describe('binaryMsv5', () => {
       id: i,
       text: `payload ${'z'.repeat(120)} ${i}`,
     })))
-    const buf = Buffer.from(mutable.freeze().saveBinary())
+    const buf = Buffer.from(mutable.freeze().saveBinarySync())
     const meta = readMsv5SnapshotCompressionMeta(buf)
     expect(meta.payloadCodec).toBe(CODEC_ZSTD)
 
@@ -139,30 +237,40 @@ describe('binaryMsv5', () => {
   test('rejects payload sizes above 1 GiB', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(docs)
-    const buf = Buffer.from(mutable.freeze().saveBinary())
+    const buf = Buffer.from(mutable.freeze().saveBinarySync())
     buf.writeUInt32LE(1024 * 1024 * 1024 + 1, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
-    expect(() => FrozenMiniSearch.loadBinary(buf, { fields: ['text'] }))
+    expect(() => FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }))
       .toThrow(/1 GiB/)
   })
 
   test('encodeFrozenSnapshotMsv5 round-trips programmatic snapshot', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(Array.from({ length: 50 }, (_, i) => ({ id: i, text: `doc ${i}` })))
-    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinary())
+    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinarySync())
     const buf = encodeFrozenSnapshotMsv5(snap)
     const dir = readMsv5SectionDirectory(buf)
     expect(dir[Msv5SectionId.Core].uncompressedLength).toBe(16)
-    expect(FrozenMiniSearch.loadBinary(buf, { fields: ['text'] }).search('doc').length)
+    expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('doc').length)
       .toBeGreaterThan(0)
   })
 
-  test('loadBinary still reads legacy MSv4', () => {
+  test('loadBinary still reads deprecated MSv4 and emits DeprecationWarning', () => {
+    resetDeprecatedBinaryWarningsForTests()
+    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinary())
+    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinarySync())
     const legacy = encodeFrozenSnapshotMSv4(snap)
-    const loaded = FrozenMiniSearch.loadBinary(legacy, options)
+    const loaded = FrozenMiniSearch.loadBinarySync(legacy, options)
     expect(loaded.search('hello').length).toBeGreaterThan(0)
+    expect(emitWarning).toHaveBeenCalledWith(
+      expect.stringContaining('MSv4'),
+      expect.objectContaining({
+        type: 'DeprecationWarning',
+        code: 'MINISEARCH_MSv4_DEPRECATED',
+      }),
+    )
+    emitWarning.mockRestore()
   })
 })
 
@@ -177,7 +285,7 @@ describe('binaryMsv5 load memory', () => {
       text: `term${i % 200} repeated content ${i}`,
     }))
     mutable.addAll(big)
-    const buf = mutable.freeze().saveBinary()
+    const buf = mutable.freeze().saveBinarySync()
     const fileBytes = buf.length
 
     global.gc()

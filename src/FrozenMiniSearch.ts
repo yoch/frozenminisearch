@@ -17,6 +17,7 @@ import {
   decodeFrozenSnapshot,
   decodeFrozenSnapshotAsync,
   encodeFrozenSnapshot,
+  encodeFrozenSnapshotAsync,
   fieldNamesFromFieldIds,
 } from './binaryFormat'
 import { createIdToShortIdLookup, type IdToShortIdLookup } from './frozenIdLookup'
@@ -59,6 +60,7 @@ import type {
   OptionsWithDefaults,
 } from './frozenTypes'
 export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
+import { warnDeprecatedBinaryApi } from './binaryDeprecation'
 import { DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
 
@@ -377,7 +379,8 @@ export default class FrozenMiniSearch<T = any> {
     return autoSuggestFromSearch((q, o) => this.search(q, o), queryString, merged)
   }
 
-  saveBinary(): Buffer {
+  /** Serialize this index as an **MSv5** frozen snapshot buffer (synchronous). */
+  saveBinarySync(): Buffer {
     return encodeFrozenSnapshot({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -393,11 +396,50 @@ export default class FrozenMiniSearch<T = any> {
     }, undefined, this._index)
   }
 
-  static loadBinary<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
+  /**
+   * @deprecated Use {@link saveBinarySync} or {@link saveBinaryAsync} explicitly.
+   */
+  saveBinary(): Buffer {
+    warnDeprecatedBinaryApi('saveBinary')
+    return this.saveBinarySync()
+  }
+
+  /** Non-blocking zstd compression; same MSv5 output as {@link saveBinarySync}. */
+  async saveBinaryAsync(): Promise<Buffer> {
+    return encodeFrozenSnapshotAsync({
+      documentCount: this._documentCount,
+      nextId: this._nextId,
+      fieldIds: this._fieldIds,
+      fieldCount: this._fieldCount,
+      fieldNames: fieldNamesFromFieldIds(this._fieldIds),
+      avgFieldLength: this._avgFieldLength,
+      externalIds: this._externalIds,
+      storedFields: this._storedFields,
+      fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
+      treeShape: [],
+      postings: this._postings,
+    }, undefined, this._index)
+  }
+
+  /**
+   * Load a frozen snapshot from a buffer (**MSv5**; **MSv3/MSv4** readable but deprecated).
+   */
+  static loadBinarySync<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     const snap = decodeFrozenSnapshot(buffer)
     return FrozenMiniSearch.fromBinarySnapshot(snap, options)
   }
 
+  /**
+   * @deprecated Use {@link loadBinarySync} or {@link loadBinaryAsync} explicitly.
+   */
+  static loadBinary<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
+    warnDeprecatedBinaryApi('loadBinary')
+    return FrozenMiniSearch.loadBinarySync(buffer, options)
+  }
+
+  /**
+   * Load MSv5 with streaming zstd decompression (bounded memory). Non-MSv5 buffers fall back to {@link loadBinarySync}.
+   */
   static async loadBinaryAsync<T>(
     buffer: Buffer,
     options: Options<T> = {} as Options<T>,

@@ -50,6 +50,7 @@ function writePackedNode(chunks: Buffer[], tree: PackedRadixTree, node: number):
   }
 }
 
+/** @deprecated MSv3/MSv4 recursive DFS term-tree section; MSv5 uses columnar wire in `packedRadixBinaryMsv5.ts`. */
 export function buildTermTreeSectionFromPacked(tree: PackedRadixTree): Buffer {
   const chunks: Buffer[] = []
   writePackedNode(chunks, tree, 0)
@@ -184,6 +185,7 @@ function flattenDecodedNodes(nodes: DecodeNodeScratch[], termCount: number): Pac
   }
 }
 
+/** @deprecated MSv3/MSv4 recursive DFS term-tree section; MSv5 uses columnar wire in `packedRadixBinaryMsv5.ts`. */
 export function readPackedTermTreeSection(
   buf: Buffer,
   offset: number,

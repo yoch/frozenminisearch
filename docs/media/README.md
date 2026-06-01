@@ -16,6 +16,7 @@ Reproducible memory and CPU measurements for regression tracking.
 | `yarn benchmark:targeted` | Run failure-prone scenarios only → stdout or `--out file.json` |
 | `yarn benchmark:targeted:compare` | Compare two targeted captures; fails only if **after** regresses vs **before** |
 | `yarn benchmark:baseline:update` | `record` + copy to `reference.json` |
+| `yarn benchmark:binary-format` | MSv5 vs MSv4/MSv3 size + save/load on benchmark corpora (no baseline file) |
 | `benchmarks/scripts/record-history.sh` | Append HEAD → `perf-history.jsonl` (clean tree) |
 | `benchmarks/scripts/analyze-history.sh` | Timeline, compare, CHANGELOG snippets, vs mutable |
 

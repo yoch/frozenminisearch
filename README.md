@@ -140,7 +140,8 @@ count on freeze if the hint was too large.
 - **`fromDocuments()`** — build that structure in one pass (skips nested `Map` postings and radix cloning at freeze time).
 - **`createFrozenIndexBuilder()`** — same output without a temporary `documents[]` array; finalize with `freezeFrozenIndexBuilder(builder)` (or `assembleFrozen(builder.freezeParams())` for custom assembly).
 - **`fromAsyncIterable()`** — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + `for await` + `freezeFrozenIndexBuilder`.
-- **`saveBinarySync()` / `loadBinarySync()` / `loadBinaryAsync()`** — `saveBinarySync()` writes **MSv5** (single postings wire, packed columnar radix tree, optional single-payload zstd). `loadBinaryAsync()` streams zstd decompression and materializes one section at a time (bounded memory), while `loadBinarySync()` is the synchronous path. **MSv1/MSv2 are not supported**; **MSv3/MSv4 remain readable but deprecated**. Field names are stored in the snapshot; `fields` in load options is **optional** (if provided, it must match exactly). Custom `tokenize` / `processTerm` are **not** stored — pass the same functions at load time if you customized them. `storeFields` data is embedded in the snapshot.
+- **Binary snapshots (save / load)** — `saveBinarySync()` / `saveBinaryAsync()` write **MSv5** format (compact, zstd-compressed). Reload with `loadBinarySync(buffer, options)` (whole buffer in memory) or `loadBinaryAsync(buffer, options)` (lower peak RAM on zstd payloads). Older **MSv3** / **MSv4** files still load; re-save with `saveBinarySync()` to upgrade to MSv5.
+- **What the snapshot stores** — field names and `storeFields` payloads are embedded. The `fields` option on load is **optional** (names come from the file); if you pass it, it must match exactly. **`tokenize` / `processTerm` are not stored** — pass the same functions at load time when you customized indexing.
 - **Deprecated aliases** — `saveBinary()` and `loadBinary()` still point to the sync implementations and emit a one-time `DeprecationWarning` asking to choose `*Sync()` or `*Async()` explicitly.
 - **Term frequencies** — stored as `Uint8` (max 255 per doc/term); only affects scores for extreme term repetition.
 - **`frozenMemoryBreakdown()`** — introspect postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).
@@ -189,7 +190,7 @@ TypeScript definitions: `dist/es/index.d.ts`.
 
 | Area | Change | Effect |
 |------|--------|--------|
-| **Format** | MSv3 replaces MSv1/MSv2 (breaking) | CRC32 payload check; binary field names, ids, stored fields, term tree |
+| **Format** | MSv3 binary snapshots (8.0+) | CRC32 payload check; binary field names, ids, stored fields, term tree |
 | **Format** | MSv4: sparse postings, `Uint16` doc ids when `nextId ≤ 65535` | Smaller on-disk + in-memory footprint for multi-field indexes |
 | **Format** | MSv3/MSv4 (8.2+): no dictionary section; terms only in packed tree | Smaller snapshots; same MSv3 vs MSv4 encode choice as before |
 | **Term index** | Packed radix tree (`PackedRadixTree` internally) | Smaller footprint and cache-friendly term lookup vs `SearchableMap` at query time |
@@ -238,17 +239,19 @@ npm run build
 
 Use `npm run` for scripts (Yarn 1.x on Node 22 prints `url.parse` deprecation noise when invoking `yarn test` / `yarn build`).
 
-**Publish stable** (updates npm `latest`):
+### Release checklist
 
-```bash
-npm run release:stable
-```
+The npm tarball ships `dist` + markdown only; **`docs/` is for the repo / GitHub Pages** and is **not** regenerated on publish. Before releasing:
 
-**Publish a pre-release** (dist-tag `beta` only):
+1. Bump `version` in `package.json` and update [CHANGELOG.md](./CHANGELOG.md).
+2. `npm test` and `npm run build` (also run by `prepublishOnly` on publish).
+3. If **README** or **public API** changed: `npm run build-docs`, then commit `docs/` (TypeDoc output — do not edit `docs/index.html` by hand).
+4. Commit version + changelog (+ docs if step 3) on a clean tree.
+5. Publish:
+   - **Stable** (`latest`): `npm run release:stable`
+   - **Pre-release** (`beta` tag only): `npm run release:beta`
 
-```bash
-npm run release:beta
-```
+Optional after a stable release: refresh [benchmark reference](benchmarks/README.md) on a clean tree (separate commit).
 
 **Requirements:** Node.js **22.15.0+** (declared in `engines`) — this is where `node:zlib` gained the zstd APIs used by MSv5 snapshots. On older runtimes the library still works: `saveBinarySync()` / `saveBinaryAsync()` fall back to a **raw (uncompressed) payload** (interoperable, just larger), and reading a zstd snapshot throws a clear error asking to upgrade Node. No browser UMD/CDN build in this fork (Node-only ESM + CJS).
 

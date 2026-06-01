@@ -20,7 +20,7 @@ MSv5 frozen binary snapshots by default, with explicit sync/async save/load APIs
   - **Single zstd payload** (`node:zlib`, level 9, `pledgedSrcSize`, no frame checksum) — 12 logical sections in one compressed stream (better ratio than per-section compression). Raw when &lt; 64 B or when zstd does not strictly shrink the payload. Uncompressed section directory + per-section CRC-32. Hard cap at 1 GiB decompressed payload
   - **`saveBinaryAsync()` / `loadBinaryAsync()`** — non-blocking zstd compress on save; streaming zstd decompress on load (one section at a time, bounded RAM). Sync load caps decompression at the same 1 GiB trust boundary
   - **`saveBinary()` / `loadBinary()` deprecated** — aliases to sync paths with a one-time `DeprecationWarning`; use `*Sync()` or `*Async()` explicitly
-  - **MSv3 / MSv4 deprecated** — still readable via `loadBinarySync()` (one-time warning per format); re-save with `saveBinarySync()` for MSv5. MSv1/MSv2 rejected. Legacy encoders remain for tests only
+  - **MSv3 / MSv4 deprecated** — still readable via `loadBinarySync()` (one-time warning per format); re-save with `saveBinarySync()` for MSv5. Legacy encoders remain for tests only
   - **Node.js 22.15.0+** recommended for MSv5 zstd (`node:zlib`). Re-save existing snapshots with `saveBinarySync()` to benefit from MSv5; golden baseline at `34a47bf` (see **8.3.1** for `engines` and graceful fallback on older runtimes)
 
 ## v8.2.5
@@ -85,7 +85,7 @@ dictionary section.
   - Benchmark harness: 3×50 defaults, `benchmark:diff` without re-run, heap-floor
     policy for small frozen corpora
   - [breaking change] Re-save binary snapshots from **8.1.x** or **8.2.0-beta0**
-    (dictionary section layout). MSv1/MSv2 remain unsupported
+    (dictionary section layout)
 
 ## v8.2.0-beta1
 
@@ -169,7 +169,7 @@ First stable release of `@yoch/minisearch` (Node.js fork of MiniSearch).
     `FrozenIndexBuilder`, `fromAsyncIterable`, and search parity with mutable `MiniSearch`
     when built with the same options
   - **MSv3 binary snapshots** (`saveBinary` / `loadBinary`): CRC-32 integrity, embedded field
-    names and stored fields; MSv1/MSv2 not supported (re-save with `saveBinary()`)
+    names and stored fields
   - **Mutable `MiniSearch`** retained for incremental indexing (`add`, `remove`, `discard`, JSON
     serialize)
   - Node-only ESM + CJS build; no browser UMD bundle in this package
@@ -178,14 +178,14 @@ Consolidates changes shipped in `8.0.0-beta.0` through `8.0.0-beta.4`.
 
 ## v8.0.0-beta.4
 
-**Breaking:** binary snapshots use **MSv3** only. Files written with MSv1 or MSv2
-(beta.3 and earlier) must be re-saved with `saveBinary()`.
+**Breaking:** binary snapshots use **MSv3** only. Files written with **8.0.0-beta.3**
+and earlier must be re-saved with `saveBinary()`.
 
-  - Replace MSv1/MSv2 with MSv3: CRC-32 payload integrity, binary field names,
-    external ids, stored fields, and term tree (no JSON metadata section)
+  - **MSv3**: CRC-32 payload integrity, binary field names, external ids, stored
+    fields, and term tree (no JSON metadata section)
   - `loadBinary`: `fields` option is optional when reloading (names are embedded
     in the snapshot); if provided, must still match exactly
-  - Reject legacy MSv1/MSv2 buffers with a clear error message
+  - Reject unknown or pre-MSv3 binary buffers with a clear error message
   - Preserve radix tree sibling order on encode (prefix/fuzzy/autoSuggest parity
     after round-trip)
 
@@ -233,9 +233,9 @@ binary serialization; packaging no longer ships a browser UMD bundle.
   - Add `FrozenMiniSearch`, a read-only index with compact TypedArray postings,
     built via `MiniSearch#freeze()` or `FrozenMiniSearch.loadBinary()`
   - Add `saveBinary()` / `FrozenMiniSearch.loadBinary()` for smaller on-disk
-    snapshots and faster loads than `JSON.stringify` / `loadJSON` (`MSv2` flat
-    postings on write; `MSv1` still readable on load; same `fields`, `tokenize`,
-    and `processTerm` as at index build time are still required in `options`)
+    snapshots and faster loads than `JSON.stringify` / `loadJSON` (same `fields`,
+    `tokenize`, and `processTerm` as at index build time are still required in
+    `options`)
   - Flat in-memory postings (`allDocIds` / `allFreqs` buffers) reduce JS object
     overhead; `frozenMemoryBreakdown()` for benchmark profiling
   - Frozen postings clamp per-doc term frequency to 255 (Uint8). This can

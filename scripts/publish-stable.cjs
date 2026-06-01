@@ -19,6 +19,7 @@ function run (cmd, args) {
   if (r.status !== 0) process.exit(r.status ?? 1)
 }
 
-console.log(`Publishing ${name}@${version} (dist-tag latest)…\n`)
+console.log(`Publishing ${name}@${version} (dist-tag latest)…`)
+console.log('Reminder: if README/API changed, run `npm run build-docs` and commit docs/ before this step.\n')
 run('npm', ['publish'])
 console.log(`\nDone. Verify: npm view ${name} version dist-tags`)

@@ -362,7 +362,6 @@ and leaf invariants via `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts`.
 **deprecated** (emit a one-time `DeprecationWarning`; re-save with **`saveBinarySync()`**).
 **`loadBinaryAsync()`** is the memory-bounded streaming path for compressed MSv5.
 `saveBinary()` and `loadBinary()` remain as deprecated aliases to sync methods and emit one-time deprecation warnings.
-MSv1/MSv2 are not supported and must be re-saved as MSv5.
 
 ### PackedRadixTree module (internal)
 

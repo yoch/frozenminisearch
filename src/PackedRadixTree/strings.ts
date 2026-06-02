@@ -4,11 +4,14 @@ export function labelSlice(heap: string, start: number, len: number): string {
   return heap.slice(start, start + len)
 }
 
+/** Rebuild a fuzzy-search path from heap label segments (used by fuzzy traversal only). */
 export function buildTermFromSegments(heap: string, segments: LabelSegment[]): string {
-  if (segments.length === 0) return ''
-  let out = ''
-  for (const seg of segments) {
-    out += labelSlice(heap, seg.start, seg.len)
+  const depth = segments.length
+  if (depth === 0) return ''
+  if (depth === 1) return labelSlice(heap, segments[0].start, segments[0].len)
+  const parts = new Array<string>(depth)
+  for (let i = 0; i < depth; i++) {
+    parts[i] = labelSlice(heap, segments[i].start, segments[i].len)
   }
-  return out
+  return parts.join('')
 }

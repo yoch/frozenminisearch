@@ -2,6 +2,12 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+PackedRadixTree subtree iteration performance (no API or iteration-order change).
+
+  - Replace recursive `yield*` DFS with an **explicit prefix stack** for `entries()` / `prefixEntries()` — large CPU win on benchmark corpora vs the previous recursive segment-stack implementation (see dev bench `yarn benchmark:packed-emit`)
+
 ## v8.3.2
 
 Fuzzy search length pruning (no API or result-set change).

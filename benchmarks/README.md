@@ -36,6 +36,22 @@ yarn benchmark:packed-fuzzy
 
 Le smoke CPU de `yarn benchmark:packed-radix` inclut aussi `fuzzy(query,k)` sur le corpus `scale` (k=1,2).
 
+### emitSubtree / prefix iteration (production DFS)
+
+Mesure `entries()` et `prefixEntries()` sur corpora synthétiques + BDPM, avec préfixes à fort fan-out découverts automatiquement :
+
+```bash
+yarn benchmark:packed-emit
+yarn benchmark:packed-emit -- --baseline   # → benchmarks/baselines/packed-emit-latest.json
+```
+
+Profiling CPU :
+
+```bash
+npm run build-packed-radix-bench
+node --cpu-prof --expose-gc benchmarks/dist/packedRadixEmitSubtree.cjs
+```
+
 ### Index BDPM / vétérinaire (fixtures réelles)
 
 Snapshots MSv5 copiés dans [`fixtures/medicaments-indexes/`](fixtures/medicaments-indexes/) (présentations, spécialités, compositions, etc.). Chargés via `decodeFrozenSnapshotMsv5` — même arbre packed qu’en production.

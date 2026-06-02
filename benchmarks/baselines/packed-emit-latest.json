@@ -1,0 +1,191 @@
+{
+  "metadata": {
+    "capturedAt": "2026-06-02T11:06:06.807Z",
+    "node": "v22.22.0",
+    "packageVersion": "8.3.2",
+    "gcExposed": true,
+    "git": {
+      "commit": "309bbd0db3cc6d0ef62f750397eda3b99aa2a2f1",
+      "commitShort": "309bbd0",
+      "branch": "master",
+      "dirty": true,
+      "trackedDirty": true
+    },
+    "warmup": 5,
+    "runs": 40,
+    "note": "Production emitSubtree (explicit stack + prefix strings)."
+  },
+  "corpora": {
+    "scale": {
+      "discovered": {
+        "sampled": 2000,
+        "fullScan": true,
+        "prefixShort": "zc",
+        "shortTerms": 10,
+        "shortHistCount": 10,
+        "prefixWide": "zc",
+        "wideTerms": 10,
+        "wideHistCount": 10,
+        "wideTarget": 400,
+        "treeSize": 2000
+      },
+      "timings": {
+        "entries-full": {
+          "medianMs": 0.48349550000000363,
+          "terms": 2000,
+          "nsPerTerm": 241.74775000000182
+        },
+        "prefix-discovered-short": {
+          "medianMs": 0.007168500000005906,
+          "terms": 10,
+          "prefix": "zc",
+          "nsPerTerm": 716.8500000005906
+        },
+        "prefix-discovered-wide": {
+          "medianMs": 0.007213499999991768,
+          "terms": 10,
+          "prefix": "zc",
+          "nsPerTerm": 721.3499999991768
+        }
+      }
+    },
+    "prefix-suffix-5k": {
+      "discovered": {
+        "sampled": 5000,
+        "fullScan": true,
+        "prefixShort": "bh",
+        "shortTerms": 1035,
+        "shortHistCount": 1035,
+        "prefixWide": "su",
+        "wideTerms": 1022,
+        "wideHistCount": 1022,
+        "wideTarget": 1000,
+        "treeSize": 5000
+      },
+      "timings": {
+        "entries-full": {
+          "medianMs": 1.234144499999985,
+          "terms": 5000,
+          "nsPerTerm": 246.82889999999702
+        },
+        "prefix-discovered-short": {
+          "medianMs": 0.24715900000001056,
+          "terms": 1035,
+          "prefix": "bh",
+          "nsPerTerm": 238.80096618358507
+        },
+        "prefix-discovered-wide": {
+          "medianMs": 0.33068099999997,
+          "terms": 1022,
+          "prefix": "su",
+          "nsPerTerm": 323.5626223091683
+        }
+      }
+    },
+    "mid-edge": {
+      "discovered": {
+        "sampled": 1,
+        "fullScan": true,
+        "prefixShort": "ac",
+        "shortTerms": 1,
+        "shortHistCount": 1,
+        "prefixWide": "ac",
+        "wideTerms": 1,
+        "wideHistCount": 1,
+        "wideTarget": 1,
+        "treeSize": 1
+      },
+      "timings": {
+        "entries-full": {
+          "medianMs": 0.0030650000000207456,
+          "terms": 1,
+          "nsPerTerm": 3065.0000000207456
+        },
+        "prefix-discovered-short": {
+          "medianMs": 0.0034204999999758456,
+          "terms": 1,
+          "prefix": "ac",
+          "nsPerTerm": 3420.4999999758456
+        },
+        "prefix-discovered-wide": {
+          "medianMs": 0.0034755000000075142,
+          "terms": 1,
+          "prefix": "ac",
+          "nsPerTerm": 3475.5000000075142
+        },
+        "mid-edge-prefix": {
+          "medianMs": 0.0034815000000207874,
+          "terms": 1,
+          "prefix": "acq",
+          "nsPerTerm": 3481.5000000207874
+        }
+      }
+    },
+    "bdpm-presentations": {
+      "discovered": {
+        "sampled": 37275,
+        "fullScan": true,
+        "prefixShort": "30",
+        "shortTerms": 7178,
+        "shortHistCount": 7178,
+        "prefixWide": "302",
+        "wideTerms": 2550,
+        "wideHistCount": 2550,
+        "wideTarget": 2500,
+        "treeSize": 37275
+      },
+      "timings": {
+        "entries-full": {
+          "medianMs": 12.218459500000051,
+          "terms": 37275,
+          "nsPerTerm": 327.7923407109337
+        },
+        "prefix-discovered-short": {
+          "medianMs": 1.3130709999999226,
+          "terms": 7178,
+          "prefix": "30",
+          "nsPerTerm": 182.92992477012018
+        },
+        "prefix-discovered-wide": {
+          "medianMs": 0.45679200000006404,
+          "terms": 2550,
+          "prefix": "302",
+          "nsPerTerm": 179.13411764708394
+        }
+      }
+    },
+    "bdpm-specialites": {
+      "discovered": {
+        "sampled": 23015,
+        "fullScan": true,
+        "prefixShort": "61",
+        "shortTerms": 1674,
+        "shortHistCount": 1674,
+        "prefixWide": "63",
+        "wideTerms": 1501,
+        "wideHistCount": 1501,
+        "wideTarget": 1500,
+        "treeSize": 23015
+      },
+      "timings": {
+        "entries-full": {
+          "medianMs": 5.892834000000107,
+          "terms": 23015,
+          "nsPerTerm": 256.0431892244235
+        },
+        "prefix-discovered-short": {
+          "medianMs": 0.31266900000002806,
+          "terms": 1674,
+          "prefix": "61",
+          "nsPerTerm": 186.7795698924899
+        },
+        "prefix-discovered-wide": {
+          "medianMs": 0.282049499999971,
+          "terms": 1501,
+          "prefix": "63",
+          "nsPerTerm": 187.90772818119316
+        }
+      }
+    }
+  }
+}

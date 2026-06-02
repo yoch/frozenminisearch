@@ -98,9 +98,22 @@ const packedRadixFuzzySweepBench = {
   plugins: packedRadixBenchPlugins,
 }
 
+const packedRadixEmitSubtreeBench = {
+  input: 'benchmarks/packedRadixEmitSubtree.js',
+  output: {
+    sourcemap: true,
+    dir: 'benchmarks/dist',
+    format: 'commonjs',
+    entryFileNames: 'packedRadixEmitSubtree.cjs',
+    plugins: [],
+  },
+  external: ['benchmark'],
+  plugins: packedRadixBenchPlugins,
+}
+
 function rollupExports () {
   if (process.env.PACKED_RADIX_BENCH === 'true') {
-    return [packedRadixBench, packedRadixFuzzyBench, packedRadixFuzzySweepBench]
+    return [packedRadixBench, packedRadixFuzzyBench, packedRadixFuzzySweepBench, packedRadixEmitSubtreeBench]
   }
   if (process.env.BENCHMARKS === 'true') return [benchmarks]
   return [

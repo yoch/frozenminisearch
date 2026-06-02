@@ -103,6 +103,8 @@
     "build-benchmark": "BENCHMARKS=true npm run build",
     "build-packed-radix-bench": "PACKED_RADIX_BENCH=true NODE_ENV=production rollup -c",
     "benchmark:packed-radix": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs",
+    "benchmark:packed-emit": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixEmitSubtree.cjs",
+    "benchmark:packed-emit:baseline": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixEmitSubtree.cjs --baseline",
     "benchmark:packed-fuzzy": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixFuzzy.cjs",
     "benchmark:packed-fuzzy-sweep": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixFuzzySweep.cjs",
     "benchmark:medicaments-indexes": "NODE_OPTIONS='--expose-gc' npx --yes tsx benchmarks/analyzeMedicamentsIndexes.js",

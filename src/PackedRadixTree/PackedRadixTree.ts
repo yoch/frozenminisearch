@@ -1,6 +1,6 @@
 import { packedRadixFuzzyEntries } from './fuzzy'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
-import { buildTermFromSegments, type LabelSegment } from './strings'
+import { labelSlice } from './strings'
 import type { PackedIndexArray, PackedRadixTreeData, PackedStringRadixMap } from './types'
 
 function labelsMatch(heap: string, start: number, len: number, key: string, keyOff: number): boolean {
@@ -8,6 +8,22 @@ function labelsMatch(heap: string, start: number, len: number, key: string, keyO
     if (heap.charCodeAt(start + i) !== key.charCodeAt(keyOff + i)) return false
   }
   return true
+}
+
+type EmitFrame = {
+  node: number
+  slot: number
+  first: number
+  leafSlot: number
+  prefix: string
+}
+
+function pushEmitFrame(frames: EmitFrame[], tree: PackedRadixTree, node: number, prefix: string): void {
+  const first = tree.nodeEdgeOffset[node]
+  const edgeCount = tree.nodeEdgeOffset[node + 1] - first
+  const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
+  const totalCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
+  frames.push({ node, slot: totalCount - 1, first, leafSlot, prefix })
 }
 
 export default class PackedRadixTree implements PackedStringRadixMap<number>, PackedRadixTreeData {
@@ -49,93 +65,103 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   }
 
   get(term: string): number | undefined {
-    let node = 0
-    let pos = 0
-    const n = term.length
-    const heap = this.labelHeap
-
-    while (pos < n) {
-      const ei = this.findEdge(node, term.charCodeAt(pos))
-      if (ei < 0) return undefined
-      const start = this.edgeLabelStart[ei]
-      const len = this.edgeLabelLength[ei]
-      if (pos + len > n) return undefined
-      if (!labelsMatch(heap, start, len, term, pos)) return undefined
-      pos += len
-      node = this.edgeChild[ei]
-    }
-
-    if (this.nodeLeafOrder[node] === 0) return undefined
-    return this.nodeValue[node]
+    const walk = this.walkKey(term, false)
+    if (walk == null || !walk.keyFullyConsumed) return undefined
+    if (this.nodeLeafOrder[walk.node] === 0) return undefined
+    return this.nodeValue[walk.node]
   }
 
   * entries(): IterableIterator<[string, number]> {
-    yield *this.emitSubtree(0, [])
+    yield *this.emitSubtree(0, '')
   }
 
   * prefixEntries(prefix: string): IterableIterator<[string, number]> {
-    if (prefix.length === 0) {
-      yield *this.entries()
-      return
-    }
+    const start = this.resolvePrefixWalk(prefix)
+    if (start == null) return
+    yield *this.emitSubtree(start.node, start.prefix)
+  }
 
+  /**
+   * Walk `prefix` to the subtree root; returns accumulated heap label prefix string.
+   * `null` when no terms share the prefix.
+   */
+  private resolvePrefixWalk(prefix: string): { node: number, prefix: string } | null {
+    if (prefix.length === 0) {
+      return { node: 0, prefix: '' }
+    }
+    const walk = this.walkKey(prefix, true)
+    if (walk == null) return null
+    return { node: walk.node, prefix: walk.prefix }
+  }
+
+  /**
+   * Follow `key` from the root. Shared by exact lookup and prefix iteration.
+   * Mid-edge stop uses the full edge label in `prefix` (SearchableMap parity).
+   */
+  private walkKey(
+    key: string,
+    accumulatePrefix: boolean,
+  ): { node: number, prefix: string, keyFullyConsumed: boolean } | null {
     let node = 0
-    const segments: LabelSegment[] = []
+    let prefixStr = ''
     let pos = 0
     const heap = this.labelHeap
-    const n = prefix.length
+    const n = key.length
 
     while (pos < n) {
-      const ei = this.findEdge(node, prefix.charCodeAt(pos))
-      if (ei < 0) return
+      const ei = this.findEdge(node, key.charCodeAt(pos))
+      if (ei < 0) return null
 
       const start = this.edgeLabelStart[ei]
       const len = this.edgeLabelLength[ei]
       const remaining = n - pos
 
       if (remaining < len) {
-        if (!labelsMatch(heap, start, remaining, prefix, pos)) return
-        segments.push({ start, len })
-        node = this.edgeChild[ei]
-        yield *this.emitSubtree(node, segments)
-        return
+        if (!labelsMatch(heap, start, remaining, key, pos)) return null
+        if (accumulatePrefix) prefixStr += labelSlice(heap, start, len)
+        return { node: this.edgeChild[ei], prefix: prefixStr, keyFullyConsumed: false }
       }
 
-      if (!labelsMatch(heap, start, len, prefix, pos)) return
-      segments.push({ start, len })
+      if (!labelsMatch(heap, start, len, key, pos)) return null
+      if (accumulatePrefix) prefixStr += labelSlice(heap, start, len)
       pos += len
       node = this.edgeChild[ei]
     }
 
-    yield *this.emitSubtree(node, segments)
+    return { node, prefix: prefixStr, keyFullyConsumed: true }
   }
 
   /**
+   * Fuzzy search still builds terms via segment stacks in {@link packedRadixFuzzyEntries}.
    * Depth-first traversal matching {@link SearchableMap}'s `TreeIterator`, which
    * visits siblings in reverse Map-insertion order (last key first). The leaf, if
    * any, sits at `nodeLeafOrder` among the original sibling slots; everything else
    * is an edge. Exact order matters for prefix iteration and autoSuggest parity.
    */
-  private * emitSubtree(node: number, segments: LabelSegment[]): IterableIterator<[string, number]> {
-    const first = this.nodeEdgeOffset[node]
-    const edgeCount = this.nodeEdgeOffset[node + 1] - first
-    const leafSlot = decodeLeafSlot(this.nodeLeafOrder[node])
-    const totalCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
+  private * emitSubtree(startNode: number, startPrefix: string): IterableIterator<[string, number]> {
     const heap = this.labelHeap
+    const frames: EmitFrame[] = []
+    pushEmitFrame(frames, this, startNode, startPrefix)
 
-    for (let slot = totalCount - 1; slot >= 0; slot--) {
-      const edgeOffset = edgeOffsetAtSlot(slot, leafSlot)
-      if (edgeOffset < 0) {
-        yield [buildTermFromSegments(heap, segments), this.nodeValue[node]]
+    while (frames.length) {
+      const frame = frames[frames.length - 1]
+      if (frame.slot < 0) {
+        frames.pop()
         continue
       }
-      const ei = first + edgeOffset
-      segments.push({
-        start: this.edgeLabelStart[ei],
-        len: this.edgeLabelLength[ei],
-      })
-      yield *this.emitSubtree(this.edgeChild[ei], segments)
-      segments.pop()
+
+      const slot = frame.slot--
+      const edgeOffset = edgeOffsetAtSlot(slot, frame.leafSlot)
+      if (edgeOffset < 0) {
+        yield [frame.prefix, this.nodeValue[frame.node]]
+        continue
+      }
+
+      const ei = frame.first + edgeOffset
+      const start = this.edgeLabelStart[ei]
+      const len = this.edgeLabelLength[ei]
+      const childPrefix = frame.prefix + labelSlice(heap, start, len)
+      pushEmitFrame(frames, this, this.edgeChild[ei], childPrefix)
     }
   }
 

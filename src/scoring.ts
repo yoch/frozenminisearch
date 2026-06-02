@@ -1,5 +1,13 @@
 import { readDocId, SegmentPostingList } from './compactPostings'
-import type { MatchInfo, SearchOptions, SearchResult, CombinationOperator, LowercaseCombinationOperator, BM25Params } from './searchTypes'
+import type {
+  MatchInfo,
+  SearchOptions,
+  SearchOptionsWithDefaults,
+  SearchResult,
+  CombinationOperator,
+  LowercaseCombinationOperator,
+  BM25Params,
+} from './searchTypes'
 
 export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
 
@@ -40,6 +48,32 @@ export interface AggregateContext {
 
 export const defaultBM25params: BM25Params = { k: 1.2, b: 0.7, d: 0.5 }
 
+/** Per-field BM25 constants hoisted out of posting loops (avgFieldLength is fixed per field). */
+type Bm25FieldConstants = {
+  k: number
+  d: number
+  k1: number
+  oneMinusB: number
+  bOverAvg: number
+}
+
+function bm25FieldConstants(bm25params: BM25Params, avgFieldLength: number): Bm25FieldConstants {
+  const { k, b, d } = bm25params
+  return { k, d, k1: k + 1, oneMinusB: 1 - b, bOverAvg: b / avgFieldLength }
+}
+
+function calcBM25ScoreWithConstants(
+  termFreq: number,
+  matchingCount: number,
+  totalCount: number,
+  fieldLength: number,
+  constants: Bm25FieldConstants,
+): number {
+  const { k, d, k1, oneMinusB, bOverAvg } = constants
+  const invDocFreq = Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
+  return invDocFreq * (d + termFreq * k1 / (termFreq + k * (oneMinusB + bOverAvg * fieldLength)))
+}
+
 export const calcBM25Score = (
   termFreq: number,
   matchingCount: number,
@@ -47,14 +81,30 @@ export const calcBM25Score = (
   fieldLength: number,
   avgFieldLength: number,
   bm25params: BM25Params,
-): number => {
-  const { k, b, d } = bm25params
-  const invDocFreq = Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
-  return invDocFreq * (d + termFreq * (k + 1) / (termFreq + k * (1 - b + b * fieldLength / avgFieldLength)))
-}
+): number => calcBM25ScoreWithConstants(
+  termFreq, matchingCount, totalCount, fieldLength, bm25FieldConstants(bm25params, avgFieldLength),
+)
 
 export const getOwnProperty = (object: Record<string, unknown>, property: string): unknown =>
   Object.prototype.hasOwnProperty.call(object, property) ? object[property] : undefined
+
+/** Field boosts for one query spec; `names` is computed once from `boosts`. */
+export type FieldBoostsForQuery = {
+  names: string[]
+  boosts: { [field: string]: number }
+}
+
+export function fieldBoostsForQuery(
+  options: SearchOptionsWithDefaults,
+  fields: string[],
+): FieldBoostsForQuery {
+  const searchFields = options.fields || fields
+  const boosts: { [field: string]: number } = {}
+  for (const field of searchFields) {
+    boosts[field] = (getOwnProperty(options.boost as Record<string, unknown>, field) as number) || 1
+  }
+  return { names: Object.keys(boosts), boosts }
+}
 
 export const assignUniqueTerm = (target: string[], term: string): void => {
   if (!target.includes(term)) target.push(term)
@@ -104,8 +154,7 @@ function scorePostingDoc(
   matchingFields: number,
   context: AggregateContext,
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
-  bm25params: BM25Params,
-  avgFieldLength: number,
+  bm25: Bm25FieldConstants,
   results: RawResult,
 ): void {
   const docBoost = boostDocumentFn
@@ -114,7 +163,9 @@ function scorePostingDoc(
   if (!docBoost) return
 
   const fieldLength = context.getFieldLength(docId, fieldId)
-  const rawScore = calcBM25Score(termFreq, matchingFields, context.documentCount, fieldLength, avgFieldLength, bm25params)
+  const rawScore = calcBM25ScoreWithConstants(
+    termFreq, matchingFields, context.documentCount, fieldLength, bm25,
+  )
   const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
 
   const result = results.get(docId)
@@ -151,7 +202,7 @@ function aggregateSegmentPostingList(
   results: RawResult,
 ): number {
   let matchingFields = list.length
-  const avgFieldLength = context.avgFieldLength[fieldId]
+  const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
   const { docIds, freqs, offset, length } = list
 
   for (let i = 0; i < length; i++) {
@@ -167,7 +218,7 @@ function aggregateSegmentPostingList(
     scorePostingDoc(
       sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
       termWeight, termBoost, fieldBoost, matchingFields,
-      context, boostDocumentFn, bm25params, avgFieldLength, results,
+      context, boostDocumentFn, bm25, results,
     )
   }
   return matchingFields
@@ -179,7 +230,7 @@ export function aggregateTerm(
   termWeight: number,
   termBoost: number,
   fieldTermData: FieldTermDataLike | undefined,
-  fieldBoosts: { [field: string]: number },
+  fieldBoosts: FieldBoostsForQuery,
   context: AggregateContext,
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25params: BM25Params,
@@ -187,8 +238,8 @@ export function aggregateTerm(
 ): RawResult {
   if (fieldTermData == null) return results
 
-  for (const field of Object.keys(fieldBoosts)) {
-    const fieldBoost = fieldBoosts[field]
+  for (const field of fieldBoosts.names) {
+    const fieldBoost = fieldBoosts.boosts[field]
     const fieldId = context.fieldIds[field]
     const postingList = fieldTermData.get(fieldId)
     if (postingList == null) continue
@@ -203,7 +254,7 @@ export function aggregateTerm(
     }
 
     let matchingFields = postingList.size
-    const avgFieldLength = context.avgFieldLength[fieldId]
+    const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
 
     postingList.forEachDoc((docId, termFreq) => {
       if (context.isDocActive != null && !context.isDocActive(docId)) {
@@ -215,7 +266,7 @@ export function aggregateTerm(
       scorePostingDoc(
         sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
         termWeight, termBoost, fieldBoost, matchingFields,
-        context, boostDocumentFn, bm25params, avgFieldLength, results,
+        context, boostDocumentFn, bm25, results,
       )
     })
   }
@@ -241,19 +292,19 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
     return a
   },
   [AND]: (a, b) => {
-    const combined = new Map<number, RawResultValue>()
-    for (const docId of b.keys()) {
-      const existing = a.get(docId)
-      if (existing == null) continue
-      const { score, terms, match } = b.get(docId)!
+    for (const docId of a.keys()) {
+      const inB = b.get(docId)
+      if (inB == null) {
+        a.delete(docId)
+        continue
+      }
+      const existing = a.get(docId)!
+      const { score, terms, match } = inB
+      existing.score += score
       assignUniqueTerms(existing.terms, terms)
-      combined.set(docId, {
-        score: existing.score + score,
-        terms: existing.terms,
-        match: Object.assign(existing.match, match),
-      })
+      Object.assign(existing.match, match)
     }
-    return combined
+    return a
   },
   [AND_NOT]: (a, b) => {
     for (const docId of b.keys()) a.delete(docId)
@@ -261,6 +312,10 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
   },
 }
 
+/**
+ * Combines per-term raw results. Mutates `results[0]` in place (OR/AND/AND_NOT); do not reuse
+ * other entries in `results` after this call.
+ */
 export function combineResults(results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
   if (results.length === 0) return new Map()
   const operator = combineWith.toLowerCase() as LowercaseCombinationOperator

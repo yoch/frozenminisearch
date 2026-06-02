@@ -3,8 +3,8 @@ import type { FrozenTermIndex } from './frozenTermIndex'
 import {
   aggregateTerm,
   combineResults,
+  fieldBoostsForQuery,
   termToQuerySpec,
-  getOwnProperty,
   type AggregateContext,
   type FieldTermDataLike,
   type QuerySpec,
@@ -104,25 +104,13 @@ export function createQueryIndexView<L>(
   }
 }
 
-function fieldBoostsFromOptions(
-  options: SearchOptionsWithDefaults,
-  fields: string[],
-): { [field: string]: number } {
-  const searchFields = options.fields || fields
-  const boosts: { [field: string]: number } = {}
-  for (const field of searchFields) {
-    boosts[field] = (getOwnProperty(options.boost as Record<string, unknown>, field) as number) || 1
-  }
-  return boosts
-}
-
 function executeQuerySpec(
   query: QuerySpec,
   searchOptions: SearchOptions,
   params: QueryEngineParams,
 ): RawResult {
   const options: SearchOptionsWithDefaults = { ...params.globalSearchOptions, ...searchOptions }
-  const boosts = fieldBoostsFromOptions(options, params.fields)
+  const fieldBoosts = fieldBoostsForQuery(options, params.fields)
   const { boostDocument, weights, maxFuzzy, bm25 } = options
   const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
   const { indexView, aggregateContext } = params
@@ -134,7 +122,7 @@ function executeQuerySpec(
     results?: RawResult,
   ): RawResult => aggregateTerm(
     query.term, derivedTerm, termWeight, query.termBoost,
-    data, boosts, aggregateContext, boostDocument, bm25, results,
+    data, fieldBoosts, aggregateContext, boostDocument, bm25, results,
   )
 
   const results = score(query.term, 1, indexView.getTermData(query.term))

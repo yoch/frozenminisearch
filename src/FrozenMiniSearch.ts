@@ -89,18 +89,32 @@ function assertFieldsMatchSnapshot(
   }
 }
 
-/** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts. */
-export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
+function assembleFrozenInternal<T>(
+  params: FrozenAssembleParams<T>,
+  trustedSource: boolean,
+): FrozenMiniSearch<T> {
   const termCount = params.termCount
-  validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
   if (params.fieldLengthMatrix.length !== params.nextId * params.fieldCount) {
     throw new Error('FrozenMiniSearch: fieldLengthMatrix size mismatch')
   }
   if (params.avgFieldLength.length !== params.fieldCount) {
     throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
   }
-  validateFrozenTermIndexLeaves(params.index, termCount)
+  if (!trustedSource) {
+    validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
+    validateFrozenTermIndexLeaves(params.index, termCount)
+  }
   return new FrozenMiniSearch(params)
+}
+
+/** Trusted build paths only (same package); skips O(postings) layout checks. */
+function assembleFrozenTrusted<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
+  return assembleFrozenInternal(params, true)
+}
+
+/** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts (full validation). */
+export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
+  return assembleFrozenInternal(params, false)
 }
 
 function buildFlatPostingsFromSource<T>(
@@ -196,7 +210,7 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
 
   const flat = buildFlatPostingsFromSource(source, fieldCount, resolvedNextId, shortIdRemap)
 
-  return assembleFrozen({
+  return assembleFrozenTrusted({
     options: source.options,
     documentCount,
     nextId: resolvedNextId,
@@ -214,12 +228,12 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
 }
 
 export function buildFrozenFromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
-  return assembleFrozen(buildFrozenParamsFromDocuments(documents, options))
+  return assembleFrozenTrusted(buildFrozenParamsFromDocuments(documents, options))
 }
 
 /** Finalize a {@link FrozenIndexBuilder} into a read-only index. */
 export function freezeFrozenIndexBuilder<T>(builder: FrozenIndexBuilder<T>): FrozenMiniSearch<T> {
-  return assembleFrozen(builder.freezeParams())
+  return assembleFrozenTrusted(builder.freezeParams())
 }
 
 export default class FrozenMiniSearch<T = any> {

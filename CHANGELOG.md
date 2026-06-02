@@ -4,6 +4,8 @@
 
 ## Unreleased
 
+## v8.3.3
+
 PackedRadixTree subtree iteration performance (no API or iteration-order change for `entries()` / `prefixEntries()`).
 
   - Replace recursive `yield*` DFS with an **explicit prefix stack** for `entries()` / `prefixEntries()` — large CPU win on benchmark corpora vs the previous recursive segment-stack implementation (see dev bench `yarn benchmark:packed-emit`)

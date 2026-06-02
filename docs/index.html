@@ -1,11 +1,11 @@
 <!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>@yoch/minisearch</title><meta name="description" content="Documentation for @yoch/minisearch"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">@yoch/minisearch</a><div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>@yoch/minisearch</h1></div><div class="tsd-panel tsd-typography"><h1 id="yochminisearch" class="tsd-anchor-link">@yoch/minisearch<a href="#yochminisearch" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
 <p><strong>In-memory full-text search for Node.js</strong> — a fork of <a href="https://github.com/lucaong/minisearch">MiniSearch</a> by <a href="https://github.com/lucaong/minisearch">Luca Ongaro</a>, extended for <strong>production serving</strong>: smaller indexes, faster loads, and a read-only fast path.</p>
 <blockquote>
-<p><strong>Current release:</strong> <code>8.3.1</code> · install with <code>npm install @yoch/minisearch</code></p>
+<p><strong>Current release:</strong> <code>8.3.2</code> · install with <code>npm install @yoch/minisearch</code></p>
 </blockquote>
 <hr>
 <h2 id="why-this-fork" class="tsd-anchor-link">Why this fork?<a href="#why-this-fork" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p><a href="https://github.com/lucaong/minisearch">MiniSearch</a> is excellent for building and querying an index in JavaScript. This fork keeps that API for <strong>mutable</strong> indexing, and adds <strong><code>FrozenMiniSearch</code></strong> for when the index is built once and queried many times:</p>
+<p><a href="https://github.com/lucaong/minisearch">MiniSearch</a> is excellent for building and querying an index in JavaScript. This fork keeps that familiar API for <strong>mutable</strong> indexing and adds <strong><code>FrozenMiniSearch</code></strong> — born from a single goal, <em>shrink the in-memory index</em>, for when the corpus is built once and queried many times:</p>
 <table>
 <thead>
 <tr>
@@ -33,7 +33,7 @@
 <tr>
 <td><strong>Typical search</strong></td>
 <td>Baseline</td>
-<td>Often <strong>~20–35% faster</strong> p50 on the same corpus (see benchmarks)</td>
+<td>Often <strong>~20–45% faster</strong> p50 on the same corpus (see <a href="#benchmarks">benchmarks</a>)</td>
 </tr>
 </tbody>
 </table>
@@ -44,18 +44,27 @@
 </code><button type="button">Copy</button></pre>
 
 <p><strong>One-shot frozen index</strong> (no mutable step):</p>
-<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">options</span><span class="hl-1"> = { </span><span class="hl-4">fields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;text&#39;</span><span class="hl-1">], </span><span class="hl-4">storeFields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">] }</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">index</span><span class="hl-1"> = </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">fromDocuments</span><span class="hl-1">(</span><span class="hl-4">documents</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">)</span><br/><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">search</span><span class="hl-1">(</span><span class="hl-2">&#39;ishmael&#39;</span><span class="hl-1">, { </span><span class="hl-4">prefix:</span><span class="hl-1"> </span><span class="hl-5">true</span><span class="hl-1"> })</span><br/><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">autoSuggest</span><span class="hl-1">(</span><span class="hl-2">&#39;zen&#39;</span><span class="hl-1">)</span><br/><br/><span class="hl-7">// Persist and reload</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">buf</span><span class="hl-1"> = </span><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">saveBinarySync</span><span class="hl-1">()</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">loaded</span><span class="hl-1"> = </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">loadBinarySync</span><span class="hl-1">(</span><span class="hl-4">buf</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">)</span>
+<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">options</span><span class="hl-1"> = { </span><span class="hl-4">fields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;text&#39;</span><span class="hl-1">], </span><span class="hl-4">storeFields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">] }</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">index</span><span class="hl-1"> = </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">fromDocuments</span><span class="hl-1">(</span><span class="hl-4">documents</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">)</span><br/><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">search</span><span class="hl-1">(</span><span class="hl-2">&#39;ishmael&#39;</span><span class="hl-1">, { </span><span class="hl-4">prefix:</span><span class="hl-1"> </span><span class="hl-5">true</span><span class="hl-1"> })</span><br/><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">autoSuggest</span><span class="hl-1">(</span><span class="hl-2">&#39;zen&#39;</span><span class="hl-1">)</span><br/><br/><span class="hl-7">// Persist and reload</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">buf</span><span class="hl-1"> = </span><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">saveBinarySync</span><span class="hl-1">()</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">loaded</span><span class="hl-1"> = </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">loadBinarySync</span><span class="hl-1">(</span><span class="hl-4">buf</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">)</span>
 </code><button type="button">Copy</button></pre>
 
 <p><strong>Mutable index, then freeze</strong> (incremental build):</p>
 <pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">MiniSearch</span><span class="hl-1">, { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">ms</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">MiniSearch</span><span class="hl-1">({ </span><span class="hl-4">fields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;text&#39;</span><span class="hl-1">] })</span><br/><span class="hl-4">ms</span><span class="hl-1">.</span><span class="hl-0">addAll</span><span class="hl-1">(</span><span class="hl-4">documents</span><span class="hl-1">)</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">frozen</span><span class="hl-1"> = </span><span class="hl-4">ms</span><span class="hl-1">.</span><span class="hl-0">freeze</span><span class="hl-1">()   </span><span class="hl-7">// immutable snapshot</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">buf</span><span class="hl-1"> = </span><span class="hl-4">frozen</span><span class="hl-1">.</span><span class="hl-0">saveBinarySync</span><span class="hl-1">()</span>
 </code><button type="button">Copy</button></pre>
 
-<pre><code class="javascript"><span class="hl-7">// ESM</span><br/><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">MiniSearch</span><span class="hl-1">, { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">, </span><span class="hl-4">buildFrozenFromDocuments</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-7">// CommonJS</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">MiniSearch</span><span class="hl-1"> = </span><span class="hl-0">require</span><span class="hl-1">(</span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><span class="hl-1">)</span><br/><span class="hl-5">const</span><span class="hl-1"> { </span><span class="hl-6">FrozenMiniSearch</span><span class="hl-1"> } = </span><span class="hl-0">require</span><span class="hl-1">(</span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><span class="hl-1">)</span>
+<p>Both ESM and CommonJS are supported:</p>
+<pre><code class="javascript"><span class="hl-7">// ESM</span><br/><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">MiniSearch</span><span class="hl-1">, { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-7">// CommonJS</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">MiniSearch</span><span class="hl-1"> = </span><span class="hl-0">require</span><span class="hl-1">(</span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><span class="hl-1">)</span><br/><span class="hl-5">const</span><span class="hl-1"> { </span><span class="hl-6">FrozenMiniSearch</span><span class="hl-1"> } = </span><span class="hl-0">require</span><span class="hl-1">(</span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><span class="hl-1">)</span>
 </code><button type="button">Copy</button></pre>
 
 <hr>
-<h2 id="pick-the-right-api" class="tsd-anchor-link">Pick the right API<a href="#pick-the-right-api" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h2 id="minisearch-mutable" class="tsd-anchor-link">MiniSearch (mutable)<a href="#minisearch-mutable" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>The familiar upstream API — unchanged. Field boosts, fuzzy/prefix, nested queries, <code>AND</code> / <code>OR</code> / <code>AND_NOT</code>, filters, <code>autoSuggest</code>, vacuum after <code>discard</code>, etc.</p>
+<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">MiniSearch</span><span class="hl-1"> </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">miniSearch</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">MiniSearch</span><span class="hl-1">({ </span><span class="hl-4">fields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;text&#39;</span><span class="hl-1">] })</span><br/><span class="hl-4">miniSearch</span><span class="hl-1">.</span><span class="hl-0">addAll</span><span class="hl-1">(</span><span class="hl-4">documents</span><span class="hl-1">)</span><br/><span class="hl-4">miniSearch</span><span class="hl-1">.</span><span class="hl-0">search</span><span class="hl-1">(</span><span class="hl-2">&#39;zen art motorcycle&#39;</span><span class="hl-1">)</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Call <code>freeze()</code> on any mutable index to get the read-only structure described below.</p>
+<hr>
+<h2 id="building-a-frozen-index" class="tsd-anchor-link">Building a frozen index<a href="#building-a-frozen-index" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Pick the entry point that matches how your documents arrive:</p>
 <table>
 <thead>
 <tr>
@@ -81,166 +90,81 @@
 <td><strong><code>FrozenMiniSearch.fromAsyncIterable(iterable, options)</code></strong></td>
 </tr>
 <tr>
-<td>Load a snapshot from disk (sync)</td>
-<td><code>FrozenMiniSearch.loadBinarySync(buffer, options)</code></td>
-</tr>
-<tr>
-<td>Load a snapshot from disk (async, bounded memory on zstd payloads)</td>
-<td><code>FrozenMiniSearch.loadBinaryAsync(buffer, options)</code></td>
-</tr>
-<tr>
 <td>Custom assembly pipeline</td>
 <td><code>buildFrozenFromDocuments</code>, <code>assembleFrozen</code>, <code>freezeFromMiniSearch</code></td>
 </tr>
 </tbody>
 </table>
-<p><code>fromDocuments</code> matches <code>new MiniSearch(opts).addAll(docs).freeze()</code> for search ranking on the same corpus and options (<code>fields</code>, <code>tokenize</code>, <code>processTerm</code>, …). Frozen indexes do not support <code>add</code> / <code>remove</code>.</p>
-<p><strong>External corpus (e.g. lookup by id after search):</strong> keep full rows in your own store (<code>dataCache</code>, DB, etc.) and use minimal <code>storeFields</code> (often <code>['id']</code> only) so the frozen index does not duplicate payload text:</p>
-<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createFrozenIndexBuilder</span><span class="hl-1">, </span><span class="hl-4">freezeFrozenIndexBuilder</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">function</span><span class="hl-1"> </span><span class="hl-0">buildFrozenIndexFromRows</span><span class="hl-1"> (</span><span class="hl-4">rows</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">builder</span><span class="hl-1"> = </span><span class="hl-0">createFrozenIndexBuilder</span><span class="hl-1">(</span><span class="hl-4">options</span><span class="hl-1">, {</span><br/><span class="hl-1">    </span><span class="hl-4">estimatedDocumentCount:</span><span class="hl-1"> </span><span class="hl-4">rows</span><span class="hl-1">.</span><span class="hl-4">length</span><br/><span class="hl-1">  })</span><br/><span class="hl-1">  </span><span class="hl-3">for</span><span class="hl-1"> (</span><span class="hl-5">let</span><span class="hl-1"> </span><span class="hl-4">i</span><span class="hl-1"> = </span><span class="hl-8">0</span><span class="hl-1">; </span><span class="hl-4">i</span><span class="hl-1"> &lt; </span><span class="hl-4">rows</span><span class="hl-1">.</span><span class="hl-4">length</span><span class="hl-1">; </span><span class="hl-4">i</span><span class="hl-1">++) {</span><br/><span class="hl-1">    </span><span class="hl-4">builder</span><span class="hl-1">.</span><span class="hl-0">add</span><span class="hl-1">(</span><span class="hl-0">buildIndexDocument</span><span class="hl-1">(</span><span class="hl-4">rows</span><span class="hl-1">[</span><span class="hl-4">i</span><span class="hl-1">], </span><span class="hl-4">i</span><span class="hl-1">))</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-3">return</span><span class="hl-1"> </span><span class="hl-0">freezeFrozenIndexBuilder</span><span class="hl-1">(</span><span class="hl-4">builder</span><span class="hl-1">)</span><br/><span class="hl-1">}</span><br/><br/><span class="hl-7">// After search: enrich from your store — frozen.getStoredFields(res.id) or dataCache[type][res.id]</span>
+<p>All paths produce the same structure — compact typed postings plus a packed radix term tree. <code>fromDocuments</code> builds it in a single pass (lower peak memory than <code>freeze()</code>-after-<code>addAll</code>), and <code>fromDocuments</code> matches <code>new MiniSearch(opts).addAll(docs).freeze()</code> for search ranking on the same corpus and options (<code>fields</code>, <code>tokenize</code>, <code>processTerm</code>, …). Frozen indexes do not support <code>add</code> / <code>remove</code>.</p>
+<p><strong>Builder</strong> (doc-by-doc, no intermediate array):</p>
+<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createFrozenIndexBuilder</span><span class="hl-1">, </span><span class="hl-4">freezeFrozenIndexBuilder</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">builder</span><span class="hl-1"> = </span><span class="hl-0">createFrozenIndexBuilder</span><span class="hl-1">(</span><span class="hl-4">options</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-4">estimatedDocumentCount:</span><span class="hl-1"> </span><span class="hl-4">rows</span><span class="hl-1">.</span><span class="hl-4">length</span><span class="hl-1">  </span><span class="hl-7">// optional: pre-allocates per-doc arrays</span><br/><span class="hl-1">})</span><br/><span class="hl-3">for</span><span class="hl-1"> (</span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">doc</span><span class="hl-1"> </span><span class="hl-5">of</span><span class="hl-1"> </span><span class="hl-4">rows</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-4">builder</span><span class="hl-1">.</span><span class="hl-0">add</span><span class="hl-1">(</span><span class="hl-4">doc</span><span class="hl-1">)</span><br/><span class="hl-1">}</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">frozen</span><span class="hl-1"> = </span><span class="hl-0">freezeFrozenIndexBuilder</span><span class="hl-1">(</span><span class="hl-4">builder</span><span class="hl-1">)</span>
 </code><button type="button">Copy</button></pre>
 
-<p><strong>Async stream</strong> (no intermediate array; documents are indexed as they arrive):</p>
-<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createReadStream</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;node:fs&#39;</span><br/><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">parse</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;csv-parse&#39;</span><br/><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">async</span><span class="hl-1"> </span><span class="hl-5">function</span><span class="hl-1"> </span><span class="hl-0">buildFromCsv</span><span class="hl-1"> (</span><span class="hl-4">path</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-5">async</span><span class="hl-1"> </span><span class="hl-5">function</span><span class="hl-1"> </span><span class="hl-5">*</span><span class="hl-1"> </span><span class="hl-0">documents</span><span class="hl-1"> () {</span><br/><span class="hl-1">    </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">parser</span><span class="hl-1"> = </span><span class="hl-0">createReadStream</span><span class="hl-1">(</span><span class="hl-4">path</span><span class="hl-1">).</span><span class="hl-0">pipe</span><span class="hl-1">(</span><span class="hl-0">parse</span><span class="hl-1">({ </span><span class="hl-4">columns:</span><span class="hl-1"> </span><span class="hl-5">true</span><span class="hl-1"> }))</span><br/><span class="hl-1">    </span><span class="hl-3">for</span><span class="hl-1"> </span><span class="hl-3">await</span><span class="hl-1"> (</span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">row</span><span class="hl-1"> </span><span class="hl-5">of</span><span class="hl-1"> </span><span class="hl-4">parser</span><span class="hl-1">) {</span><br/><span class="hl-1">      </span><span class="hl-3">yield</span><span class="hl-1"> { </span><span class="hl-4">id:</span><span class="hl-1"> </span><span class="hl-4">row</span><span class="hl-1">.</span><span class="hl-4">cis</span><span class="hl-1">, </span><span class="hl-4">denomination:</span><span class="hl-1"> </span><span class="hl-4">row</span><span class="hl-1">.</span><span class="hl-4">denomination</span><span class="hl-1">, </span><span class="hl-7">/* … */</span><span class="hl-1"> }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-3">return</span><span class="hl-1"> </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">fromAsyncIterable</span><span class="hl-1">(</span><span class="hl-0">documents</span><span class="hl-1">(), </span><span class="hl-4">options</span><span class="hl-1">)</span><br/><span class="hl-1">}</span>
+<p><strong>Async stream</strong> (documents indexed as they arrive):</p>
+<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createReadStream</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;node:fs&#39;</span><br/><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">parse</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;csv-parse&#39;</span><br/><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">async</span><span class="hl-1"> </span><span class="hl-5">function</span><span class="hl-1"> </span><span class="hl-0">buildFromCsv</span><span class="hl-1"> (</span><span class="hl-4">path</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">) {</span><br/><span class="hl-1">  </span><span class="hl-5">async</span><span class="hl-1"> </span><span class="hl-5">function</span><span class="hl-1"> </span><span class="hl-5">*</span><span class="hl-1"> </span><span class="hl-0">documents</span><span class="hl-1"> () {</span><br/><span class="hl-1">    </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">parser</span><span class="hl-1"> = </span><span class="hl-0">createReadStream</span><span class="hl-1">(</span><span class="hl-4">path</span><span class="hl-1">).</span><span class="hl-0">pipe</span><span class="hl-1">(</span><span class="hl-0">parse</span><span class="hl-1">({ </span><span class="hl-4">columns:</span><span class="hl-1"> </span><span class="hl-5">true</span><span class="hl-1"> }))</span><br/><span class="hl-1">    </span><span class="hl-3">for</span><span class="hl-1"> </span><span class="hl-3">await</span><span class="hl-1"> (</span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">row</span><span class="hl-1"> </span><span class="hl-5">of</span><span class="hl-1"> </span><span class="hl-4">parser</span><span class="hl-1">) {</span><br/><span class="hl-1">      </span><span class="hl-3">yield</span><span class="hl-1"> { </span><span class="hl-4">id:</span><span class="hl-1"> </span><span class="hl-4">row</span><span class="hl-1">.</span><span class="hl-4">id</span><span class="hl-1">, </span><span class="hl-4">title:</span><span class="hl-1"> </span><span class="hl-4">row</span><span class="hl-1">.</span><span class="hl-4">title</span><span class="hl-1">, </span><span class="hl-7">/* … */</span><span class="hl-1"> }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">  </span><span class="hl-3">return</span><span class="hl-1"> </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">fromAsyncIterable</span><span class="hl-1">(</span><span class="hl-0">documents</span><span class="hl-1">(), </span><span class="hl-4">options</span><span class="hl-1">)</span><br/><span class="hl-1">}</span>
 </code><button type="button">Copy</button></pre>
 
-<p>For a <strong>sync</strong> iterable (<code>for...of</code> on an array or generator), use the builder directly:</p>
-<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createFrozenIndexBuilder</span><span class="hl-1">, </span><span class="hl-4">freezeFrozenIndexBuilder</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">builder</span><span class="hl-1"> = </span><span class="hl-0">createFrozenIndexBuilder</span><span class="hl-1">(</span><span class="hl-4">options</span><span class="hl-1">)</span><br/><span class="hl-3">for</span><span class="hl-1"> (</span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">doc</span><span class="hl-1"> </span><span class="hl-5">of</span><span class="hl-1"> </span><span class="hl-0">documentGenerator</span><span class="hl-1">()) {</span><br/><span class="hl-1">  </span><span class="hl-4">builder</span><span class="hl-1">.</span><span class="hl-0">add</span><span class="hl-1">(</span><span class="hl-4">doc</span><span class="hl-1">)</span><br/><span class="hl-1">}</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">frozen</span><span class="hl-1"> = </span><span class="hl-0">freezeFrozenIndexBuilder</span><span class="hl-1">(</span><span class="hl-4">builder</span><span class="hl-1">)</span>
-</code><button type="button">Copy</button></pre>
-
-<p><code>estimatedDocumentCount</code> in the second argument to <code>createFrozenIndexBuilder</code> pre-allocates
-per-document arrays when the final size is known; internal buffers are trimmed to the actual
-count on freeze if the hint was too large.</p>
-<hr>
-<h2 id="frozenminisearch-in-a-bit-more-detail" class="tsd-anchor-link">FrozenMiniSearch in a bit more detail<a href="#frozenminisearch-in-a-bit-more-detail" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<ul>
-<li><strong><code>freeze()</code></strong> — snapshot a mutable index into compact typed postings + a packed radix term tree (numeric term indices at leaves).</li>
-<li><strong><code>fromDocuments()</code></strong> — build that structure in one pass (skips nested <code>Map</code> postings and radix cloning at freeze time).</li>
-<li><strong><code>createFrozenIndexBuilder()</code></strong> — same output without a temporary <code>documents[]</code> array; finalize with <code>freezeFrozenIndexBuilder(builder)</code> (or <code>assembleFrozen(builder.freezeParams())</code> for custom assembly).</li>
-<li><strong><code>fromAsyncIterable()</code></strong> — async document stream (e.g. CSV parser) into a frozen index; equivalent to builder + <code>for await</code> + <code>freezeFrozenIndexBuilder</code>.</li>
-<li><strong>Binary snapshots (save / load)</strong> — <code>saveBinarySync()</code> / <code>saveBinaryAsync()</code> write <strong>MSv5</strong> format (compact, zstd-compressed). Reload with <code>loadBinarySync(buffer, options)</code> (whole buffer in memory) or <code>loadBinaryAsync(buffer, options)</code> (lower peak RAM on zstd payloads). Older <strong>MSv3</strong> / <strong>MSv4</strong> files still load; re-save with <code>saveBinarySync()</code> to upgrade to MSv5.</li>
-<li><strong>What the snapshot stores</strong> — field names and <code>storeFields</code> payloads are embedded. The <code>fields</code> option on load is <strong>optional</strong> (names come from the file); if you pass it, it must match exactly. <strong><code>tokenize</code> / <code>processTerm</code> are not stored</strong> — pass the same functions at load time when you customized indexing.</li>
-<li><strong>Deprecated aliases</strong> — <code>saveBinary()</code> and <code>loadBinary()</code> still point to the sync implementations and emit a one-time <code>DeprecationWarning</code> asking to choose <code>*Sync()</code> or <code>*Async()</code> explicitly.</li>
-<li><strong>Term frequencies</strong> — stored as <code>Uint8</code> (max 255 per doc/term); only affects scores for extreme term repetition.</li>
-<li><strong><code>frozenMemoryBreakdown()</code></strong> — introspect postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).</li>
-</ul>
-<p><strong>Mutable index → frozen:</strong> prefer a fixed corpus. If you used <code>discard()</code> on a <code>MiniSearch</code> index, run <code>vacuum()</code> before <code>freeze()</code> to shrink the snapshot; search parity is still expected without vacuum, but the binary may retain sparse slots.</p>
-<p><strong>Advanced API</strong> (<code>assembleFrozen</code>, <code>freezeFromMiniSearch</code>, <code>FrozenIndexBuilder</code>) is for custom pipelines — most apps should use <code>fromDocuments</code>, <code>freeze()</code>, or the builder helpers above.</p>
-<p>Advanced exports:</p>
+<p><strong>From a mutable index:</strong> if you used <code>discard()</code> on a <code>MiniSearch</code> index, run <code>vacuum()</code> before <code>freeze()</code> to shrink the snapshot; search parity is still expected without vacuum, but the binary may retain sparse slots.</p>
+<p><strong>Introspection:</strong> <code>frozenMemoryBreakdown()</code> reports the postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).</p>
+<p>Advanced exports for custom pipelines:</p>
 <pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">createFrozenIndexBuilder</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">freezeFrozenIndexBuilder</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">FrozenIndexBuilder</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-3">type</span><span class="hl-1"> </span><span class="hl-4">FrozenIndexBuilderHints</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">buildFrozenFromDocuments</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">assembleFrozen</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">freezeFromMiniSearch</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">frozenMemoryBreakdown</span><br/><span class="hl-1">} </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span>
 </code><button type="button">Copy</button></pre>
 
 <hr>
-<h2 id="minisearch-mutable" class="tsd-anchor-link">MiniSearch (mutable)<a href="#minisearch-mutable" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p>Full upstream-style API: field boosts, fuzzy/prefix, nested queries, <code>AND</code> / <code>OR</code> / <code>AND_NOT</code>, filters, <code>autoSuggest</code>, vacuum after <code>discard</code>, etc.</p>
-<pre><code class="javascript"><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">MiniSearch</span><span class="hl-1"> </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@yoch/minisearch&#39;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">miniSearch</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">MiniSearch</span><span class="hl-1">({ </span><span class="hl-4">fields:</span><span class="hl-1"> [</span><span class="hl-2">&#39;title&#39;</span><span class="hl-1">, </span><span class="hl-2">&#39;text&#39;</span><span class="hl-1">] })</span><br/><span class="hl-4">miniSearch</span><span class="hl-1">.</span><span class="hl-0">addAll</span><span class="hl-1">(</span><span class="hl-4">documents</span><span class="hl-1">)</span><br/><span class="hl-4">miniSearch</span><span class="hl-1">.</span><span class="hl-0">search</span><span class="hl-1">(</span><span class="hl-2">&#39;zen art motorcycle&#39;</span><span class="hl-1">)</span>
+<h2 id="binary-snapshots-save-load" class="tsd-anchor-link">Binary snapshots (save / load)<a href="#binary-snapshots-save-load" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>FrozenMiniSearch</code> persists to a compact <strong>MSv5</strong> binary format (optionally zstd-compressed) — much smaller and faster to load than JSON.</p>
+<pre><code class="javascript"><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">buf</span><span class="hl-1"> = </span><span class="hl-4">index</span><span class="hl-1">.</span><span class="hl-0">saveBinarySync</span><span class="hl-1">()              </span><span class="hl-7">// or: await index.saveBinaryAsync()</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-6">loaded</span><span class="hl-1"> = </span><span class="hl-4">FrozenMiniSearch</span><span class="hl-1">.</span><span class="hl-0">loadBinarySync</span><span class="hl-1">(</span><span class="hl-4">buf</span><span class="hl-1">, </span><span class="hl-4">options</span><span class="hl-1">)</span><br/><span class="hl-7">//             FrozenMiniSearch.loadBinaryAsync(buf, options)  // lower peak RAM on zstd payloads</span>
 </code><button type="button">Copy</button></pre>
 
-<p>TypeScript definitions: <code>dist/es/index.d.ts</code>.</p>
-<hr>
-<h2 id="frozenminisearch-optimizations" class="tsd-anchor-link">FrozenMiniSearch — optimizations<a href="#frozenminisearch-optimizations" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<h3 id="already-shipped-800" class="tsd-anchor-link">Already shipped (8.0.0+)<a href="#already-shipped-800" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<table>
-<thead>
-<tr>
-<th>Area</th>
-<th>Change</th>
-<th>Effect</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Format</strong></td>
-<td>MSv3 binary snapshots (8.0+)</td>
-<td>CRC32 payload check; binary field names, ids, stored fields, term tree</td>
-</tr>
-<tr>
-<td><strong>Format</strong></td>
-<td>MSv4: sparse postings, <code>Uint16</code> doc ids when <code>nextId ≤ 65535</code></td>
-<td>Smaller on-disk + in-memory footprint for multi-field indexes</td>
-</tr>
-<tr>
-<td><strong>Format</strong></td>
-<td>MSv3/MSv4 (8.2+): no dictionary section; terms only in packed tree</td>
-<td>Smaller snapshots; same MSv3 vs MSv4 encode choice as before</td>
-</tr>
-<tr>
-<td><strong>Term index</strong></td>
-<td>Packed radix tree (<code>PackedRadixTree</code> internally)</td>
-<td>Smaller footprint and cache-friendly term lookup vs <code>SearchableMap</code> at query time</td>
-</tr>
-<tr>
-<td><strong>Build</strong></td>
-<td><code>freeze()</code> packs radix tree in one pass from mutable leaves</td>
-<td>Lower peak memory and faster freeze vs clone-then-pack</td>
-</tr>
-<tr>
-<td><strong>Build/Format</strong></td>
-<td>No resident <code>_terms[]</code> on <code>FrozenMiniSearch</code></td>
-<td>Term strings live in the packed radix tree only</td>
-</tr>
-<tr>
-<td><strong>Build</strong></td>
-<td>Adaptive external-id lookup (<code>identity</code> vs lazy <code>Map</code>)</td>
-<td>Contiguous numeric ids cost no lookup table</td>
-</tr>
-<tr>
-<td><strong>Build/Search</strong></td>
-<td><code>freeze()</code> compacts discarded slots to a dense id range</td>
-<td>No holes to skip; wildcard iterates only active docs</td>
-</tr>
-<tr>
-<td><strong>Binary load</strong></td>
-<td>Structural validation in <code>decodeFrozenSnapshot</code> / <code>validateFrozenSnapshot</code></td>
-<td>Corrupt snapshots fail fast with <code>Invalid frozen index: …</code></td>
-</tr>
-<tr>
-<td><strong><code>loadBinarySync</code></strong></td>
-<td><code>fields</code> optional (embedded in snapshot); if provided, must match exactly</td>
-<td>Simpler reload; no silent field subset</td>
-</tr>
-<tr>
-<td><strong><code>saveBinarySync</code></strong></td>
-<td>Single pre-allocated buffer</td>
-<td>Lower peak memory while serializing</td>
-</tr>
-<tr>
-<td><strong>Search</strong></td>
-<td>Per-query cache for <code>fieldTermDataFor(termIndex)</code></td>
-<td>Fewer allocations on prefix/fuzzy queries</td>
-</tr>
-</tbody>
-</table>
-<p>Measure regressions with <a href="media/README.md"><code>benchmarks/</code></a> (<code>freezeMs</code>, <code>saveBinary</code>, <code>loadBinary</code>, search p50, heap frozen).</p>
-<h3 id="suggested-follow-ups-not-implemented-yet" class="tsd-anchor-link">Suggested follow-ups (not implemented yet)<a href="#suggested-follow-ups-not-implemented-yet" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<table>
-<thead>
-<tr>
-<th>Priority</th>
-<th>Topic</th>
-<th>Idea</th>
-<th>Trade-off</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>API</strong></td>
-<td>Input types</td>
-<td>Accept <code>Uint8Array</code> as well as <code>Buffer</code> on <code>loadBinarySync</code> / <code>loadBinaryAsync</code></td>
-<td>Broader runtime support</td>
-</tr>
-<tr>
-<td><strong>Search</strong></td>
-<td>Hot path</td>
-<td>Direct subarray posting access in <code>aggregateTerm</code></td>
-<td>Lower GC; invasive</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Intentionally deferred:</strong> embedding <code>tokenize</code> / <code>processTerm</code> in the snapshot. Raising the <code>Uint8</code> term-frequency cap needs a new postings encoding.</p>
-<p>For contributor-oriented notes, see <a href="media/DESIGN_DOCUMENT.md#frozenminisearch">DESIGN_DOCUMENT.md — FrozenMiniSearch</a>.</p>
+<ul>
+<li><strong>What it stores</strong> — field names and <code>storeFields</code> payloads are embedded, so the <code>options.fields</code> argument on load is <strong>optional</strong> (names come from the file); if you pass it, it must match exactly. <strong><code>tokenize</code> / <code>processTerm</code> are not stored</strong> — pass the same functions at load time when you customized indexing.</li>
+<li><strong>Compatibility</strong> — older <strong>MSv3</strong> / <strong>MSv4</strong> files still load; re-save with <code>saveBinarySync()</code> to upgrade to MSv5.</li>
+<li><strong>Deprecated aliases</strong> — <code>saveBinary()</code> and <code>loadBinary()</code> still map to the sync implementations and emit a one-time <code>DeprecationWarning</code>; call <code>*Sync()</code> or <code>*Async()</code> explicitly.</li>
+<li><strong>Node requirement</strong> — <strong>22.15.0+</strong> (declared in <code>engines</code>), where <code>node:zlib</code> gained the zstd APIs. On older runtimes the save methods fall back to a raw (uncompressed) payload, and reading a zstd snapshot throws a clear error.</li>
+</ul>
 <hr>
 <h2 id="benchmarks" class="tsd-anchor-link">Benchmarks<a href="#benchmarks" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p>Reproducible comparisons (heap, load time, search latency) live under <a href="media/README.md"><code>benchmarks/</code></a>:</p>
+<p>Cutting memory was the original motivation, and the win is real: the index structure shrinks <strong>~10–100× versus the mutable index</strong> across every scenario below. Numbers from <a href="media/reference.json"><code>baselines/reference.json</code></a> — Node.js v22.22.0, package 8.3.0, median of 3 runs × 50 searches.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Docs</th>
+<th>Index heap¹</th>
+<th>File size (binary vs JSON)</th>
+<th>Load time (binary vs JSON)</th>
+<th>Search p50 gain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Divina Commedia (with storeFields)</td>
+<td>14k, 1 field</td>
+<td>−90%</td>
+<td>−73%</td>
+<td>−77%</td>
+<td>~35% avg</td>
+</tr>
+<tr>
+<td>100k documents</td>
+<td>100k, 1 field</td>
+<td>−95%</td>
+<td>−88%</td>
+<td>−93%</td>
+<td>~43% avg</td>
+</tr>
+<tr>
+<td>Many fields</td>
+<td>2k, 10 fields</td>
+<td>−99%</td>
+<td>−92%</td>
+<td>−92%</td>
+<td>~45% avg</td>
+</tr>
+</tbody>
+</table>
+<p>¹ <strong>Index heap</strong> is the index structure only (postings + radix tree), estimated from <code>process.memoryUsage()</code> after GC — not exact allocator accounting. This is where the savings are largest and most consistent (≈90–99% smaller). The one caveat: when <code>storeFields</code> payloads are big, the stored JSON dominates the resident footprint, so <em>total</em> heap savings shrink (down to ~20% in extreme cases) — but file size and load time still improve regardless of <code>storeFields</code> size.</p>
+<p>Search gains are highest on exact and <code>AND</code> queries (−30 to −60 %); prefix can be slower on small corpora where the posting list fits in cache. See <a href="media/README.md"><code>benchmarks/</code></a> for per-query breakdowns.</p>
 <pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">benchmark:compare</span><span class="hl-1">    </span><span class="hl-7"># terminal report</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">benchmark:diff</span><span class="hl-1">       </span><span class="hl-7"># vs versioned baseline</span>
 </code><button type="button">Copy</button></pre>
 
@@ -249,13 +173,11 @@ count on freeze if the hint was too large.</p>
 <pre><code class="bash"><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">install</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">test</span><br/><span class="hl-0">npm</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">build</span>
 </code><button type="button">Copy</button></pre>
 
-<p>Use <code>npm run</code> for scripts (Yarn 1.x on Node 22 prints <code>url.parse</code> deprecation noise when invoking <code>yarn test</code> / <code>yarn build</code>).</p>
 <h3 id="release-checklist" class="tsd-anchor-link">Release checklist<a href="#release-checklist" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>The npm tarball ships <code>dist</code> + markdown only; <strong><code>docs/</code> is for the repo / GitHub Pages</strong> and is <strong>not</strong> regenerated on publish. Before releasing:</p>
 <ol>
 <li>Bump <code>version</code> in <code>package.json</code> and update <a href="media/CHANGELOG.md">CHANGELOG.md</a>.</li>
 <li><code>npm test</code> and <code>npm run build</code> (also run by <code>prepublishOnly</code> on publish).</li>
-<li>If <strong>README</strong> or <strong>public API</strong> changed: <code>npm run build-docs</code>, then commit <code>docs/</code> (TypeDoc output — do not edit <code>docs/index.html</code> by hand).</li>
+<li>If README or public API changed: <code>npm run build-docs</code>, then commit <code>docs/</code> (TypeDoc output — do not edit <code>docs/index.html</code> by hand).</li>
 <li>Commit version + changelog (+ docs if step 3) on a clean tree.</li>
 <li>Publish:
 <ul>
@@ -264,8 +186,7 @@ count on freeze if the hint was too large.</p>
 </ul>
 </li>
 </ol>
-<p>Optional after a stable release: refresh <a href="media/README.md">benchmark reference</a> on a clean tree (separate commit).</p>
-<p><strong>Requirements:</strong> Node.js <strong>22.15.0+</strong> (declared in <code>engines</code>) — this is where <code>node:zlib</code> gained the zstd APIs used by MSv5 snapshots. On older runtimes the library still works: <code>saveBinarySync()</code> / <code>saveBinaryAsync()</code> fall back to a <strong>raw (uncompressed) payload</strong> (interoperable, just larger), and reading a zstd snapshot throws a clear error asking to upgrade Node. No browser UMD/CDN build in this fork (Node-only ESM + CJS).</p>
+<p>For implementation details and contributor notes, see <a href="media/DESIGN_DOCUMENT.md">DESIGN_DOCUMENT.md</a>.</p>
 <hr>
 <h2 id="changelog-credits" class="tsd-anchor-link">Changelog &amp; credits<a href="#changelog-credits" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>See <a href="media/CHANGELOG.md">CHANGELOG.md</a>.</p>
@@ -274,4 +195,4 @@ count on freeze if the hint was too large.</p>
 <li><strong>This fork</strong> — <a href="https://github.com/yoch/minisearch">yoch/minisearch</a>: <code>FrozenMiniSearch</code>, packed radix term index (<code>PackedRadixTree</code>), MSv5 binary snapshots (+ MSv3/MSv4 read-compat), shared scoring refactor</li>
 </ul>
 <p>Upstream docs: <a href="https://lucaong.github.io/minisearch/">MiniSearch site</a> · <a href="https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html">intro article</a></p>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#yochminisearch"><span>@yoch/minisearch</span></a><ul><li><a href="#why-this-fork"><span>Why this fork?</span></a></li><li><a href="#quick-start"><span>Quick start</span></a></li><li><a href="#pick-the-right-api"><span>Pick the right <wbr/>API</span></a></li><li><a href="#frozenminisearch-in-a-bit-more-detail"><span>Frozen<wbr/>Mini<wbr/>Search in a bit more detail</span></a></li><li><a href="#minisearch-mutable"><span>Mini<wbr/>Search (mutable)</span></a></li><li><a href="#frozenminisearch-optimizations"><span>Frozen<wbr/>Mini<wbr/>Search — optimizations</span></a></li><li><ul><li><a href="#already-shipped-800"><span>Already shipped (8.0.0+)</span></a></li><li><a href="#suggested-follow-ups-not-implemented-yet"><span>Suggested follow-<wbr/>ups (not implemented yet)</span></a></li></ul></li><li><a href="#benchmarks"><span>Benchmarks</span></a></li><li><a href="#development"><span>Development</span></a></li><li><ul><li><a href="#release-checklist"><span>Release checklist</span></a></li></ul></li><li><a href="#changelog-credits"><span>Changelog &amp; credits</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">@yoch/minisearch</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#yochminisearch"><span>@yoch/minisearch</span></a><ul><li><a href="#why-this-fork"><span>Why this fork?</span></a></li><li><a href="#quick-start"><span>Quick start</span></a></li><li><a href="#minisearch-mutable"><span>Mini<wbr/>Search (mutable)</span></a></li><li><a href="#building-a-frozen-index"><span>Building a frozen index</span></a></li><li><a href="#binary-snapshots-save-load"><span>Binary snapshots (save / load)</span></a></li><li><a href="#benchmarks"><span>Benchmarks</span></a></li><li><a href="#development"><span>Development</span></a></li><li><ul><li><a href="#release-checklist"><span>Release checklist</span></a></li></ul></li><li><a href="#changelog-credits"><span>Changelog &amp; credits</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html">@yoch/minisearch</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

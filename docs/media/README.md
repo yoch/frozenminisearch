@@ -26,6 +26,39 @@ Always run with GC exposed:
 NODE_ENV=production node --expose-gc benchmarks/compare.js
 ```
 
+### Packed radix fuzzy (algo isolé)
+
+Compare `SearchableMap#fuzzyGet` vs `PackedRadixTree#fuzzyEntries` on les mêmes arbres (corpora synthétiques + Divina) :
+
+```bash
+yarn benchmark:packed-fuzzy
+```
+
+Le smoke CPU de `yarn benchmark:packed-radix` inclut aussi `fuzzy(query,k)` sur le corpus `scale` (k=1,2).
+
+### Index BDPM / vétérinaire (fixtures réelles)
+
+Snapshots MSv5 copiés dans [`fixtures/medicaments-indexes/`](fixtures/medicaments-indexes/) (présentations, spécialités, compositions, etc.). Chargés via `decodeFrozenSnapshotMsv5` — même arbre packed qu’en production.
+
+```bash
+yarn benchmark:packed-fuzzy    # inclut l’analyse + map vs packed sur ces index
+yarn benchmark:packed-radix    # bytes + smoke CPU sur presentations & specialites
+```
+
+### Fuzzy sweep (~6k–8k requêtes variées)
+
+Termes **existants** de l’index, typos (sub/del/ins × début/milieu/fin), mutations à 2 edits, chaque paire testée avec `k=1,2,3` quand pertinent. Par requête : médiane de **5** exécutions (défaut), puis médiane / moyenne / p95 sur tout l’échantillon.
+
+Défauts : **~10k** requêtes chronométrées, **~1k** préchauffage (échantillon de termes distinct, seed différent).
+
+```bash
+yarn benchmark:packed-fuzzy-sweep
+QUERIES=10000 WARMUP=1000 ITERS=5 CORPUS=bdpm-presentations yarn benchmark:packed-fuzzy-sweep
+NO_DOUBLE_EDITS=1 QUERIES=6000 yarn benchmark:packed-fuzzy-sweep   # 9 mutations simples seulement
+```
+
+`CORPUS` : `bdpm-presentations` (défaut), `bdpm-specialites`, `divina`, etc.
+
 `yarn benchmark:*` scripts run `yarn build` then `node --expose-gc` automatically.
 
 ## Defaults (routine)

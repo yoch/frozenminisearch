@@ -2,6 +2,14 @@
 
 `MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## v8.3.2
+
+Fuzzy search length pruning (no API or result-set change).
+
+  - **Length-bound pruning** on fuzzy radix traversal (`PackedRadixTree#fuzzyEntries` and the `SearchableMap` fuzzy path): skip branches whose dictionary prefix already exceeds `query.length + maxDistance` — same matches, faster on large frozen indexes (notably BDPM-scale term trees)
+  - **Shared helper** `fuzzyLengthPrune` for both implementations; extensive packed-vs-map parity tests on mutation sweeps
+  - **README** refresh (memory-efficient frozen serving, release checklist); user-facing docs no longer mention retired MSv1/MSv2 snapshot formats
+
 ## v8.3.1
 
 Document and harden MSv5 zstd requirements for Node.js 22.15.0+.

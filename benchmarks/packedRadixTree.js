@@ -155,7 +155,7 @@ async function main () {
     payload.corpora[corpus.id] = await runCorpus(corpus)
   }
 
-  const medicaments = loadMedicamentsCorpora()
+  const medicaments = loadMedicamentsCorpora({ withMap: false })
   printMedicamentsAnalysis(medicaments)
   for (const med of medicaments) {
     payload.corpora[med.id] = await runMedicamentsCorpus(med)

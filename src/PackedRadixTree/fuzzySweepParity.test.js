@@ -3,7 +3,7 @@ import {
   buildFuzzySweepQueries,
   collectTerms,
   planSweepSize,
-} from '../../benchmarks/fuzzyQueryMutations.js'
+} from '../../testSupport/fuzzyQueryMutations.js'
 import { fromRadixTree } from './index'
 
 const PARITY_SEED = 0x50415249 // 'PARI'

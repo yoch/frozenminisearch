@@ -4,14 +4,14 @@
  *   yarn benchmark:packed-fuzzy-sweep
  *   QUERIES=8000 ITERS=5 CORPUS=bdpm-presentations yarn benchmark:packed-fuzzy-sweep
  */
-import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { index as divinaIndex } from './divinaCommedia.js'
 import {
   buildFuzzySweepQueries,
   collectTerms,
   planSweepSize,
 } from './fuzzyQueryMutations.js'
-import { loadMedicamentsCorpora } from './medicamentsIndexes.js'
+import { median, medianTimed } from './benchmarkUtils.js'
+import { loadMedicamentsCorpus } from './medicamentsIndexes.js'
 import { printEdgeLabelHistogram } from './packedRadixEdgeStats.js'
 import { fromRadixTree } from '../src/PackedRadixTree/index.js'
 
@@ -32,29 +32,10 @@ function parseCorpusId () {
   return process.env.CORPUS ?? 'bdpm-presentations'
 }
 
-function median (values) {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid]
-}
-
 /** % latency gain for packed vs map (+ = packed faster). */
 function packedVsMapLatencyPct (mapMs, packedMs) {
   if (mapMs === 0) return null
   return Number((((mapMs - packedMs) / mapMs) * 100).toFixed(1))
-}
-
-function medianTimed (fn, iters) {
-  const samples = []
-  for (let i = 0; i < iters; i++) {
-    const t0 = performance.now()
-    fn()
-    samples.push(performance.now() - t0)
-  }
-  return median(samples)
 }
 
 function loadCorpus (corpusId) {
@@ -68,15 +49,16 @@ function loadCorpus (corpusId) {
     }
   }
 
-  const medicaments = loadMedicamentsCorpora()
-  const med = medicaments.find((c) => c.id === corpusId)
-  if (med) {
+  try {
+    const med = loadMedicamentsCorpus(corpusId, { withMap: true })
     return {
       id: med.id,
       map: med.map,
       tree: med.tree,
       termCount: med.analysis.termCount,
     }
+  } catch (err) {
+    if (!err.message?.startsWith('Unknown medicaments corpus')) throw err
   }
 
   throw new Error(`Unknown CORPUS="${corpusId}". Use divina or a medicaments id (bdpm-presentations, …).`)

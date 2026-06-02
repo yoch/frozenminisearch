@@ -130,7 +130,7 @@ async function main () {
   console.log(`Options: minSamples=${BENCH_OPTS.minSamples}, minTime=${BENCH_OPTS.minTime}s`)
 
   const results = []
-  const medicaments = loadMedicamentsCorpora()
+  const medicaments = loadMedicamentsCorpora({ withMap: true })
   printMedicamentsAnalysis(medicaments)
 
   for (const corpus of corpora.filter((c) => FUZZY_CORPUS_IDS.includes(c.id))) {

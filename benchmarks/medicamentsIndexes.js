@@ -37,7 +37,26 @@ export const MEDICAMENTS_INDEX_SPECS = [
   { id: 'vet-medicaments', file: 'vet_medicaments.msbin', source: 'vet', manifestKey: 'medicaments' },
 ]
 
+/** @type {Record<string, (corpus: object) => Array<{ query: string, maxDistance: number, label: string }>>} */
+const MEDICAMENTS_FUZZY_EXTRA_CASES = {
+  'bdpm-specialites': (corpus) => [
+    { query: 'doliprane', maxDistance: 1, label: `${corpus.id} doliprane@k=1` },
+    { query: 'dolipran', maxDistance: 1, label: `${corpus.id} dolipran@k=1` },
+  ],
+  'bdpm-substances': (corpus) => {
+    const seed = corpus.probes.fuzzySeed
+    if (!seed) return []
+    return [{
+      query: fuzzyProbe(seed),
+      maxDistance: 1,
+      label: `${corpus.id} seed-typo@k=1`,
+    }]
+  },
+}
+
 let manifestCache
+/** @type {Map<string, object>} */
+const corpusCache = new Map()
 
 function loadManifests () {
   if (manifestCache) return manifestCache
@@ -121,66 +140,66 @@ export function searchableMapFromPackedTree (tree) {
 }
 
 /**
- * @returns {Array<{
- *   id: string,
- *   tree: import('../src/PackedRadixTree/PackedRadixTree').default,
- *   map: import('../src/SearchableMap/SearchableMap').default,
- *   probes: object,
- *   analysis: object,
- *   meta: object,
- *   benchCpu: boolean,
- * }>}
+ * @param {string} id
+ * @param {{ withMap?: boolean }} [options]
  */
-export function loadMedicamentsCorpora () {
+export function loadMedicamentsCorpus (id, { withMap = false } = {}) {
+  const cacheKey = `${id}:${withMap ? 1 : 0}`
+  const cached = corpusCache.get(cacheKey)
+  if (cached) return cached
+
+  const spec = MEDICAMENTS_INDEX_SPECS.find((s) => s.id === id)
+  if (!spec) {
+    throw new Error(`Unknown medicaments corpus id: ${id}`)
+  }
+
   const manifests = loadManifests()
+  const { tree, snap } = loadPackedTreeFromMsbin(spec.file)
+  const analysis = analyzePackedTree(tree)
+  const manifestEntry = manifests[spec.source].indexes[spec.manifestKey]
 
-  return MEDICAMENTS_INDEX_SPECS.map((spec) => {
-    const { tree, snap } = loadPackedTreeFromMsbin(spec.file)
-    const analysis = analyzePackedTree(tree)
-    const manifestEntry = manifests[spec.source].indexes[spec.manifestKey]
+  const corpus = {
+    id: spec.id,
+    tree,
+    map: withMap ? searchableMapFromPackedTree(tree) : null,
+    probes: probesForTree(analysis),
+    analysis,
+    benchCpu: spec.id === 'bdpm-presentations' || spec.id === 'bdpm-specialites',
+    meta: {
+      kind: 'medicaments-msv5',
+      source: spec.source,
+      manifestKey: spec.manifestKey,
+      file: spec.file,
+      fileBytes: manifestEntry?.bytes,
+      documentCount: snap.documentCount,
+      manifestTermCount: manifestEntry?.termCount,
+      ...analysis,
+    },
+  }
 
-    return {
-      id: spec.id,
-      tree,
-      map: searchableMapFromPackedTree(tree),
-      probes: probesForTree(analysis),
-      analysis,
-      benchCpu: spec.id === 'bdpm-presentations' || spec.id === 'bdpm-specialites',
-      meta: {
-        kind: 'medicaments-msv5',
-        source: spec.source,
-        manifestKey: spec.manifestKey,
-        file: spec.file,
-        fileBytes: manifestEntry?.bytes,
-        documentCount: snap.documentCount,
-        manifestTermCount: manifestEntry?.termCount,
-        ...analysis,
-      },
-    }
-  })
+  corpusCache.set(cacheKey, corpus)
+  return corpus
+}
+
+/**
+ * @param {{ withMap?: boolean, ids?: string[] | null }} [options]
+ */
+export function loadMedicamentsCorpora ({ withMap = false, ids = null } = {}) {
+  const specs = ids
+    ? MEDICAMENTS_INDEX_SPECS.filter((s) => ids.includes(s.id))
+    : MEDICAMENTS_INDEX_SPECS
+  return specs.map((s) => loadMedicamentsCorpus(s.id, { withMap }))
 }
 
 /** Extra fuzzy cases tuned per index (French pharma-ish typos). */
 export function medicamentsFuzzyCases (corpus) {
-  const seed = corpus.probes.fuzzySeed
   const cases = fuzzyCasesFromProbe(corpus.probes.fuzzyQuery).map((c) => ({
     ...c,
     label: `${corpus.id} ${c.label}`,
   }))
 
-  if (corpus.id === 'bdpm-specialites') {
-    cases.push(
-      { query: 'doliprane', maxDistance: 1, label: `${corpus.id} doliprane@k=1` },
-      { query: 'dolipran', maxDistance: 1, label: `${corpus.id} dolipran@k=1` },
-    )
-  }
-  if (corpus.id === 'bdpm-substances' && seed) {
-    cases.push({
-      query: fuzzyProbe(seed),
-      maxDistance: 1,
-      label: `${corpus.id} seed-typo@k=1`,
-    })
-  }
+  const extra = MEDICAMENTS_FUZZY_EXTRA_CASES[corpus.id]
+  if (extra) cases.push(...extra(corpus))
 
   return cases
 }

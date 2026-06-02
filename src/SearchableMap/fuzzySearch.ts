@@ -60,6 +60,7 @@ const recurse = <T = any>(
         results.set(prefix, [node.get(key)!, distance])
       }
     } else {
+      // m = next matrix row index; dictionary prefix on path has length m - 1
       if (shouldPruneFuzzyEdge(m - 1, key.length, query.length, maxDistance)) {
         continue key
       }

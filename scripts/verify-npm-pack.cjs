@@ -4,7 +4,7 @@ const { execSync } = require('node:child_process')
 const { join } = require('node:path')
 
 const root = join(__dirname, '..')
-const forbidden = [/^benchmarks\//, /^src\//, /^examples\//]
+const forbidden = [/^benchmarks\//, /^testSupport\//, /^src\//, /^examples\//]
 
 const out = execSync('npm pack --dry-run 2>&1', {
   cwd: root,
@@ -25,4 +25,4 @@ for (const p of paths) {
   }
 }
 
-console.log(`verify-npm-pack: ok (${paths.length} files, no benchmarks/src)`)
+console.log(`verify-npm-pack: ok (${paths.length} files, no dev-only paths)`)

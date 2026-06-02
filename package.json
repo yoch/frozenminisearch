@@ -105,7 +105,6 @@
     "benchmark:packed-radix": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs",
     "benchmark:packed-fuzzy": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixFuzzy.cjs",
     "benchmark:packed-fuzzy-sweep": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixFuzzySweep.cjs",
-    "benchmark:packed-fuzzy-sweep": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixFuzzySweep.cjs",
     "benchmark:medicaments-indexes": "NODE_OPTIONS='--expose-gc' npx --yes tsx benchmarks/analyzeMedicamentsIndexes.js",
     "benchmark:packed-radix:record": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs --reference",
     "benchmark:packed-radix:diff": "node benchmarks/diffPackedRadixBaseline.js",

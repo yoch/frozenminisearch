@@ -52,6 +52,13 @@ const benchmarks = {
   plugins: [typescript({ compilerOptions: { outDir: 'benchmarks/dist' } })]
 }
 
+const packedRadixBenchPlugins = [
+  typescript({
+    include: ['benchmarks/**/*.js', 'src/**/*.ts'],
+    compilerOptions: { outDir: 'benchmarks/dist', rootDir: '.' },
+  }),
+]
+
 const packedRadixBench = {
   input: 'benchmarks/packedRadixTree.js',
   output: {
@@ -59,19 +66,42 @@ const packedRadixBench = {
     dir: 'benchmarks/dist',
     format: 'commonjs',
     entryFileNames: 'packedRadixTree.cjs',
-    plugins: []
+    plugins: [],
   },
   external: ['benchmark'],
-  plugins: [
-    typescript({
-      include: ['benchmarks/**/*.js', 'src/**/*.ts'],
-      compilerOptions: { outDir: 'benchmarks/dist', rootDir: '.' },
-    }),
-  ],
+  plugins: packedRadixBenchPlugins,
+}
+
+const packedRadixFuzzyBench = {
+  input: 'benchmarks/packedRadixFuzzy.js',
+  output: {
+    sourcemap: true,
+    dir: 'benchmarks/dist',
+    format: 'commonjs',
+    entryFileNames: 'packedRadixFuzzy.cjs',
+    plugins: [],
+  },
+  external: ['benchmark'],
+  plugins: packedRadixBenchPlugins,
+}
+
+const packedRadixFuzzySweepBench = {
+  input: 'benchmarks/packedRadixFuzzySweep.js',
+  output: {
+    sourcemap: true,
+    dir: 'benchmarks/dist',
+    format: 'commonjs',
+    entryFileNames: 'packedRadixFuzzySweep.cjs',
+    plugins: [],
+  },
+  external: ['benchmark'],
+  plugins: packedRadixBenchPlugins,
 }
 
 function rollupExports () {
-  if (process.env.PACKED_RADIX_BENCH === 'true') return [packedRadixBench]
+  if (process.env.PACKED_RADIX_BENCH === 'true') {
+    return [packedRadixBench, packedRadixFuzzyBench, packedRadixFuzzySweepBench]
+  }
   if (process.env.BENCHMARKS === 'true') return [benchmarks]
   return [
   config({ format: 'es', input: 'src/index.ts', output: 'es6', dir: 'es' }),

@@ -1,0 +1,23 @@
+{
+  "format": "msv5",
+  "prefix": "vet",
+  "exported_at": "2026-06-02T05:35:22.383Z",
+  "indexes": {
+    "medicaments": {
+      "file": "vet_medicaments.msbin",
+      "bytes": 159315,
+      "documentCount": 3213,
+      "termCount": 5852,
+      "estimatedStructuredBytes": 331889
+    },
+    "compositions": {
+      "file": "vet_compositions.msbin",
+      "bytes": 129729,
+      "documentCount": 4842,
+      "termCount": 4551,
+      "estimatedStructuredBytes": 273356
+    }
+  },
+  "last_updated": "2026-05-21T06:30:27.000Z",
+  "source": "base de données publique des médicaments vétérinaires autorisés en France - Anses/ANMV"
+}

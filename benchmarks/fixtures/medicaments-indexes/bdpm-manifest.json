@@ -1,0 +1,81 @@
+{
+  "format": "msv5",
+  "prefix": "bdpm",
+  "exported_at": "2026-06-02T05:35:14.595Z",
+  "indexes": {
+    "specialites": {
+      "file": "bdpm_specialites.msbin",
+      "bytes": 658493,
+      "documentCount": 15848,
+      "termCount": 23015,
+      "estimatedStructuredBytes": 1770910
+    },
+    "presentations": {
+      "file": "bdpm_presentations.msbin",
+      "bytes": 995654,
+      "documentCount": 20905,
+      "termCount": 37275,
+      "estimatedStructuredBytes": 2664254
+    },
+    "compositions": {
+      "file": "bdpm_compositions.msbin",
+      "bytes": 774237,
+      "documentCount": 32389,
+      "termCount": 20796,
+      "estimatedStructuredBytes": 1921867
+    },
+    "avis_smr": {
+      "file": "bdpm_avis_smr.msbin",
+      "bytes": 586622,
+      "documentCount": 15257,
+      "termCount": 11317,
+      "estimatedStructuredBytes": 1912459
+    },
+    "avis_asmr": {
+      "file": "bdpm_avis_asmr.msbin",
+      "bytes": 613661,
+      "documentCount": 9906,
+      "termCount": 12901,
+      "estimatedStructuredBytes": 1905913
+    },
+    "generiques": {
+      "file": "bdpm_generiques.msbin",
+      "bytes": 128964,
+      "documentCount": 10704,
+      "termCount": 1999,
+      "estimatedStructuredBytes": 501215
+    },
+    "conditions": {
+      "file": "bdpm_conditions.msbin",
+      "bytes": 188261,
+      "documentCount": 28151,
+      "termCount": 346,
+      "estimatedStructuredBytes": 768652
+    },
+    "ruptures": {
+      "file": "bdpm_ruptures.msbin",
+      "bytes": 5927,
+      "documentCount": 779,
+      "termCount": 11,
+      "estimatedStructuredBytes": 15786
+    },
+    "substances": {
+      "file": "bdpm_substances.msbin",
+      "bytes": 103215,
+      "documentCount": 3896,
+      "termCount": 3815,
+      "estimatedStructuredBytes": 210772
+    },
+    "mitm": {
+      "file": "bdpm_mitm.msbin",
+      "bytes": 336907,
+      "documentCount": 7711,
+      "termCount": 11703,
+      "estimatedStructuredBytes": 732585
+    }
+  },
+  "last_updated": "2026-05-24T22:16:54.627Z",
+  "source": "base de données publique des médicaments - gouv.fr",
+  "load_has_avis": true,
+  "load_mitm": true
+}

@@ -5,6 +5,13 @@ import { fileURLToPath } from 'node:url'
 import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { fromRadixTree } from '../src/PackedRadixTree/index.js'
 import { corpora } from './packedRadixCorpora.js'
+import { fuzzyCasesFromProbe } from './packedRadixFuzzyCases.js'
+import {
+  loadMedicamentsCorpora,
+  loadPackedTreeFromMsbin,
+  MEDICAMENTS_INDEX_SPECS,
+  printMedicamentsAnalysis,
+} from './medicamentsIndexes.js'
 import {
   appendPackedRadixHistory,
   assertCleanTrackedTree,
@@ -23,28 +30,8 @@ const LATEST_PATH = join(BASELINES_DIR, 'packed-radix-latest.json')
 const BENCH_OPTS = { minSamples: 12, minTime: 0.15 }
 const HEAP_RUNS = 3
 
-export function measureStructuredBytes (tree) {
-  const nodeBytes = (
-    tree.nodeEdgeOffset.byteLength
-    + tree.nodeValue.byteLength
-    + tree.nodeLeafOrder.byteLength
-  )
-  const edgeBytes = (
-    tree.edgeLabelStart.byteLength
-    + tree.edgeLabelLength.byteLength
-    + tree.edgeChild.byteLength
-  )
-  const labelBytesUtf16Estimate = tree.labelHeap.length * 2
-
-  return {
-    nodeBytes,
-    edgeBytes,
-    labelBytesUtf16Estimate,
-    labelCodeUnits: tree.labelHeap.length,
-    totalStructuredBytes: nodeBytes + edgeBytes + labelBytesUtf16Estimate,
-    packedByteLength: tree.packedByteLength(),
-  }
-}
+export { measureStructuredBytes } from './packedRadixMetrics.js'
+import { measureStructuredBytes } from './packedRadixMetrics.js'
 
 function buildTree (entries) {
   const map = SearchableMap.from(entries)
@@ -74,6 +61,10 @@ function runCpuSmoke (tree, probes) {
     .add('get(miss)', () => { tree.get(probes.getMiss) }, BENCH_OPTS)
     .add('prefix(short)', () => { Array.from(tree.prefixEntries(probes.prefixShort)) }, BENCH_OPTS)
 
+  for (const { label, query, maxDistance } of fuzzyCasesFromProbe(probes.fuzzyQuery)) {
+    suite.add(label, () => { Array.from(tree.fuzzyEntries(query, maxDistance)) }, BENCH_OPTS)
+  }
+
   return new Promise((resolve) => {
     suite.on('complete', function onComplete () {
       const timings = {}
@@ -86,22 +77,27 @@ function runCpuSmoke (tree, probes) {
   })
 }
 
-async function runCorpus (corpus) {
-  const { tree, runtime } = measureRuntimeHeap(corpus.entries)
-  const bytes = measureStructuredBytes(tree)
-  const timings = corpus.benchCpu ? await runCpuSmoke(tree, corpus.probes) : null
-
+function logCorpusLine (id, tree, bytes, runtime, timings) {
   console.log(
-    `${corpus.id}: terms=${tree.size} nodes=${tree.nodeCount} edges=${tree.edgeCount}`
+    `${id}: terms=${tree.size} nodes=${tree.nodeCount} edges=${tree.edgeCount}`
     + ` structured=${bytes.totalStructuredBytes}B`
-    + ` runtime≈${runtime.totalResidentApproxBytes}B`
-    + ` (heap=${runtime.heapBytes} ext=${runtime.externalBytes} ab=${runtime.arrayBuffersBytes})`,
+    + (runtime != null
+      ? ` runtime≈${runtime.totalResidentApproxBytes}B`
+        + ` (heap=${runtime.heapBytes} ext=${runtime.externalBytes} ab=${runtime.arrayBuffersBytes})`
+      : ''),
   )
   if (timings != null) {
     for (const [name, t] of Object.entries(timings)) {
       console.log(`  ${name}: ${t.hz.toFixed(0)} ops/s`)
     }
   }
+}
+
+async function runCorpus (corpus) {
+  const { tree, runtime } = measureRuntimeHeap(corpus.entries)
+  const bytes = measureStructuredBytes(tree)
+  const timings = corpus.benchCpu ? await runCpuSmoke(tree, corpus.probes) : null
+  logCorpusLine(corpus.id, tree, bytes, runtime, timings)
 
   return {
     size: tree.size,
@@ -111,6 +107,35 @@ async function runCorpus (corpus) {
     runtime,
     timings,
     ...(corpus.meta != null ? { meta: corpus.meta } : {}),
+  }
+}
+
+async function runMedicamentsCorpus (med) {
+  const spec = MEDICAMENTS_INDEX_SPECS.find((s) => s.id === med.id)
+  let runtime = null
+  if (spec) {
+    const sample = medianMeasureHeap(() => loadPackedTreeFromMsbin(spec.file), HEAP_RUNS)
+    runtime = {
+      runs: HEAP_RUNS,
+      heapBytes: sample.heapBytes,
+      externalBytes: sample.externalBytes,
+      arrayBuffersBytes: sample.arrayBuffersBytes,
+      rssBytes: sample.rssBytes,
+      totalResidentApproxBytes: sample.totalResidentApproxBytes,
+    }
+  }
+  const bytes = measureStructuredBytes(med.tree)
+  const timings = med.benchCpu ? await runCpuSmoke(med.tree, med.probes) : null
+  logCorpusLine(med.id, med.tree, bytes, runtime, timings)
+
+  return {
+    size: med.tree.size,
+    nodeCount: med.tree.nodeCount,
+    edgeCount: med.tree.edgeCount,
+    bytes,
+    runtime,
+    timings,
+    meta: med.meta,
   }
 }
 
@@ -128,6 +153,12 @@ async function main () {
 
   for (const corpus of corpora) {
     payload.corpora[corpus.id] = await runCorpus(corpus)
+  }
+
+  const medicaments = loadMedicamentsCorpora()
+  printMedicamentsAnalysis(medicaments)
+  for (const med of medicaments) {
+    payload.corpora[med.id] = await runMedicamentsCorpus(med)
   }
 
   if (writeReference) {
@@ -163,7 +194,12 @@ async function main () {
   }
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+const isPackedRadixBenchMain = process.argv[1]?.endsWith('packedRadixTree.cjs')
+  || process.argv[1]?.endsWith('packedRadixTree.js')
+
+if (isPackedRadixBenchMain) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

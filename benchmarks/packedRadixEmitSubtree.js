@@ -5,7 +5,7 @@ import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { fromRadixTree } from '../src/PackedRadixTree/index.js'
 import { corpora } from './packedRadixCorpora.js'
 import { loadMedicamentsCorpus } from './medicamentsIndexes.js'
-import { collectRunMetadata } from './benchmarkUtils.js'
+import { collectRunMetadata, median } from './benchmarkUtils.js'
 import { discoverPrefixProbes, countPrefixEntries } from './packedRadixEmitProbes.js'
 
 const WARMUP = 5
@@ -17,12 +17,6 @@ const LATEST_PATH = join(BASELINES_DIR, 'packed-emit-latest.json')
 function buildTree (entries) {
   const map = SearchableMap.from(entries)
   return fromRadixTree(map.radixTree, map.size)
-}
-
-function median (values) {
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
 /**

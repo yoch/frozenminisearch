@@ -1,8 +1,7 @@
 /**
- * Micro-benchmark: SearchableMap#fuzzyGet vs PackedRadixTree#fuzzyEntries
- * on identical radix trees (same corpora / Divina index).
+ * Compare SearchableMap#fuzzyGet vs PackedRadixTree#fuzzyEntries on identical trees.
+ * Uses interleaved map/packed timing (one variant per round) for stable packed-vs-map ratios.
  */
-import Benchmark from 'benchmark'
 import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { fromRadixTree } from '../src/PackedRadixTree/index.js'
 import { index as divinaIndex } from './divinaCommedia.js'
@@ -13,11 +12,12 @@ import {
   medicamentsFuzzyCases,
   printMedicamentsAnalysis,
 } from './medicamentsIndexes.js'
+import { median } from './benchmarkUtils.js'
 
-const BENCH_OPTS = { minSamples: 12, minTime: 0.15 }
+const WARMUP = 5
+const RUNS = 25
 
-/** Corpora included in the fuzzy comparison grid. */
-const FUZZY_CORPUS_IDS = [
+const ALL_SYNTHETIC_IDS = [
   'small',
   'dense-prefix',
   'scale',
@@ -25,54 +25,50 @@ const FUZZY_CORPUS_IDS = [
   'short5-alphabet800-10k',
 ]
 
+const DEFAULT_SYNTHETIC_IDS = ['scale', 'prefix-suffix-5k', 'dense-prefix']
+const QUICK_SYNTHETIC_IDS = ['scale']
+const DEFAULT_MEDICAMENT_IDS = ['bdpm-presentations', 'bdpm-specialites']
+const QUICK_MEDICAMENT_IDS = ['bdpm-presentations']
+
 function pctPackedVsMap (mapHz, packedHz) {
   if (mapHz === 0) return null
   return Number((((packedHz - mapHz) / mapHz) * 100).toFixed(1))
 }
 
-function runPairSuite (suiteName, map, packed, cases) {
-  const suite = new Benchmark.Suite(suiteName)
-  for (const { query, maxDistance, label } of cases) {
-    const tag = label ?? `${query}@k=${maxDistance}`
-    suite
-      .add(`map ${tag}`, () => { map.fuzzyGet(query, maxDistance) }, BENCH_OPTS)
-      .add(`packed ${tag}`, () => { Array.from(packed.fuzzyEntries(query, maxDistance)) }, BENCH_OPTS)
+/**
+ * Interleaved timing: each round runs map then packed (same query/k); median after warmup.
+ */
+function benchCaseInterleaved (map, packed, { query, maxDistance }) {
+  const mapTimes = []
+  const packedTimes = []
+  for (let round = 0; round < WARMUP + RUNS; round++) {
+    let t0 = performance.now()
+    map.fuzzyGet(query, maxDistance)
+    const mapMs = performance.now() - t0
+    t0 = performance.now()
+    Array.from(packed.fuzzyEntries(query, maxDistance))
+    const packedMs = performance.now() - t0
+    if (round >= WARMUP) {
+      mapTimes.push(mapMs)
+      packedTimes.push(packedMs)
+    }
   }
+  const mapMedianMs = median(mapTimes)
+  const packedMedianMs = median(packedTimes)
+  return {
+    mapMedianMs,
+    packedMedianMs,
+    mapHz: 1000 / mapMedianMs,
+    packedHz: 1000 / packedMedianMs,
+    packedVsMapPct: pctPackedVsMap(1000 / mapMedianMs, 1000 / packedMedianMs),
+  }
+}
 
-  return new Promise((resolve) => {
-    const rows = []
-    suite.on('cycle', (event) => {
-      const bench = event.target
-      rows.push({
-        name: bench.name,
-        hz: bench.hz,
-        meanMs: bench.stats.mean * 1000,
-      })
-    })
-    suite.on('complete', () => {
-      const byTag = new Map()
-      for (const row of rows) {
-        const isMap = row.name.startsWith('map ')
-        const tag = row.name.slice(isMap ? 4 : 7)
-        const entry = byTag.get(tag) ?? { tag }
-        if (isMap) {
-          entry.mapHz = row.hz
-          entry.mapMeanMs = row.meanMs
-        } else {
-          entry.packedHz = row.hz
-          entry.packedMeanMs = row.meanMs
-        }
-        byTag.set(tag, entry)
-      }
-      const summary = [...byTag.values()].map((e) => ({
-        ...e,
-        packedVsMapPct: e.mapHz != null && e.packedHz != null
-          ? pctPackedVsMap(e.mapHz, e.packedHz)
-          : null,
-      }))
-      resolve(summary)
-    })
-    suite.run()
+function runCaseSuite (map, packed, cases) {
+  return cases.map(({ query, maxDistance, label }) => {
+    const tag = label ?? `${query}@k=${maxDistance}`
+    const timing = benchCaseInterleaved(map, packed, { query, maxDistance })
+    return { tag, ...timing }
   })
 }
 
@@ -82,30 +78,30 @@ function buildPair (entries) {
   return { map, packed, size: map.size }
 }
 
-async function benchCorpus (corpus) {
+function benchCorpus (corpus) {
   const { map, packed, size } = buildPair(corpus.entries)
   const cases = fuzzyCasesFromProbe(corpus.probes.fuzzyQuery).map((c) => ({
     ...c,
     label: `${corpus.id} ${c.label}`,
   }))
-  const summary = await runPairSuite(`corpus:${corpus.id}`, map, packed, cases)
+  const summary = runCaseSuite(map, packed, cases)
   return { corpusId: corpus.id, termCount: size, summary }
 }
 
-async function benchMedicamentsCorpus (corpus) {
+function benchMedicamentsCorpus (corpus) {
   const cases = medicamentsFuzzyCases(corpus)
-  const summary = await runPairSuite(`medicaments:${corpus.id}`, corpus.map, corpus.tree, cases)
+  const summary = runCaseSuite(corpus.map, corpus.tree, cases)
   return { corpusId: corpus.id, termCount: corpus.analysis.termCount, summary }
 }
 
-async function benchDivina () {
+function benchDivina () {
   const map = divinaIndex
   const packed = fromRadixTree(map.radixTree, map.size)
   const cases = DIVINA_FUZZY_CASES.map((c) => ({
     ...c,
     label: `divina ${c.query}@k=${c.maxDistance}`,
   }))
-  const summary = await runPairSuite('divina', map, packed, cases)
+  const summary = runCaseSuite(map, packed, cases)
   return { corpusId: 'divina-commedia', termCount: map.size, summary }
 }
 
@@ -117,32 +113,51 @@ function printSection (result) {
     const pctStr = pct == null ? 'n/a' : `${pct >= 0 ? '+' : ''}${pct}%`
     console.log(
       `  ${row.tag}`
-      + `\n    map:    ${row.mapHz.toFixed(0)} ops/s  (${row.mapMeanMs.toFixed(3)} ms)`
-      + `\n    packed: ${row.packedHz.toFixed(0)} ops/s  (${row.packedMeanMs.toFixed(3)} ms)`
-      + `\n    packed vs map: ${pctStr}`,
+      + `\n    map:    ${row.mapHz.toFixed(0)} ops/s  (${row.mapMedianMs.toFixed(3)} ms median)`
+      + `\n    packed: ${row.packedHz.toFixed(0)} ops/s  (${row.packedMedianMs.toFixed(3)} ms median)`
+      + `\n    packed vs map: ${pctStr}  (+ = packed faster)`,
     )
   }
 }
 
-async function main () {
+function resolveBenchPlan (argv) {
+  const full = argv.includes('--full')
+  const quick = argv.includes('--quick')
+  if (full && quick) {
+    throw new Error('Use only one of --quick or --full')
+  }
+  return {
+    syntheticIds: quick ? QUICK_SYNTHETIC_IDS : full ? ALL_SYNTHETIC_IDS : DEFAULT_SYNTHETIC_IDS,
+    medicamentIds: quick ? QUICK_MEDICAMENT_IDS : full ? null : DEFAULT_MEDICAMENT_IDS,
+    includeDivina: full,
+    label: quick ? 'quick' : full ? 'full' : 'default',
+  }
+}
+
+function main () {
+  const plan = resolveBenchPlan(process.argv)
   const gcNote = global.gc ? '' : ' (warn: --expose-gc recommended)'
   console.log(`PackedRadixTree fuzzy micro-benchmark${gcNote}`)
-  console.log(`Options: minSamples=${BENCH_OPTS.minSamples}, minTime=${BENCH_OPTS.minTime}s`)
+  console.log(
+    `Mode: ${plan.label} | interleaved map/packed | warmup=${WARMUP} runs=${RUNS} (median ms)`,
+  )
 
   const results = []
-  const medicaments = loadMedicamentsCorpora({ withMap: true })
+  const medicaments = loadMedicamentsCorpora({ withMap: true, ids: plan.medicamentIds })
   printMedicamentsAnalysis(medicaments)
 
-  for (const corpus of corpora.filter((c) => FUZZY_CORPUS_IDS.includes(c.id))) {
-    results.push(await benchCorpus(corpus))
+  for (const corpus of corpora.filter((c) => plan.syntheticIds.includes(c.id))) {
+    results.push(benchCorpus(corpus))
   }
   for (const med of medicaments) {
-    results.push(await benchMedicamentsCorpus(med))
+    results.push(benchMedicamentsCorpus(med))
   }
-  results.push(await benchDivina())
+  if (plan.includeDivina) {
+    results.push(benchDivina())
+  }
 
   console.log('\n' + '='.repeat(60))
-  console.log('SUMMARY (packed vs map, + = packed faster)')
+  console.log('SUMMARY')
   console.log('='.repeat(60))
 
   for (const result of results) {
@@ -152,7 +167,9 @@ async function main () {
   console.log('\nDone.')
 }
 
-main().catch((err) => {
+try {
+  main()
+} catch (err) {
   console.error(err)
   process.exit(1)
-})
+}

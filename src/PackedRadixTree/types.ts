@@ -10,6 +10,10 @@ export interface PackedStringRadixMap<V = number> {
   readonly size: number
   get(term: string): V | undefined
   prefixEntries(prefix: string): Iterable<[string, V]>
+  /**
+   * Fuzzy matches for `term` within `maxDistance` edit distance. Yields every matching
+   * `[term, value, distance]`; iteration order is implementation-defined (compare sets, not order).
+   */
   fuzzyEntries(term: string, maxDistance: number): Iterable<[string, V, number]>
   entries(): Iterable<[string, V]>
   packedByteLength(): number

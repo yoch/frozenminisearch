@@ -81,7 +81,6 @@ const packedRadixFuzzyBench = {
     entryFileNames: 'packedRadixFuzzy.cjs',
     plugins: [],
   },
-  external: ['benchmark'],
   plugins: packedRadixBenchPlugins,
 }
 
@@ -107,7 +106,6 @@ const packedRadixEmitSubtreeBench = {
     entryFileNames: 'packedRadixEmitSubtree.cjs',
     plugins: [],
   },
-  external: ['benchmark'],
   plugins: packedRadixBenchPlugins,
 }
 

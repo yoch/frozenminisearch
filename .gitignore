@@ -12,3 +12,6 @@ yarn-error.log
 FORK_NOTES.md
 benchmarks/baselines/latest.json
 benchmarks/baselines/packed-radix-latest.json
+# Local-only fuzzy algo A/B (prefix-string candidate vs prod segments)
+benchmarks/fuzzyPrefixVariant.ts
+benchmarks/packedRadixFuzzyAlgoCompare.js

@@ -4,9 +4,10 @@
 
 ## Unreleased
 
-PackedRadixTree subtree iteration performance (no API or iteration-order change).
+PackedRadixTree subtree iteration performance (no API or iteration-order change for `entries()` / `prefixEntries()`).
 
   - Replace recursive `yield*` DFS with an **explicit prefix stack** for `entries()` / `prefixEntries()` — large CPU win on benchmark corpora vs the previous recursive segment-stack implementation (see dev bench `yarn benchmark:packed-emit`)
+  - Document and test **`fuzzyEntries`** as the same match **set** as `fuzzyGet` (sorted tuple parity in tests); fuzzy iteration order is not guaranteed to match `Map` key order
 
 ## v8.3.2
 

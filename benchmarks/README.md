@@ -28,10 +28,12 @@ NODE_ENV=production node --expose-gc benchmarks/compare.js
 
 ### Packed radix fuzzy (algo isolé)
 
-Compare `SearchableMap#fuzzyGet` vs `PackedRadixTree#fuzzyEntries` on les mêmes arbres (corpora synthétiques + Divina) :
+Compare `SearchableMap#fuzzyGet` vs `PackedRadixTree#fuzzyEntries` avec **chrono entrelacée** (un variant par round : map, packed, map, …) — médiane après warmup, pour limiter le biais GC/thermique.
 
 ```bash
-yarn benchmark:packed-fuzzy
+yarn benchmark:packed-fuzzy              # défaut : scale + 3 synth + 2 BDPM (~1 min)
+yarn benchmark:packed-fuzzy -- --quick   # smoke : scale + bdpm-presentations
+yarn benchmark:packed-fuzzy -- --full    # tout : 5 synth + 7 médicaments + Divina
 ```
 
 Le smoke CPU de `yarn benchmark:packed-radix` inclut aussi `fuzzy(query,k)` sur le corpus `scale` (k=1,2).

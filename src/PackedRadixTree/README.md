@@ -1,6 +1,9 @@
 # PackedRadixTree
 
-In-memory packed radix tree for string keys with numeric payloads. Same traversal semantics as `SearchableMap` (reverse sibling order, leaf slot position).
+In-memory packed radix tree for string keys with numeric payloads.
+
+- `entries()` / `prefixEntries()`: same traversal order as `SearchableMap` (`TreeIterator` sibling order, leaf slot position).
+- `fuzzyEntries()`: same **set** of `[term, value, distance]` as `SearchableMap#fuzzyGet`; iteration order is implementation-defined.
 
 ## Usage
 

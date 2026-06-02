@@ -132,7 +132,6 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   }
 
   /**
-   * Fuzzy search still builds terms via segment stacks in {@link packedRadixFuzzyEntries}.
    * Depth-first traversal matching {@link SearchableMap}'s `TreeIterator`, which
    * visits siblings in reverse Map-insertion order (last key first). The leaf, if
    * any, sits at `nodeLeafOrder` among the original sibling slots; everything else

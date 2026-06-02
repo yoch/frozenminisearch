@@ -3,6 +3,7 @@ import { TREE_NODE_EDGE, TREE_NODE_LEAF } from '../binaryConstants'
 import { buildTermTreeSection } from '../binaryStructures'
 import { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from '../packedRadixBinary'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
+import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
 import PackedRadixTree, { fromRadixTree } from './index'
 
 const terms = ['summer', 'acqua', 'aqua', 'acquire', 'poisson', 'qua']
@@ -18,6 +19,11 @@ test('fromRadixTree with mapLeaf options matches termCount form', () => {
   })
   expect(Array.from(viaOptions.entries())).toEqual(Array.from(packed.entries()))
 })
+
+function expectFuzzyMultiset(packed, map, query, maxDistance) {
+  expect(sortedFuzzyTuples(packed.fuzzyEntries(query, maxDistance)))
+    .toEqual(sortedMapFuzzy(map.fuzzyGet(query, maxDistance)))
+}
 
 function expectPackedParity(entries, probes = {}) {
   const {
@@ -46,10 +52,10 @@ function expectPackedParity(entries, probes = {}) {
   for (const prefix of prefixes) {
     expect(Array.from(p.prefixEntries(prefix))).toEqual(Array.from(m.atPrefix(prefix).entries()))
   }
+  // fuzzyEntries: same match set as fuzzyGet; iteration order is not compared.
   for (const query of fuzzyQueries) {
     for (const distance of fuzzyDistances) {
-      expect(Array.from(p.fuzzyEntries(query, distance)).map(([key, value, dist]) => [key, value, dist]))
-        .toEqual(Array.from(m.fuzzyGet(query, distance)).map(([key, [value, dist]]) => [key, value, dist]))
+      expectFuzzyMultiset(p, m, query, distance)
     }
   }
 }
@@ -150,8 +156,7 @@ describe('PackedRadixTree module', () => {
       }
       for (const query of ['', 'a', 'ab', 'ba', 'ccc', 'zz']) {
         for (const distance of [0, 1, 2]) {
-          expect(Array.from(p.fuzzyEntries(query, distance)).map(([key, value, dist]) => [key, value, dist]))
-            .toEqual(Array.from(m.fuzzyGet(query, distance)).map(([key, [value, dist]]) => [key, value, dist]))
+          expectFuzzyMultiset(p, m, query, distance)
         }
       }
     }
@@ -165,15 +170,9 @@ describe('PackedRadixTree module', () => {
     }
   })
 
-  test('fuzzyEntries match SearchableMap fuzzyGet', () => {
+  test('fuzzyEntries match SearchableMap fuzzyGet (same match set)', () => {
     for (const distance of [0, 1, 2, 3]) {
-      const fromPacked = Array.from(packed.fuzzyEntries('acqua', distance))
-        .map(([key, value, dist]) => [key, dist])
-        .sort()
-      const fromMap = Array.from(map.fuzzyGet('acqua', distance))
-        .map(([key, [, dist]]) => [key, dist])
-        .sort()
-      expect(fromPacked).toEqual(fromMap)
+      expectFuzzyMultiset(packed, map, 'acqua', distance)
     }
   })
 

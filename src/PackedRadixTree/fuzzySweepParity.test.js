@@ -4,21 +4,10 @@ import {
   collectTerms,
   planSweepSize,
 } from '../../testSupport/fuzzyQueryMutations.js'
+import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
 import { fromRadixTree } from './index'
 
 const PARITY_SEED = 0x50415249 // 'PARI'
-
-function sortedFuzzyTuples (entries) {
-  return [...entries]
-    .map(([term, value, distance]) => [term, value, distance])
-    .sort((a, b) => a[0].localeCompare(b[0]) || a[2] - b[2])
-}
-
-function sortedMapFuzzy (results) {
-  return [...results]
-    .map(([term, [value, distance]]) => [term, value, distance])
-    .sort((a, b) => a[0].localeCompare(b[0]) || a[2] - b[2])
-}
 
 function buildIndexFromTerms (terms) {
   const map = SearchableMap.from(terms.map((term, i) => [term, i]))

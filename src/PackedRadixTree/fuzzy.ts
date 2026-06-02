@@ -1,3 +1,4 @@
+import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'
 import { buildTermFromSegments, type LabelSegment } from './strings'
@@ -65,6 +66,10 @@ function recurse(
     const ei = first + edgeOffset
     const labelStart = tree.edgeLabelStart[ei]
     const labelLen = tree.edgeLabelLength[ei]
+    if (shouldPruneFuzzyEdge(rowStart - 1, labelLen, query.length, maxDistance)) {
+      continue edge
+    }
+
     let i = rowStart
 
     for (let pos = 0; pos < labelLen; ++pos, ++i) {

@@ -9,6 +9,7 @@ package-lock.json
 /benchmarks/dist
 /coverage
 yarn-error.log
+isolate-*.log
 FORK_NOTES.md
 benchmarks/baselines/latest.json
 benchmarks/baselines/packed-radix-latest.json

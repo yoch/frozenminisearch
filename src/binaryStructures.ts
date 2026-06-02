@@ -287,57 +287,6 @@ export function buildTermTreeSection(tree: RadixTree<number>): Buffer {
   return Buffer.concat(chunks)
 }
 
-function readTermTreeNode(buf: Buffer, offset: number, end: number): { tree: RadixTree<number>, next: number } {
-  if (offset + 2 > end) {
-    throw invalidFrozenIndex('term tree node child count truncated')
-  }
-  const childCount = buf.readUInt16LE(offset)
-  const tree = new Map() as RadixTree<number>
-  let o = offset + 2
-
-  for (let c = 0; c < childCount; c++) {
-    if (o >= end) {
-      throw invalidFrozenIndex('term tree child truncated')
-    }
-    const tag = buf.readUInt8(o)
-    if (tag === TREE_NODE_LEAF) {
-      if (o + 5 > end) {
-        throw invalidFrozenIndex('term tree leaf truncated')
-      }
-      tree.set(LEAF, buf.readUInt32LE(o + 1))
-      o += 5
-      continue
-    }
-    if (tag === TREE_NODE_EDGE) {
-      if (o + 3 > end) {
-        throw invalidFrozenIndex('term tree edge header truncated')
-      }
-      const keyLen = buf.readUInt16LE(o + 1)
-      const keyStart = o + 3
-      const keyEnd = keyStart + keyLen
-      if (keyEnd > end) {
-        throw invalidFrozenIndex('term tree edge key out of bounds')
-      }
-      const key = buf.toString('utf8', keyStart, keyEnd)
-      const { tree: child, next } = readTermTreeNode(buf, keyEnd, end)
-      tree.set(key, child)
-      o = next
-      continue
-    }
-    throw invalidFrozenIndex(`unknown term tree node tag ${tag}`)
-  }
-
-  return { tree, next: o }
-}
-
-export function readTermTreeSection(buf: Buffer, offset: number, end: number): RadixTree<number> {
-  const { tree, next } = readTermTreeNode(buf, offset, end)
-  if (next !== end) {
-    throw invalidFrozenIndex('term tree section has trailing bytes')
-  }
-  return tree
-}
-
 export function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {
   for (const [key, val] of tree) {
     if (key === LEAF) {
@@ -363,7 +312,7 @@ export function deserializeTermIndexTree(shape: TreeShape): RadixTree<number> {
   return tree
 }
 
-export function serializeTermIndexTree(tree: RadixTree<number>): TreeShape {
+function serializeTermIndexTree(tree: RadixTree<number>): TreeShape {
   const shape: TreeShape = []
   const entries: Array<[string, number | RadixTree<number>]> = []
   for (const [key, val] of tree) {

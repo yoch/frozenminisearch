@@ -96,6 +96,16 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
         ],
       })
     })
+
+    test('AND_NOT with nested negated branch without combineWith', () => {
+      expectSameResults(mutable, frozen, {
+        combineWith: 'AND_NOT',
+        queries: [
+          'zen',
+          { queries: ['whale', 'ocean'] },
+        ],
+      })
+    })
   })
 
   describe('with boostDocument', () => {
@@ -107,6 +117,11 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
 
     test('AND_NOT with boostDocument', () => {
       expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND_NOT', boostDocument })
+    })
+
+    test('AND_NOT with boostDocument returning 0 still matches mutable/frozen', () => {
+      const zeroBoost = (id) => (id === 3 ? 0 : 1)
+      expectSameResults(mutable, frozen, 'zen whale', { combineWith: 'AND_NOT', boostDocument: zeroBoost })
     })
   })
 

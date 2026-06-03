@@ -60,12 +60,6 @@ type NormalizedStringQuery = {
   specs: QuerySpec[]
 }
 
-type DerivedMatch = {
-  data: FieldTermDataLike | undefined
-  derivedTerm: AggregateDerivedTerm
-  termWeight: number
-}
-
 export type QueryIndexView = StringQueryIndexView | IndexedQueryIndexView
 
 export interface QueryEngineParams {
@@ -81,14 +75,6 @@ export interface QueryEngineParams {
 const AND_GATE_MAX_ABSOLUTE = 5000
 const AND_GATE_MAX_FRACTION = 0.1
 
-function eagerDerivedTerm(term: string): AggregateDerivedTerm {
-  return { kind: 'eager', term }
-}
-
-function lazyDerivedTerm(resolve: () => string): AggregateDerivedTerm {
-  return { kind: 'lazy', resolve }
-}
-
 function docIdsFromResult(result: RawResult): Set<number> {
   return new Set(result.keys())
 }
@@ -99,20 +85,23 @@ function isWildcardQuery(query: Query): boolean {
   return query.queries.some(isWildcardQuery)
 }
 
+function isGatedCombinationOperator(operator: CombinationOperator): boolean {
+  const op = operator.toLowerCase()
+  return op === 'and' || op === 'and_not'
+}
+
 function shouldUseGatedEvaluation(
-  params: QueryEngineParams,
   branchCount: number,
   operator: CombinationOperator,
   hasWildcard: boolean,
 ): boolean {
   if (hasWildcard) return false
-  if (params.indexView.mode !== 'indexed') return false
   if (branchCount <= 1) return false
-  const op = operator.toLowerCase()
-  return op === 'and' || op === 'and_not'
+  return isGatedCombinationOperator(operator)
 }
 
-function shouldGateAndBranch(gate: Set<number>, documentCount: number): boolean {
+/** Empty gate still gates (no docs pass); only skip gating when intersection exceeds size heuristics. */
+function gateIsSelectiveEnough(gate: Set<number>, documentCount: number): boolean {
   if (gate.size === 0) return true
   const maxSize = Math.min(
     AND_GATE_MAX_ABSOLUTE,
@@ -150,23 +139,29 @@ function normalizeStringQuery(
   }
 }
 
-function visitQuerySpecMatches(
+function lazyIndexedTerm(
+  indexView: IndexedQueryIndexView,
+  termIndex: number,
+): AggregateDerivedTerm {
+  return { kind: 'lazy', resolve: () => indexView.resolveTermByIndex(termIndex) }
+}
+
+function visitQuerySpecForScoring(
   query: QuerySpec,
   options: SearchOptionsWithDefaults,
   params: QueryEngineParams,
-  useLazyIndexedTerms: boolean,
-  visit: (match: DerivedMatch) => void,
+  visit: (
+    data: FieldTermDataLike | undefined,
+    derivedTerm: AggregateDerivedTerm,
+    termWeight: number,
+  ) => void,
 ): void {
   const { indexView } = params
   const { weights, maxFuzzy } = options
   const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
   const maxDistance = maxFuzzyDistance(query, maxFuzzy)
 
-  visit({
-    data: indexView.getTermData(query.term),
-    derivedTerm: eagerDerivedTerm(query.term),
-    termWeight: 1,
-  })
+  visit(indexView.getTermData(query.term), query.term, 1)
 
   if (indexView.mode === 'indexed') {
     const seenPrefix = new Set<number>()
@@ -175,25 +170,21 @@ function visitQuerySpecMatches(
         const distance = length - query.term.length
         if (!distance) continue
         seenPrefix.add(termIndex)
-        visit({
+        visit(
           data,
-          derivedTerm: useLazyIndexedTerms
-            ? lazyDerivedTerm(() => indexView.resolveTermByIndex(termIndex))
-            : eagerDerivedTerm(indexView.resolveTermByIndex(termIndex)),
-          termWeight: prefixWeight * length / (length + 0.3 * distance),
-        })
+          lazyIndexedTerm(indexView, termIndex),
+          prefixWeight * length / (length + 0.3 * distance),
+        )
       }
     }
     if (!maxDistance) return
     for (const { termIndex, length, data, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
       if (!distance || seenPrefix.has(termIndex)) continue
-      visit({
+      visit(
         data,
-        derivedTerm: useLazyIndexedTerms
-          ? lazyDerivedTerm(() => indexView.resolveTermByIndex(termIndex))
-          : eagerDerivedTerm(indexView.resolveTermByIndex(termIndex)),
-        termWeight: fuzzyWeight * length / (length + distance),
-      })
+        lazyIndexedTerm(indexView, termIndex),
+        fuzzyWeight * length / (length + distance),
+      )
     }
     return
   }
@@ -206,22 +197,70 @@ function visitQuerySpecMatches(
       const distance = term.length - query.term.length
       if (!distance) continue
       fuzzyMatches?.delete(term)
-      visit({
+      visit(
         data,
-        derivedTerm: eagerDerivedTerm(term),
-        termWeight: prefixWeight * term.length / (term.length + 0.3 * distance),
-      })
+        term,
+        prefixWeight * term.length / (term.length + 0.3 * distance),
+      )
     }
   }
 
   if (!fuzzyMatches) return
   for (const [term, { data, distance }] of fuzzyMatches) {
     if (!distance) continue
-    visit({
+    visit(
       data,
-      derivedTerm: eagerDerivedTerm(term),
-      termWeight: fuzzyWeight * term.length / (term.length + distance),
-    })
+      term,
+      fuzzyWeight * term.length / (term.length + distance),
+    )
+  }
+}
+
+function visitQuerySpecForDocIds(
+  query: QuerySpec,
+  options: SearchOptionsWithDefaults,
+  params: QueryEngineParams,
+  visit: (data: FieldTermDataLike | undefined) => void,
+): void {
+  const { indexView } = params
+  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
+
+  visit(indexView.getTermData(query.term))
+
+  if (indexView.mode === 'indexed') {
+    const seenPrefix = new Set<number>()
+    if (query.prefix) {
+      for (const { termIndex, length, data } of indexView.getPrefixMatchesByIndex(query.term)) {
+        const distance = length - query.term.length
+        if (!distance) continue
+        seenPrefix.add(termIndex)
+        visit(data)
+      }
+    }
+    if (!maxDistance) return
+    for (const { termIndex, data, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
+      if (!distance || seenPrefix.has(termIndex)) continue
+      visit(data)
+    }
+    return
+  }
+
+  const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
+  const fuzzyMatches = maxDistance ? indexView.getFuzzyMatches(query.term, maxDistance) : undefined
+
+  if (prefixMatches) {
+    for (const [term, data] of prefixMatches) {
+      const distance = term.length - query.term.length
+      if (!distance) continue
+      fuzzyMatches?.delete(term)
+      visit(data)
+    }
+  }
+
+  if (!fuzzyMatches) return
+  for (const [, { data, distance }] of fuzzyMatches) {
+    if (!distance) continue
+    visit(data)
   }
 }
 
@@ -236,7 +275,7 @@ function executeQuerySpecInternal(
   const termOptions: AggregateTermOptions | undefined = allowedDocs == null ? undefined : { allowedDocs }
   const results = new Map() as RawResult
 
-  visitQuerySpecMatches(query, options, params, allowedDocs != null, ({ data, derivedTerm, termWeight }) => {
+  visitQuerySpecForScoring(query, options, params, (data, derivedTerm, termWeight) => {
     aggregateTerm(
       query.term,
       derivedTerm,
@@ -265,7 +304,7 @@ function collectDocIdsForQuerySpec(
   const fieldBoosts = fieldBoostsForQuery(options, params.fields)
   const docIds = new Set<number>()
 
-  visitQuerySpecMatches(query, options, params, false, ({ data }) => {
+  visitQuerySpecForDocIds(query, options, params, (data) => {
     collectDocIdsFromFieldTermData(
       data,
       fieldBoosts,
@@ -276,6 +315,20 @@ function collectDocIdsForQuerySpec(
   })
 
   return docIds
+}
+
+function intersectDocIdsInPlace(docIds: Set<number>, branchDocIds: Set<number>): void {
+  for (const docId of docIds) {
+    if (!branchDocIds.has(docId)) docIds.delete(docId)
+  }
+}
+
+function subtractDocIdsInPlace(docIds: Set<number>, excludedDocIds: Set<number>): void {
+  for (const docId of excludedDocIds) docIds.delete(docId)
+}
+
+function subtractDocIdsFromResult(result: RawResult, excludedDocIds: Set<number>): void {
+  for (const docId of excludedDocIds) result.delete(docId)
 }
 
 function collectCombinedDocIds<T>(
@@ -300,18 +353,14 @@ function collectCombinedDocIds<T>(
   const docIds = collectBranch(branches[0], allowedDocs)
   if (op === 'and') {
     for (let i = 1; i < branches.length; i++) {
-      const branchDocIds = collectBranch(branches[i], docIds)
-      for (const docId of docIds) {
-        if (!branchDocIds.has(docId)) docIds.delete(docId)
-      }
+      intersectDocIdsInPlace(docIds, collectBranch(branches[i], docIds))
     }
     return docIds
   }
 
   if (op === 'and_not') {
     for (let i = 1; i < branches.length; i++) {
-      const excludedDocIds = collectBranch(branches[i], docIds)
-      for (const docId of excludedDocIds) docIds.delete(docId)
+      subtractDocIdsInPlace(docIds, collectBranch(branches[i], docIds))
     }
     return docIds
   }
@@ -319,6 +368,11 @@ function collectCombinedDocIds<T>(
   throw new Error(`Invalid combination operator: ${operator}`)
 }
 
+/**
+ * AND: score every branch (with optional docId gate on later branches), then intersect scores.
+ * AND_NOT: score the positive branch only; negated branches are collected as docId sets and
+ * subtracted without scoring (avoids term materialization on excluded branches).
+ */
 function executeCombinedBranches<T>(
   branches: readonly T[],
   operator: CombinationOperator,
@@ -342,7 +396,7 @@ function executeCombinedBranches<T>(
 
   if (op === 'and') {
     for (let i = 1; i < branches.length; i++) {
-      const branchAllowed = shouldGateAndBranch(gate, params.aggregateContext.documentCount)
+      const branchAllowed = gateIsSelectiveEnough(gate, params.aggregateContext.documentCount)
         ? gate
         : allowedDocs
       result = combineResults([result, executeBranch(branches[i], branchAllowed)], AND)
@@ -353,8 +407,7 @@ function executeCombinedBranches<T>(
 
   if (op === 'and_not') {
     for (let i = 1; i < branches.length; i++) {
-      const excludedDocIds = collectBranch(branches[i], gate)
-      for (const docId of excludedDocIds) result.delete(docId)
+      subtractDocIdsFromResult(result, collectBranch(branches[i], gate))
       gate = docIdsFromResult(result)
     }
     return result
@@ -440,15 +493,17 @@ function collectDocIdsForQueryInternal(
   if (typeof query !== 'string') {
     const combination = query as QueryCombination
     const options = { ...searchOptions, ...combination, queries: undefined }
+    const operator = (options.combineWith ?? params.globalSearchOptions.combineWith) as CombinationOperator
     return collectCombinedDocIds(
       combination.queries,
-      options.combineWith as CombinationOperator,
+      operator,
       (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
       allowedDocs,
     )
   }
 
   const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
+  const combineWith = (operator ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
   if (specs.length <= 1) {
     return specs.length === 1
@@ -458,7 +513,7 @@ function collectDocIdsForQueryInternal(
 
   return collectCombinedDocIds(
     specs,
-    operator,
+    combineWith,
     (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, options, params, branchAllowed),
     allowedDocs,
   )
@@ -480,6 +535,24 @@ function executeWildcardQuery(
   return results
 }
 
+function executeGatedCombinedQuery<T>(
+  branches: readonly T[],
+  operator: CombinationOperator,
+  params: QueryEngineParams,
+  executeBranch: (branch: T, allowedDocs?: Set<number>) => RawResult,
+  collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
+  allowedDocs?: Set<number>,
+): RawResult {
+  return executeCombinedBranches(
+    branches,
+    operator,
+    params,
+    executeBranch,
+    collectBranch,
+    allowedDocs,
+  )
+}
+
 function executeQueryInternal(
   query: Query,
   searchOptions: SearchOptions,
@@ -493,10 +566,10 @@ function executeQueryInternal(
   if (typeof query !== 'string') {
     const combination = query as QueryCombination
     const options = { ...searchOptions, ...combination, queries: undefined }
-    const operator = options.combineWith as CombinationOperator
+    const operator = (options.combineWith ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
-    if (shouldUseGatedEvaluation(params, combination.queries.length, operator, isWildcardQuery(query))) {
-      return executeCombinedBranches(
+    if (shouldUseGatedEvaluation(combination.queries.length, operator, isWildcardQuery(query))) {
+      return executeGatedCombinedQuery(
         combination.queries,
         operator,
         params,
@@ -513,11 +586,12 @@ function executeQueryInternal(
   }
 
   const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
+  const combineWith = (operator ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
-  if (shouldUseGatedEvaluation(params, specs.length, operator, false)) {
-    return executeCombinedBranches(
+  if (shouldUseGatedEvaluation(specs.length, combineWith, false)) {
+    return executeGatedCombinedQuery(
       specs,
-      operator,
+      combineWith,
       params,
       (spec, branchAllowed) => executeQuerySpecInternal(spec, options, params, branchAllowed),
       (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, options, params, branchAllowed),
@@ -526,7 +600,7 @@ function executeQueryInternal(
   }
 
   const results = specs.map(spec => executeQuerySpecInternal(spec, options, params, allowedDocs))
-  return combineResults(results, operator)
+  return combineResults(results, combineWith)
 }
 
 export function executeQuery(

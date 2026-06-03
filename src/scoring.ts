@@ -141,8 +141,9 @@ export function mapFieldTermData(data: Map<number, Map<number, number>>): FieldT
   }
 }
 
+/** Eager materialized term, or lazy resolver for indexed derived matches. */
 export type AggregateDerivedTerm =
-  | { kind: 'eager', term: string }
+  | string
   | { kind: 'lazy', resolve: () => string }
 
 export type AggregateTermOptions = {
@@ -154,11 +155,9 @@ function getDerivedTerm(
   derivedTerm: AggregateDerivedTerm,
   cache: { value?: string },
 ): string {
-  if (derivedTerm.kind === 'lazy') {
-    if (cache.value === undefined) cache.value = derivedTerm.resolve()
-    return cache.value
-  }
-  return derivedTerm.term
+  if (typeof derivedTerm === 'string') return derivedTerm
+  if (cache.value === undefined) cache.value = derivedTerm.resolve()
+  return cache.value
 }
 
 function scorePostingDoc(

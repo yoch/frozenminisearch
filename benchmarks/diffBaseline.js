@@ -22,7 +22,9 @@ import {
   STRUCTURAL_TIMING_THRESHOLDS,
   compareHeapFrozenMb,
   compareHeapSavingPct,
+  compareSearchMetric,
   compareTimingMetric,
+  SEARCH_MS_FLOOR,
 } from './regressionPolicy.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
 
@@ -41,7 +43,6 @@ const { runs, searchIterations } = parseBenchmarkArgs()
 const THRESHOLDS = {
   heapFrozenMb: { warnPct: 5, failPct: 10 },
   ...STRUCTURAL_TIMING_THRESHOLDS,
-  frozenSearchP50: { warnPct: 20, failPct: 50 },
   heapFrozenSavingPct: { warnDrop: 5, failDrop: 10, higherIsBetter: true },
 }
 
@@ -120,7 +121,7 @@ function compareScenario (ref, cur) {
   for (const row of cur.search) {
     const prev = refSearch[row.label]
     if (!prev) continue
-    const s = compareMetric(`search p50 ${row.label}`, prev.frozenP50, row.frozenP50, 'frozenSearchP50')
+    const s = compareSearchMetric(`search p50 ${row.label}`, prev.frozenP50, row.frozenP50)
     if (strictSearch) {
       bump(s)
     } else if (s !== 'ok') {
@@ -198,7 +199,7 @@ function main () {
   }
   console.log('='.repeat(72))
   console.log('\nThresholds (fail): heap frozen +10%; loadBinary +20%; heap saving −10 pts.')
-  console.log('Search p50: informational unless --strict.')
+  console.log(`Search p50: abs floor below ${SEARCH_MS_FLOOR} ms; informational unless --strict.`)
   console.log('Workflow: benchmark:record once → benchmark:diff (or diff other JSON via --current).\n')
 
   if (overall === 'fail') process.exit(1)

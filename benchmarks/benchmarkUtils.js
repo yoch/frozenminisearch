@@ -134,6 +134,12 @@ export function medianMeasureHeap (fn, runs = 1) {
 /** Routine defaults: median of 3 scenario runs, 50 timed searches each. */
 export const DEFAULT_BENCHMARK_RUNS = 3
 export const DEFAULT_SEARCH_ITERATIONS = 50
+/** Warmup searches before timing (JIT + term caches). */
+export const DEFAULT_BENCH_WARMUP = 200
+/** Max searches per clock read when per-op time is below resolution. */
+export const DEFAULT_BENCH_BATCH = 32
+/** Target elapsed ms per batch sample (performance.now() resolution ~0.05 ms). */
+export const BENCH_BATCH_TARGET_MS = 0.05
 
 export function defaultBenchmarkRuns () {
   const fromEnv = Number(process.env.RUNS)
@@ -145,6 +151,36 @@ export function defaultSearchIterations () {
   const fromEnv = Number(process.env.SEARCH_ITERATIONS)
   if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
   return DEFAULT_SEARCH_ITERATIONS
+}
+
+export function defaultBenchWarmup () {
+  const fromEnv = Number(process.env.BENCH_WARMUP)
+  if (Number.isFinite(fromEnv) && fromEnv >= 0) return Math.floor(fromEnv)
+  return DEFAULT_BENCH_WARMUP
+}
+
+export function defaultBenchBatchSize () {
+  const fromEnv = Number(process.env.BENCH_BATCH)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
+  return DEFAULT_BENCH_BATCH
+}
+
+/**
+ * Pick batch size so one clock read spans at least {@link BENCH_BATCH_TARGET_MS}.
+ * @param {() => void} runSearch
+ * @param {number} maxBatch
+ */
+export function resolveBenchBatchSize (runSearch, maxBatch = defaultBenchBatchSize()) {
+  const probe = []
+  for (let i = 0; i < 10; i++) {
+    const t0 = performance.now()
+    runSearch()
+    probe.push(performance.now() - t0)
+  }
+  probe.sort((a, b) => a - b)
+  const p50 = probe[Math.floor(probe.length * 0.5)]
+  if (p50 <= 0 || p50 >= BENCH_BATCH_TARGET_MS) return 1
+  return Math.min(maxBatch, Math.max(1, Math.ceil(BENCH_BATCH_TARGET_MS / p50)))
 }
 
 export function parseRunsArg (args = process.argv) {
@@ -197,13 +233,19 @@ export function argValue (flag, args = process.argv) {
 }
 
 export function benchSearch (index, query, searchOptions = {}, iterations = defaultSearchIterations()) {
-  index.search(query, searchOptions)
+  const runSearch = () => index.search(query, searchOptions)
+
+  const warmupCount = Math.max(defaultBenchWarmup(), iterations)
+  for (let i = 0; i < warmupCount; i++) runSearch()
+
+  const batchSize = resolveBenchBatchSize(runSearch)
   const times = []
   for (let i = 0; i < iterations; i++) {
     const t0 = performance.now()
-    index.search(query, searchOptions)
-    times.push(performance.now() - t0)
+    for (let b = 0; b < batchSize; b++) runSearch()
+    times.push((performance.now() - t0) / batchSize)
   }
+
   times.sort((a, b) => a - b)
   return {
     p50: times[Math.floor(times.length * 0.5)],

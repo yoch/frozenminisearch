@@ -1,7 +1,7 @@
 import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'
-import { buildTermFromSegments, type LabelSegment } from './strings'
+import { buildTermFromSegmentArrays } from './strings'
 
 export function packedRadixFuzzyEntries(
   tree: PackedRadixTree,
@@ -17,7 +17,8 @@ export function packedRadixFuzzyEntries(
   for (let j = 0; j < n; ++j) matrix[j] = j
   for (let i = 1; i < m; ++i) matrix[i * n] = i
 
-  const segments: LabelSegment[] = []
+  const segmentStarts = new Uint32Array(m)
+  const segmentLens = new Uint32Array(m)
 
   recurse(
     tree,
@@ -28,7 +29,9 @@ export function packedRadixFuzzyEntries(
     1,
     n,
     0,
-    segments,
+    segmentStarts,
+    segmentLens,
+    0,
   )
 
   return results
@@ -43,7 +46,9 @@ function recurse(
   rowStart: number,
   n: number,
   node: number,
-  segments: LabelSegment[],
+  segmentStarts: Uint32Array,
+  segmentLens: Uint32Array,
+  depth: number,
 ): void {
   const heap = tree.labelHeap
   const offset = rowStart * n
@@ -58,7 +63,7 @@ function recurse(
     if (edgeOffset < 0) {
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {
-        results.push([buildTermFromSegments(heap, segments), tree.nodeValue[node], distance])
+        results.push([buildTermFromSegmentArrays(heap, segmentStarts, segmentLens, depth), tree.nodeValue[node], distance])
       }
       continue
     }
@@ -99,7 +104,8 @@ function recurse(
       }
     }
 
-    segments.push({ start: labelStart, len: labelLen })
+    segmentStarts[depth] = labelStart
+    segmentLens[depth] = labelLen
     recurse(
       tree,
       query,
@@ -109,8 +115,9 @@ function recurse(
       i,
       n,
       tree.edgeChild[ei],
-      segments,
+      segmentStarts,
+      segmentLens,
+      depth + 1,
     )
-    segments.pop()
   }
 }

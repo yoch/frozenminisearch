@@ -4,13 +4,25 @@
 
 ## Unreleased
 
-Frozen search engine and benchmarking transparency.
+## v8.4.0-beta.0
 
-  - **Ref-first frozen traversal** — `prefixRefs` / `fuzzyRefs` plus `termByIndex`; no persistent string cache on `PackedRadixTree` (strings rebuilt per call)
-  - **AND / AND_NOT branch gating** — score later branches with an `allowedDocs` gate when selective; `matchingFields` unchanged under gate (BM25 parity with score-then-combine); oracle tests vs non-gated path in `queryEngine.gate.test.js`
-  - **Frozen field-term flyweight** — one rebindable `FieldTermDataLike` per `FrozenMiniSearch` (O(1) RAM); docIds/gating read postings via `collectDocIdsFromFrozenLayout` without per-term wrappers
-  - **AND gate parameters** — documented in `docs/AND_GATE_PARAMETERS.md` (`queryEngineGateLimits.ts`, not public API)
-  - **Benchmark defaults** — routine suite `3×25` timed searches with `100` warmup per query (lighter than former `3×50` / `200` warmup); `BENCH_SEARCH_ONLY=1` skips indexing/save/load metrics
+Pre-release: major frozen search performance work since 8.3.3. **No intentional public API or MSv5 wire-format changes** — same `MiniSearch` / `FrozenMiniSearch` surface; re-test ranking on your corpus before production. Install: `npm install @yoch/minisearch@beta`.
+
+### Frozen search (query path)
+
+  - **Ref-first prefix / fuzzy** on `PackedRadixTree` — `prefixRefs` / `fuzzyRefs` with `termByIndex`; dictionary strings materialized per traversal, not cached on the tree
+  - **Fuzzy traversal** — parallel label segment arrays; pre-decoded query code units; tighter Levenshtein inner loop; simplified MSv5 packed-tree decode (term strings built with direct concat)
+  - **AND / AND_NOT branch gating** — when a branch is selective enough, later branches score only against an `allowedDocs` set (large wins on multi-term queries); `matchingFields` still follow score-then-combine semantics under the gate; limits in `queryEngineGateLimits.ts` (not public API); oracle parity in `queryEngine.gate.test.js`
+  - **Field-term flyweight** — one rebindable `FieldTermDataLike` per `FrozenMiniSearch` instead of a growing per-term cache; doc-id collection and gating read postings via `collectDocIdsFromFrozenLayout` on the frozen layout
+  - **Query engine** — unified gated / non-gated visitors; fix nested `combineWith` resolution on compound queries
+  - **Build / load** — assorted frozen build and search micro-optimizations without API changes
+
+### Developer benchmarks
+
+  - **Fixed batch per query** — committed `benchmarks/searchBenchBatches.json` (calibrated at **0.3 ms** wall per sample, same batch for mutable and frozen); no adaptive batching at record time; `searchBenchProtocol` + `batchSize` stored in captures; `yarn benchmark:calibrate-batches` after query/corpus changes
+  - Routine suite defaults: **3×25** timed searches, **100** warmup; `BENCH_SEARCH_ONLY=1` for search-only profile; regression policy and `benchmark:diff` batch mismatch warnings
+  - Re-recorded `benchmarks/baselines/reference.json` under the new protocol
+  - **`docs/AND_GATE_PARAMETERS.md`** — tuning notes for gate thresholds; dev script `benchmark:and-gate-tuning`
 
 ## v8.3.3
 

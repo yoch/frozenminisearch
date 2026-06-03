@@ -85,7 +85,7 @@ NO_DOUBLE_EDITS=1 QUERIES=6000 yarn benchmark:packed-fuzzy-sweep   # 9 mutations
 - **100 warmup** + **25 timed searches** per query (`BENCH_WARMUP`, `SEARCH_ITERATIONS`)
 - Override via env: `RUNS=2 SEARCH_ITERATIONS=30 BENCH_WARMUP=120 yarn benchmark:record`
 
-`baselines/reference.json` was captured with **3×50** (warmup 200) on 8.3.3 — diff search timings against it remain indicative; run `yarn benchmark:baseline:update` after intentional changes to realign the golden file.
+`baselines/reference.json` uses **fixed `batchSize` per query** (`searchBenchBatches.json`, 0.3 ms calibration target). Run `yarn benchmark:calibrate-batches` after corpus/query changes, then `yarn benchmark:baseline:update` to refresh the golden file.
 
 **Search only** (skip indexing, freeze, saveBinary, load, heap — one `addAll`+`freeze` per scenario for timing):
 

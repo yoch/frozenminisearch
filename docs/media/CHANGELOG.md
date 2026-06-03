@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+## v8.4.0-beta.0
+
+Pre-release: frozen search performance (ref-first prefix/fuzzy, AND/AND_NOT gating, field-term flyweight, query-engine fixes) and fixed per-query benchmark batches (0.3 ms calibration). No intentional public API or MSv5 wire changes. Install: `npm install @yoch/minisearch@beta`.
+
 ## v8.3.3
 
 PackedRadixTree subtree iteration performance (no API or iteration-order change for `entries()` / `prefixEntries()`).

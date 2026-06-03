@@ -21,7 +21,9 @@ test('fromRadixTree with mapLeaf options matches termCount form', () => {
 })
 
 function expectFuzzyMultiset(packed, map, query, maxDistance) {
-  expect(sortedFuzzyTuples(packed.fuzzyEntries(query, maxDistance)))
+  const refsAsEntries = Array.from(packed.fuzzyRefs(query, maxDistance))
+    .map(({ termIndex, distance }) => [packed.termByIndex(termIndex), termIndex, distance])
+  expect(sortedFuzzyTuples(refsAsEntries))
     .toEqual(sortedMapFuzzy(map.fuzzyGet(query, maxDistance)))
 }
 
@@ -50,9 +52,11 @@ function expectPackedParity(entries, probes = {}) {
     expect(p.get(term)).toBe(m.get(term))
   }
   for (const prefix of prefixes) {
-    expect(Array.from(p.prefixEntries(prefix))).toEqual(Array.from(m.atPrefix(prefix).entries()))
+    const fromRefs = Array.from(p.prefixRefs(prefix))
+      .map(({ termIndex }) => [p.termByIndex(termIndex), termIndex])
+    expect(fromRefs).toEqual(Array.from(m.atPrefix(prefix).entries()))
   }
-  // fuzzyEntries: same match set as fuzzyGet; iteration order is not compared.
+  // fuzzyRefs: same match set as fuzzyGet; iteration order is not compared.
   for (const query of fuzzyQueries) {
     for (const distance of fuzzyDistances) {
       expectFuzzyMultiset(p, m, query, distance)
@@ -152,7 +156,9 @@ describe('PackedRadixTree module', () => {
       }
       expect(Array.from(p.entries())).toEqual(Array.from(m.entries()))
       for (const prefix of ['', 'a', 'b', 'c', 'aa', 'ab', 'bc', 'zzz']) {
-        expect(Array.from(p.prefixEntries(prefix))).toEqual(Array.from(m.atPrefix(prefix).entries()))
+        const refs = Array.from(p.prefixRefs(prefix))
+          .map(({ termIndex }) => [p.termByIndex(termIndex), termIndex])
+        expect(refs).toEqual(Array.from(m.atPrefix(prefix).entries()))
       }
       for (const query of ['', 'a', 'ab', 'ba', 'ccc', 'zz']) {
         for (const distance of [0, 1, 2]) {
@@ -162,24 +168,68 @@ describe('PackedRadixTree module', () => {
     }
   })
 
-  test('prefixEntries match SearchableMap atPrefix', () => {
+  test('prefixRefs match SearchableMap atPrefix', () => {
     for (const prefix of ['', 'a', 'ac', 'sum', 'xyz']) {
-      const fromPacked = Array.from(packed.prefixEntries(prefix))
+      const fromPacked = Array.from(packed.prefixRefs(prefix))
+        .map(({ termIndex }) => [packed.termByIndex(termIndex), termIndex])
       const fromMap = Array.from(map.atPrefix(prefix).entries())
       expect(fromPacked).toEqual(fromMap)
     }
   })
 
-  test('fuzzyEntries match SearchableMap fuzzyGet (same match set)', () => {
+  test('fuzzyRefs match SearchableMap fuzzyGet (same match set)', () => {
     for (const distance of [0, 1, 2, 3]) {
       expectFuzzyMultiset(packed, map, 'acqua', distance)
     }
   })
 
+  test('termByIndex and termLengthByIndex rebuild terms from lazy metadata', () => {
+    for (const [term, index] of map.entries()) {
+      expect(packed.termByIndex(index)).toBe(term)
+      expect(packed.termLengthByIndex(index)).toBe(term.length)
+    }
+  })
+
+  test('prefixRefs preserve prefix order and lengths', () => {
+    const prefix = 'ac'
+    const refs = Array.from(packed.prefixRefs(prefix))
+    const rebuilt = refs.map(({ termIndex }) => packed.termByIndex(termIndex))
+    expect(rebuilt).toEqual(Array.from(map.atPrefix(prefix).entries()).map(([term]) => term))
+    for (const ref of refs) {
+      expect(ref.length).toBe(packed.termByIndex(ref.termIndex).length)
+    }
+  })
+
+  test('fuzzyEntries remains parity-equivalent to SearchableMap fuzzyGet', () => {
+    for (const distance of [0, 1, 2, 3]) {
+      expect(sortedFuzzyTuples(packed.fuzzyEntries('acqua', distance)))
+        .toEqual(sortedMapFuzzy(map.fuzzyGet('acqua', distance)))
+    }
+    const refs = Array.from(packed.fuzzyRefs('acqua', 2))
+      .map(({ termIndex, distance }) => [termIndex, distance])
+      .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]))
+    const entries = Array.from(packed.fuzzyEntries('acqua', 2))
+      .map(([, termIndex, distance]) => [termIndex, distance])
+      .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]))
+    expect(refs).toEqual(entries)
+  })
+
+  test('prefixEntries remains parity-equivalent to SearchableMap atPrefix', () => {
+    for (const prefix of ['', 'a', 'ac', 'sum', 'xyz']) {
+      expect(Array.from(packed.prefixEntries(prefix)))
+        .toEqual(Array.from(map.atPrefix(prefix).entries()))
+    }
+    const prefix = 'ac'
+    const refs = Array.from(packed.prefixRefs(prefix))
+      .map(({ termIndex }) => [packed.termByIndex(termIndex), termIndex])
+    expect(Array.from(packed.prefixEntries(prefix))).toEqual(refs)
+  })
+
   test('mid-edge prefix includes full terms', () => {
-    const m = SearchableMap.from([['acquire', 3]])
+    const m = SearchableMap.from([['acquire', 0]])
     const p = fromRadixTree(m.radixTree, m.size)
-    expect(Array.from(p.prefixEntries('acq'))).toEqual([['acquire', 3]])
+    expect(Array.from(p.prefixRefs('acq')).map(({ termIndex }) => [p.termByIndex(termIndex), termIndex]))
+      .toEqual([['acquire', 0]])
   })
 
   test('validateFrozenTermIndexLeaves rejects wrong leaf count', () => {

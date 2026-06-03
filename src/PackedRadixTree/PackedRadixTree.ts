@@ -1,5 +1,12 @@
-import { packedRadixFuzzyEntries } from './fuzzy'
+import { packedRadixFuzzyEntries, packedRadixFuzzyRefs } from './fuzzy'
+import type { PackedFuzzyRef, PackedTermRef } from './types'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
+import {
+  buildLazyTermMetadata,
+  reconstructTermFromIndex,
+  termLengthFromIndex,
+  type PackedLazyTermMetadata,
+} from './lazyMetadata'
 import { labelSlice } from './strings'
 import type { PackedIndexArray, PackedRadixTreeData, PackedStringRadixMap } from './types'
 
@@ -18,12 +25,28 @@ type EmitFrame = {
   prefix: string
 }
 
+type EmitRefFrame = {
+  node: number
+  slot: number
+  first: number
+  leafSlot: number
+  length: number
+}
+
 function pushEmitFrame(frames: EmitFrame[], tree: PackedRadixTree, node: number, prefix: string): void {
   const first = tree.nodeEdgeOffset[node]
   const edgeCount = tree.nodeEdgeOffset[node + 1] - first
   const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
   const totalCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
   frames.push({ node, slot: totalCount - 1, first, leafSlot, prefix })
+}
+
+function pushEmitRefFrame(frames: EmitRefFrame[], tree: PackedRadixTree, node: number, length: number): void {
+  const first = tree.nodeEdgeOffset[node]
+  const edgeCount = tree.nodeEdgeOffset[node + 1] - first
+  const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
+  const totalCount = packedNodeChildCount(edgeCount, leafSlot >= 0)
+  frames.push({ node, slot: totalCount - 1, first, leafSlot, length })
 }
 
 export default class PackedRadixTree implements PackedStringRadixMap<number>, PackedRadixTreeData {
@@ -37,6 +60,8 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   readonly edgeLabelStart: PackedIndexArray
   readonly edgeLabelLength: PackedIndexArray
   readonly edgeChild: PackedIndexArray
+  private _lazyTermMetadata: PackedLazyTermMetadata | undefined
+  private _termStringCache: Map<number, string> | undefined
 
   private constructor(data: PackedRadixTreeData) {
     this.size = data.size
@@ -75,10 +100,17 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     yield *this.emitSubtree(0, '')
   }
 
+  /** @deprecated Internal benchmark/compat wrapper. Prefer `prefixRefs` + `termByIndex`. */
   * prefixEntries(prefix: string): IterableIterator<[string, number]> {
     const start = this.resolvePrefixWalk(prefix)
     if (start == null) return
     yield *this.emitSubtree(start.node, start.prefix)
+  }
+
+  * prefixRefs(prefix: string): IterableIterator<PackedTermRef> {
+    const start = this.resolvePrefixWalkRef(prefix)
+    if (start == null) return
+    yield *this.emitSubtreeRefs(start.node, start.prefixLength)
   }
 
   /**
@@ -94,6 +126,15 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     return { node: walk.node, prefix: walk.prefix }
   }
 
+  private resolvePrefixWalkRef(prefix: string): { node: number, prefixLength: number } | null {
+    if (prefix.length === 0) {
+      return { node: 0, prefixLength: 0 }
+    }
+    const walk = this.walkKey(prefix, false)
+    if (walk == null) return null
+    return { node: walk.node, prefixLength: walk.prefixLength }
+  }
+
   /**
    * Follow `key` from the root. Shared by exact lookup and prefix iteration.
    * Mid-edge stop uses the full edge label in `prefix` (SearchableMap parity).
@@ -101,9 +142,10 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   private walkKey(
     key: string,
     accumulatePrefix: boolean,
-  ): { node: number, prefix: string, keyFullyConsumed: boolean } | null {
+  ): { node: number, prefix: string, prefixLength: number, keyFullyConsumed: boolean } | null {
     let node = 0
     let prefixStr = ''
+    let prefixLength = 0
     let pos = 0
     const heap = this.labelHeap
     const n = key.length
@@ -119,16 +161,18 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
       if (remaining < len) {
         if (!labelsMatch(heap, start, remaining, key, pos)) return null
         if (accumulatePrefix) prefixStr += labelSlice(heap, start, len)
-        return { node: this.edgeChild[ei], prefix: prefixStr, keyFullyConsumed: false }
+        prefixLength += len
+        return { node: this.edgeChild[ei], prefix: prefixStr, prefixLength, keyFullyConsumed: false }
       }
 
       if (!labelsMatch(heap, start, len, key, pos)) return null
       if (accumulatePrefix) prefixStr += labelSlice(heap, start, len)
+      prefixLength += len
       pos += len
       node = this.edgeChild[ei]
     }
 
-    return { node, prefix: prefixStr, keyFullyConsumed: true }
+    return { node, prefix: prefixStr, prefixLength, keyFullyConsumed: true }
   }
 
   /**
@@ -164,8 +208,62 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     }
   }
 
+  private * emitSubtreeRefs(startNode: number, startLength: number): IterableIterator<PackedTermRef> {
+    const frames: EmitRefFrame[] = []
+    pushEmitRefFrame(frames, this, startNode, startLength)
+
+    while (frames.length) {
+      const frame = frames[frames.length - 1]
+      if (frame.slot < 0) {
+        frames.pop()
+        continue
+      }
+
+      const slot = frame.slot--
+      const edgeOffset = edgeOffsetAtSlot(slot, frame.leafSlot)
+      if (edgeOffset < 0) {
+        yield { termIndex: this.nodeValue[frame.node], length: frame.length }
+        continue
+      }
+
+      const ei = frame.first + edgeOffset
+      const len = this.edgeLabelLength[ei]
+      pushEmitRefFrame(frames, this, this.edgeChild[ei], frame.length + len)
+    }
+  }
+
+  /** @deprecated Internal benchmark/compat wrapper. Prefer `fuzzyRefs` + `termByIndex`. */
   fuzzyEntries(term: string, maxDistance: number): Iterable<[string, number, number]> {
     return packedRadixFuzzyEntries(this, term, maxDistance)
+  }
+
+  fuzzyRefs(term: string, maxDistance: number): Iterable<PackedFuzzyRef> {
+    return packedRadixFuzzyRefs(this, term, maxDistance)
+  }
+
+  lazyTermMetadata(): PackedLazyTermMetadata {
+    if (this._lazyTermMetadata == null) {
+      this._lazyTermMetadata = buildLazyTermMetadata(this)
+    }
+    return this._lazyTermMetadata
+  }
+
+  termLengthByIndex(termIndex: number): number {
+    return termLengthFromIndex(this, this.lazyTermMetadata(), termIndex)
+  }
+
+  termByIndex(termIndex: number): string {
+    let cache = this._termStringCache
+    if (cache == null) {
+      cache = new Map()
+      this._termStringCache = cache
+    }
+    let term = cache.get(termIndex)
+    if (term === undefined) {
+      term = reconstructTermFromIndex(this, this.lazyTermMetadata(), termIndex)
+      cache.set(termIndex, term)
+    }
+    return term
   }
 
   packedByteLength(): number {

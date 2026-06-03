@@ -2,8 +2,9 @@
 
 In-memory packed radix tree for string keys with numeric payloads.
 
-- `entries()` / `prefixEntries()`: same traversal order as `SearchableMap` (`TreeIterator` sibling order, leaf slot position).
-- `fuzzyEntries()`: same **set** of `[term, value, distance]` as `SearchableMap#fuzzyGet`; iteration order is implementation-defined.
+- `prefixRefs()` / `fuzzyRefs()`: ref-first internal primitives for query execution (`termIndex`, `length`, and fuzzy `distance`).
+- `entries()`: string iterator used for full materialization/parity.
+- `prefixEntries()` / `fuzzyEntries()`: deprecated internal benchmark/compat wrappers; prefer refs plus `termByIndex()`.
 
 ## Usage
 
@@ -15,8 +16,8 @@ const map = SearchableMap.from([['foo', 0], ['bar', 1]])
 const tree = fromRadixTree(map.radixTree, map.size)
 
 tree.get('foo') // 0
-Array.from(tree.prefixEntries('f'))
-Array.from(tree.fuzzyEntries('fxo', 1))
+Array.from(tree.prefixRefs('f'))
+Array.from(tree.fuzzyRefs('fxo', 1))
 ```
 
 Custom leaf mapping (e.g. frozen index build):

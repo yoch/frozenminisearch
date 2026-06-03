@@ -1,15 +1,38 @@
 import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'
-import { buildTermFromSegmentArrays } from './strings'
+import type { PackedFuzzyRef } from './types'
 
+export function packedRadixFuzzyRefs(
+  tree: PackedRadixTree,
+  query: string,
+  maxDistance: number,
+): Iterable<PackedFuzzyRef> {
+  const results: PackedFuzzyRef[] = []
+  runFuzzy(tree, query, maxDistance, results)
+  return results
+}
+
+/** @deprecated Internal benchmark/compat wrapper. Prefer `packedRadixFuzzyRefs`. */
 export function packedRadixFuzzyEntries(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
 ): Iterable<[string, number, number]> {
   const results: Array<[string, number, number]> = []
-  if (maxDistance < 0) return results
+  for (const { termIndex, distance } of packedRadixFuzzyRefs(tree, query, maxDistance)) {
+    results.push([tree.termByIndex(termIndex), termIndex, distance])
+  }
+  return results
+}
+
+function runFuzzy(
+  tree: PackedRadixTree,
+  query: string,
+  maxDistance: number,
+  results: PackedFuzzyRef[],
+): void {
+  if (maxDistance < 0) return
 
   const n = query.length + 1
   const m = n + maxDistance
@@ -21,9 +44,6 @@ export function packedRadixFuzzyEntries(
   const queryCodes = new Uint16Array(n)
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
-  const segmentStarts = new Uint32Array(m)
-  const segmentLens = new Uint32Array(m)
-
   recurse(
     tree,
     queryLen,
@@ -33,12 +53,8 @@ export function packedRadixFuzzyEntries(
     matrix,
     1,
     0,
-    segmentStarts,
-    segmentLens,
     0,
   )
-
-  return results
 }
 
 function recurse(
@@ -46,13 +62,11 @@ function recurse(
   queryLen: number,
   queryCodes: Uint16Array,
   maxDistance: number,
-  results: Array<[string, number, number]>,
+  results: PackedFuzzyRef[],
   matrix: Uint8Array,
   rowStart: number,
   node: number,
-  segmentStarts: Uint32Array,
-  segmentLens: Uint32Array,
-  depth: number,
+  termLength: number,
 ): void {
   const heap = tree.labelHeap
   const n = queryLen + 1
@@ -68,7 +82,8 @@ function recurse(
     if (edgeOffset < 0) {
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {
-        results.push([buildTermFromSegmentArrays(heap, segmentStarts, segmentLens, depth), tree.nodeValue[node], distance])
+        const termIndex = tree.nodeValue[node]
+        results.push({ termIndex, distance, length: termLength })
       }
       continue
     }
@@ -113,8 +128,6 @@ function recurse(
       }
     }
 
-    segmentStarts[depth] = labelStart
-    segmentLens[depth] = labelLen
     recurse(
       tree,
       queryLen,
@@ -124,9 +137,7 @@ function recurse(
       matrix,
       i,
       tree.edgeChild[ei],
-      segmentStarts,
-      segmentLens,
-      depth + 1,
+      termLength + labelLen,
     )
   }
 }

@@ -28,7 +28,10 @@ function assertSweepParity ({ map, packed, terms, termSample }) {
   expect(cases.length).toBeLessThanOrEqual(expectedMax)
 
   for (const { query, maxDistance } of cases) {
-    const fromPacked = sortedFuzzyTuples(packed.fuzzyEntries(query, maxDistance))
+    const fromPacked = sortedFuzzyTuples(
+      Array.from(packed.fuzzyRefs(query, maxDistance))
+        .map(({ termIndex, distance }) => [packed.termByIndex(termIndex), termIndex, distance]),
+    )
     const fromMap = sortedMapFuzzy(map.fuzzyGet(query, maxDistance))
     expect(fromMap).toEqual(fromPacked)
   }

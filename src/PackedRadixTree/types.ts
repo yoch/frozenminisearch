@@ -5,17 +5,33 @@
  */
 export type PackedIndexArray = Uint8Array | Uint16Array | Uint32Array
 
+export type PackedTermRef = {
+  termIndex: number
+  length: number
+}
+
+export type PackedFuzzyRef = PackedTermRef & {
+  distance: number
+}
+
 /** In-memory packed string radix map (term → payload). */
 export interface PackedStringRadixMap<V = number> {
   readonly size: number
   get(term: string): V | undefined
+  entries(): Iterable<[string, V]>
+  prefixRefs(prefix: string): Iterable<PackedTermRef>
+  fuzzyRefs(term: string, maxDistance: number): Iterable<PackedFuzzyRef>
+  termByIndex(termIndex: number): string
+  termLengthByIndex(termIndex: number): number
+  /** @deprecated Internal benchmark/compat wrapper. Prefer `prefixRefs` + `termByIndex`. */
   prefixEntries(prefix: string): Iterable<[string, V]>
   /**
+   * @deprecated Internal benchmark/compat wrapper. Prefer `fuzzyRefs` + `termByIndex`.
+   *
    * Fuzzy matches for `term` within `maxDistance` edit distance. Yields every matching
    * `[term, value, distance]`; iteration order is implementation-defined (compare sets, not order).
    */
   fuzzyEntries(term: string, maxDistance: number): Iterable<[string, V, number]>
-  entries(): Iterable<[string, V]>
   packedByteLength(): number
   packedNodeCount(): number
   packedEdgeCount(): number

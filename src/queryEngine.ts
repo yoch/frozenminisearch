@@ -19,14 +19,21 @@ import type {
   SearchOptionsWithDefaults,
 } from './searchTypes'
 import { WILDCARD_QUERY } from './symbols'
+import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
 
 /**
  * Adapter exposing the index storage (mutable maps or frozen flat arrays) to the
  * shared query engine. All accessors are lazy: prefix/fuzzy results are iterated
  * only once by the engine, so wrappers should be allocated on demand.
  */
-export interface QueryIndexView {
+interface BaseQueryIndexView {
   getTermData(term: string): FieldTermDataLike | undefined
+  /** Iterate over active documents (used by wildcard queries). */
+  forEachActiveDoc(callback: (docId: number, externalId: unknown, storedFields?: Record<string, unknown>) => void): void
+}
+
+interface StringQueryIndexView extends BaseQueryIndexView {
+  mode: 'string'
   /** Iterable of (term, data) for terms sharing the prefix. May be undefined when prefix search is not requested. */
   getPrefixMatches(term: string): Iterable<[string, FieldTermDataLike]> | undefined
   /** Map keyed by term; must support `.delete(term)` so the engine can drop fuzzy duplicates of prefix hits. */
@@ -34,9 +41,16 @@ export interface QueryIndexView {
     term: string,
     maxDistance: number,
   ): Map<string, { data: FieldTermDataLike, distance: number }> | undefined
-  /** Iterate over active documents (used by wildcard queries). */
-  forEachActiveDoc(callback: (docId: number, externalId: unknown, storedFields?: Record<string, unknown>) => void): void
 }
+
+interface IndexedQueryIndexView extends BaseQueryIndexView {
+  mode: 'indexed'
+  getPrefixMatchesByIndex(term: string): Iterable<PackedTermRef & { data: FieldTermDataLike }>
+  getFuzzyMatchesByIndex(term: string, maxDistance: number): Iterable<PackedFuzzyRef & { data: FieldTermDataLike }>
+  resolveTermByIndex(termIndex: number): string
+}
+
+export type QueryIndexView = StringQueryIndexView | IndexedQueryIndexView
 
 export interface QueryEngineParams {
   fields: string[]
@@ -54,22 +68,23 @@ export function createFrozenQueryIndexView(
   forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
 ): QueryIndexView {
   return {
+    mode: 'indexed',
     getTermData(term) {
       const ti = index.get(term)
       return ti == null ? undefined : fieldTermDataFor(ti)
     },
-    * getPrefixMatches(term) {
-      for (const [t, ti] of index.prefixEntries(term)) {
-        yield [t, fieldTermDataFor(ti)]
+    * getPrefixMatchesByIndex(term) {
+      for (const { termIndex, length } of index.prefixRefs(term)) {
+        yield { termIndex, length, data: fieldTermDataFor(termIndex) }
       }
     },
-    getFuzzyMatches(term, maxDistance) {
-      const matches = index.fuzzyEntries(term, maxDistance)
-      const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
-      for (const [t, ti, distance] of matches) {
-        out.set(t, { data: fieldTermDataFor(ti), distance })
+    * getFuzzyMatchesByIndex(term, maxDistance) {
+      for (const { termIndex, length, distance } of index.fuzzyRefs(term, maxDistance)) {
+        yield { termIndex, length, distance, data: fieldTermDataFor(termIndex) }
       }
-      return out
+    },
+    resolveTermByIndex(termIndex) {
+      return index.termByIndex(termIndex)
     },
     forEachActiveDoc,
   }
@@ -82,6 +97,7 @@ export function createQueryIndexView<L>(
   forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
 ): QueryIndexView {
   return {
+    mode: 'string',
     getTermData(term) {
       const leaf = index.get(term)
       return leaf == null ? undefined : toFieldTermData(leaf)
@@ -125,20 +141,45 @@ function executeQuerySpec(
     data, fieldBoosts, aggregateContext, boostDocument, bm25, results,
   )
 
-  const results = score(query.term, 1, indexView.getTermData(query.term))
-
-  const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
-
-  let fuzzyMatches: Map<string, { data: FieldTermDataLike, distance: number }> | undefined
+  let maxDistance = 0
   if (query.fuzzy) {
     const fuzzy = (query.fuzzy === true) ? 0.2 : query.fuzzy
-    const maxDistance = fuzzy < 1
+    maxDistance = fuzzy < 1
       ? Math.min(maxFuzzy, Math.round(query.term.length * fuzzy))
       : fuzzy
-    if (maxDistance) {
-      fuzzyMatches = indexView.getFuzzyMatches(query.term, maxDistance)
-    }
   }
+
+  const results = score(query.term, 1, indexView.getTermData(query.term))
+
+  if (indexView.mode === 'indexed') {
+    const prefixRefs = query.prefix ? indexView.getPrefixMatchesByIndex(query.term) : undefined
+    const seenPrefix = new Set<number>()
+    if (prefixRefs) {
+      for (const { termIndex, length, data } of prefixRefs) {
+        const distance = length - query.term.length
+        if (!distance) continue
+        seenPrefix.add(termIndex)
+        const term = indexView.resolveTermByIndex(termIndex)
+        const weight = prefixWeight * length / (length + 0.3 * distance)
+        score(term, weight, data, results)
+      }
+    }
+    const fuzzyMatchesByIndex = maxDistance
+      ? indexView.getFuzzyMatchesByIndex(query.term, maxDistance)
+      : undefined
+    if (fuzzyMatchesByIndex) {
+      for (const { termIndex, length, data, distance } of fuzzyMatchesByIndex) {
+        if (!distance || seenPrefix.has(termIndex)) continue
+        const term = indexView.resolveTermByIndex(termIndex)
+        const weight = fuzzyWeight * length / (length + distance)
+        score(term, weight, data, results)
+      }
+    }
+    return results
+  }
+
+  const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
+  const fuzzyMatches = maxDistance ? indexView.getFuzzyMatches(query.term, maxDistance) : undefined
 
   if (prefixMatches) {
     for (const [term, data] of prefixMatches) {

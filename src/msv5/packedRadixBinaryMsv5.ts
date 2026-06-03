@@ -87,25 +87,20 @@ function readColumn(
       ? new Uint8Array(0)
       : new Uint8Array(buf.buffer, buf.byteOffset + offset, elementCount)
   } else if (width === 2) {
+    // Columns are pad4-aligned at encode time; section buffers are 4-aligned in MSv5 payloads.
     if (offset % 2 !== 0) {
-      const out = new Uint16Array(elementCount)
-      for (let i = 0; i < elementCount; i++) out[i] = buf.readUInt16LE(offset + i * 2)
-      arr = out
-    } else {
-      arr = elementCount === 0
-        ? new Uint16Array(0)
-        : new Uint16Array(buf.buffer, buf.byteOffset + offset, elementCount)
+      throw invalidFrozenIndex('term tree Uint16 column misaligned')
     }
+    arr = elementCount === 0
+      ? new Uint16Array(0)
+      : new Uint16Array(buf.buffer, buf.byteOffset + offset, elementCount)
   } else {
     if (offset % 4 !== 0) {
-      const out = new Uint32Array(elementCount)
-      for (let i = 0; i < elementCount; i++) out[i] = buf.readUInt32LE(offset + i * 4)
-      arr = out
-    } else {
-      arr = elementCount === 0
-        ? new Uint32Array(0)
-        : new Uint32Array(buf.buffer, buf.byteOffset + offset, elementCount)
+      throw invalidFrozenIndex('term tree Uint32 column misaligned')
     }
+    arr = elementCount === 0
+      ? new Uint32Array(0)
+      : new Uint32Array(buf.buffer, buf.byteOffset + offset, elementCount)
   }
   return { arr, next: offset + padded }
 }

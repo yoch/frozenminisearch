@@ -9,9 +9,9 @@ export function buildTermFromSegments(heap: string, segments: LabelSegment[]): s
   const depth = segments.length
   if (depth === 0) return ''
   if (depth === 1) return labelSlice(heap, segments[0].start, segments[0].len)
-  const parts = new Array<string>(depth)
-  for (let i = 0; i < depth; i++) {
-    parts[i] = labelSlice(heap, segments[i].start, segments[i].len)
+  let result = labelSlice(heap, segments[0].start, segments[0].len)
+  for (let i = 1; i < depth; i++) {
+    result += labelSlice(heap, segments[i].start, segments[i].len)
   }
-  return parts.join('')
+  return result
 }

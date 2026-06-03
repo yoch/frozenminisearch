@@ -61,7 +61,6 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   readonly edgeLabelLength: PackedIndexArray
   readonly edgeChild: PackedIndexArray
   private _lazyTermMetadata: PackedLazyTermMetadata | undefined
-  private _termStringCache: Map<number, string> | undefined
 
   private constructor(data: PackedRadixTreeData) {
     this.size = data.size
@@ -253,17 +252,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   }
 
   termByIndex(termIndex: number): string {
-    let cache = this._termStringCache
-    if (cache == null) {
-      cache = new Map()
-      this._termStringCache = cache
-    }
-    let term = cache.get(termIndex)
-    if (term === undefined) {
-      term = reconstructTermFromIndex(this, this.lazyTermMetadata(), termIndex)
-      cache.set(termIndex, term)
-    }
-    return term
+    return reconstructTermFromIndex(this, this.lazyTermMetadata(), termIndex)
   }
 
   packedByteLength(): number {

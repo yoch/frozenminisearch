@@ -74,20 +74,14 @@ export function reconstructTermFromIndex(
 ): string {
   assertTermIndex(tree, termIndex)
   const heap = tree.labelHeap
+  const { edgeLabelStart, edgeLabelLength } = tree
 
-  // Edges are collected leaf → root, then concatenated root → leaf.
-  const edges: number[] = []
+  let result = ''
   let node = metadata.leafNodeByTermIndex[termIndex]
   while (node !== 0) {
     const ei = metadata.parentEdge[node]
-    edges.push(ei)
+    result = labelSlice(heap, edgeLabelStart[ei], edgeLabelLength[ei]) + result
     node = metadata.parentNode[node]
-  }
-
-  let result = ''
-  for (let i = edges.length - 1; i >= 0; i--) {
-    const ei = edges[i]
-    result += labelSlice(heap, tree.edgeLabelStart[ei], tree.edgeLabelLength[ei])
   }
   return result
 }

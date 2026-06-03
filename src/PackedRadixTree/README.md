@@ -6,6 +6,14 @@ In-memory packed radix tree for string keys with numeric payloads.
 - `entries()`: string iterator used for full materialization/parity.
 - `prefixEntries()` / `fuzzyEntries()`: deprecated internal benchmark/compat wrappers; prefer refs plus `termByIndex()`.
 
+## Term resolution (frozen search)
+
+- **`termByIndex(termIndex)`** rebuilds the UTF-16 string on every call by walking parent edges (`lazyMetadata.ts`). There is **no cross-request string cache** on the tree instance.
+- **`lazyTermMetadata()`** (private) builds parent pointers once per `PackedRadixTree` instance; subsequent `termByIndex` / `termLengthByIndex` calls reuse that structure only.
+- **`termLengthByIndex`** returns length without materializing the string (used for prefix/fuzzy weights).
+
+Frozen search uses `prefixRefs` / `fuzzyRefs` plus lazy `termByIndex` only when a posting is scored (match keys, `boostDocument`, etc.).
+
 ## Usage
 
 ```typescript

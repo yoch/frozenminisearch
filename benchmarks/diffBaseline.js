@@ -25,6 +25,7 @@ import {
   compareSearchMetric,
   compareTimingMetric,
   SEARCH_MS_FLOOR,
+  SEARCH_PCT_FAIL,
 } from './regressionPolicy.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
 
@@ -37,7 +38,7 @@ const argv = process.argv.slice(2)
 const strictSearch = argv.includes('--strict')
 const forceRun = argv.includes('--run')
 
-const { runs, searchIterations } = parseBenchmarkArgs()
+const { runs, searchIterations, benchProfile } = parseBenchmarkArgs()
 
 /** Lower is better unless noted. */
 const THRESHOLDS = {
@@ -96,7 +97,7 @@ function compareMetric (label, refVal, curVal, metricKey, higherIsBetter = false
   return status
 }
 
-function compareScenario (ref, cur) {
+function compareScenario (ref, cur, { structural = true } = {}) {
   console.log(`\n${'─'.repeat(72)}`)
   console.log(`${cur.name} (${cur.id})`)
   console.log('─'.repeat(72))
@@ -108,21 +109,27 @@ function compareScenario (ref, cur) {
     else if (s === 'warn' && worst !== 'fail') worst = 'warn'
   }
 
-  const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
-  compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
-  compareTimingMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs', bump)
-  compareTimingMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs', bump)
-  compareTimingMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
-  bump(compareMetric('disk binary (MB)', ref.diskMb.binary, cur.diskMb.binary, 'heapFrozenMb'))
-  bump(compareMetric('postings typed (MB)', mb(ref.memoryBreakdown.postings.totalTypedBytes), mb(cur.memoryBreakdown.postings.totalTypedBytes), 'heapFrozenMb'))
-  bump(compareMetric('radix est. (MB)', mb(ref.memoryBreakdown.radixTree.estimatedBytes), mb(cur.memoryBreakdown.radixTree.estimatedBytes), 'heapFrozenMb'))
+  if (structural) {
+    const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
+    compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
+    compareTimingMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs', bump)
+    compareTimingMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs', bump)
+    compareTimingMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
+    bump(compareMetric('disk binary (MB)', ref.diskMb.binary, cur.diskMb.binary, 'heapFrozenMb'))
+    if (ref.memoryBreakdown?.postings && cur.memoryBreakdown?.postings) {
+      bump(compareMetric('postings typed (MB)', mb(ref.memoryBreakdown.postings.totalTypedBytes), mb(cur.memoryBreakdown.postings.totalTypedBytes), 'heapFrozenMb'))
+      bump(compareMetric('radix est. (MB)', mb(ref.memoryBreakdown.radixTree.estimatedBytes), mb(cur.memoryBreakdown.radixTree.estimatedBytes), 'heapFrozenMb'))
+    }
+  } else {
+    console.log('  (indexing / heap / disk / load — skipped, search-only profile)')
+  }
 
   const refSearch = Object.fromEntries(ref.search.map((r) => [r.label, r]))
   for (const row of cur.search) {
     const prev = refSearch[row.label]
     if (!prev) continue
     const s = compareSearchMetric(`search p50 ${row.label}`, prev.frozenP50, row.frozenP50)
-    if (strictSearch) {
+    if (strictSearch || !structural) {
       bump(s)
     } else if (s !== 'ok') {
       console.log('       (search timing informational only; use --strict to fail on search)')
@@ -151,7 +158,8 @@ function main () {
       ...collectRunMetadata(),
       runs,
       searchIterations,
-      scenarios: runBenchmarkSuite(undefined, runs, searchIterations),
+      benchProfile,
+      scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile }),
     }
     mkdirSync(BASELINES_DIR, { recursive: true })
     writeFileSync(LATEST_PATH, JSON.stringify(current, null, 2) + '\n')
@@ -168,10 +176,18 @@ function main () {
   console.log(`Current:   ${current.capturedAt} @ ${current.git?.commitShort}${current.git?.dirty ? ' (dirty)' : ''}`)
   const curRuns = current.runs ?? 1
   const curIters = current.searchIterations ?? '(legacy)'
+  const curProfile = current.benchProfile ?? current.scenarios[0]?.benchProfile ?? 'full'
+  const refProfile = reference.benchProfile ?? reference.scenarios[0]?.benchProfile ?? 'full'
+  const diffSearchOnly = benchProfile === 'search' || curProfile === 'search'
   if (forceRun) {
-    console.log(`Measured:  ${runs} run(s)/scenario, ${searchIterations} search iterations`)
+    console.log(`Measured:  ${runs} run(s)/scenario, ${searchIterations} search iterations, profile=${curProfile}`)
   } else {
-    console.log(`Captured:  ${curRuns} run(s)/scenario, ${curIters} search iterations`)
+    console.log(`Captured:  ${curRuns} run(s)/scenario, ${curIters} search iterations, profile=${curProfile}`)
+  }
+  if (diffSearchOnly) {
+    console.log('Diff mode: search p50 only (indexing / save / load / heap omitted)\n')
+  } else if (refProfile === 'search' && curProfile === 'full') {
+    console.warn('Warning: reference is search-only but current is full — structural lines compare mixed profiles.\n')
   }
 
   const curById = Object.fromEntries(current.scenarios.map((s) => [s.id, s]))
@@ -184,7 +200,7 @@ function main () {
       overall = 'fail'
       continue
     }
-    const status = compareScenario(refScenario, curScenario)
+    const status = compareScenario(refScenario, curScenario, { structural: !diffSearchOnly })
     if (status === 'fail') overall = 'fail'
     else if (status === 'warn' && overall === 'ok') overall = 'warn'
   }
@@ -198,8 +214,12 @@ function main () {
     console.log('FAIL: regressions exceed thresholds. Review before merging.')
   }
   console.log('='.repeat(72))
-  console.log('\nThresholds (fail): heap frozen +10%; loadBinary +20%; heap saving −10 pts.')
-  console.log(`Search p50: abs floor below ${SEARCH_MS_FLOOR} ms; informational unless --strict.`)
+  if (!diffSearchOnly) {
+    console.log('\nThresholds (fail): heap frozen +10%; loadBinary +20%; heap saving −10 pts.')
+    console.log(`Search p50: abs floor below ${SEARCH_MS_FLOOR} ms; informational unless --strict.`)
+  } else {
+    console.log(`\nSearch-only thresholds (fail): +${SEARCH_PCT_FAIL}% or floor rules below ${SEARCH_MS_FLOOR} ms baseline.`)
+  }
   console.log('Workflow: benchmark:record once → benchmark:diff (or diff other JSON via --current).\n')
 
   if (overall === 'fail') process.exit(1)

@@ -1,6 +1,7 @@
 import { readDocId, SegmentPostingList } from './compactPostings'
 import type {
   MatchInfo,
+  Query,
   SearchOptions,
   SearchOptionsWithDefaults,
   SearchResult,
@@ -407,6 +408,30 @@ export interface FinalizeSearchParams {
   getStoredFields: (docId: number) => Record<string, unknown> | undefined
   filter?: (result: SearchResult) => boolean
   skipSort?: boolean
+}
+
+/** Merge search options, apply wildcard skipSort, then {@link finalizeSearchResults}. */
+export function finalizeRawSearchResults(
+  rawResults: RawResult,
+  query: Query,
+  searchOptions: SearchOptions,
+  globalSearchOptions: SearchOptionsWithDefaults,
+  wildcard: Query,
+  getExternalId: (docId: number) => unknown,
+  getStoredFields: (docId: number) => Record<string, unknown> | undefined,
+): SearchResult[] {
+  const searchOptionsWithDefaults: SearchOptionsWithDefaults = {
+    ...globalSearchOptions,
+    ...searchOptions,
+  }
+  const skipSort = query === wildcard && searchOptionsWithDefaults.boostDocument == null
+  return finalizeSearchResults({
+    rawResults,
+    getExternalId,
+    getStoredFields,
+    filter: searchOptionsWithDefaults.filter,
+    skipSort,
+  })
 }
 
 export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {

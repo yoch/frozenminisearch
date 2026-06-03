@@ -22,6 +22,43 @@ import {
   defaultSearchIterations,
 } from './benchmarkUtils.js'
 
+function avgFrozenP50GainPct (search) {
+  return search.length > 0
+    ? Number((search.reduce((s, r) => s + (1 - r.frozenP50 / r.mutableP50), 0) / search.length * 100).toFixed(1))
+    : 0
+}
+
+function prepareScenarioSearchIndexes (corpus, options) {
+  gc()
+  const mutableSearchIndex = new MiniSearch(options)
+  mutableSearchIndex.addAll(corpus)
+  gc()
+  const frozenBuild = new MiniSearch(options)
+  frozenBuild.addAll(corpus)
+  const frozenSearchIndex = frozenBuild.freeze()
+  gc()
+  return { mutableSearchIndex, frozenSearchIndex }
+}
+
+function benchScenarioSearch (mutableSearchIndex, frozenSearchIndex, queries, searchIterations) {
+  const search = []
+  for (const { label, q, opts } of queries) {
+    const mutable = benchSearch(mutableSearchIndex, q, opts, searchIterations)
+    const frozen = benchSearch(frozenSearchIndex, q, opts, searchIterations)
+    search.push({
+      label,
+      query: q,
+      mutableP50: Number(mutable.p50.toFixed(4)),
+      frozenP50: Number(frozen.p50.toFixed(4)),
+      mutableP95: Number(mutable.p95.toFixed(4)),
+      frozenP95: Number(frozen.p95.toFixed(4)),
+      frozenP50VsMutablePct: pctDeltaRound(mutable.p50, frozen.p50),
+    })
+  }
+  gc()
+  return { search, avgFrozenP50GainPct: avgFrozenP50GainPct(search) }
+}
+
 function median (values) {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -79,6 +116,20 @@ function aggregateScoreDrift (runs) {
 
 function aggregateScenarioRuns (runs) {
   const base = runs[0]
+  if (base.benchProfile === 'search') {
+    const search = aggregateSearch(runs)
+    return {
+      id: base.id,
+      name: base.name,
+      documentCount: base.documentCount,
+      fields: base.fields,
+      storeFields: base.storeFields,
+      benchProfile: 'search',
+      search,
+      summary: { searchFrozenP50AvgGainPct: avgFrozenP50GainPct(search) },
+    }
+  }
+
   const indexing = {
     addAllMs: medianRound(runs.map((r) => r.indexing.addAllMs), 2),
     freezeMs: medianRound(runs.map((r) => r.indexing.freezeMs), 2),
@@ -145,9 +196,6 @@ function aggregateScenarioRuns (runs) {
 
   const search = aggregateSearch(runs)
   const scoreDrift = aggregateScoreDrift(runs)
-  const avgFrozenP50GainPct = search.length > 0
-    ? Number((search.reduce((s, r) => s + (1 - r.frozenP50 / r.mutableP50), 0) / search.length * 100).toFixed(1))
-    : 0
 
   return {
     id: base.id,
@@ -183,7 +231,7 @@ function aggregateScenarioRuns (runs) {
       heapFrozenVsMutableSavingPct: heapSavingPct,
       diskBinaryVsJsonSavingPct: diskSavingPct,
       loadBinaryVsJsonSavingPct: loadSavingPct,
-      searchFrozenP50AvgGainPct: avgFrozenP50GainPct
+      searchFrozenP50AvgGainPct: avgFrozenP50GainPct(search),
     }
   }
 }
@@ -364,8 +412,31 @@ function computeScoreDrift (mutable, frozen, query, limit = 20) {
 
 /**
  * Run one benchmark scenario and return JSON-serializable metrics.
+ * @param {{ benchProfile?: 'full' | 'search' }} [benchOptions]
  */
-export function runScenario (scenario, searchIterations = defaultSearchIterations()) {
+export function runScenario (scenario, searchIterations = defaultSearchIterations(), benchOptions = {}) {
+  const benchProfile = benchOptions.benchProfile ?? 'full'
+  if (benchProfile === 'search') {
+    const { id, name, corpus, options, queries } = scenario
+    const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
+    const { search, avgFrozenP50GainPct: gain } = benchScenarioSearch(
+      mutableSearchIndex,
+      frozenSearchIndex,
+      queries,
+      searchIterations,
+    )
+    return {
+      id,
+      name,
+      documentCount: corpus.length,
+      fields: options.fields,
+      storeFields: options.storeFields || [],
+      benchProfile: 'search',
+      search,
+      summary: { searchFrozenP50AvgGainPct: gain },
+    }
+  }
+
   const { id, name, corpus, options, queries, driftQueries } = scenario
 
   let json
@@ -444,37 +515,16 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
     return out
   }
 
-  const search = []
-  for (const { label, q, opts } of queries) {
-    const mutable = withIndex(() => {
-      const ms = new MiniSearch(options)
-      ms.addAll(corpus)
-      return ms
-    }, (idx) => benchSearch(idx, q, opts, searchIterations))
-
-    const frozen = withIndex(() => {
-      const ms = new MiniSearch(options)
-      ms.addAll(corpus)
-      return ms.freeze()
-    }, (idx) => benchSearch(idx, q, opts, searchIterations))
-
-    search.push({
-      label,
-      query: q,
-      mutableP50: Number(mutable.p50.toFixed(4)),
-      frozenP50: Number(frozen.p50.toFixed(4)),
-      mutableP95: Number(mutable.p95.toFixed(4)),
-      frozenP95: Number(frozen.p95.toFixed(4)),
-      frozenP50VsMutablePct: pctDeltaRound(mutable.p50, frozen.p50)
-    })
-  }
+  const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
+  const { search, avgFrozenP50GainPct: searchGain } = benchScenarioSearch(
+    mutableSearchIndex,
+    frozenSearchIndex,
+    queries,
+    searchIterations,
+  )
 
   const heapSavingPct = heapMutable.heapMb > 0
     ? Number((100 * (1 - heapFrozen.heapMb / heapMutable.heapMb)).toFixed(1))
-    : 0
-
-  const avgFrozenP50GainPct = search.length > 0
-    ? Number((search.reduce((s, r) => s + (1 - r.frozenP50 / r.mutableP50), 0) / search.length * 100).toFixed(1))
     : 0
 
   let scoreDrift
@@ -548,7 +598,7 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
       heapFrozenVsMutableSavingPct: heapSavingPct,
       diskBinaryVsJsonSavingPct: jsonMb > 0 ? Number((100 * (1 - binaryMb / jsonMb)).toFixed(1)) : 0,
       loadBinaryVsJsonSavingPct: loadJson.ms > 0 ? Number((100 * (1 - loadBinary.ms / loadJson.ms)).toFixed(1)) : 0,
-      searchFrozenP50AvgGainPct: avgFrozenP50GainPct
+      searchFrozenP50AvgGainPct: searchGain,
     }
   }
 }
@@ -557,14 +607,32 @@ export function runBenchmarkSuite (
   scenarios = buildScenarioList(),
   runs = defaultBenchmarkRuns(),
   searchIterations = defaultSearchIterations(),
+  benchOptions = {},
 ) {
-  if (runs <= 1) {
-    return scenarios.map((scenario) => runScenario(scenario, searchIterations))
+  const total = scenarios.length
+  const benchProfile = benchOptions.benchProfile ?? 'full'
+  const profileLabel = benchProfile === 'search' ? 'search-only' : 'full'
+  if (benchProfile === 'search') {
+    console.log('Benchmark profile: search-only (skip indexing / heap / save / load timing)\n')
   }
-  return scenarios.map((scenario) => {
+  if (runs <= 1) {
+    return scenarios.map((scenario, index) => {
+      const t0 = performance.now()
+      console.log(`[bench ${index + 1}/${total}] ${scenario.id} (${profileLabel}) …`)
+      const result = runScenario(scenario, searchIterations, benchOptions)
+      console.log(`[bench ${index + 1}/${total}] ${scenario.id} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
+      return result
+    })
+  }
+  return scenarios.map((scenario, index) => {
     const results = []
     for (let i = 0; i < runs; i++) {
-      results.push(runScenario(scenario, searchIterations))
+      const t0 = performance.now()
+      console.log(`[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${runs} (${profileLabel}) …`)
+      results.push(runScenario(scenario, searchIterations, benchOptions))
+      console.log(
+        `[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${runs} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+      )
     }
     return aggregateScenarioRuns(results)
   })

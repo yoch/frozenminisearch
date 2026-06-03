@@ -4,11 +4,11 @@ import {
   AND,
   AND_NOT,
   mapFieldTermData,
-  finalizeSearchResults,
   getOwnProperty,
   type AggregateContext,
   type RawResult,
 } from './scoring'
+import { finalizeRawSearchResults } from './scoring'
 import { freezeFromMiniSearch } from './FrozenMiniSearch'
 import type { FreezeSource } from './frozenTypes'
 import { WILDCARD_QUERY } from './symbols'
@@ -885,17 +885,15 @@ export default class MiniSearch<T = any> {
    * @param searchOptions  Search options. Each option, if not given, defaults to the corresponding value of `searchOptions` given to the constructor, or to the library default.
    */
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
-    const { searchOptions: globalSearchOptions } = this._options
-    const searchOptionsWithDefaults: SearchOptionsWithDefaults = { ...globalSearchOptions, ...searchOptions }
-    const rawResults = this.executeQuery(query, searchOptions)
-    const skipSort = query === MiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null
-    return finalizeSearchResults({
-      rawResults,
-      getExternalId: docId => this._documentIds.get(docId),
-      getStoredFields: docId => this._storedFields.get(docId),
-      filter: searchOptionsWithDefaults.filter,
-      skipSort,
-    })
+    return finalizeRawSearchResults(
+      this.executeQuery(query, searchOptions),
+      query,
+      searchOptions,
+      this._options.searchOptions,
+      MiniSearch.wildcard,
+      docId => this._documentIds.get(docId),
+      docId => this._storedFields.get(docId),
+    )
   }
 
   /**

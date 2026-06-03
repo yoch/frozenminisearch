@@ -1,4 +1,5 @@
 import MiniSearch from './MiniSearch'
+import { searchNaive } from './queryEngineHarness'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea ocean', category: 'fiction' },
@@ -39,6 +40,30 @@ function expectSameResults(mutable, frozen, query, searchOptions = {}, { expecte
   if (expectedIds !== undefined) {
     expect(sortedIds(a)).toEqual([...expectedIds].sort((x, y) => x - y))
   }
+}
+
+function expectSameAsNaive(engine, query, searchOptions = {}) {
+  const gated = engine.search(query, searchOptions)
+  const naive = searchNaive(engine, query, searchOptions)
+  expect(sortedIds(naive)).toEqual(sortedIds(gated))
+  expect(naive.length).toBe(gated.length)
+  for (let i = 0; i < gated.length; i++) {
+    const g = gated.find(r => r.id === naive[i].id)
+    const n = naive[i]
+    expect(g).toBeDefined()
+    expect(n.score).toBeCloseTo(g.score, 6)
+    expect(n.terms).toEqual(g.terms)
+    expect(n.match).toEqual(g.match)
+    expect(n.queryTerms).toEqual(g.queryTerms)
+  }
+}
+
+function buildUniformCorpus(docCount, textFn = i => `common token${i}`) {
+  const docs = []
+  for (let i = 0; i < docCount; i++) {
+    docs.push({ id: i, text: typeof textFn === 'function' ? textFn(i) : textFn })
+  }
+  return docs
 }
 
 describe('Gate docId scoring (AND / AND_NOT)', () => {
@@ -155,6 +180,91 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
 
     test('prefix single term unchanged', () => {
       expectSameResults(mutable, frozen, 'neur', { prefix: true }, { expectedIds: [3] })
+    })
+  })
+
+  describe('oracle: gated vs naive score-then-combine', () => {
+    test('mutable AND exact+exact', () => {
+      expectSameAsNaive(mutable, 'zen art', { combineWith: 'AND' })
+    })
+
+    test('mutable AND exact+prefix', () => {
+      expectSameAsNaive(mutable, 'zen arch', { combineWith: 'AND', prefix: true })
+    })
+
+    test('mutable AND_NOT', () => {
+      expectSameAsNaive(mutable, 'zen art', { combineWith: 'AND_NOT' })
+    })
+
+    test('mutable nested AND with OR', () => {
+      expectSameAsNaive(mutable, {
+        combineWith: 'AND',
+        queries: ['zen', { combineWith: 'OR', queries: ['motorcycle', 'archery'] }],
+      })
+    })
+
+    test('mutable nested OR with AND', () => {
+      expectSameAsNaive(mutable, {
+        combineWith: 'OR',
+        queries: [
+          { combineWith: 'AND', queries: ['zen', 'art'] },
+          'whale',
+        ],
+      })
+    })
+
+    test('frozen AND exact+exact', () => {
+      expectSameAsNaive(frozen, 'zen art', { combineWith: 'AND' })
+    })
+
+    test('frozen AND exact+prefix', () => {
+      expectSameAsNaive(frozen, 'zen arch', { combineWith: 'AND', prefix: true })
+    })
+
+    test('frozen AND_NOT', () => {
+      expectSameAsNaive(frozen, 'matrix zen', { combineWith: 'AND_NOT' })
+    })
+
+    test('empty AND gate returns no results', () => {
+      const query = { combineWith: 'AND', queries: ['zen', 'nonexistenttermxyz'] }
+      expect(mutable.search(query)).toEqual([])
+      expectSameAsNaive(mutable, query)
+      expectSameAsNaive(frozen, query)
+    })
+  })
+
+  describe('gate threshold (gateIsSelectiveEnough fallback)', () => {
+    test('large intersection uses non-selective path but matches naive oracle', () => {
+      const docCount = 6_000
+      const ms = new MiniSearch({
+        fields: ['text'],
+        searchOptions: { prefix: false },
+      })
+      ms.addAll(buildUniformCorpus(docCount, i => `alpha beta ${i}`))
+      const frozen = ms.freeze()
+      const opts = { combineWith: 'AND' }
+      const query = 'alpha beta'
+      expectSameAsNaive(ms, query, opts)
+      expectSameAsNaive(frozen, query, opts)
+      expect(ms.search(query, opts).length).toBeGreaterThan(1000)
+    }, 30_000)
+
+    test('small selective gate still matches naive oracle', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
+      ms.addAll(buildUniformCorpus(200, i => (i < 5 ? `zen item${i}` : `unique${i} alpha`)))
+      const frozen = ms.freeze()
+      const opts = { combineWith: 'AND', prefix: true }
+      expectSameAsNaive(ms, 'zen uniq', opts)
+      expectSameAsNaive(frozen, 'zen uniq', opts)
+    })
+  })
+
+  describe('boostDocument (results only, not call-count contract)', () => {
+    test('gated AND with boostDocument matches naive oracle', () => {
+      const boostDocument = (id, term) => (id === 2 || term === 'archery' ? 2 : 1)
+      const opts = { combineWith: 'AND', boostDocument }
+      expectSameAsNaive(mutable, 'zen art', opts)
+      expectSameAsNaive(frozen, 'zen art', opts)
     })
   })
 

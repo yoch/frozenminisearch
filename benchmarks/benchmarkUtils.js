@@ -131,11 +131,11 @@ export function medianMeasureHeap (fn, runs = 1) {
   }
 }
 
-/** Routine defaults: median of 3 scenario runs, 50 timed searches each. */
+/** Routine defaults: median of 3 scenario runs, 25 timed searches, 100 warmup each. */
 export const DEFAULT_BENCHMARK_RUNS = 3
-export const DEFAULT_SEARCH_ITERATIONS = 50
-/** Warmup searches before timing (JIT + term caches). */
-export const DEFAULT_BENCH_WARMUP = 200
+export const DEFAULT_SEARCH_ITERATIONS = 25
+/** Warmup searches before timing (JIT + per-instance posting view cache on frozen indexes). */
+export const DEFAULT_BENCH_WARMUP = 100
 /** Max searches per clock read when per-op time is below resolution. */
 export const DEFAULT_BENCH_BATCH = 32
 /** Target elapsed ms per batch sample (performance.now() resolution ~0.05 ms). */
@@ -213,10 +213,19 @@ export function parseSearchIterationsArg (args = process.argv) {
   return iterations
 }
 
+export function parseBenchProfile (args = process.argv) {
+  const env = process.env.BENCH_SEARCH_ONLY
+  if (env === '1' || env === 'true' || env === 'yes') return 'search'
+  if (env === '0' || env === 'false') return 'full'
+  if (args.includes('--search-only')) return 'search'
+  return 'full'
+}
+
 export function parseBenchmarkArgs (args = process.argv) {
   return {
     runs: parseRunsArg(args),
     searchIterations: parseSearchIterationsArg(args),
+    benchProfile: parseBenchProfile(args),
   }
 }
 

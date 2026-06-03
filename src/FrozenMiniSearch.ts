@@ -3,11 +3,11 @@ import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { fromRadixTree } from './PackedRadixTree'
 import {
-  finalizeSearchResults,
   type AggregateContext,
   type FieldTermDataLike,
   type RawResult,
 } from './scoring'
+import { finalizeRawSearchResults } from './scoring'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
@@ -250,7 +250,7 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
   private readonly _termCount: number
   private readonly _postings: FrozenPostingsLayout
-  /** Per-term {@link FieldTermDataLike} views; safe to retain for the instance lifetime (index is immutable). */
+  /** Per-term {@link FieldTermDataLike} wrappers (not a copy of postings), retained for the instance lifetime. */
   private _fieldTermDataCache: FieldTermDataLike[] | undefined
   private readonly _aggregateContext: AggregateContext
   private readonly _queryEngineParams: QueryEngineParams
@@ -375,17 +375,15 @@ export default class FrozenMiniSearch<T = any> {
   vacuum(): Promise<void> { throwReadOnly() }
 
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
-    const { searchOptions: globalSearchOptions } = this._options
-    const searchOptionsWithDefaults: SearchOptionsWithDefaults = { ...globalSearchOptions, ...searchOptions }
-    const rawResults = this.executeQuery(query, searchOptions)
-    const skipSort = query === FrozenMiniSearch.wildcard && searchOptionsWithDefaults.boostDocument == null
-    return finalizeSearchResults({
-      rawResults,
-      getExternalId: docId => this._externalIds[docId],
-      getStoredFields: docId => this._storedFields[docId],
-      filter: searchOptionsWithDefaults.filter,
-      skipSort,
-    })
+    return finalizeRawSearchResults(
+      this.executeQuery(query, searchOptions),
+      query,
+      searchOptions,
+      this._options.searchOptions,
+      FrozenMiniSearch.wildcard,
+      docId => this._externalIds[docId],
+      docId => this._storedFields[docId],
+    )
   }
 
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {

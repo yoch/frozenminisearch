@@ -21,7 +21,7 @@ const BASELINES_DIR = join(__dirname, 'baselines')
 const useReference = process.argv.includes('--reference')
 const force = process.argv.includes('--force')
 const outFile = join(BASELINES_DIR, useReference ? 'reference.json' : 'latest.json')
-const { runs, searchIterations } = parseBenchmarkArgs()
+const { runs, searchIterations, benchProfile } = parseBenchmarkArgs()
 
 if (useReference) {
   assertCleanTrackedTree({ force, context: 'MiniSearch reference.json' })
@@ -40,7 +40,8 @@ const payload = {
     : 'local-latest',
   runs,
   searchIterations,
-  scenarios: runBenchmarkSuite(undefined, runs, searchIterations),
+  benchProfile,
+  scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile }),
 }
 
 if (useReference && !force) {
@@ -59,8 +60,14 @@ if (useReference) {
 if (payload.git.dirty && !useReference) {
   console.warn('  warning: working tree is dirty; latest.json may be harder to reproduce')
 }
+console.log(`  profile: ${payload.benchProfile}`)
 console.log(`  runs: ${runs}, search iterations: ${searchIterations} (median per scenario)`)
 console.log(`  scenarios: ${payload.scenarios.length}`)
 for (const s of payload.scenarios) {
-  console.log(`  - ${s.id}: frozen heap ${s.heapMb.frozen} MB (${s.heapMb.frozenVsMutableSavingPct}% vs mutable)`)
+  if (s.benchProfile === 'search') {
+    const gain = s.summary?.searchFrozenP50AvgGainPct
+    console.log(`  - ${s.id}: search-only (avg frozen p50 gain ${gain}%)`)
+  } else {
+    console.log(`  - ${s.id}: frozen heap ${s.heapMb.frozen} MB (${s.heapMb.frozenVsMutableSavingPct}% vs mutable)`)
+  }
 }

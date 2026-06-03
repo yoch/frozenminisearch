@@ -24,6 +24,10 @@ import type {
 } from './searchTypes'
 import { WILDCARD_QUERY } from './symbols'
 import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
+import {
+  gateIsSelectiveEnough,
+  type QueryEngineRunOptions,
+} from './queryEngineGateLimits'
 
 /**
  * Adapter exposing the index storage (mutable maps or frozen flat arrays) to the
@@ -71,9 +75,15 @@ export interface QueryEngineParams {
   aggregateContext: AggregateContext
 }
 
-/** Max intersection size for AND branch gating; above this, score full branch then combine. */
-const AND_GATE_MAX_ABSOLUTE = 5000
-const AND_GATE_MAX_FRACTION = 0.1
+function useGatedEvaluation(
+  run: QueryEngineRunOptions | undefined,
+  branchCount: number,
+  operator: CombinationOperator,
+  hasWildcard: boolean,
+): boolean {
+  if (run?.disableGating) return false
+  return shouldUseGatedEvaluation(branchCount, operator, hasWildcard)
+}
 
 function docIdsFromResult(result: RawResult): Set<number> {
   return new Set(result.keys())
@@ -98,16 +108,6 @@ function shouldUseGatedEvaluation(
   if (hasWildcard) return false
   if (branchCount <= 1) return false
   return isGatedCombinationOperator(operator)
-}
-
-/** Empty gate still gates (no docs pass); only skip gating when intersection exceeds size heuristics. */
-function gateIsSelectiveEnough(gate: Set<number>, documentCount: number): boolean {
-  if (gate.size === 0) return true
-  const maxSize = Math.min(
-    AND_GATE_MAX_ABSOLUTE,
-    Math.max(100, Math.floor(documentCount * AND_GATE_MAX_FRACTION)),
-  )
-  return gate.size <= maxSize
 }
 
 function maxFuzzyDistance(query: QuerySpec, maxFuzzy: number): number {
@@ -380,6 +380,7 @@ function executeCombinedBranches<T>(
   executeBranch: (branch: T, allowedDocs?: Set<number>) => RawResult,
   collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
   allowedDocs?: Set<number>,
+  run?: QueryEngineRunOptions,
 ): RawResult {
   if (branches.length === 0) return new Map()
 
@@ -395,10 +396,11 @@ function executeCombinedBranches<T>(
   let gate = docIdsFromResult(result)
 
   if (op === 'and') {
+    const limits = run?.gateLimits
+    const documentCount = params.aggregateContext.documentCount
     for (let i = 1; i < branches.length; i++) {
-      const branchAllowed = gateIsSelectiveEnough(gate, params.aggregateContext.documentCount)
-        ? gate
-        : allowedDocs
+      const selective = gateIsSelectiveEnough(gate.size, documentCount, limits)
+      const branchAllowed = selective ? gate : allowedDocs
       result = combineResults([result, executeBranch(branches[i], branchAllowed)], AND)
       gate = docIdsFromResult(result)
     }
@@ -547,6 +549,7 @@ function executeGatedCombinedQuery<T>(
   executeBranch: (branch: T, allowedDocs?: Set<number>) => RawResult,
   collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
   allowedDocs?: Set<number>,
+  run?: QueryEngineRunOptions,
 ): RawResult {
   return executeCombinedBranches(
     branches,
@@ -555,6 +558,7 @@ function executeGatedCombinedQuery<T>(
     executeBranch,
     collectBranch,
     allowedDocs,
+    run,
   )
 }
 
@@ -563,6 +567,7 @@ function executeQueryInternal(
   searchOptions: SearchOptions,
   params: QueryEngineParams,
   allowedDocs?: Set<number>,
+  run?: QueryEngineRunOptions,
 ): RawResult {
   if (query === WILDCARD_QUERY) {
     return executeWildcardQuery(searchOptions, params)
@@ -578,19 +583,20 @@ function executeQueryInternal(
     ) as CombinationOperator
     const childSearchOptions = { ...options, combineWith: undefined }
 
-    if (shouldUseGatedEvaluation(combination.queries.length, operator, isWildcardQuery(query))) {
+    if (useGatedEvaluation(run, combination.queries.length, operator, isWildcardQuery(query))) {
       return executeGatedCombinedQuery(
         combination.queries,
         operator,
         params,
-        (branch, branchAllowed) => executeQueryInternal(branch, childSearchOptions, params, branchAllowed),
+        (branch, branchAllowed) => executeQueryInternal(branch, childSearchOptions, params, branchAllowed, run),
         (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, childSearchOptions, params, branchAllowed),
         allowedDocs,
+        run,
       )
     }
 
     const results = combination.queries.map(subquery =>
-      executeQueryInternal(subquery, childSearchOptions, params, allowedDocs),
+      executeQueryInternal(subquery, childSearchOptions, params, allowedDocs, run),
     )
     return combineResults(results, operator)
   }
@@ -598,7 +604,7 @@ function executeQueryInternal(
   const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
   const combineWith = (operator ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
-  if (shouldUseGatedEvaluation(specs.length, combineWith, false)) {
+  if (useGatedEvaluation(run, specs.length, combineWith, false)) {
     return executeGatedCombinedQuery(
       specs,
       combineWith,
@@ -606,6 +612,7 @@ function executeQueryInternal(
       (spec, branchAllowed) => executeQuerySpecInternal(spec, options, params, branchAllowed),
       (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, options, params, branchAllowed),
       allowedDocs,
+      run,
     )
   }
 
@@ -619,4 +626,14 @@ export function executeQuery(
   params: QueryEngineParams,
 ): RawResult {
   return executeQueryInternal(query, searchOptions, params)
+}
+
+/** @packageInternal Tests and benchmarks only. */
+export function executeQueryWithRunOptions(
+  query: Query,
+  searchOptions: SearchOptions,
+  params: QueryEngineParams,
+  run?: QueryEngineRunOptions,
+): RawResult {
+  return executeQueryInternal(query, searchOptions, params, undefined, run)
 }

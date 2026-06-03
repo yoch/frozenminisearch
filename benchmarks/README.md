@@ -8,7 +8,7 @@ Reproducible memory and CPU measurements for regression tracking.
 
 | Command | Description |
 |---------|-------------|
-| `yarn benchmark:compare` | Human-readable report (runs suite; default 3×50 search iters) |
+| `yarn benchmark:compare` | Human-readable report (runs suite; default 3×25 search iters, warmup 100) |
 | `yarn benchmark:compare --from baselines/latest.json` | Same report from saved JSON (no re-run) |
 | `yarn benchmark:record` | Run suite → `baselines/latest.json` |
 | `yarn benchmark:diff` | `latest.json` vs `reference.json` (no re-run) |
@@ -82,8 +82,26 @@ NO_DOUBLE_EDITS=1 QUERIES=6000 yarn benchmark:packed-fuzzy-sweep   # 9 mutations
 ## Defaults (routine)
 
 - **3 runs** per scenario (median aggregation)
-- **50 timed searches** per query (`--iterations` to override)
-- Override via env: `RUNS=2 SEARCH_ITERATIONS=30 yarn benchmark:record`
+- **100 warmup** + **25 timed searches** per query (`BENCH_WARMUP`, `SEARCH_ITERATIONS`)
+- Override via env: `RUNS=2 SEARCH_ITERATIONS=30 BENCH_WARMUP=120 yarn benchmark:record`
+
+`baselines/reference.json` was captured with **3×50** (warmup 200) on 8.3.3 — diff search timings against it remain indicative; run `yarn benchmark:baseline:update` after intentional changes to realign the golden file.
+
+**Search only** (skip indexing, freeze, saveBinary, load, heap — one `addAll`+`freeze` per scenario for timing):
+
+```bash
+BENCH_SEARCH_ONLY=1 npm run benchmark:record
+BENCH_SEARCH_ONLY=1 npm run benchmark:diff:run    # measure + diff vs reference (search p50 only)
+# or: node --expose-gc benchmarks/captureBaseline.js --search-only
+```
+
+Dev / smoke (faster, same scenarios):
+
+```bash
+RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20 yarn benchmark:record
+```
+
+The suite logs progress per scenario (`[bench N/M] …`). Search timing reuses one mutable and one frozen index per scenario (warm steady-state, including `_fieldTermDataCache` on frozen).
 
 `benchmark:diff` does **not** re-run the suite: record once, diff as often as needed.
 Compare another capture: `yarn benchmark:diff --current=path/to/run.json`.
@@ -96,9 +114,15 @@ When implementing changes from [README — suggested optimizations](../README.md
 
 - `indexing.freezeMs`, `indexing.saveBinaryMs`, `loadMs.binary`
 - `heapMb.frozen`, `heapMb.frozenVsMutableSavingPct`
-- Search p50/p95 on prefix and fuzzy scenarios (noisy; use median over `--runs 3`)
+- Search p50/p95 on prefix and fuzzy scenarios (noisy; use median over default `--runs 3`)
 
 Update `baselines/reference.json` only after intentional wins: `yarn benchmark:baseline:update`.
+
+## Frozen search timing
+
+`benchSearch()` runs **100 warmup searches** by default on the same index instance, then timed iterations. That is **steady-state** latency (V8 JIT + `_fieldTermDataCache` on `FrozenMiniSearch`). Override via `BENCH_WARMUP`.
+
+**AND / AND_NOT gating** — see [`docs/AND_GATE_PARAMETERS.md`](../docs/AND_GATE_PARAMETERS.md). Oracle tests: `queryEngine.gate.test.js`. Optional sweep: `benchmarks/and-gate-tuning.mjs`.
 
 ## Files
 

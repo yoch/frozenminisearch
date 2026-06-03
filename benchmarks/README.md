@@ -122,6 +122,14 @@ Update `baselines/reference.json` only after intentional wins: `yarn benchmark:b
 
 `benchSearch()` runs **100 warmup searches** by default on the same index instance, then timed iterations (steady-state: V8 JIT). Override via `BENCH_WARMUP`.
 
+**Fixed batch per query** — Search timings use a committed `benchmarks/searchBenchBatches.json` (not adaptive batching at record time). Each query has the same `batchSize` for mutable and frozen. Sizes are calibrated once with a **0.3 ms** target wall time per sample (`ceil(0.3 / probeP50)`, max 32), taking the **max** of mutable and frozen probes:
+
+```bash
+yarn benchmark:calibrate-batches   # after changing corpora or search queries
+```
+
+Re-run calibration when you add or change scenarios/queries, then commit `searchBenchBatches.json`. Captures include `searchBenchProtocol` and per-row `batchSize`. `benchmark:diff` warns when batch sizes differ between reference and current.
+
 **AND / AND_NOT gating** — see [`docs/AND_GATE_PARAMETERS.md`](../docs/AND_GATE_PARAMETERS.md). Oracle tests: `queryEngine.gate.test.js`. Optional sweep: `benchmarks/and-gate-tuning.mjs`.
 
 ## Files

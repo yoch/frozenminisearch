@@ -92,6 +92,7 @@
     "coverage": "jest --coverage",
     "benchmark": "npm run build-benchmark && NODE_ENV=production node --expose-gc benchmarks/dist/index.cjs",
     "benchmark:compare": "npm run build && node --expose-gc benchmarks/compare.js",
+    "benchmark:calibrate-batches": "npm run build && node --expose-gc benchmarks/scripts/calibrate-search-batches.mjs",
     "benchmark:record": "npm run build && node --expose-gc benchmarks/captureBaseline.js",
     "benchmark:record:search": "npm run build && BENCH_SEARCH_ONLY=1 node --expose-gc benchmarks/captureBaseline.js",
     "benchmark:diff:search:run": "npm run build && BENCH_SEARCH_ONLY=1 node --expose-gc benchmarks/diffBaseline.js --run",

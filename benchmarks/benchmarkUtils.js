@@ -136,10 +136,8 @@ export const DEFAULT_BENCHMARK_RUNS = 3
 export const DEFAULT_SEARCH_ITERATIONS = 25
 /** Warmup searches before timing (JIT + per-instance posting view cache on frozen indexes). */
 export const DEFAULT_BENCH_WARMUP = 100
-/** Max searches per clock read when per-op time is below resolution. */
+/** Max searches per clock read (fixed batches are calibrated in searchBenchBatches.json). */
 export const DEFAULT_BENCH_BATCH = 32
-/** Target elapsed ms per batch sample (performance.now() resolution ~0.05 ms). */
-export const BENCH_BATCH_TARGET_MS = 0.05
 
 export function defaultBenchmarkRuns () {
   const fromEnv = Number(process.env.RUNS)
@@ -157,30 +155,6 @@ export function defaultBenchWarmup () {
   const fromEnv = Number(process.env.BENCH_WARMUP)
   if (Number.isFinite(fromEnv) && fromEnv >= 0) return Math.floor(fromEnv)
   return DEFAULT_BENCH_WARMUP
-}
-
-export function defaultBenchBatchSize () {
-  const fromEnv = Number(process.env.BENCH_BATCH)
-  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
-  return DEFAULT_BENCH_BATCH
-}
-
-/**
- * Pick batch size so one clock read spans at least {@link BENCH_BATCH_TARGET_MS}.
- * @param {() => void} runSearch
- * @param {number} maxBatch
- */
-export function resolveBenchBatchSize (runSearch, maxBatch = defaultBenchBatchSize()) {
-  const probe = []
-  for (let i = 0; i < 10; i++) {
-    const t0 = performance.now()
-    runSearch()
-    probe.push(performance.now() - t0)
-  }
-  probe.sort((a, b) => a - b)
-  const p50 = probe[Math.floor(probe.length * 0.5)]
-  if (p50 <= 0 || p50 >= BENCH_BATCH_TARGET_MS) return 1
-  return Math.min(maxBatch, Math.max(1, Math.ceil(BENCH_BATCH_TARGET_MS / p50)))
 }
 
 export function parseRunsArg (args = process.argv) {
@@ -241,13 +215,29 @@ export function argValue (flag, args = process.argv) {
   return null
 }
 
-export function benchSearch (index, query, searchOptions = {}, iterations = defaultSearchIterations()) {
+/**
+ * @param {object} [benchOptions]
+ * @param {number} benchOptions.batchSize — fixed batch from searchBenchBatches.json (required)
+ */
+export function benchSearch (
+  index,
+  query,
+  searchOptions = {},
+  iterations = defaultSearchIterations(),
+  benchOptions = {},
+) {
+  const batchSize = benchOptions.batchSize
+  if (!Number.isFinite(batchSize) || batchSize < 1) {
+    throw new Error(
+      'benchSearch requires benchOptions.batchSize (see benchmarks/searchBenchBatches.json)',
+    )
+  }
+
   const runSearch = () => index.search(query, searchOptions)
 
   const warmupCount = Math.max(defaultBenchWarmup(), iterations)
   for (let i = 0; i < warmupCount; i++) runSearch()
 
-  const batchSize = resolveBenchBatchSize(runSearch)
   const times = []
   for (let i = 0; i < iterations; i++) {
     const t0 = performance.now()
@@ -258,7 +248,8 @@ export function benchSearch (index, query, searchOptions = {}, iterations = defa
   times.sort((a, b) => a - b)
   return {
     p50: times[Math.floor(times.length * 0.5)],
-    p95: times[Math.floor(times.length * 0.95)]
+    p95: times[Math.floor(times.length * 0.95)],
+    batchSize,
   }
 }
 

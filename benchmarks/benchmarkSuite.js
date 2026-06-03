@@ -21,6 +21,7 @@ import {
   defaultBenchmarkRuns,
   defaultSearchIterations,
 } from './benchmarkUtils.js'
+import { applySearchBenchBatchesToScenarios } from './loadSearchBenchBatches.js'
 
 function avgFrozenP50GainPct (search) {
   return search.length > 0
@@ -42,12 +43,17 @@ function prepareScenarioSearchIndexes (corpus, options) {
 
 function benchScenarioSearch (mutableSearchIndex, frozenSearchIndex, queries, searchIterations) {
   const search = []
-  for (const { label, q, opts } of queries) {
-    const mutable = benchSearch(mutableSearchIndex, q, opts, searchIterations)
-    const frozen = benchSearch(frozenSearchIndex, q, opts, searchIterations)
+  for (const { label, q, opts, benchBatch } of queries) {
+    if (!benchBatch) {
+      throw new Error(`Missing benchBatch for search "${label}" (run benchmark:calibrate-batches)`)
+    }
+    const benchOpts = { batchSize: benchBatch }
+    const mutable = benchSearch(mutableSearchIndex, q, opts, searchIterations, benchOpts)
+    const frozen = benchSearch(frozenSearchIndex, q, opts, searchIterations, benchOpts)
     search.push({
       label,
       query: q,
+      batchSize: benchBatch,
       mutableP50: Number(mutable.p50.toFixed(4)),
       frozenP50: Number(frozen.p50.toFixed(4)),
       mutableP95: Number(mutable.p95.toFixed(4)),
@@ -85,6 +91,7 @@ function aggregateSearch (runs) {
     return {
       label: row.label,
       query: row.query,
+      batchSize: row.batchSize,
       mutableP50,
       frozenP50,
       mutableP95,
@@ -380,6 +387,11 @@ export function buildScenarioList () {
   ]
 }
 
+/** Scenarios with fixed `benchBatch` per query (from searchBenchBatches.json). */
+export function buildBenchmarkScenarios () {
+  return applySearchBenchBatchesToScenarios(buildScenarioList())
+}
+
 function computeScoreDrift (mutable, frozen, query, limit = 20) {
   const a = mutable.search(query).slice(0, limit)
   const b = frozen.search(query).slice(0, limit)
@@ -604,7 +616,7 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
 }
 
 export function runBenchmarkSuite (
-  scenarios = buildScenarioList(),
+  scenarios = buildBenchmarkScenarios(),
   runs = defaultBenchmarkRuns(),
   searchIterations = defaultSearchIterations(),
   benchOptions = {},

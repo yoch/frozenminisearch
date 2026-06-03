@@ -136,7 +136,7 @@ function benchMany (index, q, opts, runs = benchRuns, iterations = benchIteratio
   const samples = []
   for (let r = 0; r < runs; r++) {
     gc()
-    samples.push(benchSearch(index, q, opts, iterations).p50)
+    samples.push(benchSearch(index, q, opts, iterations, { batchSize: 1 }).p50)
   }
   return { p50: medianOf(samples), samples }
 }

@@ -14,6 +14,7 @@ import {
   parseBenchmarkArgs,
 } from './benchmarkUtils.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
+import { getSearchBenchProtocol } from './loadSearchBenchBatches.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BASELINES_DIR = join(__dirname, 'baselines')
@@ -41,6 +42,7 @@ const payload = {
   runs,
   searchIterations,
   benchProfile,
+  searchBenchProtocol: getSearchBenchProtocol(),
   scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile }),
 }
 

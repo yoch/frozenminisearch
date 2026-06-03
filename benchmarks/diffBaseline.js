@@ -28,6 +28,7 @@ import {
   SEARCH_PCT_FAIL,
 } from './regressionPolicy.js'
 import { runBenchmarkSuite } from './benchmarkSuite.js'
+import { getSearchBenchProtocol } from './loadSearchBenchBatches.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BASELINES_DIR = join(__dirname, 'baselines')
@@ -128,6 +129,15 @@ function compareScenario (ref, cur, { structural = true } = {}) {
   for (const row of cur.search) {
     const prev = refSearch[row.label]
     if (!prev) continue
+    if (
+      prev.batchSize != null
+      && row.batchSize != null
+      && prev.batchSize !== row.batchSize
+    ) {
+      console.log(
+        `  warn batchSize ${row.label.padEnd(16)} ref=${prev.batchSize} cur=${row.batchSize} (timing not comparable)`,
+      )
+    }
     const s = compareSearchMetric(`search p50 ${row.label}`, prev.frozenP50, row.frozenP50)
     if (strictSearch || !structural) {
       bump(s)
@@ -159,6 +169,7 @@ function main () {
       runs,
       searchIterations,
       benchProfile,
+      searchBenchProtocol: getSearchBenchProtocol(),
       scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile }),
     }
     mkdirSync(BASELINES_DIR, { recursive: true })

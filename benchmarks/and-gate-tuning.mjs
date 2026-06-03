@@ -64,22 +64,6 @@ function buildFrozen (docs, searchOptions = { prefix: true, fuzzy: 0.2 }) {
   return ms.freeze()
 }
 
-/**
- * Upper-bound RAM for `_fieldTermDataCache` if every termIndex gets a wrapper once.
- * Wrappers are small objects + `get()` closures; postings stay in shared flat buffers.
- */
-function estimateFieldTermDataCacheCost (termCount) {
-  const WRAPPER_BYTES = 80
-  const ARRAY_SLOT_BYTES = 8
-  const upperBoundBytes = termCount * (WRAPPER_BYTES + ARRAY_SLOT_BYTES)
-  return {
-    termCount,
-    upperBoundBytes,
-    upperBoundMb: Number((upperBoundBytes / 1024 / 1024).toFixed(3)),
-    note: 'Per-term FieldTermDataLike wrapper; not a copy of postings. Dense single-field indexes use one wrapper per term touched.',
-  }
-}
-
 function median (arr) {
   const s = [...arr].sort((a, b) => a - b)
   return s[Math.floor(s.length / 2)]
@@ -244,21 +228,8 @@ function summarizeTrends (cases, gridResults) {
 
 function main () {
   const cases = buildCases()
-  const cacheSamples = cases.map(c => {
-    const f = c.build()
-    return estimateFieldTermDataCacheCost(f.termCount)
-  })
-  const maxCache = cacheSamples.reduce((a, b) => (
-    b.upperBoundBytes > a.upperBoundBytes ? b : a
-  ))
 
   console.log('AND gate tuning — sweep:', SWEEP, `(${ABS_GRID.length}×${FRAC_GRID.length}×${cases.length} cases, ${TIMED} timed)`)
-  console.log('\n_fieldTermDataCache cost estimate (upper bound, all terms touched once):')
-  for (const s of cacheSamples) {
-    console.log(`  termCount=${s.termCount} → ≤${s.upperBoundMb} MiB`)
-  }
-  console.log(`  worst corpus in suite: termCount=${maxCache.termCount} → ≤${maxCache.upperBoundMb} MiB`)
-  console.log('  (typical query touches far fewer termIndices than termCount)')
 
   const gridResults = []
 
@@ -303,7 +274,6 @@ function main () {
     timedIterations: TIMED,
     absGrid: ABS_GRID,
     fracGrid: FRAC_GRID,
-    fieldTermDataCacheEstimate: { perCase: cacheSamples, worst: maxCache },
     cases: cases.map(c => ({
       id: c.id,
       description: c.description,

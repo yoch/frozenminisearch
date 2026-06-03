@@ -46,6 +46,6 @@ La gate après la branche 0 est `|résultat branche 0|`. **Le terme le plus sél
 
 - Script optionnel : `benchmarks/and-gate-tuning.mjs` (`npm run benchmark:and-gate-tuning` si le script est présent dans `package.json`).
 - Tests oracle : `src/queryEngine.gate.test.js` (comparaison gated vs chemin naïf via `queryEngineHarness.ts`).
-- Suite de régression perf : `npm run benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**, cache `_fieldTermDataCache` chaud).
+- Suite de régression perf : `npm run benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**).
 
 Ne pas changer les défauts sans refaire le tuning et, si les gains sont intentionnels, mettre à jour `reference.json`.

@@ -1,6 +1,11 @@
 import SearchableMap from './SearchableMap/SearchableMap'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import {
+  collectDocIdsFromFrozenLayout,
+  type FrozenFieldTermFlyweight,
+  type FrozenPostingsLayout,
+} from './frozenPostings'
+import {
   aggregateTerm,
   AND,
   collectDocIdsFromFieldTermData,
@@ -10,6 +15,7 @@ import {
   type AggregateContext,
   type AggregateDerivedTerm,
   type AggregateTermOptions,
+  type FieldBoostsForQuery,
   type FieldTermDataLike,
   type QuerySpec,
   type RawResult,
@@ -53,8 +59,21 @@ interface StringQueryIndexView extends BaseQueryIndexView {
 
 interface IndexedQueryIndexView extends BaseQueryIndexView {
   mode: 'indexed'
-  getPrefixMatchesByIndex(term: string): Iterable<PackedTermRef & { data: FieldTermDataLike }>
-  getFuzzyMatchesByIndex(term: string, maxDistance: number): Iterable<PackedFuzzyRef & { data: FieldTermDataLike }>
+  resolveTermIndex(term: string): number | undefined
+  /**
+   * Rebinds the instance flyweight; returned reference is valid only until the next
+   * `fieldTermData` call or prefix/fuzzy iterator step on this view.
+   */
+  fieldTermData(termIndex: number): FieldTermDataLike
+  collectDocIds(
+    termIndex: number,
+    fieldBoosts: FieldBoostsForQuery,
+    context: AggregateContext,
+    docIds: Set<number>,
+    allowedDocs?: Set<number>,
+  ): void
+  getPrefixMatchesByIndex(term: string): Iterable<PackedTermRef>
+  getFuzzyMatchesByIndex(term: string, maxDistance: number): Iterable<PackedFuzzyRef>
   resolveTermByIndex(termIndex: number): string
 }
 
@@ -161,33 +180,40 @@ function visitQuerySpecForScoring(
   const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
   const maxDistance = maxFuzzyDistance(query, maxFuzzy)
 
-  visit(indexView.getTermData(query.term), query.term, 1)
-
   if (indexView.mode === 'indexed') {
+    const exactTi = indexView.resolveTermIndex(query.term)
+    visit(
+      exactTi == null ? undefined : indexView.fieldTermData(exactTi),
+      query.term,
+      1,
+    )
+
     const seenPrefix = new Set<number>()
     if (query.prefix) {
-      for (const { termIndex, length, data } of indexView.getPrefixMatchesByIndex(query.term)) {
+      for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
         const distance = length - query.term.length
         if (!distance) continue
         seenPrefix.add(termIndex)
         visit(
-          data,
+          indexView.fieldTermData(termIndex),
           lazyIndexedTerm(indexView, termIndex),
           prefixWeight * length / (length + 0.3 * distance),
         )
       }
     }
     if (!maxDistance) return
-    for (const { termIndex, length, data, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
+    for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
       if (!distance || seenPrefix.has(termIndex)) continue
       visit(
-        data,
+        indexView.fieldTermData(termIndex),
         lazyIndexedTerm(indexView, termIndex),
         fuzzyWeight * length / (length + distance),
       )
     }
     return
   }
+
+  visit(indexView.getTermData(query.term), query.term, 1)
 
   const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
   const fuzzyMatches = maxDistance ? indexView.getFuzzyMatches(query.term, maxDistance) : undefined
@@ -223,27 +249,11 @@ function visitQuerySpecForDocIds(
   visit: (data: FieldTermDataLike | undefined) => void,
 ): void {
   const { indexView } = params
+  if (indexView.mode !== 'string') return
+
   const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
 
   visit(indexView.getTermData(query.term))
-
-  if (indexView.mode === 'indexed') {
-    const seenPrefix = new Set<number>()
-    if (query.prefix) {
-      for (const { termIndex, length, data } of indexView.getPrefixMatchesByIndex(query.term)) {
-        const distance = length - query.term.length
-        if (!distance) continue
-        seenPrefix.add(termIndex)
-        visit(data)
-      }
-    }
-    if (!maxDistance) return
-    for (const { termIndex, data, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-      if (!distance || seenPrefix.has(termIndex)) continue
-      visit(data)
-    }
-    return
-  }
 
   const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
   const fuzzyMatches = maxDistance ? indexView.getFuzzyMatches(query.term, maxDistance) : undefined
@@ -303,12 +313,38 @@ function collectDocIdsForQuerySpec(
   const options: SearchOptionsWithDefaults = { ...params.globalSearchOptions, ...searchOptions }
   const fieldBoosts = fieldBoostsForQuery(options, params.fields)
   const docIds = new Set<number>()
+  const { indexView, aggregateContext } = params
+  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
+
+  if (indexView.mode === 'indexed') {
+    const exactTi = indexView.resolveTermIndex(query.term)
+    if (exactTi != null) {
+      indexView.collectDocIds(exactTi, fieldBoosts, aggregateContext, docIds, allowedDocs)
+    }
+
+    const seenPrefix = new Set<number>()
+    if (query.prefix) {
+      for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
+        const distance = length - query.term.length
+        if (!distance) continue
+        seenPrefix.add(termIndex)
+        indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+      }
+    }
+    if (maxDistance) {
+      for (const { termIndex, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
+        if (!distance || seenPrefix.has(termIndex)) continue
+        indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+      }
+    }
+    return docIds
+  }
 
   visitQuerySpecForDocIds(query, options, params, (data) => {
     collectDocIdsFromFieldTermData(
       data,
       fieldBoosts,
-      params.aggregateContext,
+      aggregateContext,
       docIds,
       allowedDocs,
     )
@@ -421,24 +457,31 @@ function executeCombinedBranches<T>(
 /** Query adapter for packed frozen term indexes. */
 export function createFrozenQueryIndexView(
   index: FrozenTermIndex,
-  fieldTermDataFor: (termIndex: number) => FieldTermDataLike,
+  layout: FrozenPostingsLayout,
+  flyweight: FrozenFieldTermFlyweight,
   forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
 ): QueryIndexView {
   return {
     mode: 'indexed',
+    resolveTermIndex(term) {
+      const ti = index.get(term)
+      return ti == null ? undefined : ti
+    },
+    fieldTermData(termIndex) {
+      return flyweight.bind(termIndex)
+    },
+    collectDocIds(termIndex, fieldBoosts, context, docIds, allowedDocs) {
+      collectDocIdsFromFrozenLayout(layout, termIndex, fieldBoosts, context, docIds, allowedDocs)
+    },
     getTermData(term) {
       const ti = index.get(term)
-      return ti == null ? undefined : fieldTermDataFor(ti)
+      return ti == null ? undefined : flyweight.bind(ti)
     },
     * getPrefixMatchesByIndex(term) {
-      for (const { termIndex, length } of index.prefixRefs(term)) {
-        yield { termIndex, length, data: fieldTermDataFor(termIndex) }
-      }
+      yield* index.prefixRefs(term)
     },
     * getFuzzyMatchesByIndex(term, maxDistance) {
-      for (const { termIndex, length, distance } of index.fuzzyRefs(term, maxDistance)) {
-        yield { termIndex, length, distance, data: fieldTermDataFor(termIndex) }
-      }
+      yield* index.fuzzyRefs(term, maxDistance)
     },
     resolveTermByIndex(termIndex) {
       return index.termByIndex(termIndex)

@@ -2,11 +2,7 @@ import type { RadixTree } from './SearchableMap/types'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { fromRadixTree } from './PackedRadixTree'
-import {
-  type AggregateContext,
-  type FieldTermDataLike,
-  type RawResult,
-} from './scoring'
+import { type AggregateContext, type RawResult } from './scoring'
 import { finalizeRawSearchResults } from './scoring'
 import {
   defaultSearchOptions,
@@ -22,10 +18,11 @@ import {
 } from './binaryFormat'
 import { createIdToShortIdLookup, type IdToShortIdLookup } from './frozenIdLookup'
 import {
-  fieldTermDataFromLayout,
+  createFrozenFieldTermFlyweight,
   materializeFrozenPostings,
   postingsTypedBytes,
   validateFrozenPostingsLayout,
+  type FrozenFieldTermFlyweight,
   type FrozenPostingsLayout,
 } from './frozenPostings'
 import {
@@ -250,8 +247,7 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
   private readonly _termCount: number
   private readonly _postings: FrozenPostingsLayout
-  /** Per-term {@link FieldTermDataLike} wrappers (not a copy of postings), retained for the instance lifetime. */
-  private _fieldTermDataCache: FieldTermDataLike[] | undefined
+  private readonly _fieldTermFlyweight: FrozenFieldTermFlyweight
   private readonly _aggregateContext: AggregateContext
   private readonly _queryEngineParams: QueryEngineParams
 
@@ -269,6 +265,7 @@ export default class FrozenMiniSearch<T = any> {
     this._index = params.index
     this._termCount = params.termCount
     this._postings = params.postings
+    this._fieldTermFlyweight = createFrozenFieldTermFlyweight(this._postings)
 
     this._aggregateContext = {
       documentCount: this._documentCount,
@@ -285,7 +282,8 @@ export default class FrozenMiniSearch<T = any> {
       processTerm: this._options.processTerm,
       indexView: createFrozenQueryIndexView(
         this._index,
-        ti => this.fieldTermDataFor(ti),
+        this._postings,
+        this._fieldTermFlyweight,
         (callback) => {
           for (let shortId = 0; shortId < this._nextId; shortId++) {
             const id = this._externalIds[shortId]
@@ -537,22 +535,7 @@ export default class FrozenMiniSearch<T = any> {
     return this._fieldLengthMatrix[docId * this._fieldCount + fieldId] ?? 0
   }
 
-  private fieldTermDataFor(termIndex: number): FieldTermDataLike {
-    let cache = this._fieldTermDataCache
-    if (cache == null) {
-      cache = new Array(this._termCount)
-      this._fieldTermDataCache = cache
-    }
-    let data = cache[termIndex]
-    if (data == null) {
-      data = fieldTermDataFromLayout(this._postings, termIndex)
-      cache[termIndex] = data
-    }
-    return data
-  }
-
   private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
     return runQuery(query, searchOptions, this._queryEngineParams)
   }
-
 }

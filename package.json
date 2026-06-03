@@ -96,7 +96,6 @@
     "benchmark:record:search": "npm run build && BENCH_SEARCH_ONLY=1 node --expose-gc benchmarks/captureBaseline.js",
     "benchmark:diff:search:run": "npm run build && BENCH_SEARCH_ONLY=1 node --expose-gc benchmarks/diffBaseline.js --run",
     "benchmark:baseline:update": "npm run build && node --expose-gc benchmarks/captureBaseline.js --reference",
-    "benchmark:volet3-cold-warm": "npm run build && node --expose-gc benchmarks/volet3-cold-warm.mjs",
     "benchmark:and-gate-tuning": "npx --yes tsx benchmarks/and-gate-tuning.mjs",
     "benchmark:diff": "node --expose-gc benchmarks/diffBaseline.js",
     "benchmark:diff:run": "npm run build && node --expose-gc benchmarks/diffBaseline.js --run",

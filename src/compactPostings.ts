@@ -1,4 +1,4 @@
-import type { FieldTermDataLike, PostingListLike } from './scoring'
+import type { PostingListLike } from './scoring'
 
 const MAX_FREQ_UINT8 = 255
 
@@ -41,23 +41,4 @@ export class SegmentPostingList implements PostingListLike {
  */
 export function clampFreq(freq: number): number {
   return freq > MAX_FREQ_UINT8 ? MAX_FREQ_UINT8 : freq
-}
-
-export function flatFieldTermData(
-  termIndex: number,
-  fieldCount: number,
-  postingsOffsets: Uint32Array,
-  postingsLengths: Uint32Array,
-  allDocIds: DocIdArray,
-  allFreqs: Uint8Array,
-): FieldTermDataLike {
-  const base = termIndex * fieldCount
-  return {
-    get(fieldId: number) {
-      const len = postingsLengths[base + fieldId]
-      if (len === 0) return undefined
-      const off = postingsOffsets[base + fieldId]
-      return new SegmentPostingList(allDocIds, allFreqs, off, len)
-    },
-  }
 }

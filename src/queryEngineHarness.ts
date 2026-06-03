@@ -77,9 +77,3 @@ export function searchNaive(
 ): SearchResult[] {
   return searchWithRunOptions(engine, query, searchOptions, { disableGating: true })
 }
-
-/** Volet3 cold bench: clear per-term posting view wrappers between iterations. */
-export function resetFrozenFieldTermDataCache(fs: FrozenMiniSearch): void {
-  const frozen = fs as unknown as { _fieldTermDataCache?: unknown }
-  frozen._fieldTermDataCache = undefined
-}

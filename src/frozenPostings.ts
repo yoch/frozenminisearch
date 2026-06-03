@@ -1,11 +1,10 @@
 import {
   clampFreq,
-  flatFieldTermData,
   readDocId,
   SegmentPostingList,
   type DocIdArray,
 } from './compactPostings'
-import type { FieldTermDataLike } from './scoring'
+import type { AggregateContext, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
 import { DISCARDED_DOC_ID, materializeFlatPostings, type FlatPostingsMaterializeParams } from './flatPostings'
 
 export type { DocIdArray } from './compactPostings'
@@ -266,35 +265,94 @@ function findSparseSlotByFieldId(
   return -1
 }
 
-export function fieldTermDataFromLayout(
+type FrozenPostingSlice = { offset: number, length: number }
+
+/** Resolve one (termIndex, fieldId) posting run in flat buffers; shared by flyweight and docId collect. */
+function frozenPostingSlice(
   layout: FrozenPostingsLayout,
   termIndex: number,
-): FieldTermDataLike {
+  fieldId: number,
+): FrozenPostingSlice | undefined {
   if (layout.layout === 'dense') {
-    return flatFieldTermData(
-      termIndex,
-      layout.fieldCount,
-      layout.denseOffsets!,
-      layout.denseLengths!,
-      layout.allDocIds,
-      layout.allFreqs,
-    )
+    const base = termIndex * layout.fieldCount + fieldId
+    const len = layout.denseLengths![base]
+    if (len === 0) return undefined
+    return { offset: layout.denseOffsets![base], length: len }
   }
 
-  const starts = layout.sparseTermStarts!
-  const start = starts[termIndex]
-  const end = starts[termIndex + 1]
-  const fieldIds = layout.sparseFieldIds!
-  const offsets = layout.sparseOffsets!
-  const lengths = layout.sparseLengths!
+  const start = layout.sparseTermStarts![termIndex]
+  const end = layout.sparseTermStarts![termIndex + 1]
+  const slot = findSparseSlotByFieldId(layout.sparseFieldIds!, start, end, fieldId)
+  if (slot < 0) return undefined
+  const len = layout.sparseLengths![slot]
+  if (len === 0) return undefined
+  return { offset: layout.sparseOffsets![slot], length: len }
+}
 
-  return {
-    get(fieldId: number) {
-      const slot = findSparseSlotByFieldId(fieldIds, start, end, fieldId)
-      if (slot < 0) return undefined
-      const len = lengths[slot]
-      if (len === 0) return undefined
-      return new SegmentPostingList(layout.allDocIds, layout.allFreqs, offsets[slot], len)
+/** Single rebindable {@link FieldTermDataLike} per frozen index (O(1) RAM). */
+export type FrozenFieldTermFlyweight = FieldTermDataLike & {
+  bind(termIndex: number): FrozenFieldTermFlyweight
+}
+
+/**
+ * One flyweight wrapper for the lifetime of a frozen index. Call {@link bind} before each
+ * `get`; the returned object is always the same instance (valid until the next `bind`).
+ */
+export function createFrozenFieldTermFlyweight(layout: FrozenPostingsLayout): FrozenFieldTermFlyweight {
+  let termIndex = -1
+  const { allDocIds, allFreqs } = layout
+
+  const flyweight: FrozenFieldTermFlyweight = {
+    bind(ti: number) {
+      termIndex = ti
+      return flyweight
     },
+    get(fieldId: number) {
+      const slice = frozenPostingSlice(layout, termIndex, fieldId)
+      if (slice == null) return undefined
+      return new SegmentPostingList(allDocIds, allFreqs, slice.offset, slice.length)
+    },
+  }
+  return flyweight
+}
+
+function collectDocIdsFromFrozenSegment(
+  allDocIds: DocIdArray,
+  offset: number,
+  length: number,
+  context: AggregateContext,
+  docIds: Set<number>,
+  allowedDocs?: Set<number>,
+): void {
+  for (let i = 0; i < length; i++) {
+    const docId = readDocId(allDocIds, offset + i)
+    if (context.isDocActive != null && !context.isDocActive(docId)) continue
+    if (allowedDocs != null && !allowedDocs.has(docId)) continue
+    docIds.add(docId)
+  }
+}
+
+/** Collect docIds from flat postings without {@link FieldTermDataLike} wrappers. */
+export function collectDocIdsFromFrozenLayout(
+  layout: FrozenPostingsLayout,
+  termIndex: number,
+  fieldBoosts: FieldBoostsForQuery,
+  context: AggregateContext,
+  docIds: Set<number>,
+  allowedDocs?: Set<number>,
+): void {
+  const { fieldIds } = context
+
+  for (const field of fieldBoosts.names) {
+    const slice = frozenPostingSlice(layout, termIndex, fieldIds[field])
+    if (slice == null) continue
+    collectDocIdsFromFrozenSegment(
+      layout.allDocIds,
+      slice.offset,
+      slice.length,
+      context,
+      docIds,
+      allowedDocs,
+    )
   }
 }

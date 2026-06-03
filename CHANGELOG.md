@@ -8,7 +8,7 @@ Frozen search engine and benchmarking transparency.
 
   - **Ref-first frozen traversal** — `prefixRefs` / `fuzzyRefs` plus `termByIndex`; no persistent string cache on `PackedRadixTree` (strings rebuilt per call)
   - **AND / AND_NOT branch gating** — score later branches with an `allowedDocs` gate when selective; `matchingFields` unchanged under gate (BM25 parity with score-then-combine); oracle tests vs non-gated path in `queryEngine.gate.test.js`
-  - **`_fieldTermDataCache`** on `FrozenMiniSearch` — caches per-`termIndex` `FieldTermDataLike` wrappers for the instance lifetime (routine `benchmark:record` measures warm steady-state with this cache hot)
+  - **Frozen field-term flyweight** — one rebindable `FieldTermDataLike` per `FrozenMiniSearch` (O(1) RAM); docIds/gating read postings via `collectDocIdsFromFrozenLayout` without per-term wrappers
   - **AND gate parameters** — documented in `docs/AND_GATE_PARAMETERS.md` (`queryEngineGateLimits.ts`, not public API)
   - **Benchmark defaults** — routine suite `3×25` timed searches with `100` warmup per query (lighter than former `3×50` / `200` warmup); `BENCH_SEARCH_ONLY=1` skips indexing/save/load metrics
 

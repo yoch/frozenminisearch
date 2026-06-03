@@ -101,7 +101,7 @@ Dev / smoke (faster, same scenarios):
 RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20 yarn benchmark:record
 ```
 
-The suite logs progress per scenario (`[bench N/M] …`). Search timing reuses one mutable and one frozen index per scenario (warm steady-state, including `_fieldTermDataCache` on frozen).
+The suite logs progress per scenario (`[bench N/M] …`). Search timing reuses one mutable and one frozen index per scenario (warm steady-state).
 
 `benchmark:diff` does **not** re-run the suite: record once, diff as often as needed.
 Compare another capture: `yarn benchmark:diff --current=path/to/run.json`.
@@ -120,7 +120,7 @@ Update `baselines/reference.json` only after intentional wins: `yarn benchmark:b
 
 ## Frozen search timing
 
-`benchSearch()` runs **100 warmup searches** by default on the same index instance, then timed iterations. That is **steady-state** latency (V8 JIT + `_fieldTermDataCache` on `FrozenMiniSearch`). Override via `BENCH_WARMUP`.
+`benchSearch()` runs **100 warmup searches** by default on the same index instance, then timed iterations (steady-state: V8 JIT). Override via `BENCH_WARMUP`.
 
 **AND / AND_NOT gating** — see [`docs/AND_GATE_PARAMETERS.md`](../docs/AND_GATE_PARAMETERS.md). Oracle tests: `queryEngine.gate.test.js`. Optional sweep: `benchmarks/and-gate-tuning.mjs`.
 

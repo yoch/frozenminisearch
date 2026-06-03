@@ -121,7 +121,25 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
   })
 
   test('AND_NOT combine', () => {
-    expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND_NOT' })
+    expectSameResults(mutable, frozen, 'matrix zen', { combineWith: 'AND_NOT' })
+    expect(mutable.search('matrix zen', { combineWith: 'AND_NOT' }).map(r => r.id)).toEqual([3])
+  })
+
+  test('AND_NOT nested negated branch defaults to OR combineWith', () => {
+    const extendedDocs = [
+      ...docs,
+      { id: 5, title: 'Ocean Life', text: 'whale dolphin ocean marine biology', category: 'science' },
+    ]
+    const extendedOpts = { ...options, searchOptions: { prefix: true, fuzzy: 0.2 } }
+    const extendedMutable = new MiniSearch(extendedOpts)
+    extendedMutable.addAll(extendedDocs)
+    const extendedFrozen = extendedMutable.freeze()
+    const query = {
+      combineWith: 'AND_NOT',
+      queries: ['ocean', { queries: ['matrix', 'whale'] }],
+    }
+    expect(extendedMutable.search(query)).toEqual([])
+    expectSameResults(extendedMutable, extendedFrozen, query)
   })
 
   test('field boost', () => {

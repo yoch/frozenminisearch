@@ -21,7 +21,11 @@ function buildEngines() {
   return { mutable, frozen }
 }
 
-function expectSameResults(mutable, frozen, query, searchOptions = {}) {
+function sortedIds(results) {
+  return results.map(r => r.id).sort((a, b) => a - b)
+}
+
+function expectSameResults(mutable, frozen, query, searchOptions = {}, { expectedIds } = {}) {
   const a = mutable.search(query, searchOptions)
   const b = frozen.search(query, searchOptions)
   expect(b.length).toBe(a.length)
@@ -31,6 +35,9 @@ function expectSameResults(mutable, frozen, query, searchOptions = {}) {
     expect(b[i].terms).toEqual(a[i].terms)
     expect(b[i].match).toEqual(a[i].match)
     expect(b[i].queryTerms).toEqual(a[i].queryTerms)
+  }
+  if (expectedIds !== undefined) {
+    expect(sortedIds(a)).toEqual([...expectedIds].sort((x, y) => x - y))
   }
 }
 
@@ -44,25 +51,26 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
 
   describe('AND combinations', () => {
     test.each([
-      ['exact+exact', 'zen art', { combineWith: 'AND' }],
-      ['exact+prefix', 'zen arch', { combineWith: 'AND', prefix: true }],
-      ['exact+fuzzy', 'zen artry', { combineWith: 'AND', fuzzy: 0.3 }],
-      ['prefix+fuzzy', 'neur neurmanc', { combineWith: 'AND', prefix: true, fuzzy: 0.3 }],
-      ['3 terms', 'zen art motorcycle', { combineWith: 'AND' }],
-    ])('%s', (_label, query, opts) => {
-      expectSameResults(mutable, frozen, query, opts)
+      ['exact+exact', 'zen art', { combineWith: 'AND' }, [2, 4]],
+      ['exact+prefix', 'zen arch', { combineWith: 'AND', prefix: true }, [4]],
+      ['exact+fuzzy', 'zen artry', { combineWith: 'AND', fuzzy: 0.3 }, [2, 4]],
+      ['prefix+exact', 'neur hacker', { combineWith: 'AND', prefix: true }, [3]],
+      ['3 terms', 'zen art motorcycle', { combineWith: 'AND' }, [2]],
+    ])('%s', (_label, query, opts, expectedIds) => {
+      expectSameResults(mutable, frozen, query, opts, { expectedIds })
     })
   })
 
   describe('AND_NOT combinations', () => {
     test.each([
-      ['left exact', 'zen art', { combineWith: 'AND_NOT' }],
-      ['left prefix', 'zen arch', { combineWith: 'AND_NOT', prefix: true }],
-      ['left fuzzy', 'zen artry', { combineWith: 'AND_NOT', fuzzy: 0.3 }],
-      ['right prefix excluded', 'whale oce', { combineWith: 'AND_NOT', prefix: true }],
-      ['right fuzzy excluded', 'whale oceon', { combineWith: 'AND_NOT', fuzzy: 0.3 }],
-    ])('%s', (_label, query, opts) => {
-      expectSameResults(mutable, frozen, query, opts)
+      ['left exact vacuous', 'zen art', { combineWith: 'AND_NOT' }, []],
+      ['left discriminant', 'matrix zen', { combineWith: 'AND_NOT' }, [3]],
+      ['left prefix', 'zen arch', { combineWith: 'AND_NOT', prefix: true }, [2]],
+      ['left fuzzy', 'zen artry', { combineWith: 'AND_NOT', fuzzy: 0.3 }, []],
+      ['right prefix excluded', 'whale oce', { combineWith: 'AND_NOT', prefix: true }, []],
+      ['right fuzzy excluded', 'whale oceon', { combineWith: 'AND_NOT', fuzzy: 0.3 }, []],
+    ])('%s', (_label, query, opts, expectedIds) => {
+      expectSameResults(mutable, frozen, query, opts, { expectedIds })
     })
   })
 
@@ -74,7 +82,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
           'zen',
           { combineWith: 'OR', queries: ['motorcycle', 'archery'] },
         ],
-      })
+      }, { expectedIds: [2, 4] })
     })
 
     test('OR containing AND (inner AND gated)', () => {
@@ -84,7 +92,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
           { combineWith: 'AND', queries: ['zen', 'art'] },
           'whale',
         ],
-      })
+      }, { expectedIds: [1, 2, 4, 5] })
     })
 
     test('AND_NOT with nested negated OR', () => {
@@ -94,17 +102,27 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
           'zen',
           { combineWith: 'OR', queries: ['motorcycle', 'ocean'] },
         ],
-      })
+      }, { expectedIds: [2, 4] })
     })
 
-    test('AND_NOT with nested negated branch without combineWith', () => {
+    test('AND_NOT with nested negated branch without combineWith (zen)', () => {
       expectSameResults(mutable, frozen, {
         combineWith: 'AND_NOT',
         queries: [
           'zen',
           { queries: ['whale', 'ocean'] },
         ],
-      })
+      }, { expectedIds: [2, 4] })
+    })
+
+    test('AND_NOT with nested negated branch without combineWith defaults to OR', () => {
+      expectSameResults(mutable, frozen, {
+        combineWith: 'AND_NOT',
+        queries: [
+          'ocean',
+          { queries: ['matrix', 'whale'] },
+        ],
+      }, { expectedIds: [] })
     })
   })
 
@@ -112,30 +130,31 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     const boostDocument = (id, term) => (id === 2 || term === 'archery' ? 2 : 1)
 
     test('AND with boostDocument', () => {
-      expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND', boostDocument })
+      expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND', boostDocument }, { expectedIds: [2, 4] })
     })
 
     test('AND_NOT with boostDocument', () => {
-      expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND_NOT', boostDocument })
+      expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND_NOT', boostDocument }, { expectedIds: [] })
     })
 
-    test('AND_NOT with boostDocument returning 0 still matches mutable/frozen', () => {
-      const zeroBoost = (id) => (id === 3 ? 0 : 1)
-      expectSameResults(mutable, frozen, 'zen whale', { combineWith: 'AND_NOT', boostDocument: zeroBoost })
+    test('AND_NOT with boostDocument returning 0 excludes boosted doc from positive branch', () => {
+      const zeroBoost = (id) => (id === 2 ? 0 : 1)
+      expectSameResults(mutable, frozen, 'zen whale', { combineWith: 'AND_NOT', boostDocument: zeroBoost }, { expectedIds: [4] })
+      expect(sortedIds(mutable.search('zen whale', { combineWith: 'AND_NOT' }))).toEqual([2, 4])
     })
   })
 
   describe('non-regression OR and exact', () => {
     test('OR unchanged', () => {
-      expectSameResults(mutable, frozen, 'zen whale', { combineWith: 'OR' })
+      expectSameResults(mutable, frozen, 'zen whale', { combineWith: 'OR' }, { expectedIds: [1, 2, 4, 5] })
     })
 
     test('exact single term unchanged', () => {
-      expectSameResults(mutable, frozen, 'zen')
+      expectSameResults(mutable, frozen, 'zen', {}, { expectedIds: [2, 4] })
     })
 
     test('prefix single term unchanged', () => {
-      expectSameResults(mutable, frozen, 'neur', { prefix: true })
+      expectSameResults(mutable, frozen, 'neur', { prefix: true }, { expectedIds: [3] })
     })
   })
 

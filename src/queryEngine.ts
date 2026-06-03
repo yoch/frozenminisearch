@@ -493,11 +493,16 @@ function collectDocIdsForQueryInternal(
   if (typeof query !== 'string') {
     const combination = query as QueryCombination
     const options = { ...searchOptions, ...combination, queries: undefined }
-    const operator = (options.combineWith ?? params.globalSearchOptions.combineWith) as CombinationOperator
+    const operator = (
+      combination.combineWith
+      ?? searchOptions.combineWith
+      ?? params.globalSearchOptions.combineWith
+    ) as CombinationOperator
+    const childSearchOptions = { ...options, combineWith: undefined }
     return collectCombinedDocIds(
       combination.queries,
       operator,
-      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
+      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, childSearchOptions, params, branchAllowed),
       allowedDocs,
     )
   }
@@ -566,21 +571,26 @@ function executeQueryInternal(
   if (typeof query !== 'string') {
     const combination = query as QueryCombination
     const options = { ...searchOptions, ...combination, queries: undefined }
-    const operator = (options.combineWith ?? params.globalSearchOptions.combineWith) as CombinationOperator
+    const operator = (
+      combination.combineWith
+      ?? searchOptions.combineWith
+      ?? params.globalSearchOptions.combineWith
+    ) as CombinationOperator
+    const childSearchOptions = { ...options, combineWith: undefined }
 
     if (shouldUseGatedEvaluation(combination.queries.length, operator, isWildcardQuery(query))) {
       return executeGatedCombinedQuery(
         combination.queries,
         operator,
         params,
-        (branch, branchAllowed) => executeQueryInternal(branch, options, params, branchAllowed),
-        (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
+        (branch, branchAllowed) => executeQueryInternal(branch, childSearchOptions, params, branchAllowed),
+        (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, childSearchOptions, params, branchAllowed),
         allowedDocs,
       )
     }
 
     const results = combination.queries.map(subquery =>
-      executeQueryInternal(subquery, options, params, allowedDocs),
+      executeQueryInternal(subquery, childSearchOptions, params, allowedDocs),
     )
     return combineResults(results, operator)
   }

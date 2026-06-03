@@ -141,9 +141,29 @@ export function mapFieldTermData(data: Map<number, Map<number, number>>): FieldT
   }
 }
 
+export type AggregateDerivedTerm =
+  | { kind: 'eager', term: string }
+  | { kind: 'lazy', resolve: () => string }
+
+export type AggregateTermOptions = {
+  /** When set, only score postings whose docId is in this set. Does not affect matchingFields. */
+  allowedDocs?: Set<number>
+}
+
+function getDerivedTerm(
+  derivedTerm: AggregateDerivedTerm,
+  cache: { value?: string },
+): string {
+  if (derivedTerm.kind === 'lazy') {
+    if (cache.value === undefined) cache.value = derivedTerm.resolve()
+    return cache.value
+  }
+  return derivedTerm.term
+}
+
 function scorePostingDoc(
   sourceTerm: string,
-  derivedTerm: string,
+  derivedTerm: AggregateDerivedTerm,
   field: string,
   fieldId: number,
   docId: number,
@@ -156,9 +176,11 @@ function scorePostingDoc(
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25: Bm25FieldConstants,
   results: RawResult,
+  derivedTermCache: { value?: string },
 ): void {
+  const resolvedDerivedTerm = getDerivedTerm(derivedTerm, derivedTermCache)
   const docBoost = boostDocumentFn
-    ? boostDocumentFn(context.getExternalId(docId), derivedTerm, context.getStoredFields(docId))
+    ? boostDocumentFn(context.getExternalId(docId), resolvedDerivedTerm, context.getStoredFields(docId))
     : 1
   if (!docBoost) return
 
@@ -172,24 +194,24 @@ function scorePostingDoc(
   if (result) {
     result.score += weightedScore
     assignUniqueTerm(result.terms, sourceTerm)
-    const match = getOwnProperty(result.match as Record<string, unknown>, derivedTerm) as string[] | undefined
+    const match = getOwnProperty(result.match as Record<string, unknown>, resolvedDerivedTerm) as string[] | undefined
     if (match) {
       match.push(field)
     } else {
-      result.match[derivedTerm] = [field]
+      result.match[resolvedDerivedTerm] = [field]
     }
   } else {
     results.set(docId, {
       score: weightedScore,
       terms: [sourceTerm],
-      match: { [derivedTerm]: [field] },
+      match: { [resolvedDerivedTerm]: [field] },
     })
   }
 }
 
 function aggregateSegmentPostingList(
   sourceTerm: string,
-  derivedTerm: string,
+  derivedTerm: AggregateDerivedTerm,
   termWeight: number,
   termBoost: number,
   field: string,
@@ -200,25 +222,29 @@ function aggregateSegmentPostingList(
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25params: BM25Params,
   results: RawResult,
+  allowedDocs?: Set<number>,
 ): number {
   let matchingFields = list.length
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
   const { docIds, freqs, offset, length } = list
+  const derivedTermCache: { value?: string } = {}
 
   for (let i = 0; i < length; i++) {
     const docId = readDocId(docIds, offset + i)
     const termFreq = freqs[offset + i]
 
     if (context.isDocActive != null && !context.isDocActive(docId)) {
-      context.onInactiveDoc?.(docId, fieldId, derivedTerm)
+      context.onInactiveDoc?.(docId, fieldId, getDerivedTerm(derivedTerm, derivedTermCache))
       matchingFields -= 1
       continue
     }
 
+    if (allowedDocs != null && !allowedDocs.has(docId)) continue
+
     scorePostingDoc(
       sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
       termWeight, termBoost, fieldBoost, matchingFields,
-      context, boostDocumentFn, bm25, results,
+      context, boostDocumentFn, bm25, results, derivedTermCache,
     )
   }
   return matchingFields
@@ -226,7 +252,7 @@ function aggregateSegmentPostingList(
 
 export function aggregateTerm(
   sourceTerm: string,
-  derivedTerm: string,
+  derivedTerm: AggregateDerivedTerm,
   termWeight: number,
   termBoost: number,
   fieldTermData: FieldTermDataLike | undefined,
@@ -235,8 +261,11 @@ export function aggregateTerm(
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25params: BM25Params,
   results: RawResult = new Map(),
+  termOptions?: AggregateTermOptions,
 ): RawResult {
   if (fieldTermData == null) return results
+
+  const { allowedDocs } = termOptions ?? {}
 
   for (const field of fieldBoosts.names) {
     const fieldBoost = fieldBoosts.boosts[field]
@@ -249,29 +278,76 @@ export function aggregateTerm(
         sourceTerm, derivedTerm, termWeight, termBoost,
         field, fieldId, fieldBoost, postingList,
         context, boostDocumentFn, bm25params, results,
+        allowedDocs,
       )
       continue
     }
 
     let matchingFields = postingList.size
     const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
+    const derivedTermCache: { value?: string } = {}
 
     postingList.forEachDoc((docId, termFreq) => {
       if (context.isDocActive != null && !context.isDocActive(docId)) {
-        context.onInactiveDoc?.(docId, fieldId, derivedTerm)
+        context.onInactiveDoc?.(docId, fieldId, getDerivedTerm(derivedTerm, derivedTermCache))
         matchingFields -= 1
         return
       }
 
+      if (allowedDocs != null && !allowedDocs.has(docId)) return
+
       scorePostingDoc(
         sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
         termWeight, termBoost, fieldBoost, matchingFields,
-        context, boostDocumentFn, bm25, results,
+        context, boostDocumentFn, bm25, results, derivedTermCache,
       )
     })
   }
 
   return results
+}
+
+function collectDocIdsFromSegmentPostingList(
+  list: SegmentPostingList,
+  context: AggregateContext,
+  docIds: Set<number>,
+  allowedDocs?: Set<number>,
+): void {
+  const { docIds: ids, offset, length } = list
+  for (let i = 0; i < length; i++) {
+    const docId = readDocId(ids, offset + i)
+    if (context.isDocActive != null && !context.isDocActive(docId)) continue
+    if (allowedDocs != null && !allowedDocs.has(docId)) continue
+    docIds.add(docId)
+  }
+}
+
+/** Collect docIds from posting lists without scoring or term materialization. */
+export function collectDocIdsFromFieldTermData(
+  fieldTermData: FieldTermDataLike | undefined,
+  fieldBoosts: FieldBoostsForQuery,
+  context: AggregateContext,
+  docIds: Set<number>,
+  allowedDocs?: Set<number>,
+): void {
+  if (fieldTermData == null) return
+
+  for (const field of fieldBoosts.names) {
+    const fieldId = context.fieldIds[field]
+    const postingList = fieldTermData.get(fieldId)
+    if (postingList == null) continue
+
+    if (postingList instanceof SegmentPostingList) {
+      collectDocIdsFromSegmentPostingList(postingList, context, docIds, allowedDocs)
+      continue
+    }
+
+    postingList.forEachDoc((docId) => {
+      if (context.isDocActive != null && !context.isDocActive(docId)) return
+      if (allowedDocs != null && !allowedDocs.has(docId)) return
+      docIds.add(docId)
+    })
+  }
 }
 
 type CombinatorFunction = (a: RawResult, b: RawResult) => RawResult

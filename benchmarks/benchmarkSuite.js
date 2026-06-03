@@ -202,6 +202,10 @@ export function buildScenarioList () {
       queries: [
         { label: 'exact', q: 'inferno', opts: {} },
         { label: 'AND', q: 'inferno paradiso', opts: { combineWith: 'AND' } },
+        { label: 'AND+prefix', q: 'infe para', opts: { combineWith: 'AND', prefix: true } },
+        { label: 'AND+fuzzy', q: 'infern paradis', opts: { combineWith: 'AND', fuzzy: 0.2 } },
+        { label: 'AND_NOT', q: 'inferno paradiso', opts: { combineWith: 'AND_NOT' } },
+        { label: 'AND_NOT+prefix', q: 'infe para', opts: { combineWith: 'AND_NOT', prefix: true } },
         { label: 'prefix', q: 'infe', opts: { prefix: true } },
         { label: 'fuzzy', q: 'infern', opts: { fuzzy: 0.2 } }
       ]
@@ -223,6 +227,8 @@ export function buildScenarioList () {
       options: { fields: ['txt'], storeFields: [] },
       queries: [
         { label: 'exact', q: 'unique12345', opts: {} },
+        { label: 'AND+prefix', q: 'unique1 common', opts: { combineWith: 'AND', prefix: true } },
+        { label: 'AND_NOT', q: 'unique1 common', opts: { combineWith: 'AND_NOT' } },
         { label: 'prefix', q: 'unique1', opts: { prefix: true } }
       ]
     },

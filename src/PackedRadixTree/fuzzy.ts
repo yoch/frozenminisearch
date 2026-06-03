@@ -85,12 +85,17 @@ function recurse(
       for (let j = jmin; j < jmax; ++j) {
         const different = char !== query.charCodeAt(j)
 
-        const rpl = matrix[prevRowOffset + j] + +different
+        // Manual Math.min for better performance in the inner loop
+        let dist = matrix[prevRowOffset + j]
+        if (different) dist++
+
         const del = matrix[prevRowOffset + j + 1] + 1
+        if (del < dist) dist = del
+
         const ins = matrix[thisRowOffset + j] + 1
+        if (ins < dist) dist = ins
 
-        const dist = matrix[thisRowOffset + j + 1] = Math.min(rpl, del, ins)
-
+        matrix[thisRowOffset + j + 1] = dist
         if (dist < minDistance) minDistance = dist
       }
 

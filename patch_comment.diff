@@ -1,0 +1,9 @@
+--- src/PackedRadixTree/fuzzy.ts
++++ src/PackedRadixTree/fuzzy.ts
+@@ -85,6 +85,7 @@
+       for (let j = jmin; j < jmax; ++j) {
+         const different = char !== query.charCodeAt(j)
+
++        // Manual Math.min for better performance in the inner loop
+         let dist = matrix[prevRowOffset + j]
+         if (different) dist++

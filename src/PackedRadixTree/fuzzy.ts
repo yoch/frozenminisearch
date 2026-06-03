@@ -17,12 +17,17 @@ export function packedRadixFuzzyEntries(
   for (let j = 0; j < n; ++j) matrix[j] = j
   for (let i = 1; i < m; ++i) matrix[i * n] = i
 
+  const queryLen = query.length
+  const queryCodes = new Uint16Array(n)
+  for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
+
   const segmentStarts = new Uint32Array(m)
   const segmentLens = new Uint32Array(m)
 
   recurse(
     tree,
-    query,
+    queryLen,
+    queryCodes,
     maxDistance,
     results,
     matrix,
@@ -39,7 +44,8 @@ export function packedRadixFuzzyEntries(
 
 function recurse(
   tree: PackedRadixTree,
-  query: string,
+  queryLen: number,
+  queryCodes: Uint16Array,
   maxDistance: number,
   results: Array<[string, number, number]>,
   matrix: Uint8Array,
@@ -71,7 +77,7 @@ function recurse(
     const ei = first + edgeOffset
     const labelStart = tree.edgeLabelStart[ei]
     const labelLen = tree.edgeLabelLength[ei]
-    if (shouldPruneFuzzyEdge(rowStart - 1, labelLen, query.length, maxDistance)) {
+    if (shouldPruneFuzzyEdge(rowStart - 1, labelLen, queryLen, maxDistance)) {
       continue edge
     }
 
@@ -88,7 +94,7 @@ function recurse(
       const jmax = Math.min(n - 1, i + maxDistance)
 
       for (let j = jmin; j < jmax; ++j) {
-        const different = char !== query.charCodeAt(j)
+        const different = j < queryLen ? char !== queryCodes[j] : true
 
         const rpl = matrix[prevRowOffset + j] + +different
         const del = matrix[prevRowOffset + j + 1] + 1
@@ -108,7 +114,8 @@ function recurse(
     segmentLens[depth] = labelLen
     recurse(
       tree,
-      query,
+      queryLen,
+      queryCodes,
       maxDistance,
       results,
       matrix,

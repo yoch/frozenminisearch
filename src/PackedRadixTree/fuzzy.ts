@@ -32,7 +32,6 @@ export function packedRadixFuzzyEntries(
     results,
     matrix,
     1,
-    n,
     0,
     segmentStarts,
     segmentLens,
@@ -50,13 +49,13 @@ function recurse(
   results: Array<[string, number, number]>,
   matrix: Uint8Array,
   rowStart: number,
-  n: number,
   node: number,
   segmentStarts: Uint32Array,
   segmentLens: Uint32Array,
   depth: number,
 ): void {
   const heap = tree.labelHeap
+  const n = queryLen + 1
   const offset = rowStart * n
 
   const first = tree.nodeEdgeOffset[node]
@@ -82,25 +81,29 @@ function recurse(
     }
 
     let i = rowStart
+    let thisRowOffset = rowStart * n
 
-    for (let pos = 0; pos < labelLen; ++pos, ++i) {
+    for (let pos = 0; pos < labelLen; ++pos, ++i, thisRowOffset += n) {
       const char = heap.charCodeAt(labelStart + pos)
-      const thisRowOffset = n * i
       const prevRowOffset = thisRowOffset - n
 
       let minDistance = matrix[thisRowOffset]
 
+      // Keep Math.max/min: V8 inlines two-arg min/max well; manual ternaries showed no gain.
       const jmin = Math.max(0, i - maxDistance - 1)
-      const jmax = Math.min(n - 1, i + maxDistance)
+      const jmax = Math.min(queryLen, i + maxDistance)
 
       for (let j = jmin; j < jmax; ++j) {
-        const different = j < queryLen ? char !== queryCodes[j] : true
+        const different = char === queryCodes[j] ? 0 : 1
 
-        const rpl = matrix[prevRowOffset + j] + +different
+        const rpl = matrix[prevRowOffset + j] + different
         const del = matrix[prevRowOffset + j + 1] + 1
         const ins = matrix[thisRowOffset + j] + 1
 
-        const dist = matrix[thisRowOffset + j + 1] = Math.min(rpl, del, ins)
+        let dist = rpl
+        if (del < dist) dist = del
+        if (ins < dist) dist = ins
+        matrix[thisRowOffset + j + 1] = dist
 
         if (dist < minDistance) minDistance = dist
       }
@@ -120,7 +123,6 @@ function recurse(
       results,
       matrix,
       i,
-      n,
       tree.edgeChild[ei],
       segmentStarts,
       segmentLens,

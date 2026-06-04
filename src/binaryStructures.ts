@@ -311,20 +311,3 @@ export function deserializeTermIndexTree(shape: TreeShape): RadixTree<number> {
   }
   return tree
 }
-
-function serializeTermIndexTree(tree: RadixTree<number>): TreeShape {
-  const shape: TreeShape = []
-  const entries: Array<[string, number | RadixTree<number>]> = []
-  for (const [key, val] of tree) {
-    entries.push([key, val as number | RadixTree<number>])
-  }
-  entries.sort((a, b) => a[0].localeCompare(b[0]))
-  for (const [key, val] of entries) {
-    if (key === LEAF) {
-      shape.push([key, val as number])
-    } else {
-      shape.push([key, serializeTermIndexTree(val as RadixTree<number>)])
-    }
-  }
-  return shape
-}

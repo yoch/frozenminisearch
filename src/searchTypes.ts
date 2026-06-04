@@ -205,7 +205,10 @@ export type SearchResult = {
 /** A boolean combination of sub-queries. */
 export type QueryCombination = SearchOptions & { queries: Query[] }
 
-/** Wildcard query symbol, used to match all documents. */
+/**
+ * Wildcard query symbol, used to match all documents.
+ * Use {@link MiniSearch.wildcard} or {@link FrozenMiniSearch.wildcard}.
+ */
 export type Wildcard = typeof WILDCARD_QUERY
 
 /**

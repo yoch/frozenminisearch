@@ -41,7 +41,6 @@ import type {
   Options,
   Query,
   SearchOptions,
-  SearchOptionsWithDefaults,
   SearchResult,
   Suggestion,
 } from './searchTypes'

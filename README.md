@@ -201,7 +201,7 @@ npm run build
 
 1. Bump `version` in `package.json` and update [CHANGELOG.md](./CHANGELOG.md).
 2. `npm test` and `npm run build` (also run by `prepublishOnly` on publish).
-3. If README or public API changed: `npm run build-docs`, then commit `docs/` (TypeDoc output — do not edit `docs/index.html` by hand).
+3. If README or public API changed: `npm run build-docs` (syncs `docs/media/` from root changelog, design doc, and benchmarks; then TypeDoc + demo), then commit `docs/` HTML (do not edit `docs/index.html` by hand). Files under `docs/media/` are generated and gitignored — GitHub Pages is deployed via the **Docs** workflow (`.github/workflows/docs.yml`).
 4. Commit version + changelog (+ docs if step 3) on a clean tree.
 5. Publish:
    - **Stable** (`latest`): `npm run release:stable`

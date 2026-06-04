@@ -1,6 +1,6 @@
 /**
  * Smallest unsigned typed array that can hold the structure's indices. Widths
- * are chosen adaptively at build time (see {@link packedIndexArray}); reads via
+ * are chosen adaptively at build time (`packedIndexArray` in `layout.ts`); reads via
  * `arr[i]` are width-agnostic, so query code never branches on the concrete type.
  */
 export type PackedIndexArray = Uint8Array | Uint16Array | Uint32Array

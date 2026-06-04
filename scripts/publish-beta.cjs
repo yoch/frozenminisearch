@@ -20,7 +20,7 @@ function run (cmd, args) {
 }
 
 console.log(`Publishing ${name}@${version} (dist-tag beta)…`)
-console.log('Reminder: if README/API changed, run `npm run build-docs` and commit docs/ before this step.\n')
+console.log('Reminder: if README/API changed, run `npm run build-docs`, commit docs/ HTML, and ensure the Docs GitHub Action has run (docs/media/ is not versioned).\n')
 run('npm', ['publish', '--tag', 'beta'])
 console.log(`\nDone. beta → ${version} (latest unchanged)`)
 console.log('Verify: npm view', name, 'dist-tags')

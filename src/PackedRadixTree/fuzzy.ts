@@ -1,3 +1,4 @@
+/* eslint-disable no-labels */
 import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'

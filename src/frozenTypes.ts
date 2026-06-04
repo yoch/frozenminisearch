@@ -52,6 +52,11 @@ export interface FrozenMemoryBreakdown {
   estimatedStructuredBytes: number
 }
 
+/**
+ * Low-level parameters for {@link assembleFrozen} (custom frozen index pipelines).
+ * Field types are part of the public surface for advanced assembly; typical apps use
+ * {@link buildFrozenFromDocuments}, {@link freezeFromMiniSearch}, or binary load instead.
+ */
 export interface FrozenAssembleParams<T = any> {
   options: OptionsWithDefaults<T>
   documentCount: number

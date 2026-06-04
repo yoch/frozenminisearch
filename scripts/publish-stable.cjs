@@ -20,6 +20,6 @@ function run (cmd, args) {
 }
 
 console.log(`Publishing ${name}@${version} (dist-tag latest)…`)
-console.log('Reminder: if README/API changed, run `npm run build-docs` and commit docs/ before this step.\n')
+console.log('Reminder: if README/API changed, run `npm run build-docs`, commit docs/ HTML, and ensure the Docs GitHub Action has run (docs/media/ is not versioned).\n')
 run('npm', ['publish'])
 console.log(`\nDone. Verify: npm view ${name} version dist-tags`)

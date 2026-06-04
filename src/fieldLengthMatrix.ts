@@ -3,7 +3,7 @@ import { packedIndexArray } from './PackedRadixTree/layout'
 import type { PackedIndexArray } from './PackedRadixTree/types'
 import { FLAG_FL_U8, FLAG_FL_U16 } from './msv5/binaryMsv5Constants'
 
-/** Same adaptive unsigned width as {@link PackedIndexArray} / {@link packedIndexArray}. */
+/** Adaptive-width unsigned column (1/2/4 bytes per element) for field lengths and packed radix columns. */
 export type FieldLengthArray = PackedIndexArray
 
 export function maxInArrayLike(data: ArrayLike<number>, length?: number): number {

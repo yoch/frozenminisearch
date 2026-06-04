@@ -1,5 +1,5 @@
-# Build TypeDoc + docs/media copies and publish to GitHub Pages.
-# Enable in repo settings: Pages → Source: GitHub Actions.
+# Verify TypeDoc + docs/media on push/PR; publish to GitHub Pages on manual dispatch.
+# First-time setup: repo Settings → Pages → Source: GitHub Actions, then run this workflow manually.
 name: Docs
 
 on:
@@ -16,20 +16,51 @@ on:
       - 'examples/plain_js/**'
       - 'scripts/sync-docs-media.cjs'
       - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'DESIGN_DOCUMENT.md'
+      - 'benchmarks/README.md'
+      - 'benchmarks/baselines/reference.json'
+      - 'typedoc.json'
+      - 'examples/plain_js/**'
+      - 'scripts/sync-docs-media.cjs'
+      - '.github/workflows/docs.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - run: yarn build-docs
+      - name: Verify generated docs/media
+        run: |
+          test -f docs/media/DESIGN_DOCUMENT.md
+          test -f docs/media/CHANGELOG.md
+          test -f docs/media/README.md
+          test -f docs/media/reference.json
+          test -f docs/index.html
+
+  deploy:
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

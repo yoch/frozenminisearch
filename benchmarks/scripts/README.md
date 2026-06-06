@@ -65,7 +65,7 @@ Chaque scénario mesure déjà les deux index sur le même corpus :
 
 - **Heap** : `heapMb.mutable` vs `heapMb.frozen` (+ `frozenVsMutableSavingPct`)
 - **Recherche** : `search[].mutableP50` vs `search[].frozenP50` (+ `frozenP50VsMutablePct`)
-- **Score** : `scoreDrift` sur `extreme-overflowFrequency` (freq > 255)
+- **Score** : `scoreDrift` sur `extreme-overflowFrequency` (tf > 255) — **0 %** attendu avec freqs adaptatives ; u8 legacy peut encore dériver
 
 `analyze-history.sh --vs-mutable` résume ces colonnes sur le dernier enregistrement.
 

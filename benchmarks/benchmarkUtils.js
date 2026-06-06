@@ -131,9 +131,9 @@ export function medianMeasureHeap (fn, runs = 1) {
   }
 }
 
-/** Routine defaults: median of 3 scenario runs, 25 timed searches, 100 warmup each. */
+/** Routine defaults: median of 3 scenario runs, 15 timed searches, 100 warmup each. */
 export const DEFAULT_BENCHMARK_RUNS = 3
-export const DEFAULT_SEARCH_ITERATIONS = 25
+export const DEFAULT_SEARCH_ITERATIONS = 15
 /** Warmup searches before timing (JIT + per-instance posting view cache on frozen indexes). */
 export const DEFAULT_BENCH_WARMUP = 100
 /** Max searches per clock read (fixed batches are calibrated in searchBenchBatches.json). */

@@ -1,11 +1,17 @@
 import {
-  clampFreq,
+  allocateFreqs,
   readDocId,
   SegmentPostingList,
   type DocIdArray,
+  type FreqArray,
 } from './compactPostings'
 import type { AggregateContext, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
-import { DISCARDED_DOC_ID, materializeFlatPostings, type FlatPostingsMaterializeParams } from './flatPostings'
+import {
+  DISCARDED_DOC_ID,
+  materializeFlatPostings,
+  postingFreqValue,
+  type FlatPostingsMaterializeParams,
+} from './flatPostings'
 
 export type { DocIdArray } from './compactPostings'
 
@@ -26,7 +32,7 @@ export interface FrozenPostingsLayout {
   /** Width of sparse field id column; null when layout is dense. */
   sparseFieldIdWidth: 8 | 16 | null
   allDocIds: DocIdArray
-  allFreqs: Uint8Array
+  allFreqs: FreqArray
   denseOffsets: Uint32Array | null
   denseLengths: Uint32Array | null
   sparseTermStarts: Uint32Array | null
@@ -99,7 +105,22 @@ export function materializeFrozenPostings(
   const allDocIds: DocIdArray = docIdWidth === 16
     ? new Uint16Array(totalPostings)
     : new Uint32Array(totalPostings)
-  const allFreqs = new Uint8Array(totalPostings)
+
+  let maxFreq = 0
+  for (let ti = 0; ti < termCount; ti++) {
+    const start = termStarts[ti]
+    const end = termStarts[ti + 1]
+    for (let s = start; s < end; s++) {
+      const f = sparseFieldIdsScratch[s]
+      forEachPosting(ti, f, (rawDocId, freq) => {
+        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
+        if (docId === DISCARDED_DOC_ID) return
+        const v = postingFreqValue(freq, clampFrequencies)
+        if (v > maxFreq) maxFreq = v
+      })
+    }
+  }
+  const allFreqs = allocateFreqs(totalPostings, maxFreq)
 
   const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
     ? new Uint16Array(sparseFieldIdsScratch)
@@ -119,7 +140,7 @@ export function materializeFrozenPostings(
         } else {
           (allDocIds as Uint32Array)[write] = docId
         }
-        allFreqs[write] = clampFrequencies ? clampFreq(freq) : freq
+        allFreqs[write] = postingFreqValue(freq, clampFrequencies)
         write++
       })
     }

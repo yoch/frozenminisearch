@@ -20,6 +20,7 @@ import {
   buildFieldLengthMatrixSection,
   fieldLengthMatrixWireFlags,
 } from '../fieldLengthMatrix'
+import { freqWireFlags } from '../freqPostings'
 import { assembleMsv5File, assembleMsv5FileAsync } from './binaryMsv5Compression'
 import { buildMsv5PostingsSections } from './binaryMsv5Postings'
 import { buildTermTreeSectionColumnar } from './packedRadixBinaryMsv5'
@@ -54,8 +55,9 @@ export function encodeFrozenSnapshotMsv5(
   const packed = resolvePackedTree(snap, termTree, packedTermIndex)
   const postingsWire = buildMsv5PostingsSections(snap.postings)
   const flFlags = fieldLengthMatrixWireFlags(snap.fieldLengthMatrix)
+  const freqFlags = freqWireFlags(snap.postings.allFreqs)
 
-  const globalFlags = postingsWire.flags | flFlags
+  const globalFlags = postingsWire.flags | flFlags | freqFlags
 
   const rawSections = [
     buildCoreSectionWithTermCount(snap),
@@ -89,8 +91,9 @@ export async function encodeFrozenSnapshotMsv5Async(
   const packed = resolvePackedTree(snap, termTree, packedTermIndex)
   const postingsWire = buildMsv5PostingsSections(snap.postings)
   const flFlags = fieldLengthMatrixWireFlags(snap.fieldLengthMatrix)
+  const freqFlags = freqWireFlags(snap.postings.allFreqs)
 
-  const globalFlags = postingsWire.flags | flFlags
+  const globalFlags = postingsWire.flags | flFlags | freqFlags
 
   const rawSections = [
     buildCoreSectionWithTermCount(snap),

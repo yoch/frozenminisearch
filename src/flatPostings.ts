@@ -1,5 +1,4 @@
-import { clampFreq } from './compactPostings'
-import type { DocIdArray } from './compactPostings'
+import { allocateFreqs, clampFreq, type DocIdArray, type FreqArray } from './compactPostings'
 
 export const DISCARDED_DOC_ID = 0xffffffff
 
@@ -16,17 +15,21 @@ export interface FlatPostingsMaterializeParams {
   ) => void
   /** Remap short ids (dense freeze); return DISCARDED_DOC_ID to skip. */
   remapDocId?: (docId: number) => number
-  /** Apply Uint8 frequency clamp (frozen paths). */
+  /** Apply frequency clamp at {@link MAX_FREQ} (frozen paths). */
   clampFrequencies?: boolean
   /** Use Uint16 doc ids when all doc ids fit (requires nextId). */
   nextId?: number
+}
+
+export function postingFreqValue(freq: number, clampFrequencies: boolean | undefined): number {
+  return clampFrequencies ? clampFreq(freq) : freq
 }
 
 export function materializeFlatPostings(params: FlatPostingsMaterializeParams): {
   postingsOffsets: Uint32Array
   postingsLengths: Uint32Array
   allDocIds: DocIdArray
-  allFreqs: Uint8Array
+  allFreqs: FreqArray
 } {
   const { fieldCount, termCount, forEachPosting, remapDocId, clampFrequencies } = params
   const slotCount = termCount * fieldCount
@@ -34,11 +37,15 @@ export function materializeFlatPostings(params: FlatPostingsMaterializeParams): 
   const postingsLengths = new Uint32Array(slotCount)
 
   let totalPostings = 0
+  let maxFreq = 0
   for (let ti = 0; ti < termCount; ti++) {
     for (let f = 0; f < fieldCount; f++) {
-      forEachPosting(ti, f, (rawDocId) => {
+      forEachPosting(ti, f, (rawDocId, freq) => {
         const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId !== DISCARDED_DOC_ID) totalPostings++
+        if (docId === DISCARDED_DOC_ID) return
+        totalPostings++
+        const v = postingFreqValue(freq, clampFrequencies)
+        if (v > maxFreq) maxFreq = v
       })
     }
   }
@@ -47,7 +54,7 @@ export function materializeFlatPostings(params: FlatPostingsMaterializeParams): 
   const allDocIds: DocIdArray = useUint16
     ? new Uint16Array(totalPostings)
     : new Uint32Array(totalPostings)
-  const allFreqs = new Uint8Array(totalPostings)
+  const allFreqs = allocateFreqs(totalPostings, maxFreq)
 
   // Slots are visited in ascending fieldId (0..fieldCount-1) per term. Sparse layouts
   // rely on this ordering so field ids per term stay sorted for binary lookup.
@@ -65,7 +72,7 @@ export function materializeFlatPostings(params: FlatPostingsMaterializeParams): 
         } else {
           (allDocIds as Uint32Array)[write] = docId
         }
-        allFreqs[write] = clampFrequencies ? clampFreq(freq) : freq
+        allFreqs[write] = postingFreqValue(freq, clampFrequencies)
         write++
         count++
       })

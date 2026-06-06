@@ -11,6 +11,8 @@ package-lock.json
 yarn-error.log
 isolate-*.log
 FORK_NOTES.md
+# Rapport d'analyse stratégie package (local, non versionné)
+ANALYSE_STRATEGIE_PACKAGE.md
 benchmarks/baselines/latest.json
 benchmarks/baselines/packed-radix-latest.json
 # Local-only fuzzy algo A/B (prefix-string candidate vs prod segments)

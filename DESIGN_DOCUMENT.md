@@ -279,10 +279,11 @@ The element widths are chosen adaptively to save further space:
 
   - Document ids use `Uint16` when the index has at most 65535 documents,
     otherwise `Uint32`.
-  - Term frequencies are stored as `Uint8`, clamped at 255. For BM25 this is
-    effectively free: term-frequency saturation already flattens the
-    contribution of very high counts, so the clamp only perturbs scores in
-    pathological cases (a term repeated hundreds of times in one field).
+  - Term frequencies use adaptive `Uint8` / `Uint16` (never `Uint32`), chosen
+    from the index max after clamping at 65535 on frozen paths. Typical corpora
+    stay on one byte per posting; indexes with any `(term, field)` tf > 255 use
+    `Uint16` and set `FLAG_FREQ_U16` in MSv5. Values above 65535 are clamped
+    (rare; BM25+ is already flat well before that).
 
 ### Dense and sparse posting layouts
 
@@ -389,8 +390,8 @@ postings code.
 These limits are consequences of the design choices above and are worth keeping
 in mind when contributing:
 
-  - **Term frequencies cap at 255** (the `Uint8` choice). Raising the cap would
-    require a different posting encoding.
+  - **Term frequencies cap at 65535** (`Uint16` max; clamp on frozen build). No
+    `Uint32` posting-frequency column.
   - **`tokenize` and `processTerm` are not persisted.** Functions cannot be
     serialized safely, so a snapshot only stores data. If you customized these
     functions at build time, you must pass the same ones to `loadBinarySync`/`loadBinaryAsync`,

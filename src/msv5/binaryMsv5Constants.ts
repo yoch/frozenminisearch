@@ -8,6 +8,7 @@ export const FLAG_SPARSE_LAYOUT = 2
 export const FLAG_FIELD_ID_16 = 4
 export const FLAG_FL_U8 = 8
 export const FLAG_FL_U16 = 16
+export const FLAG_FREQ_U16 = 32
 
 export const CODEC_RAW = 0
 /** Zstandard (`node:zlib`) on the whole payload. */

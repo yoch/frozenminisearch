@@ -684,3 +684,48 @@ describe('fieldLengthMatrix adaptive width', () => {
     expectSameResults(mutable, frozen, 'zen')
   })
 })
+
+describe('allFreqs adaptive width', () => {
+  test('uses Uint8 for typical corpus', () => {
+    const frozen = buildFrozenDirect()
+    const { postings } = frozen.memoryBreakdown()
+    expect(postings.allFreqsBytes).toBe(postings.allDocIdsBytes / 2)
+  })
+
+  test('uses Uint16 when a term frequency exceeds 255', () => {
+    const corpus = overflowFrequencies(4, 400)
+    const opts = { fields: ['txt'] }
+    const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
+    const { postings } = frozen.memoryBreakdown()
+    expect(postings.allFreqsBytes).toBe(postings.allDocIdsBytes)
+  })
+
+  test('overflow frequencies match mutable MiniSearch scores', () => {
+    const corpus = overflowFrequencies(40, 400)
+    const opts = { fields: ['txt'] }
+    const mutable = new MiniSearch(opts)
+    mutable.addAll(corpus)
+    const frozen = mutable.freeze()
+    const ms = mutable.search('alpha', { combineWith: 'OR' })
+    const fr = frozen.search('alpha', { combineWith: 'OR' })
+    expect(fr.length).toBe(ms.length)
+    for (let i = 0; i < ms.length; i++) {
+      expect(fr[i].id).toBe(ms[i].id)
+      expect(fr[i].score).toBeCloseTo(ms[i].score, 10)
+    }
+  })
+
+  test('saveBinary round-trip preserves u8 or u16 width and scores', () => {
+    const corpus = overflowFrequencies(4, 400)
+    const opts = { fields: ['txt'] }
+    const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
+    const beforeBytes = frozen.memoryBreakdown().postings.allFreqsBytes
+    const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), opts)
+    expect(loaded.memoryBreakdown().postings.allFreqsBytes).toBe(beforeBytes)
+    const a = frozen.search('alpha', { combineWith: 'OR' })
+    const b = loaded.search('alpha', { combineWith: 'OR' })
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i].score).toBeCloseTo(a[i].score, 10)
+    }
+  })
+})

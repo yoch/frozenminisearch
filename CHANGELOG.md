@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+### Frozen postings — adaptive term frequencies
+
+  - **Adaptive `allFreqs` width** — `Uint8` when max tf ≤ 255 after clamp, else `Uint16` (no `Uint32`); frozen paths clamp at **65535** (`clampFreq`)
+  - **MSv5** — `FLAG_FREQ_U16` (global flags bit 32) on `AllFreqs` when u16; absent flag = legacy u8 section (existing snapshots still load)
+  - **BM25 parity** — overflow-frequency benchmark (`tf` > 255) matches mutable `MiniSearch`; `scoreDrift` baseline updated
+  - **Dev benchmarks** — `yarn benchmark:record:quick` (1×10 searches); `yarn benchmark:validate:freq-adaptive` (3 scenarios, ~35–40s smoke); routine `benchmark:record` default **3×15** timed searches (was 3×25)
+
 ## v8.4.0-beta.0
 
 Pre-release: major frozen search performance work since 8.3.3. **No intentional public API or MSv5 wire-format changes** — same `MiniSearch` / `FrozenMiniSearch` surface; re-test ranking on your corpus before production. Install: `npm install @yoch/minisearch@beta`.

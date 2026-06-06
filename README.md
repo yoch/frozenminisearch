@@ -13,11 +13,11 @@
 | | Mutable `MiniSearch` | `FrozenMiniSearch` |
 |---|---------------------|-------------------|
 | **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed, or you reload from disk |
-| **Memory** | Maps and nested objects per posting | Flat `Uint32Array` / `Uint8Array` postings |
+| **Memory** | Maps and nested objects per posting | Flat `Uint32Array` doc ids + adaptive `Uint8`/`Uint16` term freqs |
 | **On disk** | `toJSON` / `loadJSON` | **`saveBinarySync` / `loadBinarySync`** (MSv5) |
 | **Typical search** | Baseline | Often **~20–45% faster** p50 on the same corpus (see [benchmarks](#benchmarks)) |
 
-Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies are stored as `Uint8` (max **255** per document/field); extreme repetition can cause a small score drift versus the mutable index.
+Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies use **adaptive width** (`Uint8` when all values ≤ 255, otherwise `Uint16`), clamped at **65535** per document/field on frozen paths. MSv5 snapshots without `FLAG_FREQ_U16` remain `Uint8` (legacy).
 
 ---
 

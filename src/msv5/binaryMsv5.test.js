@@ -12,6 +12,7 @@ import { resetDeprecatedBinaryWarningsForTests } from '../binaryDeprecation'
 import {
   CODEC_RAW,
   CODEC_ZSTD,
+  FLAG_FREQ_U16,
   MSV5_FORMAT_REV_PAYLOAD,
   MSV5_HEADER_SIZE,
   MSV5_PAYLOAD_CRC_OFFSET,
@@ -20,6 +21,7 @@ import {
   MSV5_SECTION_DIR_OFFSET,
   Msv5SectionId,
 } from './binaryMsv5Constants'
+import { overflowFrequencies } from '../../benchmarks/benchmarkScenarios.js'
 import { encodeFrozenSnapshotMsv5 } from './binaryMsv5Encode'
 import {
   loadMsv5SectionsFromZstdStream,
@@ -67,6 +69,25 @@ describe('binaryMsv5', () => {
     const frozen = mutable.freeze()
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
+  })
+
+  test('MSv5 sets FLAG_FREQ_U16 when term frequencies exceed 255', () => {
+    const frozen = FrozenMiniSearch.fromDocuments(
+      overflowFrequencies(4, 400),
+      { fields: ['txt'] },
+    )
+    const buf = frozen.saveBinarySync()
+    expect(buf.readUInt16LE(6) & FLAG_FREQ_U16).toBe(FLAG_FREQ_U16)
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields: ['txt'] })
+    expect(loaded.memoryBreakdown().postings.allFreqsBytes)
+      .toBe(frozen.memoryBreakdown().postings.allFreqsBytes)
+  })
+
+  test('MSv5 legacy u8 freqs load without FLAG_FREQ_U16', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const buf = mutable.freeze().saveBinarySync()
+    expect(buf.readUInt16LE(6) & FLAG_FREQ_U16).toBe(0)
   })
 
   test('MSv5 async stream load preserves search', async () => {

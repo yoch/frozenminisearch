@@ -8,7 +8,7 @@ Reproducible memory and CPU measurements for regression tracking.
 
 | Command | Description |
 |---------|-------------|
-| `yarn benchmark:compare` | Human-readable report (runs suite; default 3×25 search iters, warmup 100) |
+| `yarn benchmark:compare` | Human-readable report (runs suite; default 3×15 search iters, warmup 100) |
 | `yarn benchmark:compare --from baselines/latest.json` | Same report from saved JSON (no re-run) |
 | `yarn benchmark:record` | Run suite → `baselines/latest.json` |
 | `yarn benchmark:diff` | `latest.json` vs `reference.json` (no re-run) |
@@ -82,7 +82,7 @@ NO_DOUBLE_EDITS=1 QUERIES=6000 yarn benchmark:packed-fuzzy-sweep   # 9 mutations
 ## Defaults (routine)
 
 - **3 runs** per scenario (median aggregation)
-- **100 warmup** + **25 timed searches** per query (`BENCH_WARMUP`, `SEARCH_ITERATIONS`)
+- **100 warmup** + **15 timed searches** per query (`BENCH_WARMUP`, `SEARCH_ITERATIONS`)
 - Override via env: `RUNS=2 SEARCH_ITERATIONS=30 BENCH_WARMUP=120 yarn benchmark:record`
 
 `baselines/reference.json` uses **fixed `batchSize` per query** (`searchBenchBatches.json`, 0.3 ms calibration target). Run `yarn benchmark:calibrate-batches` after corpus/query changes, then `yarn benchmark:baseline:update` to refresh the golden file.
@@ -98,7 +98,14 @@ BENCH_SEARCH_ONLY=1 npm run benchmark:diff:run    # measure + diff vs reference 
 Dev / smoke (faster, same scenarios):
 
 ```bash
+yarn benchmark:record:quick    # RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20
 RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20 yarn benchmark:record
+```
+
+**Freq-adaptive change** (3 scenarios, ~35–40s — gates on heap/freq bytes/scoreDrift, not single-run timings):
+
+```bash
+yarn benchmark:validate:freq-adaptive
 ```
 
 The suite logs progress per scenario (`[bench N/M] …`). Search timing reuses one mutable and one frozen index per scenario (warm steady-state).
@@ -152,14 +159,14 @@ Re-run calibration when you add or change scenarios/queries, then commit `search
 ## Recorded metrics (per scenario)
 
 - **Frozen vs mutable MiniSearch** on the same corpus: heap, search p50/p95 per query,
-  `frozenP50VsMutablePct`, `scoreDrift` on overflow frequencies
+  `frozenP50VsMutablePct`, `scoreDrift` on overflow frequencies (0% with adaptive freqs)
 - Isolated heap: mutable, frozen, loadJSON, loadBinary
 - Build heap: `addAll` + `freeze` vs `fromDocuments`
 - Indexing time: addAll, freeze, fromDocuments, saveBinary
 - Disk size: JSON vs MSv3/MSv4 binary
 - `memoryBreakdown`: typed postings, radix tree, stored fields
 - Search: p50/p95 per query
-- `scoreDrift`: mutable vs frozen score delta on **overflow frequencies** (>255 occurrences of the same term)
+- `scoreDrift`: mutable vs frozen on **overflow frequencies** (tf > 255 per field-doc); expect **0%** on indexes built with adaptive freqs (legacy u8 MSv5 snapshots may drift until re-saved)
 
 ## `benchmark:diff` thresholds (regression)
 

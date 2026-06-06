@@ -710,10 +710,10 @@
         "postings": {
           "slotCount": 4,
           "allDocIdsBytes": 12000,
-          "allFreqsBytes": 6000,
+          "allFreqsBytes": 12000,
           "offsetsBytes": 16,
           "lengthsBytes": 16,
-          "totalTypedBytes": 18032
+          "totalTypedBytes": 24032
         },
         "radixTree": {
           "nodeCount": 5,
@@ -728,7 +728,7 @@
           "avgFieldLengthBytes": 4,
           "storedFieldsJsonBytes": 0
         },
-        "estimatedStructuredBytes": 20102
+        "estimatedStructuredBytes": 26102
       },
       "search": [
         {
@@ -746,8 +746,8 @@
         {
           "query": "alpha",
           "topK": 20,
-          "maxAbsScoreDelta": 0.000001,
-          "maxRelScoreDeltaPct": 0.2,
+          "maxAbsScoreDelta": 0,
+          "maxRelScoreDeltaPct": 0,
           "missingInFrozenTopK": 0,
           "topKOrderChanged": false
         }

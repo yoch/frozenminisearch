@@ -10,8 +10,8 @@ import {
   readFieldIdArray,
   readUint16Array,
   readUint32Array,
-  readUint8Array,
 } from '../binaryIo'
+import { readFreqsSection } from '../freqPostings'
 
 export interface Msv5PostingsWire {
   flags: number
@@ -86,13 +86,14 @@ export function decodeMsv5PostingsSections(
   const docId16 = (flags & FLAG_DOC_ID_16) !== 0
   const fieldId16 = (flags & FLAG_FIELD_ID_16) !== 0
 
-  const allFreqs = readUint8Array(freqs, 0, freqs.length)
-
   const readDocIds = (): DocIdArray => {
     if (docIds.length === 0) return docId16 ? new Uint16Array(0) : new Uint32Array(0)
     if (docId16) return readUint16Array(docIds, 0, docIds.length)
     return readUint32Array(docIds, 0, docIds.length)
   }
+
+  const allDocIds = readDocIds()
+  const allFreqs = readFreqsSection(freqs, flags, allDocIds.length)
 
   if (sparse) {
     const sparseFieldIdWidth: 8 | 16 = fieldId16 ? 16 : 8
@@ -112,8 +113,8 @@ export function decodeMsv5PostingsSections(
       layout: 'sparse',
       docIdWidth: docId16 ? 16 : 32,
       sparseFieldIdWidth,
-      allDocIds: readDocIds(),
-      allFreqs: allFreqs,
+      allDocIds,
+      allFreqs,
       denseOffsets: null,
       denseLengths: null,
       sparseTermStarts,
@@ -132,7 +133,7 @@ export function decodeMsv5PostingsSections(
     layout: 'dense',
     docIdWidth: docId16 ? 16 : 32,
     sparseFieldIdWidth: null,
-    allDocIds: readDocIds(),
+    allDocIds,
     allFreqs,
     denseOffsets,
     denseLengths,

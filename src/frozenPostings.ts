@@ -85,13 +85,17 @@ export function materializeFrozenPostings(
 
   // Non-empty slots per term are emitted with fieldId in ascending order (f loops 0..fieldCount-1).
   let totalPostings = 0
+  let maxFreq = 0
   for (let ti = 0; ti < termCount; ti++) {
     termStarts[ti] = sparseFieldIdsScratch.length
     for (let f = 0; f < fieldCount; f++) {
       let count = 0
-      forEachPosting(ti, f, (rawDocId) => {
+      forEachPosting(ti, f, (rawDocId, freq) => {
         const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId !== DISCARDED_DOC_ID) count++
+        if (docId === DISCARDED_DOC_ID) return
+        count++
+        const v = postingFreqValue(freq, clampFrequencies)
+        if (v > maxFreq) maxFreq = v
       })
       if (count === 0) continue
       sparseFieldIdsScratch.push(f)
@@ -105,21 +109,6 @@ export function materializeFrozenPostings(
   const allDocIds: DocIdArray = docIdWidth === 16
     ? new Uint16Array(totalPostings)
     : new Uint32Array(totalPostings)
-
-  let maxFreq = 0
-  for (let ti = 0; ti < termCount; ti++) {
-    const start = termStarts[ti]
-    const end = termStarts[ti + 1]
-    for (let s = start; s < end; s++) {
-      const f = sparseFieldIdsScratch[s]
-      forEachPosting(ti, f, (rawDocId, freq) => {
-        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId === DISCARDED_DOC_ID) return
-        const v = postingFreqValue(freq, clampFrequencies)
-        if (v > maxFreq) maxFreq = v
-      })
-    }
-  }
   const allFreqs = allocateFreqs(totalPostings, maxFreq)
 
   const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16

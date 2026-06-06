@@ -1,7 +1,7 @@
 # Récapitulatif — fréquences postings adaptatives (u8 / u16)
 
 Document de relecture pour le changement « freq adaptive » sur `FrozenMiniSearch`.  
-Package : `@yoch/minisearch` 8.4.0-beta.0.
+Package : `@yoch/minisearch` 8.4.0-beta.1.
 
 ---
 
@@ -59,8 +59,8 @@ flowchart TD
   alloc -->|max gt 255| u16 --> wire
 ```
 
-- **Dense** : [`src/flatPostings.ts`](../src/flatPostings.ts) — 3 passes (count postings, scan max, write).
-- **Sparse** : [`src/frozenPostings.ts`](../src/frozenPostings.ts) — même logique (scan max avant allocation, puis write).
+- **Dense** : [`src/flatPostings.ts`](../src/flatPostings.ts) — 2 passes (count+max, write).
+- **Sparse** : [`src/frozenPostings.ts`](../src/frozenPostings.ts) — 2 passes (metadata sparse + count+max, write).
 - **Recherche** : [`SegmentPostingList`](../src/compactPostings.ts) lit `freqs[i]` sans branche de largeur dans la boucle BM25 ([`src/scoring.ts`](../src/scoring.ts)).
 
 ---
@@ -80,7 +80,7 @@ flowchart TD
 |---------|-------------|
 | [`src/compactPostings.ts`](../src/compactPostings.ts) | `MAX_FREQ`, `FreqArray`, `allocateFreqs`, `clampFreq(65535)`, `SegmentPostingList.freqs: FreqArray` |
 | [`src/flatPostings.ts`](../src/flatPostings.ts) | `postingFreqValue`, pass 1 count+max, pass 2 write ; `allFreqs: FreqArray` |
-| [`src/frozenPostings.ts`](../src/frozenPostings.ts) | `FrozenPostingsLayout.allFreqs: FreqArray`, scan max + allocate (sparse) |
+| [`src/frozenPostings.ts`](../src/frozenPostings.ts) | `FrozenPostingsLayout.allFreqs: FreqArray`, pass 1 metadata+count+max, pass 2 write (sparse) |
 | [`src/msv5/binaryMsv5Constants.ts`](../src/msv5/binaryMsv5Constants.ts) | `FLAG_FREQ_U16 = 32` |
 | [`src/msv5/binaryMsv5Encode.ts`](../src/msv5/binaryMsv5Encode.ts) | `globalFlags \|= freqWireFlags(snap.postings.allFreqs)` (sync + async) |
 | [`src/msv5/binaryMsv5Postings.ts`](../src/msv5/binaryMsv5Postings.ts) | `readFreqsSection(freqs, flags, allDocIds.length)` |
@@ -280,8 +280,8 @@ Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary
 
 ## 9. Points de relecture suggérés
 
-1. **Triple passe** dans `flatPostings` / sparse : coût build O(3× postings) — acceptable vs tokenisation ?
-2. **Scan max sparse** : utilise `sparseFieldIdsScratch[s]` avant construction de `sparseFieldIds` — vérifier l’invariant field id trié.
+1. **Double passe** build postings (dense et sparse) : count+max puis write — acceptable vs tokenisation ?
+2. **Invariant sparse** : field ids triés par terme (boucle `f` ascendante) — inchangé par fusion count+max.
 3. **Clamp 65535** : non benchmarké sur `repeat > 65535` (optionnel futur).
 4. **Baseline** : seul overflow patché ; pas de re-record full suite après le changement.
 

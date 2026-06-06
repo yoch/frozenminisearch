@@ -3,7 +3,8 @@ import { fromRadixTree } from './PackedRadixTree'
 import type { Options } from './searchTypes'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
-import { materializeFrozenPostings } from './frozenPostings'
+import { materializeFrozenPostingsFromBuilder } from './frozenPostings'
+import { clampFreq } from './compactPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import {
   buildFieldIds,
@@ -24,6 +25,8 @@ interface PostingsBuildState {
   terms: string[]
   postingsDocIds: (number[] | undefined)[]
   postingsFreqs: (number[] | undefined)[]
+  totalPostings: number
+  maxFreq: number
 }
 
 function getOrCreateTermIndex(state: PostingsBuildState, index: SearchableMap<number>, term: string): number {
@@ -51,25 +54,20 @@ function appendPosting(
   }
   docIds.push(docId)
   state.postingsFreqs[slot]!.push(freq)
+  const v = clampFreq(freq)
+  if (v > state.maxFreq) state.maxFreq = v
+  state.totalPostings++
 }
 
 function finalizeFlatPostings(state: PostingsBuildState, nextId: number) {
-  const { fieldCount, terms } = state
-  return materializeFrozenPostings({
-    fieldCount,
-    termCount: terms.length,
-    nextId,
-    clampFrequencies: true,
-    forEachPosting(ti, f, emit) {
-      const slot = ti * fieldCount + f
-      const docIds = state.postingsDocIds[slot]
-      if (docIds == null) return
-      const slotFreqs = state.postingsFreqs[slot]!
-      for (let i = 0; i < docIds.length; i++) {
-        emit(docIds[i], slotFreqs[i])
-      }
-    },
-  })
+  return materializeFrozenPostingsFromBuilder({
+    fieldCount: state.fieldCount,
+    termCount: state.terms.length,
+    postingsDocIds: state.postingsDocIds,
+    postingsFreqs: state.postingsFreqs,
+    totalPostings: state.totalPostings,
+    maxFreq: state.maxFreq,
+  }, nextId)
 }
 
 /** Incremental builder for {@link FrozenMiniSearch} without materializing a full `documents[]` array. */
@@ -119,6 +117,8 @@ export class FrozenIndexBuilder<T> {
       terms: this._terms,
       postingsDocIds: this._postingsDocIds,
       postingsFreqs: this._postingsFreqs,
+      totalPostings: 0,
+      maxFreq: 0,
     }
   }
 

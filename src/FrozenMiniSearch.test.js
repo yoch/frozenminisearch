@@ -729,3 +729,24 @@ describe('allFreqs adaptive width', () => {
     }
   })
 })
+
+describe('owned snapshot independence', () => {
+  test('freeze keeps fieldIds independent of mutable source', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = mutable.freeze()
+    const before = frozen.search('zen')
+    mutable._fieldIds.title = 99
+    expect(frozen.search('zen')).toEqual(before)
+  })
+
+  test('loadBinary survives wire buffer mutation after owned copy', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const buf = mutable.freeze().saveBinarySync()
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    const before = loaded.search('zen')
+    buf.fill(0)
+    expect(loaded.search('zen')).toEqual(before)
+  })
+})

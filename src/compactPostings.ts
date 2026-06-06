@@ -28,18 +28,33 @@ export function clampFreq(freq: number): number {
 export class SegmentPostingList implements PostingListLike {
   readonly docIds: DocIdArray
   readonly freqs: FreqArray
-  readonly offset: number
-  readonly length: number
+  private _offset: number
+  private _length: number
 
   constructor(docIds: DocIdArray, freqs: FreqArray, offset: number, length: number) {
     this.docIds = docIds
     this.freqs = freqs
-    this.offset = offset
-    this.length = length
+    this._offset = offset
+    this._length = length
+  }
+
+  get offset(): number {
+    return this._offset
+  }
+
+  get length(): number {
+    return this._length
+  }
+
+  /** Rebind this view to another segment in the same global buffers (flyweight use). */
+  rebind(offset: number, length: number): this {
+    this._offset = offset
+    this._length = length
+    return this
   }
 
   get size(): number {
-    return this.length
+    return this._length
   }
 
   forEachDoc(callback: (docId: number, termFreq: number) => void): void {

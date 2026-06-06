@@ -4,14 +4,19 @@ import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout
 import type PackedRadixTree from './PackedRadixTree'
 import type { PackedFuzzyRef } from './types'
 
+/**
+ * Lazy generator, same Iterable contract as `prefixRefs`. Matches are yielded as
+ * found (no eager `PackedFuzzyRef[]`). Slightly slower than materializing an array
+ * on micro-benches, but keeps the ref-first API uniform and leaves room for future
+ * query push-down (term-level gate skip, early abort). Easy to revert to eager if
+ * that never pays off.
+ */
 export function packedRadixFuzzyRefs(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
 ): Iterable<PackedFuzzyRef> {
-  const results: PackedFuzzyRef[] = []
-  runFuzzy(tree, query, maxDistance, results)
-  return results
+  return runFuzzy(tree, query, maxDistance)
 }
 
 /** @deprecated Internal benchmark/compat wrapper. Prefer `packedRadixFuzzyRefs`. */
@@ -27,12 +32,11 @@ export function packedRadixFuzzyEntries(
   return results
 }
 
-function runFuzzy(
+function* runFuzzy(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
-  results: PackedFuzzyRef[],
-): void {
+): Generator<PackedFuzzyRef> {
   if (maxDistance < 0) return
 
   const n = query.length + 1
@@ -45,12 +49,11 @@ function runFuzzy(
   const queryCodes = new Uint16Array(n)
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
-  recurse(
+  yield *recurse(
     tree,
     queryLen,
     queryCodes,
     maxDistance,
-    results,
     matrix,
     1,
     0,
@@ -58,17 +61,16 @@ function runFuzzy(
   )
 }
 
-function recurse(
+function* recurse(
   tree: PackedRadixTree,
   queryLen: number,
   queryCodes: Uint16Array,
   maxDistance: number,
-  results: PackedFuzzyRef[],
   matrix: Uint8Array,
   rowStart: number,
   node: number,
   termLength: number,
-): void {
+): Generator<PackedFuzzyRef> {
   const heap = tree.labelHeap
   const n = queryLen + 1
   const offset = rowStart * n
@@ -84,7 +86,7 @@ function recurse(
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {
         const termIndex = tree.nodeValue[node]
-        results.push({ termIndex, distance, length: termLength })
+        yield { termIndex, distance, length: termLength }
       }
       continue
     }
@@ -105,7 +107,6 @@ function recurse(
 
       let minDistance = matrix[thisRowOffset]
 
-      // Keep Math.max/min: V8 inlines two-arg min/max well; manual ternaries showed no gain.
       const jmin = Math.max(0, i - maxDistance - 1)
       const jmax = Math.min(queryLen, i + maxDistance)
 
@@ -129,12 +130,11 @@ function recurse(
       }
     }
 
-    recurse(
+    yield *recurse(
       tree,
       queryLen,
       queryCodes,
       maxDistance,
-      results,
       matrix,
       i,
       tree.edgeChild[ei],

@@ -56,6 +56,7 @@ import type {
   OptionsWithDefaults,
 } from './frozenTypes'
 export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
+import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
 import { warnDeprecatedBinaryApi } from './binaryDeprecation'
 import { DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
@@ -88,29 +89,34 @@ function assertFieldsMatchSnapshot(
 function assembleFrozenInternal<T>(
   params: FrozenAssembleParams<T>,
   trustedSource: boolean,
+  ownershipMode: SnapshotOwnershipMode,
 ): FrozenMiniSearch<T> {
-  const termCount = params.termCount
-  if (params.fieldLengthMatrix.length !== params.nextId * params.fieldCount) {
+  const owned = materializeOwnedSnapshot(params, ownershipMode)
+  const termCount = owned.termCount
+  if (owned.fieldLengthMatrix.length !== owned.nextId * owned.fieldCount) {
     throw new Error('FrozenMiniSearch: fieldLengthMatrix size mismatch')
   }
-  if (params.avgFieldLength.length !== params.fieldCount) {
+  if (owned.avgFieldLength.length !== owned.fieldCount) {
     throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
   }
   if (!trustedSource) {
-    validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
-    validateFrozenTermIndexLeaves(params.index, termCount)
+    validateFrozenPostingsLayout(owned.postings, owned.documentCount, owned.nextId)
+    validateFrozenTermIndexLeaves(owned.index, termCount)
   }
-  return new FrozenMiniSearch(params)
+  return new FrozenMiniSearch(owned)
 }
 
 /** Trusted build paths only (same package); skips O(postings) layout checks. */
-function assembleFrozenTrusted<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
-  return assembleFrozenInternal(params, true)
+function assembleFrozenTrusted<T>(
+  params: FrozenAssembleParams<T>,
+  ownershipMode: SnapshotOwnershipMode = 'trusted-build',
+): FrozenMiniSearch<T> {
+  return assembleFrozenInternal(params, true, ownershipMode)
 }
 
 /** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts (full validation). */
 export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
-  return assembleFrozenInternal(params, false)
+  return assembleFrozenInternal(params, false, 'binary-load')
 }
 
 function buildFlatPostingsFromSource<T>(
@@ -220,7 +226,7 @@ export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSear
     index: flat.index,
     termCount: flat.termCount,
     postings: flat.postings,
-  })
+  }, 'freeze-minisearch')
 }
 
 export function buildFrozenFromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {

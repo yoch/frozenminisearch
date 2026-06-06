@@ -153,6 +153,125 @@ export function materializeFrozenPostings(
   }
 }
 
+type BuilderPostingsInput = {
+  fieldCount: number
+  termCount: number
+  postingsDocIds: (number[] | undefined)[]
+  postingsFreqs: (number[] | undefined)[]
+  totalPostings: number
+  maxFreq: number
+}
+
+/** One-pass materialize from {@link FrozenIndexBuilder} scratch (counts known upfront). */
+export function materializeFrozenPostingsFromBuilder(
+  state: BuilderPostingsInput,
+  nextId: number,
+): FrozenPostingsLayout {
+  const { fieldCount, termCount, postingsDocIds, postingsFreqs, totalPostings, maxFreq } = state
+  const layout = choosePostingsLayout(fieldCount)
+  const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
+  const allDocIds: DocIdArray = docIdWidth === 16
+    ? new Uint16Array(totalPostings)
+    : new Uint32Array(totalPostings)
+  const allFreqs = allocateFreqs(totalPostings, maxFreq)
+
+  if (layout === 'dense') {
+    const slotCount = termCount * fieldCount
+    const denseOffsets = new Uint32Array(slotCount)
+    const denseLengths = new Uint32Array(slotCount)
+    let write = 0
+    for (let ti = 0; ti < termCount; ti++) {
+      const base = ti * fieldCount
+      for (let f = 0; f < fieldCount; f++) {
+        const slot = base + f
+        const docIds = postingsDocIds[slot]
+        const freqs = postingsFreqs[slot]
+        const len = docIds?.length ?? 0
+        denseOffsets[slot] = write
+        denseLengths[slot] = len
+        for (let i = 0; i < len; i++) {
+          const docId = docIds![i]
+          if (docIdWidth === 16) {
+            (allDocIds as Uint16Array)[write] = docId
+          } else {
+            (allDocIds as Uint32Array)[write] = docId
+          }
+          allFreqs[write] = freqs![i]
+          write++
+        }
+      }
+    }
+    return {
+      fieldCount,
+      termCount,
+      nextId,
+      layout,
+      docIdWidth,
+      sparseFieldIdWidth: null,
+      allDocIds,
+      allFreqs,
+      denseOffsets,
+      denseLengths,
+      sparseTermStarts: null,
+      sparseFieldIds: null,
+      sparseOffsets: null,
+      sparseLengths: null,
+    }
+  }
+
+  const sparseFieldIdWidth = chooseSparseFieldIdWidth(fieldCount)
+  const sparseFieldIdsScratch: number[] = []
+  const sparseOffsets: number[] = []
+  const sparseLengths: number[] = []
+  const termStarts: number[] = new Array(termCount + 1).fill(0)
+  let write = 0
+
+  for (let ti = 0; ti < termCount; ti++) {
+    termStarts[ti] = sparseFieldIdsScratch.length
+    for (let f = 0; f < fieldCount; f++) {
+      const slot = ti * fieldCount + f
+      const docIds = postingsDocIds[slot]
+      if (docIds == null || docIds.length === 0) continue
+      const freqs = postingsFreqs[slot]!
+      sparseFieldIdsScratch.push(f)
+      sparseOffsets.push(write)
+      sparseLengths.push(docIds.length)
+      for (let i = 0; i < docIds.length; i++) {
+        const docId = docIds[i]
+        if (docIdWidth === 16) {
+          (allDocIds as Uint16Array)[write] = docId
+        } else {
+          (allDocIds as Uint32Array)[write] = docId
+        }
+        allFreqs[write] = freqs[i]
+        write++
+      }
+    }
+    termStarts[ti + 1] = sparseFieldIdsScratch.length
+  }
+
+  const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
+    ? new Uint16Array(sparseFieldIdsScratch)
+    : new Uint8Array(sparseFieldIdsScratch)
+
+  return {
+    fieldCount,
+    termCount,
+    nextId,
+    layout,
+    docIdWidth,
+    sparseFieldIdWidth,
+    allDocIds,
+    allFreqs,
+    denseOffsets: null,
+    denseLengths: null,
+    sparseTermStarts: new Uint32Array(termStarts),
+    sparseFieldIds,
+    sparseOffsets: new Uint32Array(sparseOffsets),
+    sparseLengths: new Uint32Array(sparseLengths),
+  }
+}
+
 export function postingsTypedBytes(layout: FrozenPostingsLayout): {
   allDocIdsBytes: number
   allFreqsBytes: number
@@ -311,6 +430,7 @@ export type FrozenFieldTermFlyweight = FieldTermDataLike & {
 export function createFrozenFieldTermFlyweight(layout: FrozenPostingsLayout): FrozenFieldTermFlyweight {
   let termIndex = -1
   const { allDocIds, allFreqs } = layout
+  const segment = new SegmentPostingList(allDocIds, allFreqs, 0, 0)
 
   const flyweight: FrozenFieldTermFlyweight = {
     bind(ti: number) {
@@ -320,7 +440,7 @@ export function createFrozenFieldTermFlyweight(layout: FrozenPostingsLayout): Fr
     get(fieldId: number) {
       const slice = frozenPostingSlice(layout, termIndex, fieldId)
       if (slice == null) return undefined
-      return new SegmentPostingList(allDocIds, allFreqs, slice.offset, slice.length)
+      return segment.rebind(slice.offset, slice.length)
     },
   }
   return flyweight

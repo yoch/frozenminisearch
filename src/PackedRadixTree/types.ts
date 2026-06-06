@@ -20,6 +20,7 @@ export interface PackedStringRadixMap<V = number> {
   get(term: string): V | undefined
   entries(): Iterable<[string, V]>
   prefixRefs(prefix: string): Iterable<PackedTermRef>
+  /** Lazy generator; see `packedRadixFuzzyRefs` in `fuzzy.ts` for rationale. */
   fuzzyRefs(term: string, maxDistance: number): Iterable<PackedFuzzyRef>
   termByIndex(termIndex: number): string
   termLengthByIndex(termIndex: number): number

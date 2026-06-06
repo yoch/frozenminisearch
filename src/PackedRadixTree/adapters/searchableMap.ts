@@ -88,7 +88,8 @@ function packRadixTreeFromRadix<Leaf>(
   const edgeLabelStart = packedIndexArray(edgeCount, totalLabelLength)
   const edgeLabelLength = packedIndexArray(edgeCount, maxLabelLength)
   const edgeChild = packedIndexArray(edgeCount, Math.max(nodeCount - 1, 0))
-  let labelHeap = ''
+  const labelParts: string[] = []
+  let labelHeapLength = 0
   let edgeIndex = 0
 
   for (let nodeId = 0; nodeId < nodeCount; nodeId++) {
@@ -103,8 +104,9 @@ function packRadixTreeFromRadix<Leaf>(
       if (edge.label.length > MAX_PACKED_EDGE_LABEL_LENGTH) {
         throw new Error('PackedRadixTree: edge label too long')
       }
-      const start = labelHeap.length
-      labelHeap += edge.label
+      const start = labelHeapLength
+      labelParts.push(edge.label)
+      labelHeapLength += edge.label.length
       edgeLabelStart[edgeIndex] = start
       edgeLabelLength[edgeIndex] = edge.label.length
       edgeChild[edgeIndex] = edge.child
@@ -112,6 +114,7 @@ function packRadixTreeFromRadix<Leaf>(
     }
   }
   nodeEdgeOffset[nodeCount] = edgeIndex
+  const labelHeap = labelParts.join('')
 
   return PackedRadixTree.fromData({
     size,

@@ -4,12 +4,17 @@
 
 ## Unreleased
 
+## v8.4.0-beta.1
+
+Pre-release: adaptive posting frequencies and BM25 parity on high tf. **MSv5 wire extension** — `FLAG_FREQ_U16` (global flags bit 32) when any term frequency exceeds 255 after clamp; snapshots without the flag still load as u8. Re-save with `saveBinarySync()` to upgrade overflow corpora. No public API changes. Install: `npm install @yoch/minisearch@beta`.
+
 ### Frozen postings — adaptive term frequencies
 
   - **Adaptive `allFreqs` width** — `Uint8` when max tf ≤ 255 after clamp, else `Uint16` (no `Uint32`); frozen paths clamp at **65535** (`clampFreq`)
-  - **MSv5** — `FLAG_FREQ_U16` (global flags bit 32) on `AllFreqs` when u16; absent flag = legacy u8 section (existing snapshots still load)
+  - **MSv5** — `FLAG_FREQ_U16` on `AllFreqs` when u16; absent flag = legacy u8 section (existing snapshots still load)
   - **BM25 parity** — overflow-frequency benchmark (`tf` > 255) matches mutable `MiniSearch`; `scoreDrift` baseline updated
   - **Dev benchmarks** — `yarn benchmark:record:quick` (1×10 searches); `yarn benchmark:validate:freq-adaptive` (3 scenarios, ~35–40s smoke); routine `benchmark:record` default **3×15** timed searches (was 3×25)
+  - **Sparse build** — merge count+maxFreq on sparse postings materialize (3→2 passes)
 
 ## v8.4.0-beta.0
 

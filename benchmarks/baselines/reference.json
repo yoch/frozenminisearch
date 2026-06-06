@@ -1,7 +1,7 @@
 {
   "capturedAt": "2026-06-03T22:25:53.443Z",
   "node": "v22.22.0",
-  "packageVersion": "8.4.0-beta.0",
+  "packageVersion": "8.4.0-beta.1",
   "gcExposed": true,
   "git": {
     "commit": "6278ba14a16c7a4679db7855674e2f0cdf2ffc95",

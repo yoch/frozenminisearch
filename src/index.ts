@@ -15,6 +15,7 @@ export type {
 } from './searchTypes'
 export {
   default,
+  default as FrozenMiniSearch,
   buildFrozenFromDocuments,
   freezeFrozenIndexBuilder,
   frozenMemoryBreakdown,

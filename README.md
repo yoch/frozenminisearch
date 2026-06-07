@@ -1,10 +1,10 @@
 # @yoch/frozenminisearch
 
-**Read-only full-text search for Node.js** — compact frozen indexes, fast binary snapshots, and the same search API as [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong).
+**Read-only full-text search for Node.js** — compact frozen indexes, fast binary snapshots, and a **drop-in** search API for frozen workloads: same `search`, `autoSuggest`, scoring, and query options as [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong).
 
 > **Current release:** `1.0.0` on npm
 
-This package is a **standalone product**: no mutable `MiniSearch` class is published. Build indexes with `fromDocuments`, the incremental builder, or migrate from an existing lucaong index via `fromMiniSearchJson`.
+**Design goal:** once an index is built or loaded, migrate with the minimum code change — package name and index construction only; serving code stays the same. No mutable `MiniSearch` class is published here; build indexes with `fromDocuments`, the incremental builder, or migrate from an existing lucaong index via `fromMiniSearchJson`.
 
 ---
 
@@ -86,6 +86,36 @@ const index = freezeFrozenIndexBuilder(builder)
 ```
 
 ESM and CommonJS are both supported (`main` → CJS, `module` → ESM).
+
+---
+
+## Drop-in
+
+For **fixed corpora** (build once, serve read-only), treat this package as a drop-in replacement for lucaong `minisearch` on the serving path.
+
+**Change only:**
+
+| What | Before | After |
+|------|--------|-------|
+| Package | lucaong `minisearch` | `@yoch/frozenminisearch` |
+| Construction | `new MiniSearch(opts).addAll(docs)` | `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)` |
+| JSON snapshot | `MiniSearch.loadJSON(json)` / `toJSON()` wire format | `FrozenMiniSearch.fromMiniSearchJson(json, opts)` or `fromMiniSearchSnapshot(obj)` — no runtime dependency on lucaong `minisearch` |
+
+**Keep unchanged** after load: `search`, `autoSuggest`, `has`, `getStoredFields`, query options (`prefix`, `fuzzy`, `AND` / `OR` / `AND_NOT`, filters, boosts). Parity vs `minisearch@7` is enforced in `dev/parity/`.
+
+**Imports** — default and named both work (ESM and CJS):
+
+```javascript
+// ESM
+import FrozenMiniSearch from '@yoch/frozenminisearch'
+import { FrozenMiniSearch } from '@yoch/frozenminisearch'
+
+// CommonJS
+const FrozenMiniSearch = require('@yoch/frozenminisearch')
+const { FrozenMiniSearch } = require('@yoch/frozenminisearch')
+```
+
+**Intentionally not drop-in:** live `add` / `remove` / `discard` (frozen is read-only); browser builds; custom `tokenize` / `processTerm` are not stored in JSON or binary snapshots — pass the same functions at load when you customized them.
 
 ---
 

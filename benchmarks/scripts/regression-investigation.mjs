@@ -7,7 +7,8 @@
  *
  * caseId: highFrequency | overflowHeap | genericStringIds | largeDocumentsAnd | docIdBoundary
  */
-import MiniSearch, { FrozenMiniSearch } from '../../dist/es/index.js'
+import MiniSearch from 'minisearch'
+import FrozenMiniSearch from '../../dist/es/index.js'
 import {
   highFrequencyTerms,
   overflowFrequencies,

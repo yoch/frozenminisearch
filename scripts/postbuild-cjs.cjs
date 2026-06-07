@@ -16,6 +16,7 @@ const main = mod.default || mod
 
 module.exports = main
 module.exports.default = main
+module.exports.FrozenMiniSearch = main
 
 for (const key of Object.keys(mod)) {
   if (key !== 'default') {

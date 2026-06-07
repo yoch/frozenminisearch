@@ -207,7 +207,7 @@ export type QueryCombination = SearchOptions & { queries: Query[] }
 
 /**
  * Wildcard query symbol, used to match all documents.
- * Use {@link MiniSearch.wildcard} or {@link FrozenMiniSearch.wildcard}.
+ * Use {@link FrozenMiniSearch.wildcard}.
  */
 export type Wildcard = typeof WILDCARD_QUERY
 

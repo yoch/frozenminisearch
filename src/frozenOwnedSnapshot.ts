@@ -5,7 +5,7 @@ import type { FrozenPostingsLayout } from './frozenPostings'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { OptionsWithDefaults } from './searchTypes'
 
-export type SnapshotOwnershipMode = 'trusted-build' | 'freeze-minisearch' | 'binary-load'
+export type SnapshotOwnershipMode = 'trusted-build' | 'minisearch-json' | 'binary-load'
 
 function ownedIndexArray(arr: PackedIndexArray): PackedIndexArray {
   if (arr instanceof Uint8Array) return new Uint8Array(arr)
@@ -96,7 +96,7 @@ export function materializeOwnedSnapshot<T>(
     return params
   }
 
-  if (mode === 'freeze-minisearch') {
+  if (mode === 'minisearch-json') {
     return { ...params, ...shallowCopyJsSnapshotFields(params) }
   }
 

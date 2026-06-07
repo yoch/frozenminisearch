@@ -1,0 +1,4 @@
+[submodule "vendor/minisearch"]
+	path = vendor/minisearch
+	url = https://github.com/lucaong/minisearch.git
+	branch = master

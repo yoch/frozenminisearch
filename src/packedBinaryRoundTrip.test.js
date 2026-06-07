@@ -1,4 +1,4 @@
-import MiniSearch from './MiniSearch'
+import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
 import { decodeFrozenSnapshot } from './binaryFormat'
 
@@ -12,7 +12,7 @@ describe('packed binary round-trip', () => {
   test('saveBinary/loadBinary preserves term lookup', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = mutable.freeze()
+    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
     expect(frozen.search('zen').length).toBeGreaterThan(0)
 
     const buf = frozen.saveBinarySync()

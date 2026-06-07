@@ -257,7 +257,7 @@ see the sections above), but changes how that tree and the postings are stored:
 
   - **Leaves hold a numeric term index, not a posting structure.** The tree maps
     each term string to a small integer used to index the flat postings.
-  - **The term tree is packed in memory.** At runtime and on disk (MSv3/MSv4),
+  - **The term tree is packed in memory.** At runtime and on disk (MSv5 columnar wire),
     frozen indexes use `PackedRadixTree`, an internal module under
     `src/PackedRadixTree/`: typed arrays for nodes and edges, a shared label heap,
     and the same sibling/leaf traversal order as `SearchableMap` so prefix,
@@ -353,16 +353,15 @@ better ratio than per-section compression. Raw payload when &lt; 64 B or when zs
 uncompressed offsets and per-section CRC-32. `loadBinaryAsync()` feeds the zstd payload through Node streams and materializes
 **one section at a time** (bounded JS heap).
 Snapshots larger than 1 GiB (uncompressed payload) are rejected to avoid oversized allocations.
-Each section has a CRC-32 over its uncompressed bytes. Legacy MSv3/MSv4 tree sections
-still use the recursive DFS format in `packedRadixBinary.ts`.
+Each section has a CRC-32 over its uncompressed bytes. The term-tree section uses the
+columnar wire in `packedRadixBinaryMsv5.ts`.
 
 On load, the reader verifies section CRCs, monotonic file offsets, posting bounds,
 and leaf invariants via `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts`.
 
-**`loadBinarySync()`** reads **MSv5** synchronously; **MSv4** and **MSv3** remain readable but are
-**deprecated** (emit a one-time `DeprecationWarning`; re-save with **`saveBinarySync()`**).
-**`loadBinaryAsync()`** is the memory-bounded streaming path for compressed MSv5.
-`saveBinary()` and `loadBinary()` remain as deprecated aliases to sync methods and emit one-time deprecation warnings.
+**`loadBinarySync()`** reads **MSv5** synchronously. **`loadBinaryAsync()`** is the
+memory-bounded streaming path for compressed MSv5. Older `MSv1`–`MSv4` buffers are rejected.
+Use **`saveBinarySync()`** / **`saveBinaryAsync()`** and **`loadBinarySync()`** / **`loadBinaryAsync()`** explicitly.
 
 ### PackedRadixTree module (internal)
 
@@ -374,8 +373,7 @@ follows:
     prefix, fuzzy, `entries`).
   - **`adapters/searchableMap.ts`** — build from a mutable `RadixTree` via
     `fromRadixTree` (numeric leaves or custom `mapLeaf`).
-  - **`packedRadixBinary.ts`** — **deprecated** MSv3/MSv4 term-tree section (recursive DFS).
-  - **`src/msv5/packedRadixBinaryMsv5.ts`** — MSv5 columnar term-tree section.
+  - **`src/msv5/packedRadixBinaryMsv5.ts`** — MSv5 columnar term-tree section (on-disk wire).
   - **`frozenTermIndex.ts`** — `FrozenTermIndex` type alias and
     `validateFrozenTermIndexLeaves` (frozen-only invariants: leaf count, term-index
     range, array bounds).

@@ -2,6 +2,9 @@ import { execSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { ALL_SURFACES, surfacesFromEnv, hasStructuralSurfaces } from './framework/surfaces.mjs'
+
+export { hasStructuralSurfaces }
 
 function findRepoRoot () {
   const starts = [process.cwd(), dirname(fileURLToPath(import.meta.url))]
@@ -187,19 +190,28 @@ export function parseSearchIterationsArg (args = process.argv) {
   return iterations
 }
 
-export function parseBenchProfile (args = process.argv) {
+export function parseBenchSurfaces (args = process.argv) {
+  const fromEnv = surfacesFromEnv(process.env.BENCH_SURFACES)
+  if (fromEnv) return fromEnv
+  if (args.includes('--search-only')) return ['search']
   const env = process.env.BENCH_SEARCH_ONLY
-  if (env === '1' || env === 'true' || env === 'yes') return 'search'
-  if (env === '0' || env === 'false') return 'full'
-  if (args.includes('--search-only')) return 'search'
+  if (env === '1' || env === 'true' || env === 'yes') return ['search']
+  return [...ALL_SURFACES]
+}
+
+export function parseBenchProfile (args = process.argv) {
+  const surfaces = parseBenchSurfaces(args)
+  if (surfaces.length === 1 && surfaces[0] === 'search') return 'search'
   return 'full'
 }
 
 export function parseBenchmarkArgs (args = process.argv) {
+  const surfaces = parseBenchSurfaces(args)
   return {
     runs: parseRunsArg(args),
     searchIterations: parseSearchIterationsArg(args),
     benchProfile: parseBenchProfile(args),
+    surfaces,
   }
 }
 

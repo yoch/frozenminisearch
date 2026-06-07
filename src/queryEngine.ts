@@ -1,4 +1,3 @@
-import SearchableMap from './SearchableMap/SearchableMap'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import {
   collectDocIdsFromFrozenLayout,
@@ -8,7 +7,6 @@ import {
 import {
   aggregateTerm,
   AND,
-  collectDocIdsFromFieldTermData,
   combineResults,
   fieldBoostsForQuery,
   termToQuerySpec,
@@ -28,7 +26,7 @@ import type {
   SearchOptions,
   SearchOptionsWithDefaults,
 } from './searchTypes'
-import { WILDCARD_QUERY } from './symbols'
+import { isWildcardQuery } from './symbols'
 import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
 import {
   gateIsSelectiveEnough,
@@ -36,29 +34,13 @@ import {
 } from './queryEngineGateLimits'
 
 /**
- * Adapter exposing the index storage (mutable maps or frozen flat arrays) to the
- * shared query engine. All accessors are lazy: prefix/fuzzy results are iterated
- * only once by the engine, so wrappers should be allocated on demand.
+ * Adapter exposing packed frozen index storage to the shared query engine.
+ * Accessors are lazy: prefix/fuzzy results are iterated only once by the engine.
  */
-interface BaseQueryIndexView {
+export interface QueryIndexView {
   getTermData(term: string): FieldTermDataLike | undefined
   /** Iterate over active documents (used by wildcard queries). */
   forEachActiveDoc(callback: (docId: number, externalId: unknown, storedFields?: Record<string, unknown>) => void): void
-}
-
-interface StringQueryIndexView extends BaseQueryIndexView {
-  mode: 'string'
-  /** Iterable of (term, data) for terms sharing the prefix. May be undefined when prefix search is not requested. */
-  getPrefixMatches(term: string): Iterable<[string, FieldTermDataLike]> | undefined
-  /** Map keyed by term; must support `.delete(term)` so the engine can drop fuzzy duplicates of prefix hits. */
-  getFuzzyMatches(
-    term: string,
-    maxDistance: number,
-  ): Map<string, { data: FieldTermDataLike, distance: number }> | undefined
-}
-
-interface IndexedQueryIndexView extends BaseQueryIndexView {
-  mode: 'indexed'
   resolveTermIndex(term: string): number | undefined
   /**
    * Rebinds the instance flyweight; returned reference is valid only until the next
@@ -83,8 +65,6 @@ type NormalizedStringQuery = {
   specs: QuerySpec[]
 }
 
-export type QueryIndexView = StringQueryIndexView | IndexedQueryIndexView
-
 export interface QueryEngineParams {
   fields: string[]
   globalSearchOptions: SearchOptionsWithDefaults
@@ -108,10 +88,15 @@ function docIdsFromResult(result: RawResult): Set<number> {
   return new Set(result.keys())
 }
 
-function isWildcardQuery(query: Query): boolean {
-  if (query === WILDCARD_QUERY) return true
-  if (typeof query === 'string') return false
-  return query.queries.some(isWildcardQuery)
+function isQueryCombination(query: Query): query is QueryCombination {
+  return typeof query === 'object'
+    && query != null
+    && 'queries' in query
+    && Array.isArray((query as QueryCombination).queries)
+}
+
+function combinationHasWildcard(query: QueryCombination): boolean {
+  return query.queries.some(q => isWildcardQuery(q) || (typeof q === 'object' && q != null && 'queries' in q && combinationHasWildcard(q)))
 }
 
 function isGatedCombinationOperator(operator: CombinationOperator): boolean {
@@ -159,7 +144,7 @@ function normalizeStringQuery(
 }
 
 function lazyIndexedTerm(
-  indexView: IndexedQueryIndexView,
+  indexView: QueryIndexView,
   termIndex: number,
 ): AggregateDerivedTerm {
   return { kind: 'lazy', resolve: () => indexView.resolveTermByIndex(termIndex) }
@@ -180,97 +165,34 @@ function visitQuerySpecForScoring(
   const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
   const maxDistance = maxFuzzyDistance(query, maxFuzzy)
 
-  if (indexView.mode === 'indexed') {
-    const exactTi = indexView.resolveTermIndex(query.term)
-    visit(
-      exactTi == null ? undefined : indexView.fieldTermData(exactTi),
-      query.term,
-      1,
-    )
+  const exactTi = indexView.resolveTermIndex(query.term)
+  visit(
+    exactTi == null ? undefined : indexView.fieldTermData(exactTi),
+    query.term,
+    1,
+  )
 
-    const seenPrefix = new Set<number>()
-    if (query.prefix) {
-      for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
-        const distance = length - query.term.length
-        if (!distance) continue
-        seenPrefix.add(termIndex)
-        visit(
-          indexView.fieldTermData(termIndex),
-          lazyIndexedTerm(indexView, termIndex),
-          prefixWeight * length / (length + 0.3 * distance),
-        )
-      }
-    }
-    if (!maxDistance) return
-    for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-      if (!distance || seenPrefix.has(termIndex)) continue
+  const seenPrefix = new Set<number>()
+  if (query.prefix) {
+    for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
+      const distance = length - query.term.length
+      if (!distance) continue
+      seenPrefix.add(termIndex)
       visit(
         indexView.fieldTermData(termIndex),
         lazyIndexedTerm(indexView, termIndex),
-        fuzzyWeight * length / (length + distance),
-      )
-    }
-    return
-  }
-
-  visit(indexView.getTermData(query.term), query.term, 1)
-
-  const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
-  const fuzzyMatches = maxDistance ? indexView.getFuzzyMatches(query.term, maxDistance) : undefined
-
-  if (prefixMatches) {
-    for (const [term, data] of prefixMatches) {
-      const distance = term.length - query.term.length
-      if (!distance) continue
-      fuzzyMatches?.delete(term)
-      visit(
-        data,
-        term,
-        prefixWeight * term.length / (term.length + 0.3 * distance),
+        prefixWeight * length / (length + 0.3 * distance),
       )
     }
   }
-
-  if (!fuzzyMatches) return
-  for (const [term, { data, distance }] of fuzzyMatches) {
-    if (!distance) continue
+  if (!maxDistance) return
+  for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
+    if (!distance || seenPrefix.has(termIndex)) continue
     visit(
-      data,
-      term,
-      fuzzyWeight * term.length / (term.length + distance),
+      indexView.fieldTermData(termIndex),
+      lazyIndexedTerm(indexView, termIndex),
+      fuzzyWeight * length / (length + distance),
     )
-  }
-}
-
-function visitQuerySpecForDocIds(
-  query: QuerySpec,
-  options: SearchOptionsWithDefaults,
-  params: QueryEngineParams,
-  visit: (data: FieldTermDataLike | undefined) => void,
-): void {
-  const { indexView } = params
-  if (indexView.mode !== 'string') return
-
-  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
-
-  visit(indexView.getTermData(query.term))
-
-  const prefixMatches = query.prefix ? indexView.getPrefixMatches(query.term) : undefined
-  const fuzzyMatches = maxDistance ? indexView.getFuzzyMatches(query.term, maxDistance) : undefined
-
-  if (prefixMatches) {
-    for (const [term, data] of prefixMatches) {
-      const distance = term.length - query.term.length
-      if (!distance) continue
-      fuzzyMatches?.delete(term)
-      visit(data)
-    }
-  }
-
-  if (!fuzzyMatches) return
-  for (const [, { data, distance }] of fuzzyMatches) {
-    if (!distance) continue
-    visit(data)
   }
 }
 
@@ -316,40 +238,26 @@ function collectDocIdsForQuerySpec(
   const { indexView, aggregateContext } = params
   const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
 
-  if (indexView.mode === 'indexed') {
-    const exactTi = indexView.resolveTermIndex(query.term)
-    if (exactTi != null) {
-      indexView.collectDocIds(exactTi, fieldBoosts, aggregateContext, docIds, allowedDocs)
-    }
-
-    const seenPrefix = new Set<number>()
-    if (query.prefix) {
-      for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
-        const distance = length - query.term.length
-        if (!distance) continue
-        seenPrefix.add(termIndex)
-        indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
-      }
-    }
-    if (maxDistance) {
-      for (const { termIndex, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-        if (!distance || seenPrefix.has(termIndex)) continue
-        indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
-      }
-    }
-    return docIds
+  const exactTi = indexView.resolveTermIndex(query.term)
+  if (exactTi != null) {
+    indexView.collectDocIds(exactTi, fieldBoosts, aggregateContext, docIds, allowedDocs)
   }
 
-  visitQuerySpecForDocIds(query, options, params, (data) => {
-    collectDocIdsFromFieldTermData(
-      data,
-      fieldBoosts,
-      aggregateContext,
-      docIds,
-      allowedDocs,
-    )
-  })
-
+  const seenPrefix = new Set<number>()
+  if (query.prefix) {
+    for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
+      const distance = length - query.term.length
+      if (!distance) continue
+      seenPrefix.add(termIndex)
+      indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+    }
+  }
+  if (maxDistance) {
+    for (const { termIndex, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
+      if (!distance || seenPrefix.has(termIndex)) continue
+      indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+    }
+  }
   return docIds
 }
 
@@ -462,7 +370,6 @@ export function createFrozenQueryIndexView(
   forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
 ): QueryIndexView {
   return {
-    mode: 'indexed',
     resolveTermIndex(term) {
       const ti = index.get(term)
       return ti == null ? undefined : ti
@@ -490,43 +397,13 @@ export function createFrozenQueryIndexView(
   }
 }
 
-/** Shared radix-index adapter for mutable and frozen query paths. */
-export function createQueryIndexView<L>(
-  index: SearchableMap<L>,
-  toFieldTermData: (leaf: L) => FieldTermDataLike,
-  forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
-): QueryIndexView {
-  return {
-    mode: 'string',
-    getTermData(term) {
-      const leaf = index.get(term)
-      return leaf == null ? undefined : toFieldTermData(leaf)
-    },
-    * getPrefixMatches(term) {
-      for (const [t, leaf] of index.atPrefix(term)) {
-        yield [t, toFieldTermData(leaf)]
-      }
-    },
-    getFuzzyMatches(term, maxDistance) {
-      const matches = index.fuzzyGet(term, maxDistance)
-      if (matches == null) return undefined
-      const out = new Map<string, { data: FieldTermDataLike, distance: number }>()
-      for (const [t, [leaf, distance]] of matches) {
-        out.set(t, { data: toFieldTermData(leaf), distance })
-      }
-      return out
-    },
-    forEachActiveDoc,
-  }
-}
-
 function collectDocIdsForQueryInternal(
   query: Query,
   searchOptions: SearchOptions,
   params: QueryEngineParams,
   allowedDocs?: Set<number>,
 ): Set<number> {
-  if (query === WILDCARD_QUERY) {
+  if (isWildcardQuery(query)) {
     const docIds = new Set<number>()
     params.indexView.forEachActiveDoc((docId) => {
       if (allowedDocs != null && !allowedDocs.has(docId)) return
@@ -535,21 +412,23 @@ function collectDocIdsForQueryInternal(
     return docIds
   }
 
-  if (typeof query !== 'string') {
-    const combination = query as QueryCombination
-    const options = { ...searchOptions, ...combination, queries: undefined }
+  if (isQueryCombination(query)) {
+    const options = { ...searchOptions, ...query, queries: undefined }
     const operator = (
-      combination.combineWith
-      ?? searchOptions.combineWith
+      query.combineWith
+      ?? options.combineWith
       ?? params.globalSearchOptions.combineWith
     ) as CombinationOperator
-    const childSearchOptions = { ...options, combineWith: undefined }
     return collectCombinedDocIds(
-      combination.queries,
+      query.queries,
       operator,
-      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, childSearchOptions, params, branchAllowed),
+      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
       allowedDocs,
     )
+  }
+
+  if (typeof query !== 'string') {
+    throw new Error('FrozenMiniSearch: invalid query')
   }
 
   const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
@@ -585,26 +464,6 @@ function executeWildcardQuery(
   return results
 }
 
-function executeGatedCombinedQuery<T>(
-  branches: readonly T[],
-  operator: CombinationOperator,
-  params: QueryEngineParams,
-  executeBranch: (branch: T, allowedDocs?: Set<number>) => RawResult,
-  collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
-  allowedDocs?: Set<number>,
-  run?: QueryEngineRunOptions,
-): RawResult {
-  return executeCombinedBranches(
-    branches,
-    operator,
-    params,
-    executeBranch,
-    collectBranch,
-    allowedDocs,
-    run,
-  )
-}
-
 function executeQueryInternal(
   query: Query,
   searchOptions: SearchOptions,
@@ -612,43 +471,46 @@ function executeQueryInternal(
   allowedDocs?: Set<number>,
   run?: QueryEngineRunOptions,
 ): RawResult {
-  if (query === WILDCARD_QUERY) {
+  if (isWildcardQuery(query)) {
     return executeWildcardQuery(searchOptions, params)
   }
 
-  if (typeof query !== 'string') {
-    const combination = query as QueryCombination
-    const options = { ...searchOptions, ...combination, queries: undefined }
+  if (isQueryCombination(query)) {
+    // Spread inherits parent combineWith into child branches (lucaong 7.2 behavior).
+    const options = { ...searchOptions, ...query, queries: undefined }
     const operator = (
-      combination.combineWith
-      ?? searchOptions.combineWith
+      query.combineWith
+      ?? options.combineWith
       ?? params.globalSearchOptions.combineWith
     ) as CombinationOperator
-    const childSearchOptions = { ...options, combineWith: undefined }
 
-    if (useGatedEvaluation(run, combination.queries.length, operator, isWildcardQuery(query))) {
-      return executeGatedCombinedQuery(
-        combination.queries,
+    if (useGatedEvaluation(run, query.queries.length, operator, combinationHasWildcard(query))) {
+      return executeCombinedBranches(
+        query.queries,
         operator,
         params,
-        (branch, branchAllowed) => executeQueryInternal(branch, childSearchOptions, params, branchAllowed, run),
-        (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, childSearchOptions, params, branchAllowed),
+        (branch, branchAllowed) => executeQueryInternal(branch, options, params, branchAllowed, run),
+        (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
         allowedDocs,
         run,
       )
     }
 
-    const results = combination.queries.map(subquery =>
-      executeQueryInternal(subquery, childSearchOptions, params, allowedDocs, run),
+    const results = query.queries.map(subquery =>
+      executeQueryInternal(subquery, options, params, allowedDocs, run),
     )
     return combineResults(results, operator)
+  }
+
+  if (typeof query !== 'string') {
+    throw new Error('FrozenMiniSearch: invalid query')
   }
 
   const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
   const combineWith = (operator ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
   if (useGatedEvaluation(run, specs.length, combineWith, false)) {
-    return executeGatedCombinedQuery(
+    return executeCombinedBranches(
       specs,
       combineWith,
       params,

@@ -9,6 +9,7 @@ import type {
   LowercaseCombinationOperator,
   BM25Params,
 } from './searchTypes'
+import { isWildcardQuery } from './symbols'
 
 export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
 
@@ -399,7 +400,7 @@ export function combineResults(results: RawResult[], combineWith: CombinationOpe
   if (!combinator) {
     throw new Error(`Invalid combination operator: ${combineWith}`)
   }
-  return results.reduce(combinator) || new Map()
+  return results.reduce(combinator)
 }
 
 export interface FinalizeSearchParams {
@@ -416,7 +417,6 @@ export function finalizeRawSearchResults(
   query: Query,
   searchOptions: SearchOptions,
   globalSearchOptions: SearchOptionsWithDefaults,
-  wildcard: Query,
   getExternalId: (docId: number) => unknown,
   getStoredFields: (docId: number) => Record<string, unknown> | undefined,
 ): SearchResult[] {
@@ -424,7 +424,7 @@ export function finalizeRawSearchResults(
     ...globalSearchOptions,
     ...searchOptions,
   }
-  const skipSort = query === wildcard && searchOptionsWithDefaults.boostDocument == null
+  const skipSort = isWildcardQuery(query) && searchOptionsWithDefaults.boostDocument == null
   return finalizeSearchResults({
     rawResults,
     getExternalId,

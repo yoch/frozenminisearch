@@ -1,213 +1,156 @@
-# @yoch/minisearch
+# @yoch/frozenminisearch
 
-**In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
+**Read-only full-text search for Node.js** — compact frozen indexes, fast MSv5 binary loads, and the same search API as [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong).
 
-> **Current release:** `8.4.0` on npm `latest`
+> **Current release:** `1.0.0-beta.0` on npm (`beta` dist-tag)
+
+This package is a **standalone product**: no mutable `MiniSearch` class is published. Build indexes with `fromDocuments`, the incremental builder, or migrate from an existing lucaong index via `fromMiniSearchJson`.
 
 ---
 
-## Why this fork?
+## Why frozen instead of MiniSearch?
 
-[MiniSearch](https://github.com/lucaong/minisearch) is excellent for building and querying an index in JavaScript. This fork keeps that familiar API for **mutable** indexing and adds **`FrozenMiniSearch`** — born from a single goal, *shrink the in-memory index*, for when the corpus is built once and queried many times:
-
-| | Mutable `MiniSearch` | `FrozenMiniSearch` |
-|---|---------------------|-------------------|
-| **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed, or you reload from disk |
-| **Memory** | Maps and nested objects per posting | Flat `Uint32Array` doc ids + adaptive `Uint8`/`Uint16` term freqs |
+| | lucaong `minisearch` (mutable) | `@yoch/frozenminisearch` |
+|---|-------------------------------|---------------------------|
+| **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed or reloaded from disk |
+| **Index memory** | Maps and nested objects per posting | Flat typed arrays + packed radix term tree |
 | **On disk** | `toJSON` / `loadJSON` | **`saveBinarySync` / `loadBinarySync`** (MSv5) |
-| **Typical search** | Baseline | Often **~20–45% faster** p50 on the same corpus (see [benchmarks](#benchmarks)) |
+| **Typical search** | Baseline | Often **~20–45% faster** p50 on the same corpus |
+| **Index size (heap)** | Baseline | Often **~90–99% smaller** structure |
 
-Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, and query combinators — frozen indexes aim for **search ranking parity** with `addAll` + `freeze()` when built with the same options. Term frequencies use **adaptive width** (`Uint8` when all values ≤ 255, otherwise `Uint16`), clamped at **65535** per document/field on frozen paths. MSv5 snapshots without `FLAG_FREQ_U16` remain `Uint8` (legacy).
+Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, wildcard, and `AND` / `OR` / `AND_NOT` queries. Functional parity with lucaong `minisearch@7` is validated in `dev/parity/` (scores `toBeCloseTo` precision 6).
 
 ---
 
 ## Quick start
 
 ```bash
-npm install @yoch/minisearch
+npm install @yoch/frozenminisearch
 ```
 
-**One-shot frozen index** (no mutable step):
+**Build from documents:**
 
 ```javascript
-import { FrozenMiniSearch } from '@yoch/minisearch'
+import FrozenMiniSearch from '@yoch/frozenminisearch'
 
 const options = { fields: ['title', 'text'], storeFields: ['title'] }
 const index = FrozenMiniSearch.fromDocuments(documents, options)
-index.search('ishmael', { prefix: true })
-index.autoSuggest('zen')
 
-// Persist and reload
+index.search('ishmael', { prefix: true })
+index.autoSuggest('zen ar')
+
 const buf = index.saveBinarySync()
 const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
 ```
 
-**Mutable index, then freeze** (incremental build):
+**Incremental builder:**
 
 ```javascript
-import MiniSearch, { FrozenMiniSearch } from '@yoch/minisearch'
-
-const ms = new MiniSearch({ fields: ['title', 'text'] })
-ms.addAll(documents)
-
-const frozen = ms.freeze()   // immutable snapshot
-const buf = frozen.saveBinarySync()
-```
-
-Both ESM and CommonJS are supported:
-
-```javascript
-// ESM
-import MiniSearch, { FrozenMiniSearch } from '@yoch/minisearch'
-
-// CommonJS
-const MiniSearch = require('@yoch/minisearch')
-const { FrozenMiniSearch } = require('@yoch/minisearch')
-```
-
----
-
-## MiniSearch (mutable)
-
-The familiar upstream API — unchanged. Field boosts, fuzzy/prefix, nested queries, `AND` / `OR` / `AND_NOT`, filters, `autoSuggest`, vacuum after `discard`, etc.
-
-```javascript
-import MiniSearch from '@yoch/minisearch'
-
-const miniSearch = new MiniSearch({ fields: ['title', 'text'] })
-miniSearch.addAll(documents)
-miniSearch.search('zen art motorcycle')
-```
-
-Call `freeze()` on any mutable index to get the read-only structure described below.
-
----
-
-## Building a frozen index
-
-Pick the entry point that matches how your documents arrive:
-
-| Goal | API |
-|------|-----|
-| Live index that changes over time | `MiniSearch` → `freeze()` when you need read-only serving |
-| Fixed corpus, build frozen directly | **`FrozenMiniSearch.fromDocuments(documents, options)`** |
-| Build doc-by-doc (no `documents[]` buffer) | **`createFrozenIndexBuilder(options)`** → `.add(doc)` → **`freezeFrozenIndexBuilder(builder)`** |
-| Async stream of documents | **`FrozenMiniSearch.fromAsyncIterable(iterable, options)`** |
-| Custom assembly pipeline | `buildFrozenFromDocuments`, `assembleFrozen`, `freezeFromMiniSearch` |
-
-All paths produce the same structure — compact typed postings plus a packed radix term tree. `fromDocuments` builds it in a single pass (lower peak memory than `freeze()`-after-`addAll`), and `fromDocuments` matches `new MiniSearch(opts).addAll(docs).freeze()` for search ranking on the same corpus and options (`fields`, `tokenize`, `processTerm`, …). Frozen indexes do not support `add` / `remove`.
-
-**Builder** (doc-by-doc, no intermediate array):
-
-```javascript
-import { createFrozenIndexBuilder, freezeFrozenIndexBuilder } from '@yoch/minisearch'
-
-const builder = createFrozenIndexBuilder(options, {
-  estimatedDocumentCount: rows.length  // optional: pre-allocates per-doc arrays
-})
-for (const doc of rows) {
-  builder.add(doc)
-}
-const frozen = freezeFrozenIndexBuilder(builder)
-```
-
-**Async stream** (documents indexed as they arrive):
-
-```javascript
-import { createReadStream } from 'node:fs'
-import { parse } from 'csv-parse'
-import { FrozenMiniSearch } from '@yoch/minisearch'
-
-async function buildFromCsv (path, options) {
-  async function * documents () {
-    const parser = createReadStream(path).pipe(parse({ columns: true }))
-    for await (const row of parser) {
-      yield { id: row.id, title: row.title, /* … */ }
-    }
-  }
-  return FrozenMiniSearch.fromAsyncIterable(documents(), options)
-}
-```
-
-**From a mutable index:** if you used `discard()` on a `MiniSearch` index, run `vacuum()` before `freeze()` to shrink the snapshot; search parity is still expected without vacuum, but the binary may retain sparse slots.
-
-**Introspection:** `frozenMemoryBreakdown()` reports the postings, radix tree, and stored-field footprint (estimates only; not exact heap accounting).
-
-Advanced exports for custom pipelines:
-
-```javascript
-import {
-  FrozenMiniSearch,
+import FrozenMiniSearch, {
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
-  FrozenIndexBuilder,
-  type FrozenIndexBuilderHints,
-  buildFrozenFromDocuments,
-  assembleFrozen,
-  freezeFromMiniSearch,
-  frozenMemoryBreakdown
-} from '@yoch/minisearch'
+} from '@yoch/frozenminisearch'
+
+const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: rows.length })
+for (const doc of rows) builder.add(doc)
+const index = freezeFrozenIndexBuilder(builder)
 ```
+
+ESM and CommonJS are both supported (`main` → CJS, `module` → ESM).
 
 ---
 
-## Binary snapshots (save / load)
+## Migration
 
-`FrozenMiniSearch` persists to a compact **MSv5** binary format (optionally zstd-compressed) — much smaller and faster to load than JSON.
+### From lucaong `minisearch` JSON
 
 ```javascript
-const buf = index.saveBinarySync()              // or: await index.saveBinaryAsync()
-const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
-//             FrozenMiniSearch.loadBinaryAsync(buf, options)  // lower peak RAM on zstd payloads
+import MiniSearch from 'minisearch' // build-time only
+import FrozenMiniSearch from '@yoch/frozenminisearch'
+
+const mutable = new MiniSearch(options)
+mutable.addAll(documents)
+
+// Option A — live instance
+const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+
+// Option B — serialized index (offline / ETL)
+const json = JSON.stringify(mutable)
+const frozen2 = FrozenMiniSearch.fromMiniSearchJson(json, options)
 ```
 
-- **What it stores** — field names and `storeFields` payloads are embedded, so the `options.fields` argument on load is **optional** (names come from the file); if you pass it, it must match exactly. **`tokenize` / `processTerm` are not stored** — pass the same functions at load time when you customized indexing.
-- **Compatibility** — older **MSv3** / **MSv4** files still load; re-save with `saveBinarySync()` to upgrade to MSv5.
-- **Deprecated aliases** — `saveBinary()` and `loadBinary()` still map to the sync implementations and emit a one-time `DeprecationWarning`; call `*Sync()` or `*Async()` explicitly.
-- **Node requirement** — **22.15.0+** (declared in `engines`), where `node:zlib` gained the zstd APIs. On older runtimes the save methods fall back to a raw (uncompressed) payload, and reading a zstd snapshot throws a clear error.
+`options.fields` must match the indexed fields in the snapshot when provided.
+
+### From `@yoch/minisearch` 8.x
+
+The former fork published both `MiniSearch` and `freeze()`. This package is frozen-only:
+
+| Before (`@yoch/minisearch`) | After (`@yoch/frozenminisearch`) |
+|------------------------------|----------------------------------|
+| `new MiniSearch(opts).addAll(docs).freeze()` | `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)` |
+| lucaong JSON snapshot | `FrozenMiniSearch.fromMiniSearchJson(json)` or `fromMiniSearchSnapshot(obj)` |
+| `import MiniSearch, { FrozenMiniSearch }` | `import FrozenMiniSearch` (+ lucaong `minisearch` only if you still build mutable indexes) |
+
+---
+
+## Search API (compatible with MiniSearch)
+
+- `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
+- `autoSuggest(queryString, options?)`
+- `has(id)`, `getStoredFields(id)`
+- `saveBinarySync` / `loadBinarySync` / async variants
+
+Indexing is **not** available on a frozen instance — use `fromDocuments`, the builder, `fromMiniSearch*`, or `loadBinary*`.
+
+---
+
+## Binary snapshots (MSv5)
+
+```javascript
+const buf = index.saveBinarySync()
+const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded in MSv5
+```
+
+- **Node ≥ 22.15.0** (zstd via `node:zlib`)
+- Only **MSv5** is supported; older `MSv1`–`MSv4` snapshots must be re-saved from lucaong JSON or a mutable index
+- `tokenize` / `processTerm` are not stored — pass the same functions at load when customized
 
 ---
 
 ## Benchmarks
 
-Cutting memory was the original motivation, and the win is real: the index structure shrinks **~10–100× versus the mutable index** across every scenario below. Numbers from [`baselines/reference.json`](benchmarks/baselines/reference.json) — Node.js v22.x, package 8.4.0, median of 3 runs × 15 searches (fixed batch per query; see [benchmarks/README.md](benchmarks/README.md)).
-
-| Scenario | Docs | Index heap¹ | File size (binary vs JSON) | Load time (binary vs JSON) | Search p50 gain |
-|----------|------|------------|--------------------------|--------------------------|----------------|
-| Divina Commedia (with storeFields) | 14k, 1 field | −90% | −73% | −77% | ~35% avg |
-| 100k documents | 100k, 1 field | −95% | −88% | −93% | ~43% avg |
-| Many fields | 2k, 10 fields | −99% | −92% | −92% | ~45% avg |
-
-¹ **Index heap** is the index structure only (postings + radix tree), estimated from `process.memoryUsage()` after GC — not exact allocator accounting. This is where the savings are largest and most consistent (≈90–99% smaller). The one caveat: when `storeFields` payloads are big, the stored JSON dominates the resident footprint, so *total* heap savings shrink (down to ~20% in extreme cases) — but file size and load time still improve regardless of `storeFields` size.
-
-Search gains are highest on exact and `AND` queries (−30 to −60 %); prefix can be slower on small corpora where the posting list fits in cache. See [`benchmarks/`](benchmarks/README.md) for per-query breakdowns.
+See [benchmarks/README.md](benchmarks/README.md). Quick commands:
 
 ```bash
-npm run benchmark:compare    # terminal report
-npm run benchmark:diff       # vs versioned baseline
+npm run bench              # default regression profile
+npm run bench -- run --profile=vs-reference
+npm run bench -- run --profile=dev --quick
+npm run bench:record
+npm run bench:diff
 ```
+
+Representative wins (vs mutable `minisearch`, median search p50):
+
+| Scenario | Docs | Index heap¹ | Search p50 |
+|----------|------|------------|------------|
+| Divina Commedia + storeFields | 14k | ~−90% | ~−35% |
+| 100k documents | 100k | ~−95% | ~−43% |
+| Many fields | 2k × 10 fields | ~−99% | ~−45% |
+
+¹ Estimated structure footprint after GC — see benchmarks docs.
 
 ---
 
 ## Development
 
 ```bash
-npm install
-npm test
-npm run build
+yarn install
+yarn test          # src/ + dev/parity/
+yarn build
+node scripts/verify-npm-pack.cjs
 ```
 
-### Release checklist
-
-1. Bump `version` in `package.json` and update [CHANGELOG.md](./CHANGELOG.md).
-2. `npm test` and `npm run build` (also run by `prepublishOnly` on publish).
-3. If README or public API changed: `npm run build-docs` (syncs `docs/media/` from root changelog, design doc, and benchmarks; then TypeDoc + demo), then commit `docs/` HTML (do not edit `docs/index.html` by hand). Files under `docs/media/` are generated and gitignored — GitHub Pages is deployed via the **Docs** workflow (`.github/workflows/docs.yml`).
-4. Commit version + changelog (+ docs if step 3) on a clean tree.
-5. Publish:
-   - **Stable** (`latest`): `npm run release:stable`
-   - **Pre-release** (`beta` tag only): `npm run release:beta`
-
-For implementation details and contributor notes, see [DESIGN_DOCUMENT.md](./DESIGN_DOCUMENT.md).
+Parity tests import `minisearch` as a devDependency (reference). Optional upstream clone: `git submodule update --init vendor/minisearch`.
 
 ---
 
@@ -216,6 +159,6 @@ For implementation details and contributor notes, see [DESIGN_DOCUMENT.md](./DES
 See [CHANGELOG.md](./CHANGELOG.md).
 
 - **MiniSearch** — [Luca Ongaro](https://github.com/lucaong/minisearch) (MIT)
-- **This fork** — [yoch/minisearch](https://github.com/yoch/minisearch): `FrozenMiniSearch`, packed radix term index (`PackedRadixTree`), MSv5 binary snapshots (+ MSv3/MSv4 read-compat), shared scoring refactor
+- **@yoch/frozenminisearch** — frozen indexes, packed radix tree, MSv5 binary format
 
-Upstream docs: [MiniSearch site](https://lucaong.github.io/minisearch/) · [intro article](https://lucaongaro.eu/blog/2019/01/30/minisearch-client-side-fulltext-search-engine.html)
+Upstream docs: [MiniSearch](https://lucaong.github.io/minisearch/)

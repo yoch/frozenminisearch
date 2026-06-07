@@ -39,19 +39,6 @@ const config = ({ format, input, output, dir, extension = 'js', exports = undefi
   }
 }
 
-const benchmarks = {
-  input: 'benchmarks/index.js',
-  output: {
-    sourcemap: true,
-    dir: 'benchmarks/dist',
-    format: 'commonjs',
-    entryFileNames: '[name].cjs',
-    plugins: []
-  },
-  external: ['benchmark'],
-  plugins: [typescript({ compilerOptions: { outDir: 'benchmarks/dist' } })]
-}
-
 const packedRadixBenchPlugins = [
   typescript({
     include: ['benchmarks/**/*.js', 'src/**/*.ts'],
@@ -113,7 +100,6 @@ function rollupExports () {
   if (process.env.PACKED_RADIX_BENCH === 'true') {
     return [packedRadixBench, packedRadixFuzzyBench, packedRadixFuzzySweepBench, packedRadixEmitSubtreeBench]
   }
-  if (process.env.BENCHMARKS === 'true') return [benchmarks]
   return [
   config({ format: 'es', input: 'src/index.ts', output: 'es6', dir: 'es' }),
   config({ format: 'cjs', input: 'src/index.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),

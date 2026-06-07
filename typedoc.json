@@ -1,5 +1,5 @@
 {
-  "name": "@yoch/minisearch",
+  "name": "@yoch/frozenminisearch",
   "entryPoints": ["src/index.ts"],
   "out": "docs",
   "excludePrivate": true,

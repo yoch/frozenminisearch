@@ -1,4 +1,5 @@
-import MiniSearch, { FrozenMiniSearch, frozenMemoryBreakdown } from '../dist/es/index.js'
+import MiniSearch from 'minisearch'
+import FrozenMiniSearch, { frozenMemoryBreakdown } from '../dist/es/index.js'
 import { loadDivinaLines } from './loadDivinaLines.js'
 import {
   giantVocabulary,
@@ -22,6 +23,7 @@ import {
   defaultSearchIterations,
 } from './benchmarkUtils.js'
 import { applySearchBenchBatchesToScenarios } from './loadSearchBenchBatches.js'
+import { ALL_SURFACES, computeSurfaceNeeds } from './framework/surfaces.mjs'
 
 function avgFrozenP50GainPct (search) {
   return search.length > 0
@@ -36,7 +38,7 @@ function prepareScenarioSearchIndexes (corpus, options) {
   gc()
   const frozenBuild = new MiniSearch(options)
   frozenBuild.addAll(corpus)
-  const frozenSearchIndex = frozenBuild.freeze()
+  const frozenSearchIndex = FrozenMiniSearch.fromMiniSearch(frozenBuild, options)
   gc()
   return { mutableSearchIndex, frozenSearchIndex }
 }
@@ -123,7 +125,7 @@ function aggregateScoreDrift (runs) {
 
 function aggregateScenarioRuns (runs) {
   const base = runs[0]
-  if (base.benchProfile === 'search') {
+  if (base.benchProfile === 'search' || (base.benchSurfaces?.length === 1 && base.benchSurfaces[0] === 'search')) {
     const search = aggregateSearch(runs)
     return {
       id: base.id,
@@ -132,9 +134,14 @@ function aggregateScenarioRuns (runs) {
       fields: base.fields,
       storeFields: base.storeFields,
       benchProfile: 'search',
+      benchSurfaces: base.benchSurfaces ?? ['search'],
       search,
       summary: { searchFrozenP50AvgGainPct: avgFrozenP50GainPct(search) },
     }
+  }
+
+  if (!base.indexing) {
+    return { ...base, search: aggregateSearch(runs), scoreDrift: aggregateScoreDrift(runs) }
   }
 
   const indexing = {
@@ -427,8 +434,10 @@ function computeScoreDrift (mutable, frozen, query, limit = 20) {
  * @param {{ benchProfile?: 'full' | 'search' }} [benchOptions]
  */
 export function runScenario (scenario, searchIterations = defaultSearchIterations(), benchOptions = {}) {
-  const benchProfile = benchOptions.benchProfile ?? 'full'
-  if (benchProfile === 'search') {
+  const surfaces = benchOptions.surfaces ?? [...ALL_SURFACES]
+  const need = computeSurfaceNeeds(surfaces)
+  const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')
+  if (need.searchOnly) {
     const { id, name, corpus, options, queries } = scenario
     const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
     const { search, avgFrozenP50GainPct: gain } = benchScenarioSearch(
@@ -444,12 +453,14 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
       fields: options.fields,
       storeFields: options.storeFields || [],
       benchProfile: 'search',
+      benchSurfaces: surfaces,
       search,
       summary: { searchFrozenP50AvgGainPct: gain },
     }
   }
 
   const { id, name, corpus, options, queries, driftQueries } = scenario
+  const needsArtifacts = need.build || need.save || need.load || need.migrate || need.drift
 
   let json
   let binaryBuf
@@ -459,7 +470,7 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
   let jsonSerializeMs
   let binarySerializeMs
 
-  {
+  if (needsArtifacts) {
     const ms = timedMs(() => {
       const m = new MiniSearch(options)
       m.addAll(corpus)
@@ -469,150 +480,191 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
     const ser = timedMs(() => JSON.stringify(ms.result))
     json = ser.result
     jsonSerializeMs = ser.ms
-    const fr = timedMs(() => ms.result.freeze())
+    const fr = timedMs(() => FrozenMiniSearch.fromMiniSearch(ms.result, options))
     freezeMs = fr.ms
-    const bin = timedMs(() => fr.result.saveBinary())
+    const bin = timedMs(() => fr.result.saveBinarySync())
     binaryBuf = bin.result
     binarySerializeMs = bin.ms
-    const direct = timedMs(() => FrozenMiniSearch.fromDocuments(corpus, options))
-    fromDocumentsMs = direct.ms
-  }
-
-  const jsonMb = mbRound(json.length)
-  const binaryMb = mbRound(binaryBuf.length)
-  const binaryMagic = binaryBuf.toString('ascii', 0, 4)
-  gc()
-
-  const heapMutable = measureHeap(() => {
-    const ms = new MiniSearch(options)
-    ms.addAll(corpus)
-    return ms
-  })
-
-  const heapFrozen = measureHeap(() => {
-    const ms = new MiniSearch(options)
-    ms.addAll(corpus)
-    return ms.freeze()
-  })
-
-  const heapBuildMutableFreeze = measureHeap(() => {
-    const ms = new MiniSearch(options)
-    ms.addAll(corpus)
-    return ms.freeze()
-  })
-
-  const heapBuildFromDocuments = measureHeap(() => {
-    return FrozenMiniSearch.fromDocuments(corpus, options)
-  })
-
-  const breakdown = frozenMemoryBreakdown(heapFrozen.value)
-
-  const heapJsonLoaded = measureHeap(() => MiniSearch.loadJSON(json, options))
-  const heapBinaryLoaded = measureHeap(() => FrozenMiniSearch.loadBinary(binaryBuf, options))
-
-  gc()
-  const loadJson = timedMs(() => MiniSearch.loadJSON(json, options))
-  gc()
-  const loadBinary = timedMs(() => FrozenMiniSearch.loadBinary(binaryBuf, options))
-  gc()
-
-  function withIndex (factory, fn) {
-    gc()
-    let out
-    {
-      const index = factory()
-      out = fn(index)
+    if (need.build) {
+      const direct = timedMs(() => FrozenMiniSearch.fromDocuments(corpus, options))
+      fromDocumentsMs = direct.ms
     }
-    gc()
-    return out
   }
 
-  const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
-  const { search, avgFrozenP50GainPct: searchGain } = benchScenarioSearch(
-    mutableSearchIndex,
-    frozenSearchIndex,
-    queries,
-    searchIterations,
-  )
+  gc()
 
-  const heapSavingPct = heapMutable.heapMb > 0
+  let heapMutable
+  let heapFrozen
+  let heapBuildMutableFreeze
+  let heapBuildFromDocuments
+  if (need.memory || need.breakdown) {
+    heapMutable = measureHeap(() => {
+      const ms = new MiniSearch(options)
+      ms.addAll(corpus)
+      return ms
+    })
+    heapFrozen = measureHeap(() => {
+      const ms = new MiniSearch(options)
+      ms.addAll(corpus)
+      return FrozenMiniSearch.fromMiniSearch(ms, options)
+    })
+    if (need.build) {
+      heapBuildMutableFreeze = measureHeap(() => {
+        const ms = new MiniSearch(options)
+        ms.addAll(corpus)
+        return FrozenMiniSearch.fromMiniSearch(ms, options)
+      })
+      heapBuildFromDocuments = measureHeap(() => FrozenMiniSearch.fromDocuments(corpus, options))
+    }
+  }
+
+  let breakdown
+  if (need.breakdown) {
+    if (!heapFrozen) {
+      heapFrozen = measureHeap(() => {
+        const ms = new MiniSearch(options)
+        ms.addAll(corpus)
+        return FrozenMiniSearch.fromMiniSearch(ms, options)
+      })
+    }
+    breakdown = frozenMemoryBreakdown(heapFrozen.value)
+  }
+
+  let heapJsonLoaded
+  let heapBinaryLoaded
+  let loadJson
+  let loadBinary
+  if (need.load) {
+    heapJsonLoaded = measureHeap(() => MiniSearch.loadJSON(json, options))
+    heapBinaryLoaded = measureHeap(() => FrozenMiniSearch.loadBinarySync(binaryBuf, options))
+    gc()
+    loadJson = timedMs(() => MiniSearch.loadJSON(json, options))
+    gc()
+    loadBinary = timedMs(() => FrozenMiniSearch.loadBinarySync(binaryBuf, options))
+    gc()
+  }
+
+  let search
+  let searchGain
+  if (need.search) {
+    const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
+    const bench = benchScenarioSearch(
+      mutableSearchIndex,
+      frozenSearchIndex,
+      queries,
+      searchIterations,
+    )
+    search = bench.search
+    searchGain = bench.avgFrozenP50GainPct
+  }
+
+  const heapSavingPct = heapMutable && heapFrozen && heapMutable.heapMb > 0
     ? Number((100 * (1 - heapFrozen.heapMb / heapMutable.heapMb)).toFixed(1))
     : 0
 
   let scoreDrift
-  if (driftQueries && driftQueries.length > 0) {
+  if (need.drift && driftQueries && driftQueries.length > 0) {
     const ms = new MiniSearch(options)
     ms.addAll(corpus)
-    const frozen = ms.freeze()
+    const frozen = FrozenMiniSearch.fromMiniSearch(ms, options)
     scoreDrift = driftQueries.map((query) => computeScoreDrift(ms, frozen, query))
   }
 
-  return {
+  const jsonMb = json != null ? mbRound(json.length) : undefined
+  const binaryMb = binaryBuf != null ? mbRound(binaryBuf.length) : undefined
+  const binaryMagic = binaryBuf != null ? binaryBuf.toString('ascii', 0, 4) : undefined
+
+  const result = {
     id,
     name,
     documentCount: corpus.length,
     fields: options.fields,
     storeFields: options.storeFields || [],
-    indexing: {
-      addAllMs: Number(indexMs.toFixed(2)),
-      freezeMs: Number(freezeMs.toFixed(2)),
-      fromDocumentsMs: Number(fromDocumentsMs.toFixed(2)),
-      jsonSerializeMs: Number(jsonSerializeMs.toFixed(2)),
-      saveBinaryMs: Number(binarySerializeMs.toFixed(2)),
-      binaryMagic
-    },
-    heapMb: {
+    benchSurfaces: surfaces,
+    summary: {},
+  }
+
+  if (needsArtifacts && (need.build || need.save || need.migrate)) {
+    result.indexing = {
+      ...(need.build ? {
+        addAllMs: Number(indexMs.toFixed(2)),
+        fromDocumentsMs: Number(fromDocumentsMs.toFixed(2)),
+      } : {}),
+      ...(need.migrate ? { freezeMs: Number(freezeMs.toFixed(2)) } : {}),
+      ...(need.save ? {
+        jsonSerializeMs: Number(jsonSerializeMs.toFixed(2)),
+        saveBinaryMs: Number(binarySerializeMs.toFixed(2)),
+        binaryMagic,
+      } : {}),
+    }
+  }
+
+  if (need.memory && heapMutable && heapFrozen) {
+    result.heapMb = {
       mutable: heapMutable.heapMb,
       frozen: heapFrozen.heapMb,
-      buildMutableFreeze: heapBuildMutableFreeze.heapMb,
-      buildFromDocuments: heapBuildFromDocuments.heapMb,
-      buildFromDocumentsVsMutableFreezeSavingPct: heapBuildMutableFreeze.heapMb > 0
-        ? Number((100 * (1 - heapBuildFromDocuments.heapMb / heapBuildMutableFreeze.heapMb)).toFixed(1))
-        : 0,
-      loadJson: heapJsonLoaded.heapMb,
-      loadBinary: heapBinaryLoaded.heapMb,
-      frozenVsMutableSavingPct: heapSavingPct
-    },
-    memoryMb: {
+      ...(need.build && heapBuildMutableFreeze && heapBuildFromDocuments ? {
+        buildMutableFreeze: heapBuildMutableFreeze.heapMb,
+        buildFromDocuments: heapBuildFromDocuments.heapMb,
+        buildFromDocumentsVsMutableFreezeSavingPct: heapBuildMutableFreeze.heapMb > 0
+          ? Number((100 * (1 - heapBuildFromDocuments.heapMb / heapBuildMutableFreeze.heapMb)).toFixed(1))
+          : 0,
+      } : {}),
+      ...(need.load && heapJsonLoaded && heapBinaryLoaded ? {
+        loadJson: heapJsonLoaded.heapMb,
+        loadBinary: heapBinaryLoaded.heapMb,
+      } : {}),
+      frozenVsMutableSavingPct: heapSavingPct,
+    }
+    result.memoryMb = {
       frozen: {
         heapUsed: heapFrozen.heapMb,
         external: heapFrozen.externalMb,
         arrayBuffers: heapFrozen.arrayBuffersMb,
         rss: heapFrozen.rssMb,
-        totalResidentApprox: heapFrozen.totalResidentApproxMb
+        totalResidentApprox: heapFrozen.totalResidentApproxMb,
       },
       mutable: {
         heapUsed: heapMutable.heapMb,
         external: heapMutable.externalMb,
         arrayBuffers: heapMutable.arrayBuffersMb,
         rss: heapMutable.rssMb,
-        totalResidentApprox: heapMutable.totalResidentApproxMb
-      }
-    },
-    diskMb: {
+        totalResidentApprox: heapMutable.totalResidentApproxMb,
+      },
+    }
+    result.summary.heapFrozenVsMutableSavingPct = heapSavingPct
+  }
+
+  if (need.save && jsonMb != null && binaryMb != null) {
+    result.diskMb = {
       json: jsonMb,
       binary: binaryMb,
       binaryVsJsonSavingPct: jsonMb > 0
         ? Number((100 * (1 - binaryMb / jsonMb)).toFixed(1))
-        : 0
-    },
-    loadMs: {
+        : 0,
+    }
+    result.summary.diskBinaryVsJsonSavingPct = result.diskMb.binaryVsJsonSavingPct
+  }
+
+  if (need.load && loadJson && loadBinary) {
+    result.loadMs = {
       json: Number(loadJson.ms.toFixed(2)),
       binary: Number(loadBinary.ms.toFixed(2)),
       binaryVsJsonSavingPct: loadJson.ms > 0
         ? Number((100 * (1 - loadBinary.ms / loadJson.ms)).toFixed(1))
-        : 0
-    },
-    memoryBreakdown: breakdown,
-    search,
-    scoreDrift,
-    summary: {
-      heapFrozenVsMutableSavingPct: heapSavingPct,
-      diskBinaryVsJsonSavingPct: jsonMb > 0 ? Number((100 * (1 - binaryMb / jsonMb)).toFixed(1)) : 0,
-      loadBinaryVsJsonSavingPct: loadJson.ms > 0 ? Number((100 * (1 - loadBinary.ms / loadJson.ms)).toFixed(1)) : 0,
-      searchFrozenP50AvgGainPct: searchGain,
+        : 0,
     }
+    result.summary.loadBinaryVsJsonSavingPct = result.loadMs.binaryVsJsonSavingPct
   }
+
+  if (need.breakdown) result.memoryBreakdown = breakdown
+  if (need.search) {
+    result.search = search
+    result.summary.searchFrozenP50AvgGainPct = searchGain
+  }
+  if (need.drift) result.scoreDrift = scoreDrift
+
+  return result
 }
 
 export function runBenchmarkSuite (
@@ -622,10 +674,14 @@ export function runBenchmarkSuite (
   benchOptions = {},
 ) {
   const total = scenarios.length
-  const benchProfile = benchOptions.benchProfile ?? 'full'
-  const profileLabel = benchProfile === 'search' ? 'search-only' : 'full'
-  if (benchProfile === 'search') {
+  const surfaces = benchOptions.surfaces ?? [...ALL_SURFACES]
+  const need = computeSurfaceNeeds(surfaces)
+  const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')
+  const profileLabel = need.searchOnly ? 'search-only' : `surfaces=[${surfaces.join(',')}]`
+  if (need.searchOnly) {
     console.log('Benchmark profile: search-only (skip indexing / heap / save / load timing)\n')
+  } else if (surfaces.length < ALL_SURFACES.length) {
+    console.log(`Benchmark surfaces: ${surfaces.join(', ')}\n`)
   }
   if (runs <= 1) {
     return scenarios.map((scenario, index) => {

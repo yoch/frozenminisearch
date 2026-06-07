@@ -1,7 +1,8 @@
 import SearchableMap from '../SearchableMap/SearchableMap'
-import { TREE_NODE_EDGE, TREE_NODE_LEAF } from '../binaryConstants'
-import { buildTermTreeSection } from '../binaryStructures'
-import { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from '../packedRadixBinary'
+import {
+  buildTermTreeSectionColumnar,
+  readPackedTermTreeSectionColumnar,
+} from '../msv5/packedRadixBinaryMsv5'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
 import PackedRadixTree, { fromRadixTree } from './index'
@@ -37,15 +38,12 @@ function expectPackedParity(entries, probes = {}) {
 
   const m = SearchableMap.from(entries)
   const p = fromRadixTree(m.radixTree, m.size)
-  const packedBuf = buildTermTreeSectionFromPacked(p)
-  const mapBuf = buildTermTreeSection(m.radixTree)
+  const packedBuf = buildTermTreeSectionColumnar(p)
 
   // entries() must match Map iteration order exactly (not just as a set).
   expect(Array.from(p.entries())).toEqual(Array.from(m.entries()))
-  // Order must survive both the packed-source and Map-source binary encoders.
-  expect(Array.from(readPackedTermTreeSection(packedBuf, 0, packedBuf.length, m.size).entries()))
-    .toEqual(Array.from(m.entries()))
-  expect(Array.from(readPackedTermTreeSection(mapBuf, 0, mapBuf.length, m.size).entries()))
+  // Order must survive MSv5 columnar wire round-trip.
+  expect(Array.from(readPackedTermTreeSectionColumnar(packedBuf, m.size).entries()))
     .toEqual(Array.from(m.entries()))
 
   for (const term of gets) {
@@ -133,8 +131,8 @@ describe('PackedRadixTree module', () => {
     const p = fromRadixTree(m.radixTree, m.size)
     expect(() => validateFrozenTermIndexLeaves(p, 0)).not.toThrow()
     expect(Array.from(p.entries())).toEqual([])
-    const buf = buildTermTreeSectionFromPacked(p)
-    const back = readPackedTermTreeSection(buf, 0, buf.length, 0)
+    const buf = buildTermTreeSectionColumnar(p)
+    const back = readPackedTermTreeSectionColumnar(buf, 0)
     expect(Array.from(back.entries())).toEqual([])
   })
 
@@ -279,57 +277,22 @@ describe('PackedRadixTree module', () => {
     expect(() => fromRadixTree(m.radixTree, m.size)).toThrow(/edge label too long/)
   })
 
-  test('term tree section round-trips through binary', () => {
-    const buf = buildTermTreeSectionFromPacked(packed)
-    const back = readPackedTermTreeSection(buf, 0, buf.length, map.size)
+  test('term tree section round-trips through MSv5 columnar wire', () => {
+    const buf = buildTermTreeSectionColumnar(packed)
+    const back = readPackedTermTreeSectionColumnar(buf, map.size)
     for (const term of terms) {
       expect(back.get(term)).toBe(packed.get(term))
     }
     expect(Array.from(back.entries())).toEqual(Array.from(packed.entries()))
   })
 
-  test('Map-encoded term tree section decodes to packed index', () => {
-    const buf = buildTermTreeSection(map.radixTree)
-    const back = readPackedTermTreeSection(buf, 0, buf.length, map.size)
-    for (const term of terms) {
-      expect(back.get(term)).toBe(map.get(term))
-    }
-    expect(Array.from(back.entries())).toEqual(Array.from(map.entries()))
+  test('columnar decoder rejects truncated section', () => {
+    const buf = buildTermTreeSectionColumnar(packed)
+    expect(() => readPackedTermTreeSectionColumnar(buf.subarray(0, 8), map.size)).toThrow(/too short/)
   })
 
-  test('binary decoder rejects duplicate leaves in one node', () => {
-    const buf = Buffer.alloc(2 + 5 + 5)
-    buf.writeUInt16LE(2, 0)
-    buf.writeUInt8(TREE_NODE_LEAF, 2)
-    buf.writeUInt32LE(0, 3)
-    buf.writeUInt8(TREE_NODE_LEAF, 7)
-    buf.writeUInt32LE(1, 8)
-    expect(() => readPackedTermTreeSection(buf, 0, buf.length, 1)).toThrow(/duplicate leaf/)
-  })
-
-  test('binary decoder rejects empty edge labels', () => {
-    const buf = Buffer.alloc(2 + 3)
-    buf.writeUInt16LE(1, 0)
-    buf.writeUInt8(TREE_NODE_EDGE, 2)
-    buf.writeUInt16LE(0, 3)
-    expect(() => readPackedTermTreeSection(buf, 0, buf.length, 0)).toThrow(/edge key empty/)
-  })
-
-  test('binary decoder rejects unknown node tags', () => {
-    const buf = Buffer.alloc(2 + 1)
-    buf.writeUInt16LE(1, 0)
-    buf.writeUInt8(99, 2)
-    expect(() => readPackedTermTreeSection(buf, 0, buf.length, 0)).toThrow(/unknown term tree node tag/)
-  })
-
-  test('binary decoder rejects trailing bytes after the root node', () => {
-    const buf = Buffer.alloc(2 + 1)
-    buf.writeUInt16LE(0, 0)
-    expect(() => readPackedTermTreeSection(buf, 0, buf.length, 0)).toThrow(/trailing bytes/)
-  })
-
-  test('binary decoder rejects a truncated child count', () => {
-    const buf = Buffer.alloc(1)
-    expect(() => readPackedTermTreeSection(buf, 0, buf.length, 0)).toThrow(/child count truncated/)
+  test('columnar decoder rejects termCount mismatch', () => {
+    const buf = buildTermTreeSectionColumnar(packed)
+    expect(() => readPackedTermTreeSectionColumnar(buf, map.size + 1)).toThrow(/termCount mismatch/)
   })
 })

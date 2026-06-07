@@ -22,7 +22,7 @@ const BASELINES_DIR = join(__dirname, 'baselines')
 const useReference = process.argv.includes('--reference')
 const force = process.argv.includes('--force')
 const outFile = join(BASELINES_DIR, useReference ? 'reference.json' : 'latest.json')
-const { runs, searchIterations, benchProfile } = parseBenchmarkArgs()
+const { runs, searchIterations, benchProfile, surfaces } = parseBenchmarkArgs()
 
 if (useReference) {
   assertCleanTrackedTree({ force, context: 'MiniSearch reference.json' })
@@ -42,8 +42,9 @@ const payload = {
   runs,
   searchIterations,
   benchProfile,
+  benchSurfaces: surfaces,
   searchBenchProtocol: getSearchBenchProtocol(),
-  scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile }),
+  scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile, surfaces }),
 }
 
 if (useReference && !force) {

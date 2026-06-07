@@ -15,6 +15,7 @@ import {
   parseBenchmarkArgs,
   loadBenchmarkPayload,
   argValue,
+  hasStructuralSurfaces,
   DEFAULT_BENCHMARK_RUNS,
   DEFAULT_SEARCH_ITERATIONS,
 } from './benchmarkUtils.js'
@@ -39,7 +40,7 @@ const argv = process.argv.slice(2)
 const strictSearch = argv.includes('--strict')
 const forceRun = argv.includes('--run')
 
-const { runs, searchIterations, benchProfile } = parseBenchmarkArgs()
+const { runs, searchIterations, benchProfile, surfaces } = parseBenchmarkArgs()
 
 /** Lower is better unless noted. */
 const THRESHOLDS = {
@@ -170,7 +171,8 @@ function main () {
       searchIterations,
       benchProfile,
       searchBenchProtocol: getSearchBenchProtocol(),
-      scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile }),
+      benchSurfaces: surfaces,
+      scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile, surfaces }),
     }
     mkdirSync(BASELINES_DIR, { recursive: true })
     writeFileSync(LATEST_PATH, JSON.stringify(current, null, 2) + '\n')
@@ -190,6 +192,7 @@ function main () {
   const curProfile = current.benchProfile ?? current.scenarios[0]?.benchProfile ?? 'full'
   const refProfile = reference.benchProfile ?? reference.scenarios[0]?.benchProfile ?? 'full'
   const diffSearchOnly = benchProfile === 'search' || curProfile === 'search'
+    || !hasStructuralSurfaces(surfaces)
   if (forceRun) {
     console.log(`Measured:  ${runs} run(s)/scenario, ${searchIterations} search iterations, profile=${curProfile}`)
   } else {

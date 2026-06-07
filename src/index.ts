@@ -1,19 +1,31 @@
-import MiniSearch from './MiniSearch'
-
-export * from './MiniSearch'
+export { OR, AND, AND_NOT } from './scoring'
+export type {
+  BM25Params,
+  LowercaseCombinationOperator,
+  CombinationOperator,
+  LogLevel,
+  SearchOptions,
+  Options,
+  Suggestion,
+  MatchInfo,
+  SearchResult,
+  QueryCombination,
+  Wildcard,
+  Query,
+} from './searchTypes'
 export {
-  default as FrozenMiniSearch,
+  default,
   buildFrozenFromDocuments,
-  freezeFromMiniSearch,
   freezeFrozenIndexBuilder,
   frozenMemoryBreakdown,
   assembleFrozen,
   type FrozenAssembleParams,
   type FrozenMemoryBreakdown,
+  type MiniSearchSnapshot,
 } from './FrozenMiniSearch'
+export type { SerializedIndexEntry } from './fromMiniSearch'
 export {
   createFrozenIndexBuilder,
   FrozenIndexBuilder,
   type FrozenIndexBuilderHints,
 } from './frozenBuild'
-export default MiniSearch

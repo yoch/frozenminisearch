@@ -4,7 +4,7 @@ const { execSync } = require('node:child_process')
 const { join } = require('node:path')
 
 const root = join(__dirname, '..')
-const forbidden = [/^benchmarks\//, /^testSupport\//, /^src\//, /^examples\//]
+const forbidden = [/^benchmarks\//, /^testSupport\//, /^src\//, /^examples\//, /^dev\//, /^vendor\//]
 
 const out = execSync('npm pack --dry-run 2>&1', {
   cwd: root,

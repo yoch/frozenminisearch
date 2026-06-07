@@ -1,4 +1,3 @@
-import type SearchableMap from './SearchableMap/SearchableMap'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import type { FrozenPostingsLayout } from './frozenPostings'
@@ -7,19 +6,6 @@ import type { OptionsWithDefaults } from './searchTypes'
 
 export type { OptionsWithDefaults } from './searchTypes'
 export type { FieldLengthArray } from './fieldLengthMatrix'
-
-/** Snapshot of a mutable {@link MiniSearch} index for {@link freezeFromMiniSearch}. */
-export interface FreezeSource<T = any> {
-  options: OptionsWithDefaults<T>
-  index: SearchableMap<Map<number, Map<number, number>>>
-  documentCount: number
-  nextId: number
-  documentIds: Map<number, any>
-  fieldIds: { [key: string]: number }
-  fieldLength: Map<number, number[]>
-  avgFieldLength: number[]
-  storedFields: Map<number, Record<string, unknown>>
-}
 
 export interface FrozenMemoryBreakdown {
   termCount: number
@@ -55,7 +41,7 @@ export interface FrozenMemoryBreakdown {
 /**
  * Low-level parameters for {@link assembleFrozen} (custom frozen index pipelines).
  * Field types are part of the public surface for advanced assembly; typical apps use
- * {@link buildFrozenFromDocuments}, {@link freezeFromMiniSearch}, or binary load instead.
+ * {@link buildFrozenFromDocuments}, {@link FrozenMiniSearch.fromMiniSearchJson}, or binary load instead.
  */
 export interface FrozenAssembleParams<T = any> {
   options: OptionsWithDefaults<T>

@@ -20,6 +20,8 @@ function run (cmd, args) {
 }
 
 console.log(`Publishing ${name}@${version} (dist-tag beta)…`)
+console.log('Before first frozen release, deprecate the old package (once):')
+console.log('  npm deprecate @yoch/minisearch "Use @yoch/frozenminisearch — frozen read-only indexes and MSv5 snapshots."\n')
 console.log('Reminder: if README/API changed, run `npm run build-docs`, commit docs/ HTML, and ensure the Docs GitHub Action has run (docs/media/ is not versioned).\n')
 run('npm', ['publish', '--tag', 'beta'])
 console.log(`\nDone. beta → ${version} (latest unchanged)`)

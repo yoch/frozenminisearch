@@ -30,10 +30,9 @@ export function materializeFieldLengthMatrix(data: ArrayLike<number>, length?: n
 }
 
 /**
- * MSv3/MSv4 wire stored field length cells as Uint32 only. MSv5 encodes adaptive width
+ * MSv5 encodes adaptive width
  * ({@link fieldLengthMatrixWireFlags}) and {@link readFieldLengthMatrixSection} restores u8/u16/u32.
- * {@link fieldLengthMatrixForWire} still widens to Uint32 for the legacy encode helper used when
- * writing u32-only snapshots.
+ * {@link fieldLengthMatrixForWire} widens in-memory u8/u16 matrices to Uint32 for the MSv5 encoder.
  */
 export function fieldLengthMatrixForWire(matrix: FieldLengthArray): Uint32Array {
   if (matrix instanceof Uint32Array) return matrix

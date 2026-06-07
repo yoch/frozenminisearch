@@ -10,13 +10,14 @@
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import MiniSearch from '../src/MiniSearch.ts'
+import MiniSearch from 'minisearch'
+import FrozenMiniSearch from '../dist/es/index.js'
 import {
   DEFAULT_AND_GATE_LIMITS,
   gateIsSelectiveEnough,
   resolveGateMaxSize,
 } from '../src/queryEngineGateLimits.ts'
-import { searchWithRunOptions } from '../src/queryEngineHarness.ts'
+import { searchWithRunOptions } from '../dev/parity/queryEngineHarness.js'
 import { loadDivinaLines } from './loadDivinaLines.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -59,9 +60,10 @@ function corpusAllTerms (docCount) {
 }
 
 function buildFrozen (docs, searchOptions = { prefix: true, fuzzy: 0.2 }) {
-  const ms = new MiniSearch({ fields: ['txt'], storeFields: [], searchOptions })
+  const options = { fields: ['txt'], storeFields: [], searchOptions }
+  const ms = new MiniSearch(options)
   ms.addAll(docs)
-  return ms.freeze()
+  return FrozenMiniSearch.fromMiniSearch(ms, options)
 }
 
 function median (arr) {

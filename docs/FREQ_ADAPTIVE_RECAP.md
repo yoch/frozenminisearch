@@ -26,7 +26,7 @@ Objectif : corriger la limite artificielle à 255 **sans** doubler la colonne fr
 | Clamp frozen | `clampFrequencies: true` — [`src/FrozenMiniSearch.ts`](../src/FrozenMiniSearch.ts), [`src/frozenBuild.ts`](../src/frozenBuild.ts) |
 | Flag MSv5 | `FLAG_FREQ_U16 = 32` — [`src/msv5/binaryMsv5Constants.ts`](../src/msv5/binaryMsv5Constants.ts) |
 | Rétrocompat MSv5 | flag absent → section `AllFreqs` lue en u8 (snapshots existants) |
-| Legacy MSv3/MSv4 | decode u8 inchangé ; limite 255 tant que non re-sauvegardé en MSv5 |
+| Anciens MSv1–MSv4 | rejetés ; re-sauvegarder en MSv5 |
 
 ```typescript
 // src/compactPostings.ts
@@ -89,7 +89,7 @@ flowchart TD
 
 | Fichier | Raison |
 |---------|--------|
-| [`src/binaryDecode.ts`](../src/binaryDecode.ts) | MSv3/MSv4 restent u8 |
+| [`src/binaryDecode.ts`](../src/binaryDecode.ts) | MSv5 uniquement |
 | [`src/scoring.ts`](../src/scoring.ts) | Formule BM25+ inchangée |
 
 ### Tests
@@ -274,7 +274,7 @@ Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary
 - `Uint32` pour les fréquences de postings
 - MSv6 dédié (extension MSv5 par flags suffit)
 - Encodage vbyte / delta
-- Re-sauvegarde automatique des snapshots MSv3/MSv4
+- Re-sauvegarde requise pour les snapshots antérieurs à MSv5
 
 ---
 

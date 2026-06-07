@@ -1,10 +1,3 @@
-/** @deprecated MSv3/MSv4 identifiers; prefer MSv5 exports below. */
-export {
-  BINARY_MAGIC_V3,
-  BINARY_VERSION_V3,
-  BINARY_MAGIC_V4,
-  BINARY_VERSION_V4,
-} from './binaryConstants'
 export {
   BINARY_MAGIC_V5,
   BINARY_VERSION_V5,
@@ -33,5 +26,3 @@ export {
 
 export { encodeFrozenSnapshot, encodeFrozenSnapshotAsync } from './binaryEncode'
 export { decodeFrozenSnapshot, decodeFrozenSnapshotAsync } from './binaryDecode'
-/** @deprecated MSv3/MSv4 term-tree wire helpers. */
-export { buildTermTreeSectionFromPacked, readPackedTermTreeSection } from './packedRadixBinary'

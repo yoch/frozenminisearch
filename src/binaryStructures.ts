@@ -6,10 +6,6 @@ import { validateFrozenPostingsLayout } from './frozenPostings'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import {
-  TREE_NODE_EDGE,
-  TREE_NODE_LEAF,
-} from './binaryConstants'
-import {
   invalidFrozenIndex,
   readExternalId,
   readLengthPrefixedUtf8,
@@ -196,7 +192,7 @@ export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): s
   return names
 }
 
-/** Core with explicit {@link termCountOf} (legacy MSv3/MSv4 and MSv5; no dictionary section). */
+/** Core with explicit {@link termCountOf} (MSv5; no dictionary section). */
 export function buildCoreSectionWithTermCount(snap: FrozenSnapshot): Buffer {
   const out = Buffer.alloc(16)
   out.writeUInt32LE(snap.documentCount, 0)
@@ -247,44 +243,6 @@ export function buildStoredFieldsSection(
     heapOff += entry.length
   }
   return Buffer.concat([table, ...heapChunks])
-}
-
-function writeTermTreeNode(chunks: Buffer[], tree: RadixTree<number>): void {
-  const entries: Array<[string, number | RadixTree<number>]> = []
-  for (const [key, val] of tree) {
-    entries.push([key, val as number | RadixTree<number>])
-  }
-
-  const countBuf = Buffer.alloc(2)
-  countBuf.writeUInt16LE(entries.length, 0)
-  chunks.push(countBuf)
-
-  for (const [key, val] of entries) {
-    if (key === LEAF) {
-      const node = Buffer.alloc(1 + 4)
-      node.writeUInt8(TREE_NODE_LEAF, 0)
-      node.writeUInt32LE(val as number, 1)
-      chunks.push(node)
-    } else {
-      const keyBuf = Buffer.from(key, 'utf8')
-      if (keyBuf.length > 0xffff) {
-        throw invalidFrozenIndex('term tree edge key too long')
-      }
-      const header = Buffer.alloc(1 + 2 + keyBuf.length)
-      header.writeUInt8(TREE_NODE_EDGE, 0)
-      header.writeUInt16LE(keyBuf.length, 1)
-      keyBuf.copy(header, 3)
-      chunks.push(header)
-      writeTermTreeNode(chunks, val as RadixTree<number>)
-    }
-  }
-}
-
-/** @deprecated MSv3/MSv4 recursive DFS term-tree section; MSv5 uses columnar wire. */
-export function buildTermTreeSection(tree: RadixTree<number>): Buffer {
-  const chunks: Buffer[] = []
-  writeTermTreeNode(chunks, tree)
-  return Buffer.concat(chunks)
 }
 
 export function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {

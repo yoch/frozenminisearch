@@ -1,8 +1,39 @@
 # Changelog
 
-`MiniSearch` follows [semantic versioning](https://semver.org/spec/v2.0.0.html).
-
 ## Unreleased
+
+### Breaking
+
+- **Binary snapshots: MSv5 only** — `loadBinarySync` / `loadBinaryAsync` no longer read MSv3/MSv4; re-save from lucaong JSON or a mutable index. Removed legacy encoders (`packedRadixBinary.ts`, `encodeFrozenSnapshotMSv3/MSv4`).
+- **Removed `saveBinary()` / `loadBinary()`** — use `saveBinarySync` / `saveBinaryAsync` and `loadBinarySync` / `loadBinaryAsync`.
+
+## v1.0.0-beta.0 — `@yoch/frozenminisearch`
+
+New standalone package (frozen-only). Replaces the mutable `@yoch/minisearch` fork for serving use cases.
+
+### Added
+
+- **`FrozenMiniSearch`** as the default export — `fromDocuments`, builder, MSv5 `saveBinarySync` / `loadBinarySync`
+- **Migration loaders** — `fromMiniSearch`, `fromMiniSearchJson`, `fromMiniSearchSnapshot` (lucaong JSON wire format)
+- **Modular benchmarks** — `npm run bench` with profiles `vs-reference`, `regression`, `dev`
+- **Parity suite** — `dev/parity/` vs `minisearch` npm (functional invariants)
+
+### Removed from published API
+
+- Mutable `MiniSearch` class and `freeze()` on the fork
+- `freezeFromMiniSearch` (use `fromMiniSearchJson`)
+- Read-only mutation stubs (`add`, `remove`, …)
+
+### Migration
+
+- `@yoch/minisearch` → `@yoch/frozenminisearch` (see README)
+- `new MiniSearch(opts).addAll(docs).freeze()` → `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)`
+
+---
+
+## Legacy — `@yoch/minisearch` / MiniSearch fork
+
+`MiniSearch` fork releases follow [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
 ## v8.4.0
 

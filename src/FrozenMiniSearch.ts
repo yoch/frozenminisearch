@@ -1,7 +1,6 @@
-import type { RadixTree } from './SearchableMap/types'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
-import { fromRadixTree } from './PackedRadixTree'
+import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
 import { type AggregateContext, type RawResult } from './scoring'
 import { finalizeRawSearchResults } from './scoring'
 import {
@@ -50,24 +49,14 @@ import {
   type FieldLengthArray,
 } from './fieldLengthMatrix'
 import type {
-  FreezeSource,
   FrozenAssembleParams,
   FrozenMemoryBreakdown,
   OptionsWithDefaults,
 } from './frozenTypes'
-export type { FreezeSource, FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
+export type { FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
+export type { MiniSearchSnapshot } from './fromMiniSearch'
 import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
-import { warnDeprecatedBinaryApi } from './binaryDeprecation'
-import { DISCARDED_DOC_ID } from './flatPostings'
 import { WILDCARD_QUERY } from './symbols'
-
-const READ_ONLY_MSG = 'FrozenMiniSearch is read-only. Rebuild from a mutable MiniSearch instance.'
-
-function throwReadOnly(): never {
-  throw new Error(READ_ONLY_MSG)
-}
-
-type MutableFieldTermData = Map<number, Map<number, number>>
 
 export function frozenMemoryBreakdown(frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
   return frozen.memoryBreakdown()
@@ -117,116 +106,6 @@ function assembleFrozenTrusted<T>(
 /** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts (full validation). */
 export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
   return assembleFrozenInternal(params, false, 'binary-load')
-}
-
-function buildFlatPostingsFromSource<T>(
-  source: FreezeSource<T>,
-  fieldCount: number,
-  nextId: number,
-  shortIdRemap: Uint32Array | null,
-): {
-  termCount: number
-  index: FrozenTermIndex
-  postings: FrozenPostingsLayout
-} {
-  const fieldIndexByTermIndex: MutableFieldTermData[] = []
-  const radixTree = source.index.radixTree as RadixTree<MutableFieldTermData>
-
-  const index = fromRadixTree(radixTree, {
-    termCount: 0,
-    mapLeaf: (leaf) => {
-      const ti = fieldIndexByTermIndex.length
-      fieldIndexByTermIndex[ti] = leaf
-      return ti
-    },
-    inferTermCountFromLeaves: true,
-  })
-  const termCount = index.size
-
-  const remapDocId = shortIdRemap != null
-    ? (docId: number) => shortIdRemap[docId]
-    : undefined
-  const postings = materializeFrozenPostings({
-    fieldCount,
-    termCount,
-    nextId,
-    clampFrequencies: true,
-    remapDocId,
-    forEachPosting(ti, f, emit) {
-      const freqs = fieldIndexByTermIndex[ti].get(f)
-      if (freqs == null) return
-      for (const [shortId, freq] of freqs) {
-        emit(shortId, freq)
-      }
-    },
-  })
-
-  return { termCount, index, postings }
-}
-
-export function freezeFromMiniSearch<T>(source: FreezeSource<T>): FrozenMiniSearch<T> {
-  const fieldCount = source.options.fields.length
-  const { documentCount, nextId } = source
-
-  const useDense = documentCount < nextId
-  let shortIdRemap: Uint32Array | null = null
-  const resolvedNextId = useDense ? documentCount : nextId
-  const externalIds: unknown[] = new Array(resolvedNextId)
-  const storedFields: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
-
-  if (useDense) {
-    shortIdRemap = new Uint32Array(nextId)
-    shortIdRemap.fill(DISCARDED_DOC_ID)
-    let dense = 0
-    for (const [shortId, id] of source.documentIds) {
-      shortIdRemap[shortId] = dense
-      externalIds[dense] = id
-      storedFields[dense] = source.storedFields.get(shortId)
-      dense++
-    }
-  } else {
-    for (const [shortId, id] of source.documentIds) {
-      externalIds[shortId] = id
-      storedFields[shortId] = source.storedFields.get(shortId)
-    }
-  }
-
-  const idLookup = createIdToShortIdLookup(externalIds, resolvedNextId)
-
-  const matrixRows = useDense ? documentCount : nextId
-  const matrixCells = matrixRows * fieldCount
-  const fieldLengthScratch: number[] = new Array(matrixCells).fill(0)
-  for (const [shortId, lengths] of source.fieldLength) {
-    const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
-    if (row === DISCARDED_DOC_ID) continue
-    for (let f = 0; f < fieldCount; f++) {
-      fieldLengthScratch[row * fieldCount + f] = lengths[f] ?? 0
-    }
-  }
-  const fieldLengthMatrix = materializeFieldLengthMatrix(fieldLengthScratch)
-
-  const avgFieldLength = new Float32Array(source.avgFieldLength.length)
-  for (let i = 0; i < source.avgFieldLength.length; i++) {
-    avgFieldLength[i] = source.avgFieldLength[i]
-  }
-
-  const flat = buildFlatPostingsFromSource(source, fieldCount, resolvedNextId, shortIdRemap)
-
-  return assembleFrozenTrusted({
-    options: source.options,
-    documentCount,
-    nextId: resolvedNextId,
-    fieldIds: source.fieldIds,
-    fieldCount,
-    externalIds,
-    idLookup,
-    storedFields,
-    fieldLengthMatrix,
-    avgFieldLength,
-    index: flat.index,
-    termCount: flat.termCount,
-    postings: flat.postings,
-  }, 'freeze-minisearch')
 }
 
 export function buildFrozenFromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
@@ -367,23 +246,12 @@ export default class FrozenMiniSearch<T = any> {
     return shortId == null ? undefined : this._storedFields[shortId]
   }
 
-  add(): void { throwReadOnly() }
-  addAll(): void { throwReadOnly() }
-  addAllAsync(): Promise<void> { throwReadOnly() }
-  remove(): void { throwReadOnly() }
-  removeAll(): void { throwReadOnly() }
-  discard(): void { throwReadOnly() }
-  discardAll(): void { throwReadOnly() }
-  replace(): void { throwReadOnly() }
-  vacuum(): Promise<void> { throwReadOnly() }
-
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     return finalizeRawSearchResults(
       this.executeQuery(query, searchOptions),
       query,
       searchOptions,
       this._options.searchOptions,
-      FrozenMiniSearch.wildcard,
       docId => this._externalIds[docId],
       docId => this._storedFields[docId],
     )
@@ -411,14 +279,6 @@ export default class FrozenMiniSearch<T = any> {
     }, undefined, this._index)
   }
 
-  /**
-   * @deprecated Use {@link saveBinarySync} or {@link saveBinaryAsync} explicitly.
-   */
-  saveBinary(): Buffer {
-    warnDeprecatedBinaryApi('saveBinary')
-    return this.saveBinarySync()
-  }
-
   /** Non-blocking zstd compression; same MSv5 output as {@link saveBinarySync}. */
   async saveBinaryAsync(): Promise<Buffer> {
     return encodeFrozenSnapshotAsync({
@@ -436,24 +296,14 @@ export default class FrozenMiniSearch<T = any> {
     }, undefined, this._index)
   }
 
-  /**
-   * Load a frozen snapshot from a buffer (**MSv5**; **MSv3/MSv4** readable but deprecated).
-   */
+  /** Load a frozen snapshot from an **MSv5** buffer. */
   static loadBinarySync<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     const snap = decodeFrozenSnapshot(buffer)
     return FrozenMiniSearch.fromBinarySnapshot(snap, options)
   }
 
   /**
-   * @deprecated Use {@link loadBinarySync} or {@link loadBinaryAsync} explicitly.
-   */
-  static loadBinary<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
-    warnDeprecatedBinaryApi('loadBinary')
-    return FrozenMiniSearch.loadBinarySync(buffer, options)
-  }
-
-  /**
-   * Load MSv5 with streaming zstd decompression (bounded memory). Non-MSv5 buffers fall back to {@link loadBinarySync}.
+   * Load MSv5 with streaming zstd decompression (bounded memory).
    */
   static async loadBinaryAsync<T>(
     buffer: Buffer,
@@ -507,14 +357,40 @@ export default class FrozenMiniSearch<T = any> {
     })
   }
 
-  /**
-   * Build a read-only index in one pass from documents (no mutable MiniSearch step).
-   *
-   * Use {@link MiniSearch} + {@link MiniSearch#freeze} when you need remove, discard, or
-   * incremental updates before freezing.
-   */
+  /** Build a read-only index in one pass from documents. */
   static fromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
     return buildFrozenFromDocuments(documents, options)
+  }
+
+  /**
+   * Convert a lucaong MiniSearch JSON snapshot (`toJSON` / `loadJSON` wire format) into a
+   * frozen index. No runtime dependency on the `minisearch` package.
+   */
+  static fromMiniSearchJson<T>(json: string, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
+    return FrozenMiniSearch.fromMiniSearchSnapshot(JSON.parse(json) as MiniSearchSnapshot, options)
+  }
+
+  /**
+   * Same as {@link fromMiniSearchJson} with a pre-parsed snapshot object.
+   * `storedFields` are shallow-copied; callers must not mutate nested values
+   * after load if they intend to keep the index immutable.
+   */
+  static fromMiniSearchSnapshot<T>(
+    snapshot: MiniSearchSnapshot,
+    options: Options<T> = {} as Options<T>,
+  ): FrozenMiniSearch<T> {
+    return assembleFrozenTrusted(
+      buildFrozenAssembleParamsFromMiniSearchSnapshot(snapshot, options),
+      'minisearch-json',
+    )
+  }
+
+  /** Accepts any object exposing `toJSON()` in lucaong MiniSearch snapshot shape. */
+  static fromMiniSearch<T>(
+    source: { toJSON(): MiniSearchSnapshot },
+    options: Options<T> = {} as Options<T>,
+  ): FrozenMiniSearch<T> {
+    return FrozenMiniSearch.fromMiniSearchSnapshot(source.toJSON(), options)
   }
 
   /**

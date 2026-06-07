@@ -51,15 +51,27 @@ function printScenario (data) {
   console.log(`\n${'='.repeat(72)}`)
   console.log(`Profile: ${data.name}`)
   console.log(`  documents: ${data.documentCount}, fields: [${data.fields.join(', ')}], storeFields: [${data.storeFields.join(', ') || '(none)'}]`)
+  if (data.benchSurfaces) {
+    console.log(`  surfaces: [${data.benchSurfaces.join(', ')}]`)
+  }
   console.log('='.repeat(72))
 
-  printMemoryBreakdown(data.memoryBreakdown)
+  if (data.memoryBreakdown) printMemoryBreakdown(data.memoryBreakdown)
 
-  console.log('\nIndexing:')
-  console.log(`  addAll:         ${data.indexing.addAllMs.toFixed(1)} ms`)
-  console.log(`  freeze:         ${data.indexing.freezeMs.toFixed(1)} ms  (offline, once)`)
-  console.log(`  JSON.stringify: ${data.indexing.jsonSerializeMs.toFixed(1)} ms`)
-  console.log(`  saveBinary:     ${data.indexing.saveBinaryMs.toFixed(1)} ms  (format ${data.indexing.binaryMagic})`)
+  if (data.indexing) {
+    console.log('\nIndexing:')
+    if (data.indexing.addAllMs != null) console.log(`  addAll:         ${data.indexing.addAllMs.toFixed(1)} ms`)
+    if (data.indexing.freezeMs != null) console.log(`  freeze:         ${data.indexing.freezeMs.toFixed(1)} ms  (offline, once)`)
+    if (data.indexing.jsonSerializeMs != null) console.log(`  JSON.stringify: ${data.indexing.jsonSerializeMs.toFixed(1)} ms`)
+    if (data.indexing.saveBinaryMs != null) {
+      console.log(`  saveBinary:     ${data.indexing.saveBinaryMs.toFixed(1)} ms  (format ${data.indexing.binaryMagic})`)
+    }
+  }
+
+  if (!data.heapMb) {
+    if (data.search) printSearchTable(data)
+    return
+  }
 
   const baseHeap = data.heapMb.mutable
   printTable([
@@ -69,10 +81,39 @@ function printScenario (data) {
     { label: 'loadBinary → Frozen', heapMb: data.heapMb.loadBinary.toFixed(2), diskMb: data.diskMb.binary.toFixed(2), loadMs: data.loadMs.binary, vsMutable: pct(baseHeap, data.heapMb.loadBinary) }
   ])
 
-  console.log('\nCold load:')
-  console.log(`  loadJSON:   ${data.loadMs.json.toFixed(1)} ms`)
-  console.log(`  loadBinary: ${data.loadMs.binary.toFixed(1)} ms  (${pct(data.loadMs.json, data.loadMs.binary)} vs loadJSON)`)
+  if (data.loadMs) {
+    console.log('\nCold load:')
+    console.log(`  loadJSON:   ${data.loadMs.json.toFixed(1)} ms`)
+    console.log(`  loadBinary: ${data.loadMs.binary.toFixed(1)} ms  (${pct(data.loadMs.json, data.loadMs.binary)} vs loadJSON)`)
+  }
 
+  if (data.search) printSearchTable(data)
+
+  if (data.summary && Object.keys(data.summary).length > 0) {
+    console.log('\nProfile summary:')
+    if (data.summary.heapFrozenVsMutableSavingPct != null) {
+      console.log(`  RAM frozen vs mutable (isolated):  ${data.summary.heapFrozenVsMutableSavingPct.toFixed(1)}% smaller`)
+    }
+    if (data.summary.diskBinaryVsJsonSavingPct != null) {
+      console.log(`  Disk binary vs JSON:               ${data.summary.diskBinaryVsJsonSavingPct.toFixed(1)}% smaller`)
+    }
+    if (data.summary.loadBinaryVsJsonSavingPct != null) {
+      console.log(`  Cold load binary vs JSON:          ${data.summary.loadBinaryVsJsonSavingPct.toFixed(1)}% faster`)
+    }
+    if (data.summary.searchFrozenP50AvgGainPct != null) {
+      console.log(`  Search p50 (avg across queries):   ${data.summary.searchFrozenP50AvgGainPct.toFixed(1)}% faster on frozen`)
+    }
+  }
+
+  if (data.scoreDrift && data.scoreDrift.length > 0) {
+    console.log('\nScore drift (mutable vs frozen):')
+    for (const row of data.scoreDrift) {
+      console.log(`  ${row.query}: max Δ=${row.maxAbsScoreDelta} (rel ${row.maxRelScoreDeltaPct}%), missing topK=${row.missingInFrozenTopK}, orderChanged=${row.topKOrderChanged}`)
+    }
+  }
+}
+
+function printSearchTable (data) {
   console.log('\nSearch p50 / p95 (ms):\n')
   console.log('Query'.padEnd(12) + 'Mutable p50'.padEnd(14) + 'Frozen p50'.padEnd(14) + 'Δ p50'.padEnd(10) + 'Mutable p95'.padEnd(14) + 'Frozen p95')
   console.log('-'.repeat(68))
@@ -86,22 +127,9 @@ function printScenario (data) {
       row.frozenP95.toFixed(3)
     )
   }
-
-  console.log('\nProfile summary:')
-  console.log(`  RAM frozen vs mutable (isolated):  ${data.summary.heapFrozenVsMutableSavingPct.toFixed(1)}% smaller`)
-  console.log(`  Disk binary vs JSON:               ${data.summary.diskBinaryVsJsonSavingPct.toFixed(1)}% smaller`)
-  console.log(`  Cold load binary vs JSON:          ${data.summary.loadBinaryVsJsonSavingPct.toFixed(1)}% faster`)
-  console.log(`  Search p50 (avg across queries):   ${data.summary.searchFrozenP50AvgGainPct.toFixed(1)}% faster on frozen`)
-
-  if (data.scoreDrift && data.scoreDrift.length > 0) {
-    console.log('\nScore drift (mutable vs frozen):')
-    for (const row of data.scoreDrift) {
-      console.log(`  ${row.query}: max Δ=${row.maxAbsScoreDelta} (rel ${row.maxRelScoreDeltaPct}%), missing topK=${row.missingInFrozenTopK}, orderChanged=${row.topKOrderChanged}`)
-    }
-  }
 }
 
-const { runs, searchIterations } = parseBenchmarkArgs()
+const { runs, searchIterations, surfaces } = parseBenchmarkArgs()
 const fromPath = argValue('--from')
 
 console.log('=== MiniSearch vs FrozenMiniSearch (isolated measurements) ===\n')
@@ -118,7 +146,7 @@ if (fromPath) {
     console.log('Tip: run with --expose-gc for accurate heap numbers.\n')
   }
   console.log(`${runs} run(s)/scenario, ${searchIterations} search iterations (median)\n`)
-  scenarios = runBenchmarkSuite(buildScenarioList(), runs, searchIterations)
+  scenarios = runBenchmarkSuite(buildScenarioList(), runs, searchIterations, { surfaces })
 }
 
 for (const result of scenarios) {
@@ -137,5 +165,5 @@ console.log('Notes')
 console.log('='.repeat(72))
 console.log('• Heap is measured with one index alive; use --expose-gc for stable numbers.')
 console.log('• Memory breakdown estimates structured data; V8 object overhead is additional.')
-console.log('• saveBinarySync writes MSv5 (unified zstd payload); loadBinarySync/Async read MSv5 (+ deprecated MSv3/MSv4).')
-console.log('• Production: build mutable → freeze() → release mutable → serve frozen (or loadBinary).\n')
+console.log('• saveBinarySync writes MSv5 (unified zstd payload); loadBinarySync/Async read MSv5 only.')
+console.log('• Production: fromDocuments / fromMiniSearch → saveBinarySync → loadBinarySync.\n')

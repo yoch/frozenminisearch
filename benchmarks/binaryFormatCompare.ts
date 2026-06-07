@@ -1,16 +1,9 @@
 /**
- * Save benchmarks on existing corpora:
- *   1. saveBinarySync (MSv5) vs deprecated MSv4 / MSv3 — size + wall-clock
- *   2. saveBinarySync vs saveBinaryAsync (MSv5) — wall-clock + output size
+ * MSv5 save benchmarks: saveBinarySync vs saveBinaryAsync (size + wall-clock).
  *
  *   npm run benchmark:binary-format
  */
 import MiniSearch, { FrozenMiniSearch } from '../dist/es/index.js'
-import { decodeFrozenSnapshot } from '../src/binaryDecode.ts'
-import { encodeFrozenSnapshotMSv3, encodeFrozenSnapshotMSv4 } from '../src/binaryEncode.ts'
-import { deserializeTermIndexTree } from '../src/binaryStructures.ts'
-import type { FrozenSnapshot } from '../src/binaryStructures.ts'
-import { resetDeprecatedBinaryWarningsForTests } from '../src/binaryDeprecation.ts'
 import { CODEC_RAW, CODEC_ZSTD, MSV5_PAYLOAD_CODEC_OFFSET } from '../src/msv5/binaryMsv5Constants.ts'
 import { gc, timedMs } from './benchmarkUtils.js'
 import { loadDivinaLines } from './loadDivinaLines.js'
@@ -37,12 +30,8 @@ interface SaveResult {
   syncKiB: number
   asyncKiB: number
   byteDelta: number
-  msv4KiB: number
-  msv3KiB: number | null
   saveSyncMs: number
   saveAsyncMs: number
-  saveMsv4Ms: number
-  saveMsv3Ms: number | null
 }
 
 function median (values: number[]): number {
@@ -62,11 +51,6 @@ function pct (base: number, value: number): number {
 function payloadKind (buf: Buffer): 'raw' | 'zstd' {
   const codec = buf.readUInt8(MSV5_PAYLOAD_CODEC_OFFSET)
   return codec === CODEC_ZSTD ? 'zstd' : codec === CODEC_RAW ? 'raw' : 'raw'
-}
-
-function canEncodeMSv3 (snap: FrozenSnapshot): boolean {
-  return snap.postings.layout === 'dense'
-    && snap.postings.allDocIds instanceof Uint32Array
 }
 
 function benchSync (fn: () => void, runs = SAVE_RUNS, warmup = SAVE_WARMUP): number {
@@ -111,12 +95,10 @@ function buildScenarios (): Scenario[] {
 
 async function runScenario (scenario: Scenario): Promise<SaveResult> {
   const { corpus, options, id } = scenario
-  resetDeprecatedBinaryWarningsForTests()
 
   const ms = new MiniSearch(options)
   ms.addAll(corpus)
-  const frozen = ms.freeze()
-  const snap = decodeFrozenSnapshot(frozen.saveBinarySync())
+  const frozen = FrozenMiniSearch.fromMiniSearch(ms, options)
 
   const bufSync = frozen.saveBinarySync() as Buffer
   const saveSyncMs = benchSync(() => {
@@ -128,32 +110,14 @@ async function runScenario (scenario: Scenario): Promise<SaveResult> {
     await frozen.saveBinaryAsync()
   })
 
-  const saveMsv4Ms = benchSync(() => {
-    encodeFrozenSnapshotMSv4(snap)
-  })
-  const bufMsv4 = encodeFrozenSnapshotMSv4(snap) as Buffer
-
-  let bufMsv3: Buffer | null = null
-  let saveMsv3Ms: number | null = null
-  if (canEncodeMSv3(snap)) {
-    saveMsv3Ms = benchSync(() => {
-      encodeFrozenSnapshotMSv3(snap, deserializeTermIndexTree(snap.treeShape))
-    })
-    bufMsv3 = encodeFrozenSnapshotMSv3(snap, deserializeTermIndexTree(snap.treeShape)) as Buffer
-  }
-
   return {
     id,
     payload: payloadKind(bufSync),
     syncKiB: bufSync.length / 1024,
     asyncKiB: bufAsync.length / 1024,
     byteDelta: Math.abs(bufSync.length - bufAsync.length),
-    msv4KiB: bufMsv4.length / 1024,
-    msv3KiB: bufMsv3 != null ? bufMsv3.length / 1024 : null,
     saveSyncMs,
     saveAsyncMs,
-    saveMsv4Ms,
-    saveMsv3Ms,
   }
 }
 
@@ -161,51 +125,9 @@ function pad (s: string, n: number): string {
   return s.length >= n ? s.slice(0, n) : s + ' '.repeat(n - s.length)
 }
 
-function printSaveVsLegacy (rows: SaveResult[]): void {
-  console.log('\n═══════════════════════════════════════════════════════════════════════════════')
-  console.log('  1. SAVE — saveBinarySync (MSv5) vs formats deprecated (MSv4 / MSv3)')
-  console.log(`  median save wall-clock, ${SAVE_RUNS} runs (+${SAVE_WARMUP} warmup)  |  baseline = MSv5 sync`)
-  console.log('═══════════════════════════════════════════════════════════════════════════════\n')
-
-  console.log(
-    pad('corpus', 22)
-    + pad('pay', 6)
-    + pad('MSv5 KiB', 10)
-    + pad('MSv4 KiB', 10)
-    + pad('size MSv4', 11)
-    + pad('save sync', 11)
-    + pad('save MSv4', 11)
-    + pad('time MSv4', 11)
-    + pad('MSv3 KiB', 10),
-  )
-  console.log('-'.repeat(102))
-
-  for (const r of rows) {
-    const sizePct = `${pct(r.syncKiB, r.msv4KiB) >= 0 ? '+' : ''}${pct(r.syncKiB, r.msv4KiB).toFixed(0)}%`
-    const timePct = `${pct(r.saveSyncMs, r.saveMsv4Ms) >= 0 ? '+' : ''}${pct(r.saveSyncMs, r.saveMsv4Ms).toFixed(0)}%`
-    const msv3KiB = r.msv3KiB != null ? `${r.msv3KiB.toFixed(1)}` : '—'
-    console.log(
-      pad(r.id, 22)
-      + pad(r.payload, 6)
-      + pad(r.syncKiB.toFixed(1), 10)
-      + pad(r.msv4KiB.toFixed(1), 10)
-      + pad(sizePct, 11)
-      + pad(`${r.saveSyncMs.toFixed(1)} ms`, 11)
-      + pad(`${r.saveMsv4Ms.toFixed(1)} ms`, 11)
-      + pad(timePct, 11)
-      + pad(msv3KiB, 10),
-    )
-  }
-
-  const avgSize = rows.reduce((s, r) => s + pct(r.syncKiB, r.msv4KiB), 0) / rows.length
-  const avgTime = rows.reduce((s, r) => s + pct(r.saveSyncMs, r.saveMsv4Ms), 0) / rows.length
-  console.log('-'.repeat(102))
-  console.log(`  moyenne : MSv4 ~${avgSize.toFixed(0)} % plus gros ; save MSv4 ~${avgTime.toFixed(0)} % vs MSv5 sync`)
-}
-
 function printSaveSyncVsAsync (rows: SaveResult[]): void {
   console.log('\n═══════════════════════════════════════════════════════════════════════════════')
-  console.log('  2. SAVE — saveBinarySync vs saveBinaryAsync (même MSv5)')
+  console.log('  SAVE — saveBinarySync vs saveBinaryAsync (MSv5)')
   console.log(`  median wall-clock, ${SAVE_RUNS} runs (+${SAVE_WARMUP} warmup)  |  baseline = sync`)
   console.log('═══════════════════════════════════════════════════════════════════════════════\n')
 
@@ -260,15 +182,12 @@ Notes
 ─────
 • saveBinarySync  — zstdCompressSync sur le payload concaténé.
 • saveBinaryAsync — zstd via callback async (même sémantique MSv5 ; taille compressée ± quelques octets).
-• MSv4/MSv3       — sections non compressées (deprecated) ; encode via snap dérivé du MSv5.
-• MSv3            — seulement si nextId > 65535 (doc ids Uint32) ; sinon colonne absente.
-• « size MSv4 »   — % vs MSv5 sync (positif = MSv4 plus gros).
-• « time MSv4 »   — % temps save MSv4 vs save MSv5 sync (négatif = MSv5 plus rapide).
+• Seul le format MSv5 est supporté (dense/sparse postings, radix columnar, field lengths adaptatifs).
 `)
 }
 
 async function main (): Promise<void> {
-  console.log('Binary format SAVE benchmark')
+  console.log('Binary format SAVE benchmark (MSv5)')
   console.log(`Node ${process.version}  ${new Date().toISOString()}`)
 
   const rows: SaveResult[] = []
@@ -277,7 +196,6 @@ async function main (): Promise<void> {
     gc()
   }
 
-  printSaveVsLegacy(rows)
   printSaveSyncVsAsync(rows)
   printNotes()
 }

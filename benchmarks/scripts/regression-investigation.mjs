@@ -176,8 +176,8 @@ function runCase (id) {
   if (id === 'overflowHeap') {
     const drift = scoreDrift(ms, frozen, 'alpha')
     console.log(`\nscoreDrift mutable→frozen (top 20, expected with tf>255):`, drift)
-    const rt = frozen.saveBinary()
-    const loaded = FrozenMiniSearch.loadBinary(rt, spec.options)
+    const rt = frozen.saveBinarySync()
+    const loaded = FrozenMiniSearch.loadBinarySync(rt, spec.options)
     const driftRt = scoreDrift(frozen, loaded, 'alpha')
     console.log('scoreDrift frozen→loadBinary:', driftRt)
   }

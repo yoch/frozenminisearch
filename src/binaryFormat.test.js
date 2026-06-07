@@ -1,4 +1,4 @@
-import MiniSearch from './MiniSearch'
+import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
 import PackedRadixTree from './PackedRadixTree'
 import CRC32 from 'crc-32'
@@ -9,8 +9,6 @@ import {
   deserializeTermIndexTree,
   validateFrozenSnapshot,
   crc32Buffer,
-  BINARY_MAGIC_V3,
-  BINARY_MAGIC_V4,
   BINARY_MAGIC_V5,
 } from './binaryFormat'
 import {
@@ -21,7 +19,6 @@ import {
   Msv5SectionId,
 } from './msv5/binaryMsv5Constants'
 import { loadMsv5Sections, readMsv5SectionDirectory } from './msv5/binaryMsv5Compression'
-import { encodeFrozenSnapshotMSv3, encodeFrozenSnapshotMSv4 } from './binaryEncode'
 function densePostings(fieldCount, termCount, nextId, offsets, lengths, docIds, freqs) {
   return {
     fieldCount,
@@ -51,7 +48,7 @@ const options = { fields: ['title', 'text'] }
 function buildSnapshotFromFrozen() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  const frozen = mutable.freeze()
+  const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {})
   const buf = frozen.saveBinarySync()
   return decodeFrozenSnapshot(buf)
 }
@@ -128,11 +125,12 @@ describe('binaryFormat MSv5', () => {
     expect(() => validateFrozenSnapshot(snap)).toThrow(/leaf index out of range/)
   })
 
-  test('rejects legacy MSv1 and MSv2', () => {
-    for (const magic of ['MSv1', 'MSv2']) {
+  test('rejects legacy MSv1 through MSv4', () => {
+    const versions = { MSv1: 1, MSv2: 2, MSv3: 3, MSv4: 4 }
+    for (const magic of Object.keys(versions)) {
       const buf = Buffer.alloc(64)
       buf.write(magic, 0, 4, 'ascii')
-      buf.writeUInt16LE(magic === 'MSv1' ? 1 : 2, 4)
+      buf.writeUInt16LE(versions[magic], 4)
       expect(() => decodeFrozenSnapshot(buf)).toThrow(/no longer supported/)
     }
   })
@@ -146,7 +144,7 @@ describe('binaryFormat MSv5', () => {
   test('rejects section CRC mismatch', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = Buffer.from(mutable.freeze().saveBinarySync())
+    const buf = Buffer.from(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
     const coreDir = msv5SectionDirOffset(Msv5SectionId.Core)
     buf.writeUInt32LE(0, coreDir + 8)
     expect(() => decodeFrozenSnapshot(buf)).toThrow(/CRC mismatch/)
@@ -156,12 +154,12 @@ describe('binaryFormat MSv5', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: 'alpha', text: 'one' })
     mutable.add({ id: 42, text: 'two' })
-    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinarySync())
+    const snap = decodeFrozenSnapshot(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toBe('alpha')
     expect(snap.externalIds[1]).toBe(42)
   })
 
-  test('dense Uint32 postings encode as MSv3', () => {
+  test('dense Uint32 postings round-trip via MSv5', () => {
     const snap = {
       documentCount: 70000,
       nextId: 70000,
@@ -181,19 +179,10 @@ describe('binaryFormat MSv5', () => {
         new Uint8Array([1]),
       ),
     }
-    const buf = encodeFrozenSnapshotMSv3(snap, deserializeTermIndexTree(snap.treeShape))
-    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V3)
-    expect(buf.readUInt16LE(4)).toBe(3)
+    const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(snap.treeShape))
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
+    expect(buf.readUInt16LE(4)).toBe(5)
     expect(decodeFrozenSnapshot(buf).packedTermIndex.get('only')).toBe(0)
-  })
-
-  test('MSv4 encode/decode round-trip (multi-field path)', () => {
-    const snap = buildSnapshotFromFrozen()
-    const buf = encodeFrozenSnapshotMSv4(snap)
-    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V4)
-    const loaded = decodeFrozenSnapshot(buf)
-    expect(Array.from(loaded.packedTermIndex.entries()).map(([t]) => t).sort())
-      .toEqual(Array.from(snap.packedTermIndex.entries()).map(([t]) => t).sort())
   })
 
   test('sparse layout with >255 fields uses Uint16 field ids', () => {
@@ -205,7 +194,7 @@ describe('binaryFormat MSv5', () => {
     }
     const mutable = new MiniSearch({ fields, storeFields: [] })
     mutable.addAll(docs)
-    const frozen = mutable.freeze()
+    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, { fields })
     expect(frozen.memoryBreakdown().postings.layout).toBe('sparse')
 
     const buf = frozen.saveBinarySync()
@@ -219,7 +208,7 @@ describe('binaryFormat MSv5', () => {
   test('external id JSON blob round-trip', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: { k: 'complex' }, text: 'data' })
-    const snap = decodeFrozenSnapshot(mutable.freeze().saveBinarySync())
+    const snap = decodeFrozenSnapshot(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toEqual({ k: 'complex' })
   })
 })
@@ -230,7 +219,7 @@ describe('binaryFormat corruption guards', () => {
   beforeEach(() => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    validBuf = mutable.freeze().saveBinarySync()
+    validBuf = FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync()
   })
 
   test('rejects buffer shorter than header', () => {
@@ -317,7 +306,7 @@ describe('FrozenMiniSearch loadBinary fields', () => {
   test('load without fields uses snapshot field names', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = mutable.freeze()
+    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
     const buf = frozen.saveBinarySync()
     const loaded = FrozenMiniSearch.loadBinarySync(buf, {})
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))

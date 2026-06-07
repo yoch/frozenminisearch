@@ -1,7 +1,7 @@
 {
-  "name": "@yoch/minisearch",
-  "version": "8.4.0",
-  "description": "Node.js full-text search with FrozenMiniSearch and binary index snapshots",
+  "name": "@yoch/frozenminisearch",
+  "version": "1.0.0-beta.0",
+  "description": "Read-only Node.js full-text search — compact frozen indexes and MSv5 binary snapshots",
   "main": "dist/cjs/index.cjs",
   "module": "dist/es/index.js",
   "type": "module",
@@ -18,11 +18,11 @@
   "contributors": [
     "Luca Ongaro <https://github.com/lucaong> (MiniSearch original)"
   ],
-  "homepage": "https://github.com/yoch/minisearch#readme",
-  "bugs": "https://github.com/yoch/minisearch/issues",
+  "homepage": "https://github.com/yoch/frozenminisearch#readme",
+  "bugs": "https://github.com/yoch/frozenminisearch/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yoch/minisearch.git"
+    "url": "git+https://github.com/yoch/frozenminisearch.git"
   },
   "keywords": [
     "search",
@@ -55,6 +55,7 @@
     "fast-check": "^4.8.0",
     "globals": "^17.6.0",
     "jest": "^30.4.2",
+    "minisearch": "^7.2.0",
     "neostandard": "^0.13.0",
     "regenerator-runtime": "^0.14.0",
     "rollup": "^4.1.0",
@@ -83,14 +84,20 @@
       "ts",
       "js"
     ],
-    "testRegex": "\\.test\\.(ts|js)$",
+    "testMatch": [
+      "<rootDir>/src/**/*.test.(ts|js)",
+      "<rootDir>/dev/parity/**/*.test.(ts|js)"
+    ],
     "setupFilesAfterEnv": []
   },
   "scripts": {
     "test": "jest",
     "test-watch": "jest --watch",
     "coverage": "jest --coverage",
-    "benchmark": "npm run build-benchmark && NODE_ENV=production node --expose-gc benchmarks/dist/index.cjs",
+    "bench": "npm run build && node --expose-gc benchmarks/framework/cli.mjs",
+    "bench:record": "npm run build && node --expose-gc benchmarks/framework/cli.mjs record",
+    "bench:diff": "node --expose-gc benchmarks/framework/cli.mjs diff",
+    "bench:history": "node --expose-gc benchmarks/framework/cli.mjs history",
     "benchmark:compare": "npm run build && node --expose-gc benchmarks/compare.js",
     "benchmark:calibrate-batches": "npm run build && node --expose-gc benchmarks/scripts/calibrate-search-batches.mjs",
     "benchmark:record": "npm run build && node --expose-gc benchmarks/captureBaseline.js",
@@ -106,7 +113,6 @@
     "benchmark:targeted:compare": "node benchmarks/scripts/targeted-failures.mjs --compare",
     "benchmark:history:analyze": "node benchmarks/scripts/analyze-history.mjs",
     "benchmark:history:vs-mutable": "node benchmarks/scripts/analyze-history.mjs --vs-mutable",
-    "build-benchmark": "BENCHMARKS=true npm run build",
     "build-packed-radix-bench": "PACKED_RADIX_BENCH=true NODE_ENV=production rollup -c",
     "benchmark:packed-radix": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs",
     "benchmark:packed-emit": "npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixEmitSubtree.cjs",

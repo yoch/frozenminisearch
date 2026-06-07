@@ -1,11 +1,11 @@
-import SearchableMap from '../SearchableMap/SearchableMap'
+import SearchableMap from '../../src/SearchableMap/SearchableMap.js'
 import {
   buildFuzzySweepQueries,
   collectTerms,
   planSweepSize,
 } from '../../testSupport/fuzzyQueryMutations.js'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
-import { fromRadixTree } from './index'
+import { fromRadixTree } from '../../src/PackedRadixTree/index.js'
 
 const PARITY_SEED = 0x50415249 // 'PARI'
 

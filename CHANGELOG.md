@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## v1.0.2 — `@yoch/frozenminisearch`
+
+Patch release: lower retained heap when `storeFields` has one field. No API or MSv5 wire-format changes.
+
+### Improved
+
+- **Single-field `storeFields` at rest** — values live in a dense column instead of one `Record` per document (~75% less retained heap on Divina with `storeFields: ['txt']`; ~1.0 → ~0.3 MB).
+- **Binary save/load** — encode and decode skip intermediate row arrays when the in-memory layout or load `storeFields` hint allows direct wire paths (same bytes on disk).
+- **Posting slice lookups** — scoring flyweight reuses a scratch buffer instead of allocating `{ offset, length }` per lookup.
+
 ## v1.0.1 — `@yoch/frozenminisearch`
 
 Patch release: lower build-time peak memory and migration ergonomics. No API or wire-format changes.

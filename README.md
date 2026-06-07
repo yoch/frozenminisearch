@@ -2,7 +2,7 @@
 
 **Read-only full-text search for Node.js** — compact frozen indexes, fast binary snapshots, and a **drop-in** search API for frozen workloads: same `search`, `autoSuggest`, scoring, and query options as [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong).
 
-> **Current release:** `1.0.1` on npm
+> **Current release:** `1.0.2` on npm
 
 **Design goal:** once an index is built or loaded, migrate with the minimum code change — package name and index construction only; serving code stays the same. No mutable `MiniSearch` class is published here; build indexes with `fromDocuments`, the incremental builder, or migrate from an existing lucaong index via `fromMiniSearchJson`.
 

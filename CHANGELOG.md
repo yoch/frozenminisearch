@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## v1.0.1 — `@yoch/frozenminisearch`
+
+Patch release: lower build-time peak memory and migration ergonomics. No API or wire-format changes.
+
+### Improved
+
+- **`FrozenIndexBuilder` peak heap** — incremental typed-array posting accumulators replace per-term `number[][]` scratch; token and term-frequency buffers are reused across `add()` calls.
+- **Default tokenization during build** — single-pass field scan when the default splitter is in use (`collectFieldTermFreqsFromFieldInto`).
+
+### Fixed
+
+- **Default tokenizer parity** — leading delimiter produces an empty token (e.g. `::a` → `["", "a"]`), matching lucaong `split` behaviour.
+- **Named export** — `FrozenMiniSearch` is exported again alongside the default export (ESM and CJS).
+
 ## v1.0.0 — `@yoch/frozenminisearch`
 
 First stable release on npm. Frozen-only read-only search for Node.js.

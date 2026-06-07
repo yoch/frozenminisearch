@@ -4,6 +4,42 @@
 
 ## Unreleased
 
+## v8.4.0
+
+Stable release since 8.3.3: frozen search performance, adaptive posting frequencies, and owned immutable snapshots. **MSv5 wire extension** — `FLAG_FREQ_U16` (global flags bit 32) when any term frequency exceeds 255 after clamp; snapshots without the flag still load as u8. Re-save with `saveBinarySync()` to upgrade overflow corpora. No intentional public API breaking changes.
+
+### Frozen search (query path)
+
+  - **Ref-first prefix / fuzzy** on `PackedRadixTree` — `prefixRefs` / `fuzzyRefs` with lazy `termByIndex`; dictionary strings materialized per traversal, not cached on the tree
+  - **Fuzzy traversal** — parallel label segment arrays; pre-decoded query code units; tighter Levenshtein inner loop; simplified MSv5 packed-tree decode
+  - **AND / AND_NOT branch gating** — when a branch is selective enough, later branches score only against an `allowedDocs` set; limits in `queryEngineGateLimits.ts` (not public API); oracle parity in `queryEngine.gate.test.js`
+  - **Field-term flyweight** — one rebindable `SegmentPostingList` per `FrozenMiniSearch` instead of allocating a new view per `get()`
+  - **Query engine** — unified gated / non-gated visitors; fix nested `combineWith` resolution on compound queries
+
+### Frozen postings — adaptive term frequencies
+
+  - **Adaptive `allFreqs` width** — `Uint8` when max tf ≤ 255 after clamp, else `Uint16` (no `Uint32`); frozen paths clamp at **65535** (`clampFreq`)
+  - **MSv5** — `FLAG_FREQ_U16` on `AllFreqs` when u16; absent flag = legacy u8 section (existing snapshots still load)
+  - **BM25 parity** — overflow-frequency benchmark (`tf` > 255) matches mutable `MiniSearch`
+  - **Single-pass builder** — `materializeFrozenPostingsFromBuilder` for `FrozenIndexBuilder` / `fromDocuments` (counts known upfront)
+
+### Immutability — owned snapshots
+
+  - **`freeze()`** — shallow copy of JS metadata (`fieldIds`, `options`, `storedFields`) so the frozen index survives mutation of the source `MiniSearch`
+  - **`loadBinarySync()`** — copies TypedArrays and packed radix tree buffers so the index survives wire buffer mutation
+  - **`assembleFrozenTrusted`** — trusted build paths skip redundant copies when data is already fresh
+
+### Build / pack
+
+  - **labelHeap** — `string[]` + `join('')` when packing radix trees from `SearchableMap`
+  - **MSv5 field lengths** — adaptive u8/u16/u32 restored on binary round-trip (MSv5 wire flags)
+
+### Developer benchmarks
+
+  - **Fixed batch per query** — committed `benchmarks/searchBenchBatches.json` (calibrated at **0.3 ms** wall per sample); `searchBenchProtocol` + `batchSize` in captures; `yarn benchmark:calibrate-batches` after query/corpus changes
+  - Routine suite defaults: **3×15** timed searches, **100** warmup; `yarn benchmark:record:quick` (1×10); `yarn benchmark:validate:freq-adaptive` smoke
+  - **`docs/AND_GATE_PARAMETERS.md`** — tuning notes for gate thresholds; dev script `benchmark:and-gate-tuning`
+
 ## v8.4.0-beta.1
 
 Pre-release: adaptive posting frequencies and BM25 parity on high tf. **MSv5 wire extension** — `FLAG_FREQ_U16` (global flags bit 32) when any term frequency exceeds 255 after clamp; snapshots without the flag still load as u8. Re-save with `saveBinarySync()` to upgrade overflow corpora. No public API changes. Install: `npm install @yoch/minisearch@beta`.

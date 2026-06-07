@@ -2,7 +2,7 @@
 
 **In-memory full-text search for Node.js** — a fork of [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong/minisearch), extended for **production serving**: smaller indexes, faster loads, and a read-only fast path.
 
-> **Current release:** `8.4.0-beta.1` (pre-release) · stable `8.3.3` on npm `latest` · try beta: `npm install @yoch/minisearch@beta`
+> **Current release:** `8.4.0` on npm `latest`
 
 ---
 
@@ -170,7 +170,7 @@ const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
 
 ## Benchmarks
 
-Cutting memory was the original motivation, and the win is real: the index structure shrinks **~10–100× versus the mutable index** across every scenario below. Numbers from [`baselines/reference.json`](benchmarks/baselines/reference.json) — Node.js v22.x, package 8.4.0-beta.1, median of 3 runs × 15 searches (fixed batch per query; see [benchmarks/README.md](benchmarks/README.md)).
+Cutting memory was the original motivation, and the win is real: the index structure shrinks **~10–100× versus the mutable index** across every scenario below. Numbers from [`baselines/reference.json`](benchmarks/baselines/reference.json) — Node.js v22.x, package 8.4.0, median of 3 runs × 15 searches (fixed batch per query; see [benchmarks/README.md](benchmarks/README.md)).
 
 | Scenario | Docs | Index heap¹ | File size (binary vs JSON) | Load time (binary vs JSON) | Search p50 gain |
 |----------|------|------------|--------------------------|--------------------------|----------------|

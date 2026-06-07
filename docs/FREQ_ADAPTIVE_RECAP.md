@@ -1,7 +1,7 @@
 # Récapitulatif — fréquences postings adaptatives (u8 / u16)
 
 Document de relecture pour le changement « freq adaptive » sur `FrozenMiniSearch`.  
-Package : `@yoch/minisearch` 8.4.0-beta.1.
+Package : `@yoch/minisearch` 8.4.0.
 
 ---
 

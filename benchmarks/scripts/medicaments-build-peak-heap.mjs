@@ -75,10 +75,10 @@ function allMsbinSpecs () {
   return specs
 }
 
-function measurePhasedBuild (corpus, options, estimatedDocumentCount = corpus.length) {
+function measurePhasedBuild (corpus, options) {
   const sampler = createPeakHeapSampler()
   const builder = createFrozenIndexBuilder(options, {
-    estimatedDocumentCount,
+    estimatedDocumentCount: corpus.length,
   })
 
   for (const document of corpus) {
@@ -111,10 +111,10 @@ function measurePhasedBuild (corpus, options, estimatedDocumentCount = corpus.le
   }
 }
 
-function measureRetainedBuild (corpus, options, estimatedDocumentCount = corpus.length) {
+function measureRetainedBuild (corpus, options) {
   const sample = measureHeap(() => {
     const builder = createFrozenIndexBuilder(options, {
-      estimatedDocumentCount,
+      estimatedDocumentCount: corpus.length,
     })
     for (const document of corpus) builder.add(document)
     return freezeFrozenIndexBuilder(builder)

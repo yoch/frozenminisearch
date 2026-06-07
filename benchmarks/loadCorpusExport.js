@@ -26,7 +26,7 @@ function loadManifest (corpusDir, prefix) {
  * @param {object} doc
  * @param {string[]} fields
  */
-export function documentFieldTextBytes (doc, fields) {
+function documentFieldTextBytes (doc, fields) {
   let bytes = 0
   for (const field of fields) {
     const v = doc[field]
@@ -44,7 +44,7 @@ export function documentFieldTextBytes (doc, fields) {
  * @param {string} filePath
  * @returns {AsyncGenerator<object>}
  */
-export async function* streamJsonl (filePath) {
+async function* streamJsonl (filePath) {
   const rl = createInterface({
     input: createReadStream(filePath, { encoding: 'utf8' }),
     crlfDelay: Infinity,
@@ -115,12 +115,9 @@ export async function loadAllCorpusExportSpecs (corpusDir) {
     }
   }
   specs.sort((a, b) => a.id.localeCompare(b.id))
-  return specs.map((spec) => ({ ...spec, _root: root }))
+  return specs
 }
 
-/**
- * @param {ReturnType<typeof loadAllCorpusExportSpecs> extends Promise<infer T> ? T[number] : never} spec
- */
 /**
  * Stream documents from a corpus-export JSONL file without retaining the full corpus.
  *
@@ -153,6 +150,7 @@ export async function scanCorpusExportStats (spec) {
   }
 }
 
+/** Bulk-load entire JSONL into memory (tests, ad-hoc scripts). Benches prefer streamCorpusExportDocuments. */
 export async function loadCorpusExportDocuments (spec) {
   const documents = await readJsonl(spec.filePath)
   const fields = spec.fields ?? spec.options.fields

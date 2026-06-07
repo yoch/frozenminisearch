@@ -61,7 +61,6 @@ import {
   storedFieldsFromRows,
   storedFieldsJsonBytes,
   storedFieldsSlotCount,
-  storedFieldsToWireRows,
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
@@ -277,7 +276,8 @@ export default class FrozenMiniSearch<T = any> {
       fieldNames: fieldNamesFromFieldIds(this._fieldIds),
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
-      storedFields: storedFieldsToWireRows(this._storedFields, this._nextId),
+      storedFields: new Array(this._nextId),
+      storedFieldsLayout: this._storedFields,
       fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
@@ -294,7 +294,8 @@ export default class FrozenMiniSearch<T = any> {
       fieldNames: fieldNamesFromFieldIds(this._fieldIds),
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
-      storedFields: storedFieldsToWireRows(this._storedFields, this._nextId),
+      storedFields: new Array(this._nextId),
+      storedFieldsLayout: this._storedFields,
       fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
@@ -303,7 +304,8 @@ export default class FrozenMiniSearch<T = any> {
 
   /** Load a frozen binary snapshot. */
   static loadBinarySync<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
-    const snap = decodeFrozenSnapshot(buffer)
+    const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
+    const snap = decodeFrozenSnapshot(buffer, { storeFields })
     return FrozenMiniSearch.fromBinarySnapshot(snap, options)
   }
 
@@ -312,7 +314,8 @@ export default class FrozenMiniSearch<T = any> {
     buffer: Buffer,
     options: Options<T> = {} as Options<T>,
   ): Promise<FrozenMiniSearch<T>> {
-    const snap = await decodeFrozenSnapshotAsync(buffer)
+    const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
+    const snap = await decodeFrozenSnapshotAsync(buffer, { storeFields })
     return FrozenMiniSearch.fromBinarySnapshot(snap, options)
   }
 
@@ -351,7 +354,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldCount: snap.fieldCount,
       externalIds: snap.externalIds,
       idLookup,
-      storedFields: storedFieldsFromRows(snap.storedFields, opts.storeFields),
+      storedFields: snap.storedFieldsLayout ?? storedFieldsFromRows(snap.storedFields, opts.storeFields),
       fieldLengthMatrix: snap.fieldLengthMatrix,
       avgFieldLength: snap.avgFieldLength,
       index,

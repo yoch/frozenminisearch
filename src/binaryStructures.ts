@@ -11,6 +11,7 @@ import {
   readLengthPrefixedUtf8,
   writeExternalId,
 } from './binaryIo'
+import type { StoredFieldsLayout } from './storedFieldsLayout'
 
 export type TreeShape = Array<[string, number | TreeShape]>
 
@@ -25,6 +26,8 @@ export interface FrozenSnapshot {
   avgFieldLength: Float32Array
   externalIds: unknown[]
   storedFields: (Record<string, unknown> | undefined)[]
+  /** When set, MSv5 wire path uses layout directly; storedFields may be a length-only placeholder. */
+  storedFieldsLayout?: StoredFieldsLayout
   fieldLengthMatrix: FieldLengthArray
   treeShape: TreeShape
   /** Populated on decode; legacy path when {@link packedTermIndex} is absent. */

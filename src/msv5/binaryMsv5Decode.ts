@@ -10,6 +10,7 @@ import {
   validateFrozenSnapshot,
   type FrozenSnapshot,
 } from '../binaryStructures'
+import { readStoredFieldsWireSection } from '../storedFieldsLayout'
 import { readFieldLengthMatrixSection } from '../fieldLengthMatrix'
 import {
   isMsv5Buffer,
@@ -27,6 +28,10 @@ import { decodeMsv5PostingsSections } from './binaryMsv5Postings'
 import { readPackedTermTreeSectionColumnar } from './packedRadixBinaryMsv5'
 
 export { isMsv5Buffer } from './binaryMsv5Compression'
+
+export type FrozenDecodeHints = {
+  storeFields: readonly string[]
+}
 
 function validateMsv5Container(buf: Buffer): {
   globalFlags: number
@@ -55,6 +60,7 @@ function validateMsv5Container(buf: Buffer): {
 function decodeMsv5Sections(
   globalFlags: number,
   sections: Buffer[],
+  hints?: FrozenDecodeHints,
 ): FrozenSnapshot {
   const core = sections[Msv5SectionId.Core]
   if (core.length !== 16) {
@@ -84,12 +90,24 @@ function decodeMsv5Sections(
     sections[Msv5SectionId.ExternalIds].length,
   )
 
-  const storedFields = readStoredFieldsSection(
-    sections[Msv5SectionId.StoredFields],
-    0,
-    nextId,
-    sections[Msv5SectionId.StoredFields].length,
-  )
+  const storedFieldsLayout = hints != null
+    ? readStoredFieldsWireSection(
+      sections[Msv5SectionId.StoredFields],
+      0,
+      nextId,
+      sections[Msv5SectionId.StoredFields].length,
+      hints.storeFields,
+    )
+    : undefined
+
+  const storedFields = storedFieldsLayout != null
+    ? new Array(nextId)
+    : readStoredFieldsSection(
+      sections[Msv5SectionId.StoredFields],
+      0,
+      nextId,
+      sections[Msv5SectionId.StoredFields].length,
+    )
 
   const packedTermIndex = readPackedTermTreeSectionColumnar(
     sections[Msv5SectionId.TermTree],
@@ -130,6 +148,7 @@ function decodeMsv5Sections(
     avgFieldLength,
     externalIds,
     storedFields,
+    storedFieldsLayout,
     fieldLengthMatrix,
     treeShape: [],
     packedTermIndex,
@@ -140,12 +159,15 @@ function decodeMsv5Sections(
   return snap
 }
 
-export function decodeFrozenSnapshotMsv5(buf: Buffer): FrozenSnapshot {
+export function decodeFrozenSnapshotMsv5(buf: Buffer, hints?: FrozenDecodeHints): FrozenSnapshot {
   const { globalFlags, directory } = validateMsv5Container(buf)
-  return decodeMsv5Sections(globalFlags, loadMsv5Sections(buf, directory))
+  return decodeMsv5Sections(globalFlags, loadMsv5Sections(buf, directory), hints)
 }
 
-export async function decodeFrozenSnapshotMsv5Async(buf: Buffer): Promise<FrozenSnapshot> {
+export async function decodeFrozenSnapshotMsv5Async(
+  buf: Buffer,
+  hints?: FrozenDecodeHints,
+): Promise<FrozenSnapshot> {
   const { globalFlags, directory } = validateMsv5Container(buf)
-  return decodeMsv5Sections(globalFlags, await loadMsv5SectionsAsync(buf, directory))
+  return decodeMsv5Sections(globalFlags, await loadMsv5SectionsAsync(buf, directory), hints)
 }

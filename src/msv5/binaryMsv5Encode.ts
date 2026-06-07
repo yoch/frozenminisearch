@@ -13,6 +13,7 @@ import {
   validateTermTreeLeaves,
   type FrozenSnapshot,
 } from '../binaryStructures'
+import { buildStoredFieldsWireSection } from '../storedFieldsLayout'
 import type { FrozenTermIndex } from '../frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { fromRadixTree } from '../PackedRadixTree'
@@ -59,11 +60,15 @@ export function encodeFrozenSnapshotMsv5(
 
   const globalFlags = postingsWire.flags | flFlags | freqFlags
 
+  const storedFieldsSection = snap.storedFieldsLayout != null
+    ? buildStoredFieldsWireSection(snap.storedFieldsLayout, snap.nextId)
+    : buildStoredFieldsSection(snap.storedFields, snap.nextId)
+
   const rawSections = [
     buildCoreSectionWithTermCount(snap),
     buildFieldNamesSection(fieldNames),
     buildExternalIdsSection(snap.externalIds, snap.nextId),
-    buildStoredFieldsSection(snap.storedFields, snap.nextId),
+    storedFieldsSection,
     buildTermTreeSectionColumnar(packed),
     bufferFromView(snap.avgFieldLength),
     buildFieldLengthMatrixSection(snap.fieldLengthMatrix),
@@ -95,11 +100,15 @@ export async function encodeFrozenSnapshotMsv5Async(
 
   const globalFlags = postingsWire.flags | flFlags | freqFlags
 
+  const storedFieldsSection = snap.storedFieldsLayout != null
+    ? buildStoredFieldsWireSection(snap.storedFieldsLayout, snap.nextId)
+    : buildStoredFieldsSection(snap.storedFields, snap.nextId)
+
   const rawSections = [
     buildCoreSectionWithTermCount(snap),
     buildFieldNamesSection(fieldNames),
     buildExternalIdsSection(snap.externalIds, snap.nextId),
-    buildStoredFieldsSection(snap.storedFields, snap.nextId),
+    storedFieldsSection,
     buildTermTreeSectionColumnar(packed),
     bufferFromView(snap.avgFieldLength),
     buildFieldLengthMatrixSection(snap.fieldLengthMatrix),

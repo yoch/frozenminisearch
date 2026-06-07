@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Copy repo markdown/JSON into docs/media/ for the TypeDoc site (relative links in docs/index.html).
- * Outputs are gitignored; run via `npm run build-docs` or `npm run sync-docs-media`.
+ * Outputs are gitignored. Run after TypeDoc (`build-docs` runs typedoc first, then this script).
  */
 const { copyFileSync, mkdirSync } = require('node:fs')
 const { join } = require('node:path')

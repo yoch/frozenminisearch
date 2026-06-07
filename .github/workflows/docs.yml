@@ -14,6 +14,7 @@ on:
       - 'benchmarks/baselines/reference.json'
       - 'typedoc.json'
       - 'examples/plain_js/**'
+      - 'dev/docs/**'
       - 'scripts/sync-docs-media.cjs'
       - '.github/workflows/docs.yml'
   pull_request:
@@ -25,6 +26,7 @@ on:
       - 'DESIGN_DOCUMENT.md'
       - 'benchmarks/README.md'
       - 'benchmarks/baselines/reference.json'
+      - 'dev/docs/**'
       - 'typedoc.json'
       - 'examples/plain_js/**'
       - 'scripts/sync-docs-media.cjs'

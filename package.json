@@ -132,7 +132,7 @@
     "clean-build": "rm -rf dist",
     "build-minified": "MINIFY=true npm run build",
     "sync-docs-media": "node scripts/sync-docs-media.cjs",
-    "build-docs": "npm run sync-docs-media && typedoc --options typedoc.json && npm run build-demo",
+    "build-docs": "typedoc --options typedoc.json && npm run sync-docs-media && npm run build-demo",
     "build-demo": "mkdir -p ./docs/demo && cp -r ./examples/plain_js/. ./docs/demo",
     "lint": "eslint 'src/**/*.{js,ts}'",
     "lintfix": "eslint --fix 'src/**/*.{js,ts}'",

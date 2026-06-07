@@ -148,7 +148,7 @@ function main () {
     const scenario = scenarios[i]
     const t0 = performance.now()
     console.log(`[${i + 1}/${scenarios.length}] ${scenario.id} …`)
-    const cur = runScenario(scenario, searchIterations)
+    const cur = runScenario(scenario)
     console.log(`  done in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
     const ref = reference[scenario.id]
     if (ref == null) {

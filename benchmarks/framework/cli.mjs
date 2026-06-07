@@ -3,6 +3,7 @@
  * Unified benchmark CLI — profiles: vs-reference | regression | dev
  * Usage:
  *   node benchmarks/framework/cli.mjs run [--profile=dev] [--surfaces=search,build] [--quick]
+ *   node benchmarks/framework/cli.mjs micro [--only=fuzzy,ranking] [--list]
  *   node benchmarks/framework/cli.mjs record [--profile=regression]
  *   node benchmarks/framework/cli.mjs diff [--run]
  */
@@ -56,6 +57,9 @@ switch (cmd) {
     break
   case 'history':
     runNode(join(root, 'benchmarks/scripts/record-history.mjs'))
+    break
+  case 'micro':
+    runNode(join(root, 'benchmarks/micro/run.mjs'))
     break
   default:
     console.error(`Unknown command: ${cmd}`)

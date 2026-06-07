@@ -1,8 +1,17 @@
 /** Target wall-clock ms per timed sample when calibrating fixed search batches. */
-export const SEARCH_BENCH_BATCH_TARGET_MS = 0.3
+export const SEARCH_BENCH_BATCH_TARGET_MS = 3
 
-/** Max searches per `performance.now()` window (calibration + runtime cap). */
-export const SEARCH_BENCH_MAX_BATCH = 32
+/** Max searches per timed window (calibration + runtime cap). */
+export const SEARCH_BENCH_MAX_BATCH = 256
+
+/** Below this probe p50 (ms), use {@link SEARCH_BENCH_ITERATIONS_FAST} at record time. */
+export const SEARCH_BENCH_FAST_PROBE_MS = 0.1
+
+/** Default timed iterations per query (see {@link SEARCH_BENCH_ITERATIONS_FAST}). */
+export const SEARCH_BENCH_ITERATIONS = 20
+
+/** Extra iterations for fast queries (probe p50 &lt; {@link SEARCH_BENCH_FAST_PROBE_MS}). */
+export const SEARCH_BENCH_ITERATIONS_FAST = 50
 
 /** Probe iterations when calibrating batch sizes (not used at record time). */
 export const SEARCH_BENCH_CALIBRATE_PROBE_ITERS = 10

@@ -10,15 +10,44 @@ This package is a **standalone product**: no mutable `MiniSearch` class is publi
 
 ## Why frozen instead of MiniSearch?
 
-| | lucaong `minisearch` (mutable) | `@yoch/frozenminisearch` |
-|---|-------------------------------|---------------------------|
-| **Use when** | Documents change (`add`, `remove`, `discard`) | Corpus is fixed or reloaded from disk |
-| **Index memory** | Maps and nested objects per posting | Flat typed arrays + packed radix term tree |
-| **On disk** | `toJSON` / `loadJSON` | **`saveBinarySync` / `loadBinarySync`** (MSv5) |
-| **Typical search** | Baseline | Often **~20–45% faster** p50 on the same corpus |
-| **Index size (heap)** | Baseline | Often **~90–99% smaller** structure |
+**Mutable** lucaong `minisearch` when documents change (`add`, `remove`, `discard`). **Frozen** when the corpus is fixed or shipped as a binary snapshot — same BM25, prefix/fuzzy, `autoSuggest`, wildcard, and `AND` / `OR` / `AND_NOT`. Parity with `minisearch@7` is validated in `dev/parity/` (scores `toBeCloseTo` precision 6).
 
-Same BM25 scoring, prefix/fuzzy search, `autoSuggest`, wildcard, and `AND` / `OR` / `AND_NOT` queries. Functional parity with lucaong `minisearch@7` is validated in `dev/parity/` (scores `toBeCloseTo` precision 6).
+<!-- vs-reference:start — npm run bench:readme -->
+### Measured vs lucaong MiniSearch (reference baseline)
+
+Same BM25 queries on identical corpora. **Frozen wins on what we optimize for**: RAM, disk, cold load, and search throughput on real workloads.
+
+| Scenario | Docs | Index RAM¹ | Disk (binary vs JSON)² | Cold load³ | Search p50⁴ |
+|----------|-----:|------------|------------------------:|-----------:|------------:|
+| Divina with storeFields | 14,097 | 1.1 vs 16.0 MB (~93% less) | ~73% less | ~71% faster | ~14% faster |
+| Divina index only | 14,097 | 0.3 vs 14.9 MB (~98% less) | ~77% less | ~86% faster | ~3% faster |
+| high-frequency terms (10k docs) | 10,000 | 0.2 vs 7.4 MB (~97% less) | ~94% less | ~90% faster | ~32% faster |
+| Dense numeric ids (100k, identity lookup) | 100,000 | 1.7 vs 91.2 MB (~98% less) | ~88% less | ~90% faster | ~21% faster |
+| Doc id Uint16 boundary (65535 docs) | 65,535 | 1.1 vs 58.6 MB (~98% less) | ~91% less | ~94% faster | ~38% faster |
+
+**Headline:** 22/27 query benchmarks favor frozen (paired **hrtime** protocol v2). Divina `inferno` (exact, paired p50): mutable 16.3 µs → frozen 13.8 µs (**-2 µs**, ratio 0.87).
+
+Decomposition (Divina exact): L0 lookup ~300 ns frozen, L1 `executeQuery` ~8.1 µs, L2 full `search` ~11.5 µs (finalize ≈ 3 µs).
+
+| | lucaong `minisearch` | `@yoch/frozenminisearch` |
+|---|------------------------|---------------------------|
+| **Sweet spot** | Live index mutations | Fixed corpus, deploy from binary |
+| **Production path** | `addAll` → `toJSON` | `fromDocuments` / `fromMiniSearch` → `saveBinarySync` → `loadBinarySync` |
+| **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact MSv5 |
+
+<details>
+<summary><strong>How to read these numbers (limits &amp; protocol)</strong></summary>
+
+- **Captured:** 2026-06-07 · commit `2a9a90d` · Node v24.16.0 · minisearch **7.2.0** · **3** run(s)/scenario · protocol **v2** (hrtime-paired, batch target 3 ms).
+- ¹ **Index RAM** — `measureHeap` with `--expose-gc`, one index alive. V8 overhead is extra; treat as **trend**, not accounting. Sporadic outliers happen (e.g. index-only Divina).
+- ² **Disk** — `JSON.stringify(mutable)` vs MSv5 `saveBinarySync`.
+- ³ **Cold load** — median wall time to searchable index after read from disk format.
+- ⁴ **Search p50** — paired mutable/frozen samples per iteration; sub-0.1 ms baselines reported in **µs** in full reports. Fast queries use **50** iterations, others **20**.
+- **Not shown:** mutable `add`/`remove` (frozen is read-only by design). Freeze time is offline — see full suite for build metrics.
+- **Reproduce:** `npm run bench -- run --profile=vs-reference` · **Update this block:** `npm run bench:readme` after refreshing `benchmarks/baselines/reference.json`.
+
+</details>
+<!-- vs-reference:end -->
 
 ---
 
@@ -119,25 +148,13 @@ const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded 
 
 ## Benchmarks
 
-See [benchmarks/README.md](benchmarks/README.md). Quick commands:
+See [benchmarks/README.md](benchmarks/README.md).
 
 ```bash
-npm run bench              # default regression profile
-npm run bench -- run --profile=vs-reference
-npm run bench -- run --profile=dev --quick
-npm run bench:record
-npm run bench:diff
+npm run bench -- run --profile=vs-reference   # compare frozen vs minisearch
+npm run bench:diff                          # regression vs reference.json
+npm run bench:readme                          # refresh comparison table above
 ```
-
-Representative wins (vs mutable `minisearch`, median search p50):
-
-| Scenario | Docs | Index heap¹ | Search p50 |
-|----------|------|------------|------------|
-| Divina Commedia + storeFields | 14k | ~−90% | ~−35% |
-| 100k documents | 100k | ~−95% | ~−43% |
-| Many fields | 2k × 10 fields | ~−99% | ~−45% |
-
-¹ Estimated structure footprint after GC — see benchmarks docs.
 
 ---
 

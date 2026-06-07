@@ -43,14 +43,14 @@ function scenariosById (payload) {
   return Object.fromEntries(payload.scenarios.map((s) => [s.id, s]))
 }
 
-function benchScenario (scenario, runs, searchIterations) {
+function benchScenario (scenario, runs) {
   const freezeSamples = []
   const saveSamples = []
   const loadSamples = []
   let last
 
   for (let i = 0; i < runs; i++) {
-    const r = runScenario(scenario, searchIterations)
+    const r = runScenario(scenario)
     last = r
     freezeSamples.push(r.indexing.freezeMs)
     saveSamples.push(r.indexing.saveBinaryMs)
@@ -85,7 +85,7 @@ function runCapture () {
     runs,
     searchIterations,
     capturedAt: new Date().toISOString(),
-    scenarios: scenarios.map((s) => benchScenario(s, runs, searchIterations)),
+    scenarios: scenarios.map((s) => benchScenario(s, runs)),
   }
 
   const json = JSON.stringify(payload, null, 2) + '\n'

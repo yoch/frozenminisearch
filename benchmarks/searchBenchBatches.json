@@ -1,197 +1,197 @@
 {
-  "protocolVersion": 1,
-  "batchTargetMs": 0.3,
-  "maxBatch": 32,
+  "protocolVersion": 2,
+  "batchTargetMs": 3,
+  "maxBatch": 256,
   "calibrateProbeIterations": 10,
   "batchMode": "fixed-per-query",
   "entries": {
     "divina-storeFields::exact": {
-      "batchSize": 7,
+      "batchSize": 97,
       "calibratedProbeP50Ms": {
-        "mutable": 0.054981,
-        "frozen": 0.044243
+        "mutable": 0.035882,
+        "frozen": 0.031226
       }
     },
     "divina-storeFields::AND": {
-      "batchSize": 6,
+      "batchSize": 108,
       "calibratedProbeP50Ms": {
-        "mutable": 0.07851,
-        "frozen": 0.054063
+        "mutable": 0.027948,
+        "frozen": 0.031631
       }
     },
     "divina-storeFields::AND+prefix": {
-      "batchSize": 4,
+      "batchSize": 43,
       "calibratedProbeP50Ms": {
-        "mutable": 0.137893,
-        "frozen": 0.080245
+        "mutable": 0.077274,
+        "frozen": 0.071397
       }
     },
     "divina-storeFields::AND+fuzzy": {
-      "batchSize": 4,
+      "batchSize": 23,
       "calibratedProbeP50Ms": {
-        "mutable": 0.147393,
-        "frozen": 0.094122
+        "mutable": 0.132982,
+        "frozen": 0.163304
       }
     },
     "divina-storeFields::AND_NOT": {
-      "batchSize": 8,
+      "batchSize": 111,
       "calibratedProbeP50Ms": {
-        "mutable": 0.042404,
-        "frozen": 0.041228
+        "mutable": 0.03402,
+        "frozen": 0.027264
       }
     },
     "divina-storeFields::AND_NOT+prefix": {
-      "batchSize": 6,
+      "batchSize": 28,
       "calibratedProbeP50Ms": {
-        "mutable": 0.13967,
-        "frozen": 0.057782
+        "mutable": 0.137273,
+        "frozen": 0.1083
       }
     },
     "divina-storeFields::prefix": {
-      "batchSize": 5,
+      "batchSize": 59,
       "calibratedProbeP50Ms": {
-        "mutable": 0.094924,
-        "frozen": 0.06741
+        "mutable": 0.055372,
+        "frozen": 0.050872
       }
     },
     "divina-storeFields::fuzzy": {
-      "batchSize": 6,
+      "batchSize": 41,
       "calibratedProbeP50Ms": {
-        "mutable": 0.07238,
-        "frozen": 0.05076
+        "mutable": 0.098514,
+        "frozen": 0.074833
       }
     },
     "divina-indexOnly::exact": {
-      "batchSize": 9,
+      "batchSize": 177,
       "calibratedProbeP50Ms": {
-        "mutable": 0.04226,
-        "frozen": 0.03499
+        "mutable": 0.017031,
+        "frozen": 0.017212
       }
     },
     "divina-indexOnly::prefix": {
-      "batchSize": 5,
+      "batchSize": 30,
       "calibratedProbeP50Ms": {
-        "mutable": 0.129625,
-        "frozen": 0.067555
+        "mutable": 0.111983,
+        "frozen": 0.102927
       }
     },
     "extreme-giantVocabulary::exact": {
-      "batchSize": 32,
+      "batchSize": 256,
       "calibratedProbeP50Ms": {
-        "mutable": 0.011976,
-        "frozen": 0.009106
+        "mutable": 0.007422,
+        "frozen": 0.007581
       }
     },
     "extreme-giantVocabulary::AND+prefix": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 189.339513,
-        "frozen": 124.282926
+        "mutable": 105.868693,
+        "frozen": 90.416797
       }
     },
     "extreme-giantVocabulary::AND_NOT": {
-      "batchSize": 1,
+      "batchSize": 4,
       "calibratedProbeP50Ms": {
-        "mutable": 3.773982,
-        "frozen": 0.778556
+        "mutable": 39.694151,
+        "frozen": 0.840003
       }
     },
     "extreme-giantVocabulary::prefix": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 74.91673,
-        "frozen": 40.837643
+        "mutable": 47.434534,
+        "frozen": 34.580458
       }
     },
     "extreme-largeDocuments::exact": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 9.964906,
-        "frozen": 6.153194
+        "mutable": 7.362442,
+        "frozen": 5.414976
       }
     },
     "extreme-largeDocuments::AND": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 13.123698,
-        "frozen": 7.852921
+        "mutable": 9.228067,
+        "frozen": 6.44058
       }
     },
     "extreme-manyFields::exact": {
-      "batchSize": 1,
+      "batchSize": 2,
       "calibratedProbeP50Ms": {
-        "mutable": 4.667964,
-        "frozen": 2.745245
+        "mutable": 3.983844,
+        "frozen": 2.368231
       }
     },
     "extreme-manyFields::prefix": {
-      "batchSize": 1,
+      "batchSize": 2,
       "calibratedProbeP50Ms": {
-        "mutable": 5.757563,
-        "frozen": 2.786373
+        "mutable": 4.825004,
+        "frozen": 2.718608
       }
     },
     "extreme-highFrequency::exact": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 11.654816,
-        "frozen": 6.886257
+        "mutable": 8.462179,
+        "frozen": 5.998438
       }
     },
     "extreme-highFrequency::AND": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 29.618661,
-        "frozen": 21.185209
+        "mutable": 23.067744,
+        "frozen": 12.726741
       }
     },
     "extreme-overflowFrequency::exact": {
-      "batchSize": 1,
+      "batchSize": 3,
       "calibratedProbeP50Ms": {
-        "mutable": 1.671183,
-        "frozen": 1.242002
+        "mutable": 1.184828,
+        "frozen": 1.09173
       }
     },
     "denseNumericIds-100k::exact": {
-      "batchSize": 5,
+      "batchSize": 53,
       "calibratedProbeP50Ms": {
-        "mutable": 0.089175,
-        "frozen": 0.060786
+        "mutable": 0.067751,
+        "frozen": 0.056858
       }
     },
     "genericStringIds-100k::exact": {
-      "batchSize": 5,
+      "batchSize": 36,
       "calibratedProbeP50Ms": {
-        "mutable": 0.087658,
-        "frozen": 0.060699
+        "mutable": 0.114603,
+        "frozen": 0.085668
       }
     },
     "sparseFields-50kTerms-20Fields::exact": {
-      "batchSize": 1,
+      "batchSize": 2,
       "calibratedProbeP50Ms": {
-        "mutable": 4.897038,
-        "frozen": 3.152154
+        "mutable": 3.565086,
+        "frozen": 2.627867
       }
     },
     "docIdUint16Boundary-65535::exact": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 121.859519,
-        "frozen": 82.330638
+        "mutable": 95.274087,
+        "frozen": 55.826646
       }
     },
     "docIdUint16Boundary-65536::exact": {
       "batchSize": 1,
       "calibratedProbeP50Ms": {
-        "mutable": 118.246846,
-        "frozen": 76.403591
+        "mutable": 95.56848,
+        "frozen": 55.02268
       }
     },
     "saveBinaryAfterNoTerms::exact": {
-      "batchSize": 32,
+      "batchSize": 256,
       "calibratedProbeP50Ms": {
-        "mutable": 0.019218,
-        "frozen": 0.007827
+        "mutable": 0.010766,
+        "frozen": 0.006584
       }
     }
   }

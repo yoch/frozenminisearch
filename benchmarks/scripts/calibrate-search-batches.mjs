@@ -5,12 +5,11 @@
  *   yarn benchmark:calibrate-batches
  */
 import { writeFileSync } from 'node:fs'
-import MiniSearch from '../../dist/es/index.js'
+import MiniSearch from 'minisearch'
+import FrozenMiniSearch from '../../dist/es/index.js'
 import { buildScenarioList } from '../benchmarkSuite.js'
-import {
-  defaultBenchWarmup,
-  median,
-} from '../benchmarkUtils.js'
+import { median } from '../benchmarkUtils.js'
+import { benchHrtimeNow, benchHrtimeElapsedMs } from '../searchBenchTiming.js'
 import { BATCHES_PATH, searchBenchBatchKey } from '../loadSearchBenchBatches.js'
 import {
   computeSearchBenchBatchFromProbe,
@@ -24,9 +23,9 @@ const TARGET_MS = SEARCH_BENCH_BATCH_TARGET_MS
 function probeP50 (runSearch, probeIters = SEARCH_BENCH_CALIBRATE_PROBE_ITERS) {
   const samples = []
   for (let i = 0; i < probeIters; i++) {
-    const t0 = performance.now()
+    const t0 = benchHrtimeNow()
     runSearch()
-    samples.push(performance.now() - t0)
+    samples.push(benchHrtimeElapsedMs(t0))
   }
   return median(samples)
 }
@@ -34,8 +33,7 @@ function probeP50 (runSearch, probeIters = SEARCH_BENCH_CALIBRATE_PROBE_ITERS) {
 function calibrateQuery (mutableIndex, frozenIndex, q, opts) {
   const runMutable = () => mutableIndex.search(q, opts)
   const runFrozen = () => frozenIndex.search(q, opts)
-  const warmup = defaultBenchWarmup()
-  for (let i = 0; i < warmup; i++) {
+  for (let i = 0; i < 50; i++) {
     runMutable()
     runFrozen()
   }
@@ -64,7 +62,7 @@ for (const scenario of scenarios) {
   mutableIndex.addAll(scenario.corpus)
   const frozenBuild = new MiniSearch(scenario.options)
   frozenBuild.addAll(scenario.corpus)
-  const frozenIndex = frozenBuild.freeze()
+  const frozenIndex = FrozenMiniSearch.fromMiniSearch(frozenBuild, scenario.options)
 
   console.log(scenario.id)
   for (const { label, q, opts } of scenario.queries) {
@@ -84,7 +82,7 @@ for (const scenario of scenarios) {
 }
 
 const payload = {
-  protocolVersion: 1,
+  protocolVersion: 2,
   batchTargetMs: SEARCH_BENCH_BATCH_TARGET_MS,
   maxBatch: SEARCH_BENCH_MAX_BATCH,
   calibrateProbeIterations: SEARCH_BENCH_CALIBRATE_PROBE_ITERS,

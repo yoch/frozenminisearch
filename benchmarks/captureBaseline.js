@@ -44,7 +44,7 @@ const payload = {
   benchProfile,
   benchSurfaces: surfaces,
   searchBenchProtocol: getSearchBenchProtocol(),
-  scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile, surfaces }),
+  scenarios: runBenchmarkSuite(undefined, runs, { benchProfile, surfaces }),
 }
 
 if (useReference && !force) {

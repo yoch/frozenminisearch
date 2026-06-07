@@ -12,17 +12,19 @@ import {
   sparseFields,
   docIdUint16Boundary
 } from './benchmarkScenarios.js'
+import { median, medianRound } from './benchStats.js'
 import {
   gc,
   mbRound,
-  pctDeltaRound,
+  frozenVsMutablePct,
   measureHeap,
-  benchSearch,
+  benchSearchPaired,
+  searchIterationsForBatchEntry,
   timedMs,
   defaultBenchmarkRuns,
-  defaultSearchIterations,
 } from './benchmarkUtils.js'
-import { applySearchBenchBatchesToScenarios } from './loadSearchBenchBatches.js'
+import { applySearchBenchBatchesToScenarios, getSearchBenchBatchEntry } from './loadSearchBenchBatches.js'
+import { benchSearchLevels, primaryLookupTerm } from './searchLevels.js'
 import { ALL_SURFACES, computeSurfaceNeeds } from './framework/surfaces.mjs'
 
 function avgFrozenP50GainPct (search) {
@@ -43,42 +45,87 @@ function prepareScenarioSearchIndexes (corpus, options) {
   return { mutableSearchIndex, frozenSearchIndex }
 }
 
-function benchScenarioSearch (mutableSearchIndex, frozenSearchIndex, queries, searchIterations) {
+function benchScenarioSearch (mutableSearchIndex, frozenSearchIndex, queries, scenarioId, { searchLevels = false } = {}) {
   const search = []
+  const levels = searchLevels ? {} : undefined
+
   for (const { label, q, opts, benchBatch } of queries) {
     if (!benchBatch) {
       throw new Error(`Missing benchBatch for search "${label}" (run benchmark:calibrate-batches)`)
     }
+    const batchEntry = getSearchBenchBatchEntry(scenarioId, label)
+    const iterations = searchIterationsForBatchEntry(batchEntry)
     const benchOpts = { batchSize: benchBatch }
-    const mutable = benchSearch(mutableSearchIndex, q, opts, searchIterations, benchOpts)
-    const frozen = benchSearch(frozenSearchIndex, q, opts, searchIterations, benchOpts)
+    const paired = benchSearchPaired(
+      mutableSearchIndex,
+      frozenSearchIndex,
+      q,
+      opts,
+      iterations,
+      benchOpts,
+    )
     search.push({
       label,
       query: q,
       batchSize: benchBatch,
-      mutableP50: Number(mutable.p50.toFixed(4)),
-      frozenP50: Number(frozen.p50.toFixed(4)),
-      mutableP95: Number(mutable.p95.toFixed(4)),
-      frozenP95: Number(frozen.p95.toFixed(4)),
-      frozenP50VsMutablePct: pctDeltaRound(mutable.p50, frozen.p50),
+      searchIterations: iterations,
+      mutableP50: Number(paired.mutableP50.toFixed(4)),
+      frozenP50: Number(paired.frozenP50.toFixed(4)),
+      mutableP95: Number(paired.mutableP95.toFixed(4)),
+      frozenP95: Number(paired.frozenP95.toFixed(4)),
+      pairedRatioP50: paired.pairedRatioP50 == null
+        ? null
+        : Number(paired.pairedRatioP50.toFixed(4)),
+      frozenP50VsMutablePct: frozenVsMutablePct(paired.mutableP50, paired.frozenP50),
+      belowSearchFloor: paired.mutableP50 < 0.1,
     })
+
+    if (searchLevels) {
+      const term = primaryLookupTerm(mutableSearchIndex, q, opts)
+      levels[label] = benchSearchLevels(
+        mutableSearchIndex,
+        frozenSearchIndex,
+        q,
+        opts,
+        term,
+        iterations,
+        benchBatch,
+      )
+    }
   }
   gc()
-  return { search, avgFrozenP50GainPct: avgFrozenP50GainPct(search) }
-}
-
-function median (values) {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  if (sorted.length % 2 === 0) {
-    return (sorted[mid - 1] + sorted[mid]) / 2
+  return {
+    search,
+    searchLevels: levels,
+    avgFrozenP50GainPct: avgFrozenP50GainPct(search),
   }
-  return sorted[mid]
 }
 
-function medianRound (values, digits) {
-  return Number(median(values).toFixed(digits))
+function aggregatePairedLevel (levels) {
+  const pairedRatioSamples = levels
+    .map((l) => l.pairedRatioP50)
+    .filter((v) => v != null)
+  const mutableP50 = medianRound(levels.map((l) => l.mutableP50), 4)
+  const frozenP50 = medianRound(levels.map((l) => l.frozenP50), 4)
+  return {
+    mutableP50,
+    mutableP95: medianRound(levels.map((l) => l.mutableP95), 4),
+    frozenP50,
+    frozenP95: medianRound(levels.map((l) => l.frozenP95), 4),
+    pairedRatioP50: pairedRatioSamples.length
+      ? medianRound(pairedRatioSamples, 4)
+      : null,
+    frozenP50VsMutablePct: frozenVsMutablePct(mutableP50, frozenP50),
+    batchSize: levels[0].batchSize,
+  }
+}
+
+function aggregateFrozenLevel (levels) {
+  return {
+    frozenP50: medianRound(levels.map((l) => l.frozenP50), 4),
+    frozenP95: medianRound(levels.map((l) => l.frozenP95), 4),
+    batchSize: levels[0].batchSize,
+  }
 }
 
 function aggregateSearch (runs) {
@@ -89,18 +136,41 @@ function aggregateSearch (runs) {
     const frozenP50 = medianRound(matches.map((m) => m.frozenP50), 4)
     const mutableP95 = medianRound(matches.map((m) => m.mutableP95), 4)
     const frozenP95 = medianRound(matches.map((m) => m.frozenP95), 4)
-    const frozenP50VsMutablePct = pctDeltaRound(mutableP50, frozenP50)
+    const pairedRatioP50 = medianRound(
+      matches.map((m) => m.pairedRatioP50).filter((v) => v != null),
+      4,
+    )
     return {
       label: row.label,
       query: row.query,
       batchSize: row.batchSize,
+      searchIterations: row.searchIterations,
       mutableP50,
       frozenP50,
       mutableP95,
       frozenP95,
-      frozenP50VsMutablePct
+      pairedRatioP50: Number.isFinite(pairedRatioP50) ? pairedRatioP50 : null,
+      frozenP50VsMutablePct: frozenVsMutablePct(mutableP50, frozenP50),
+      belowSearchFloor: mutableP50 < 0.1,
     }
   })
+}
+
+function aggregateSearchLevels (runs) {
+  const first = runs[0].searchLevels
+  if (!first) return undefined
+  const out = {}
+  for (const label of Object.keys(first)) {
+    const matches = runs.map((r) => r.searchLevels?.[label]).filter(Boolean)
+    if (matches.length === 0) continue
+    out[label] = {
+      term: matches[0].term,
+      L0: aggregatePairedLevel(matches.map((m) => m.L0)),
+      L1: aggregateFrozenLevel(matches.map((m) => m.L1)),
+      L2: aggregatePairedLevel(matches.map((m) => m.L2)),
+    }
+  }
+  return out
 }
 
 function aggregateScoreDrift (runs) {
@@ -127,6 +197,7 @@ function aggregateScenarioRuns (runs) {
   const base = runs[0]
   if (base.benchProfile === 'search' || (base.benchSurfaces?.length === 1 && base.benchSurfaces[0] === 'search')) {
     const search = aggregateSearch(runs)
+    const searchLevels = aggregateSearchLevels(runs)
     return {
       id: base.id,
       name: base.name,
@@ -136,6 +207,7 @@ function aggregateScenarioRuns (runs) {
       benchProfile: 'search',
       benchSurfaces: base.benchSurfaces ?? ['search'],
       search,
+      ...(searchLevels ? { searchLevels } : {}),
       summary: { searchFrozenP50AvgGainPct: avgFrozenP50GainPct(search) },
     }
   }
@@ -210,6 +282,7 @@ function aggregateScenarioRuns (runs) {
 
   const search = aggregateSearch(runs)
   const scoreDrift = aggregateScoreDrift(runs)
+  const searchLevels = aggregateSearchLevels(runs)
 
   return {
     id: base.id,
@@ -217,6 +290,7 @@ function aggregateScenarioRuns (runs) {
     documentCount: base.documentCount,
     fields: base.fields,
     storeFields: base.storeFields,
+    benchSurfaces: base.benchSurfaces,
     indexing,
     heapMb: {
       mutable: heapMutable,
@@ -240,6 +314,7 @@ function aggregateScenarioRuns (runs) {
     },
     memoryBreakdown,
     search,
+    ...(searchLevels ? { searchLevels } : {}),
     scoreDrift,
     summary: {
       heapFrozenVsMutableSavingPct: heapSavingPct,
@@ -431,20 +506,25 @@ function computeScoreDrift (mutable, frozen, query, limit = 20) {
 
 /**
  * Run one benchmark scenario and return JSON-serializable metrics.
+ * Search iteration counts come from `SEARCH_ITERATIONS` (env/CLI) and per-query calibration
+ * (`searchIterationsForBatchEntry`); there is no per-call override.
  * @param {{ benchProfile?: 'full' | 'search' }} [benchOptions]
  */
-export function runScenario (scenario, searchIterations = defaultSearchIterations(), benchOptions = {}) {
+export function runScenario (scenario, benchOptions = {}) {
   const surfaces = benchOptions.surfaces ?? [...ALL_SURFACES]
   const need = computeSurfaceNeeds(surfaces)
   const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')
+  const levelOpts = { searchLevels: need.searchLevels }
+
   if (need.searchOnly) {
     const { id, name, corpus, options, queries } = scenario
     const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
-    const { search, avgFrozenP50GainPct: gain } = benchScenarioSearch(
+    const bench = benchScenarioSearch(
       mutableSearchIndex,
       frozenSearchIndex,
       queries,
-      searchIterations,
+      id,
+      levelOpts,
     )
     return {
       id,
@@ -454,13 +534,31 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
       storeFields: options.storeFields || [],
       benchProfile: 'search',
       benchSurfaces: surfaces,
-      search,
-      summary: { searchFrozenP50AvgGainPct: gain },
+      search: bench.search,
+      ...(bench.searchLevels ? { searchLevels: bench.searchLevels } : {}),
+      summary: { searchFrozenP50AvgGainPct: bench.avgFrozenP50GainPct },
     }
   }
 
   const { id, name, corpus, options, queries, driftQueries } = scenario
   const needsArtifacts = need.build || need.save || need.load || need.migrate || need.drift
+
+  let search
+  let searchGain
+  let searchLevels
+  if (need.search) {
+    const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
+    const bench = benchScenarioSearch(
+      mutableSearchIndex,
+      frozenSearchIndex,
+      queries,
+      id,
+      levelOpts,
+    )
+    search = bench.search
+    searchGain = bench.avgFrozenP50GainPct
+    searchLevels = bench.searchLevels
+  }
 
   let json
   let binaryBuf
@@ -542,20 +640,6 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
     gc()
     loadBinary = timedMs(() => FrozenMiniSearch.loadBinarySync(binaryBuf, options))
     gc()
-  }
-
-  let search
-  let searchGain
-  if (need.search) {
-    const { mutableSearchIndex, frozenSearchIndex } = prepareScenarioSearchIndexes(corpus, options)
-    const bench = benchScenarioSearch(
-      mutableSearchIndex,
-      frozenSearchIndex,
-      queries,
-      searchIterations,
-    )
-    search = bench.search
-    searchGain = bench.avgFrozenP50GainPct
   }
 
   const heapSavingPct = heapMutable && heapFrozen && heapMutable.heapMb > 0
@@ -661,6 +745,7 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
   if (need.search) {
     result.search = search
     result.summary.searchFrozenP50AvgGainPct = searchGain
+    if (searchLevels) result.searchLevels = searchLevels
   }
   if (need.drift) result.scoreDrift = scoreDrift
 
@@ -670,7 +755,6 @@ export function runScenario (scenario, searchIterations = defaultSearchIteration
 export function runBenchmarkSuite (
   scenarios = buildBenchmarkScenarios(),
   runs = defaultBenchmarkRuns(),
-  searchIterations = defaultSearchIterations(),
   benchOptions = {},
 ) {
   const total = scenarios.length
@@ -687,7 +771,7 @@ export function runBenchmarkSuite (
     return scenarios.map((scenario, index) => {
       const t0 = performance.now()
       console.log(`[bench ${index + 1}/${total}] ${scenario.id} (${profileLabel}) …`)
-      const result = runScenario(scenario, searchIterations, benchOptions)
+      const result = runScenario(scenario, benchOptions)
       console.log(`[bench ${index + 1}/${total}] ${scenario.id} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
       return result
     })
@@ -697,7 +781,7 @@ export function runBenchmarkSuite (
     for (let i = 0; i < runs; i++) {
       const t0 = performance.now()
       console.log(`[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${runs} (${profileLabel}) …`)
-      results.push(runScenario(scenario, searchIterations, benchOptions))
+      results.push(runScenario(scenario, benchOptions))
       console.log(
         `[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${runs} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
       )

@@ -1,5 +1,5 @@
 /** Activatable benchmark surfaces. */
-export const ALL_SURFACES = ['build', 'search', 'save', 'load', 'memory', 'breakdown', 'migrate', 'drift']
+export const ALL_SURFACES = ['build', 'search', 'search-levels', 'save', 'load', 'memory', 'breakdown', 'migrate', 'drift']
 
 const STRUCTURAL_SURFACES = new Set(['build', 'save', 'load', 'memory', 'breakdown', 'migrate', 'drift'])
 
@@ -9,7 +9,9 @@ export function parseSurfaces(argv, profile) {
     return normalizeSurfaceList(flag.split('=')[1].split(','))
   }
   if (profile === 'dev') return ['search']
-  if (profile === 'vs-reference') return ['memory', 'build', 'search', 'save', 'load', 'migrate', 'drift']
+  if (profile === 'vs-reference') {
+    return ['search', 'search-levels', 'memory', 'build', 'save', 'load', 'migrate', 'drift']
+  }
   return [...ALL_SURFACES]
 }
 
@@ -29,7 +31,8 @@ export function computeSurfaceNeeds(surfaces) {
   const s = new Set(surfaces)
   return {
     searchOnly: s.size === 1 && s.has('search'),
-    search: s.has('search'),
+    search: s.has('search') || s.has('search-levels'),
+    searchLevels: s.has('search-levels'),
     build: s.has('build'),
     save: s.has('save'),
     load: s.has('load'),

@@ -87,15 +87,8 @@ export function medianOf (values) {
   return sorted[Math.floor(sorted.length / 2)]
 }
 
-/** Median of numeric samples; 0 when empty (timing aggregates). */
-export function median (values) {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid]
-}
+import { DEFAULT_BENCH_WARMUP, median, medianRound } from './benchStats.js'
+export { DEFAULT_BENCH_WARMUP, median, medianRound }
 
 export function medianTimed (fn, iters) {
   const samples = []
@@ -134,11 +127,9 @@ export function medianMeasureHeap (fn, runs = 1) {
   }
 }
 
-/** Routine defaults: median of 3 scenario runs, 15 timed searches, 100 warmup each. */
+/** Routine defaults: median of 3 scenario runs; per-query iterations from calibration (20 / 50 if probe &lt; 0.1 ms). */
 export const DEFAULT_BENCHMARK_RUNS = 3
-export const DEFAULT_SEARCH_ITERATIONS = 15
-/** Warmup searches before timing (JIT + per-instance posting view cache on frozen indexes). */
-export const DEFAULT_BENCH_WARMUP = 100
+export const DEFAULT_SEARCH_ITERATIONS = 20
 /** Max searches per clock read (fixed batches are calibrated in searchBenchBatches.json). */
 export const DEFAULT_BENCH_BATCH = 32
 
@@ -227,43 +218,15 @@ export function argValue (flag, args = process.argv) {
   return null
 }
 
-/**
- * @param {object} [benchOptions]
- * @param {number} benchOptions.batchSize — fixed batch from searchBenchBatches.json (required)
- */
-export function benchSearch (
-  index,
-  query,
-  searchOptions = {},
-  iterations = defaultSearchIterations(),
-  benchOptions = {},
-) {
-  const batchSize = benchOptions.batchSize
-  if (!Number.isFinite(batchSize) || batchSize < 1) {
-    throw new Error(
-      'benchSearch requires benchOptions.batchSize (see benchmarks/searchBenchBatches.json)',
-    )
-  }
-
-  const runSearch = () => index.search(query, searchOptions)
-
-  const warmupCount = Math.max(defaultBenchWarmup(), iterations)
-  for (let i = 0; i < warmupCount; i++) runSearch()
-
-  const times = []
-  for (let i = 0; i < iterations; i++) {
-    const t0 = performance.now()
-    for (let b = 0; b < batchSize; b++) runSearch()
-    times.push((performance.now() - t0) / batchSize)
-  }
-
-  times.sort((a, b) => a - b)
-  return {
-    p50: times[Math.floor(times.length * 0.5)],
-    p95: times[Math.floor(times.length * 0.95)],
-    batchSize,
-  }
-}
+export {
+  benchSearch,
+  benchSearchPaired,
+  benchTimedSamples,
+  benchPairedSearchSamples,
+  formatFrozenVsMutableDelta,
+  frozenVsMutablePct,
+  searchIterationsForBatchEntry,
+} from './searchBenchTiming.js'
 
 export function timedMs (fn) {
   const t0 = performance.now()
@@ -398,6 +361,15 @@ export function appendPackedRadixHistory (payload, options = {}) {
   return 'appended'
 }
 
+function readInstalledPackageVersion (name) {
+  try {
+    const pkgPath = join(REPO_ROOT, 'node_modules', name, 'package.json')
+    return JSON.parse(readFileSync(pkgPath, 'utf8')).version
+  } catch {
+    return null
+  }
+}
+
 export function collectRunMetadata () {
   let version = null
   try {
@@ -411,6 +383,7 @@ export function collectRunMetadata () {
     capturedAt: new Date().toISOString(),
     node: process.version,
     packageVersion: version,
+    minisearchVersion: readInstalledPackageVersion('minisearch'),
     gcExposed: typeof global.gc === 'function',
     git: {
       commit: gitCommand('rev-parse HEAD'),

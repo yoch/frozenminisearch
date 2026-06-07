@@ -5,6 +5,9 @@ import {
   SEARCH_BENCH_BATCH_TARGET_MS,
   SEARCH_BENCH_MAX_BATCH,
   SEARCH_BENCH_CALIBRATE_PROBE_ITERS,
+  SEARCH_BENCH_FAST_PROBE_MS,
+  SEARCH_BENCH_ITERATIONS,
+  SEARCH_BENCH_ITERATIONS_FAST,
 } from './searchBenchProtocol.js'
 
 const BATCHES_PATH = join(dirname(fileURLToPath(import.meta.url)), 'searchBenchBatches.json')
@@ -29,10 +32,14 @@ export function loadSearchBenchBatches () {
 export function getSearchBenchProtocol () {
   const file = loadSearchBenchBatches()
   return {
-    protocolVersion: file.protocolVersion,
-    batchTargetMs: file.batchTargetMs,
-    maxBatch: file.maxBatch,
-    calibrateProbeIterations: file.calibrateProbeIterations,
+    protocolVersion: file.protocolVersion ?? 2,
+    batchTargetMs: file.batchTargetMs ?? SEARCH_BENCH_BATCH_TARGET_MS,
+    maxBatch: file.maxBatch ?? SEARCH_BENCH_MAX_BATCH,
+    calibrateProbeIterations: file.calibrateProbeIterations ?? SEARCH_BENCH_CALIBRATE_PROBE_ITERS,
+    fastProbeMs: SEARCH_BENCH_FAST_PROBE_MS,
+    defaultIterations: SEARCH_BENCH_ITERATIONS,
+    fastIterations: SEARCH_BENCH_ITERATIONS_FAST,
+    timing: 'hrtime-paired',
     batchMode: 'fixed-per-query',
   }
 }

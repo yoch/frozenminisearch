@@ -172,7 +172,7 @@ function main () {
       benchProfile,
       searchBenchProtocol: getSearchBenchProtocol(),
       benchSurfaces: surfaces,
-      scenarios: runBenchmarkSuite(undefined, runs, searchIterations, { benchProfile, surfaces }),
+      scenarios: runBenchmarkSuite(undefined, runs, { benchProfile, surfaces }),
     }
     mkdirSync(BASELINES_DIR, { recursive: true })
     writeFileSync(LATEST_PATH, JSON.stringify(current, null, 2) + '\n')
@@ -187,6 +187,15 @@ function main () {
 
   console.log(`Reference: ${reference.capturedAt} @ ${reference.git?.commitShort}`)
   console.log(`Current:   ${current.capturedAt} @ ${current.git?.commitShort}${current.git?.dirty ? ' (dirty)' : ''}`)
+  if (reference.node && current.node && reference.node !== current.node) {
+    console.warn(`⚠ Node ${current.node} vs reference ${reference.node} — timing comparison is indicative only.\n`)
+  }
+  if (reference.minisearchVersion && current.minisearchVersion
+    && reference.minisearchVersion !== current.minisearchVersion) {
+    console.warn(
+      `⚠ minisearch ${current.minisearchVersion} vs reference ${reference.minisearchVersion} — mutable baseline may differ.\n`,
+    )
+  }
   const curRuns = current.runs ?? 1
   const curIters = current.searchIterations ?? '(legacy)'
   const curProfile = current.benchProfile ?? current.scenarios[0]?.benchProfile ?? 'full'

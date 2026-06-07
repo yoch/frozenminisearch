@@ -6,7 +6,7 @@
  * Requires: yarn build && node --expose-gc
  */
 import { buildScenarioList, runBenchmarkSuite } from './benchmarkSuite.js'
-import { parseBenchmarkArgs, loadBenchmarkPayload, argValue } from './benchmarkUtils.js'
+import { parseBenchmarkArgs, loadBenchmarkPayload, argValue, formatFrozenVsMutableDelta } from './benchmarkUtils.js'
 
 const mb = (bytes) => (bytes / 1024 / 1024).toFixed(2)
 
@@ -114,18 +114,44 @@ function printScenario (data) {
 }
 
 function printSearchTable (data) {
-  console.log('\nSearch p50 / p95 (ms):\n')
-  console.log('Query'.padEnd(12) + 'Mutable p50'.padEnd(14) + 'Frozen p50'.padEnd(14) + 'Δ p50'.padEnd(10) + 'Mutable p95'.padEnd(14) + 'Frozen p95')
-  console.log('-'.repeat(68))
+  console.log('\nSearch p50 / p95 (ms, paired hrtime):\n')
+  console.log(
+    'Query'.padEnd(12) +
+    'Mutable p50'.padEnd(14) +
+    'Frozen p50'.padEnd(14) +
+    'Δ p50'.padEnd(12) +
+    'Ratio p50'.padEnd(10) +
+    'Mutable p95'.padEnd(14) +
+    'Frozen p95',
+  )
+  console.log('-'.repeat(88))
   for (const row of data.search) {
+    const ratio = row.pairedRatioP50 != null ? row.pairedRatioP50.toFixed(3) : '—'
     console.log(
       row.label.padEnd(12) +
       row.mutableP50.toFixed(3).padEnd(14) +
       row.frozenP50.toFixed(3).padEnd(14) +
-      pct(row.mutableP50, row.frozenP50).padEnd(10) +
+      formatFrozenVsMutableDelta(row.mutableP50, row.frozenP50).padEnd(12) +
+      ratio.padEnd(10) +
       row.mutableP95.toFixed(3).padEnd(14) +
-      row.frozenP95.toFixed(3)
+      row.frozenP95.toFixed(3),
     )
+  }
+
+  if (data.searchLevels && Object.keys(data.searchLevels).length > 0) {
+    console.log('\nSearch levels (L0 lookup, L1 executeQuery frozen, L2 search paired):\n')
+    for (const [label, lv] of Object.entries(data.searchLevels)) {
+      console.log(`  ${label} [term=${lv.term}]`)
+      console.log(
+        `    L0 lookup   mut ${lv.L0.mutableP50.toFixed(4)} ms  frz ${lv.L0.frozenP50.toFixed(4)} ms  `
+        + `ratio ${lv.L0.pairedRatioP50?.toFixed(3) ?? '—'}`,
+      )
+      console.log(`    L1 execute  frz ${lv.L1.frozenP50.toFixed(4)} ms`)
+      console.log(
+        `    L2 search   mut ${lv.L2.mutableP50.toFixed(4)} ms  frz ${lv.L2.frozenP50.toFixed(4)} ms  `
+        + `ratio ${lv.L2.pairedRatioP50?.toFixed(3) ?? '—'}`,
+      )
+    }
   }
 }
 
@@ -146,7 +172,7 @@ if (fromPath) {
     console.log('Tip: run with --expose-gc for accurate heap numbers.\n')
   }
   console.log(`${runs} run(s)/scenario, ${searchIterations} search iterations (median)\n`)
-  scenarios = runBenchmarkSuite(buildScenarioList(), runs, searchIterations, { surfaces })
+  scenarios = runBenchmarkSuite(buildScenarioList(), runs, { surfaces })
 }
 
 for (const result of scenarios) {

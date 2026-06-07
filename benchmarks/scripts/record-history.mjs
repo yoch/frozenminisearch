@@ -56,7 +56,7 @@ const { collectRunMetadata } = await import(new URL('benchmarkUtils.js', benchDi
 const { runBenchmarkSuite } = await import(new URL('benchmarkSuite.js', benchDir).href)
 
 console.log(`Recording ${git('rev-parse --short HEAD')} (${runs}×${searchIterations})...`)
-const scenarios = runBenchmarkSuite(undefined, runs, searchIterations)
+const scenarios = runBenchmarkSuite(undefined, runs)
 const meta = collectRunMetadata()
 const payload = {
   protocolVersion: 1,

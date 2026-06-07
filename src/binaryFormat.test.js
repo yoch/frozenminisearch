@@ -131,7 +131,7 @@ describe('binaryFormat MSv5', () => {
       const buf = Buffer.alloc(64)
       buf.write(magic, 0, 4, 'ascii')
       buf.writeUInt16LE(versions[magic], 4)
-      expect(() => decodeFrozenSnapshot(buf)).toThrow(/no longer supported/)
+      expect(() => decodeFrozenSnapshot(buf)).toThrow(/Unsupported frozen binary snapshot/)
     }
   })
 

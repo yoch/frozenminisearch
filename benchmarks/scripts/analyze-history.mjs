@@ -277,9 +277,9 @@ function printChangelog (entries, commitRef) {
 function printRetroChangelog (entries) {
   console.log('\n## Benchmark milestones (from perf-history.jsonl)\n')
   const milestones = [
-    { ref: 'db3707b', label: 'Suite introduced (MSv2)' },
-    { ref: '62be8e9', label: 'MSv3 binary' },
-    { ref: '5305918', label: 'MSv4 + adaptive postings' }
+    { ref: 'db3707b', label: 'Suite introduced' },
+    { ref: '62be8e9', label: 'Binary snapshots' },
+    { ref: '5305918', label: 'Adaptive postings' }
   ]
   for (const { ref, label } of milestones) {
     const e = findEntry(entries, ref)

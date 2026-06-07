@@ -1,5 +1,5 @@
 /**
- * Load real FrozenMiniSearch term trees (MSv5) for packed radix benchmarks.
+ * Load real FrozenMiniSearch term trees from binary fixtures for packed radix benchmarks.
  * Fixtures: benchmarks/fixtures/medicaments-indexes/
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -20,7 +20,7 @@ function resolveFixturesDir () {
     if (existsSync(join(dir, 'bdpm-manifest.json'))) return dir
   }
   throw new Error(
-    'Medicaments fixtures missing. Copy MSv5 indexes to benchmarks/fixtures/medicaments-indexes/ (see README there).',
+    'Medicaments fixtures missing. Copy binary indexes to benchmarks/fixtures/medicaments-indexes/ (see README there).',
   )
 }
 
@@ -166,7 +166,7 @@ export function loadMedicamentsCorpus (id, { withMap = false } = {}) {
     analysis,
     benchCpu: spec.id === 'bdpm-presentations' || spec.id === 'bdpm-specialites',
     meta: {
-      kind: 'medicaments-msv5',
+      kind: 'medicaments-binary',
       source: spec.source,
       manifestKey: spec.manifestKey,
       file: spec.file,

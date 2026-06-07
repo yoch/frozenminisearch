@@ -14,7 +14,7 @@ import {
 
 export type TreeShape = Array<[string, number | TreeShape]>
 
-/** Flat frozen snapshot (runtime; on disk use MSv5 via {@link encodeFrozenSnapshot}). */
+/** Flat frozen snapshot (runtime; on disk use {@link encodeFrozenSnapshot}). */
 export interface FrozenSnapshot {
   documentCount: number
   nextId: number
@@ -192,7 +192,7 @@ export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): s
   return names
 }
 
-/** Core with explicit {@link termCountOf} (MSv5; no dictionary section). */
+/** Core with explicit {@link termCountOf} (no dictionary section). */
 export function buildCoreSectionWithTermCount(snap: FrozenSnapshot): Buffer {
   const out = Buffer.alloc(16)
   out.writeUInt32LE(snap.documentCount, 0)

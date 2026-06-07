@@ -55,7 +55,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 | `build` | `fromDocuments` / `fromMiniSearch` vs mutable `addAll` |
 | `search` | Paired mutable/frozen `search()` timing (`hrtime`, see `searchBenchBatches.json`) |
 | `search-levels` | L0 lookup / L1 `executeQuery` / L2 `search` decomposition |
-| `save` / `load` | MSv5 round-trip |
+| `save` / `load` | binary snapshot round-trip |
 | `memory` | `memoryBreakdown` + heap estimates |
 | `migrate` | JSON → frozen path |
 | `drift` | Score drift vs reference (`toBeCloseTo` tolerance) |

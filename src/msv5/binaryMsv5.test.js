@@ -227,7 +227,7 @@ describe('binaryMsv5', () => {
     const legacy = Buffer.alloc(64)
     legacy.write('MSv4', 0, 4, 'ascii')
     legacy.writeUInt16LE(4, 4)
-    expect(() => FrozenMiniSearch.loadBinarySync(legacy, options)).toThrow(/no longer supported/)
+    expect(() => FrozenMiniSearch.loadBinarySync(legacy, options)).toThrow(/Unsupported frozen binary snapshot/)
   })
 })
 

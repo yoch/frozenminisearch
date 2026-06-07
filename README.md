@@ -1,8 +1,8 @@
 # @yoch/frozenminisearch
 
-**Read-only full-text search for Node.js** — compact frozen indexes, fast MSv5 binary loads, and the same search API as [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong).
+**Read-only full-text search for Node.js** — compact frozen indexes, fast binary snapshots, and the same search API as [MiniSearch](https://github.com/lucaong/minisearch) by [Luca Ongaro](https://github.com/lucaong).
 
-> **Current release:** `1.0.0-beta.0` on npm (`beta` dist-tag)
+> **Current release:** `1.0.0` on npm
 
 This package is a **standalone product**: no mutable `MiniSearch` class is published. Build indexes with `fromDocuments`, the incremental builder, or migrate from an existing lucaong index via `fromMiniSearchJson`.
 
@@ -33,14 +33,14 @@ Decomposition (Divina exact): L0 lookup ~300 ns frozen, L1 `executeQuery` ~8.1 �
 |---|------------------------|---------------------------|
 | **Sweet spot** | Live index mutations | Fixed corpus, deploy from binary |
 | **Production path** | `addAll` → `toJSON` | `fromDocuments` / `fromMiniSearch` → `saveBinarySync` → `loadBinarySync` |
-| **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact MSv5 |
+| **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact binary |
 
 <details>
 <summary><strong>How to read these numbers (limits &amp; protocol)</strong></summary>
 
 - **Captured:** 2026-06-07 · commit `2a9a90d` · Node v24.16.0 · minisearch **7.2.0** · **3** run(s)/scenario · protocol **v2** (hrtime-paired, batch target 3 ms).
 - ¹ **Index RAM** — `measureHeap` with `--expose-gc`, one index alive. V8 overhead is extra; treat as **trend**, not accounting. Sporadic outliers happen (e.g. index-only Divina).
-- ² **Disk** — `JSON.stringify(mutable)` vs MSv5 `saveBinarySync`.
+- ² **Disk** — `JSON.stringify(mutable)` vs `saveBinarySync`.
 - ³ **Cold load** — median wall time to searchable index after read from disk format.
 - ⁴ **Search p50** — paired mutable/frozen samples per iteration; sub-0.1 ms baselines reported in **µs** in full reports. Fast queries use **50** iterations, others **20**.
 - **Not shown:** mutable `add`/`remove` (frozen is read-only by design). Freeze time is offline — see full suite for build metrics.
@@ -110,15 +110,13 @@ const frozen2 = FrozenMiniSearch.fromMiniSearchJson(json, options)
 
 `options.fields` must match the indexed fields in the snapshot when provided.
 
-### From `@yoch/minisearch` 8.x
+### From lucaong `minisearch` (mutable → frozen)
 
-The former fork published both `MiniSearch` and `freeze()`. This package is frozen-only:
-
-| Before (`@yoch/minisearch`) | After (`@yoch/frozenminisearch`) |
-|------------------------------|----------------------------------|
-| `new MiniSearch(opts).addAll(docs).freeze()` | `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)` |
+| Before (mutable) | After (`@yoch/frozenminisearch`) |
+|------------------|----------------------------------|
+| `new MiniSearch(opts).addAll(docs)` then serve | `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)` |
 | lucaong JSON snapshot | `FrozenMiniSearch.fromMiniSearchJson(json)` or `fromMiniSearchSnapshot(obj)` |
-| `import MiniSearch, { FrozenMiniSearch }` | `import FrozenMiniSearch` (+ lucaong `minisearch` only if you still build mutable indexes) |
+| `import MiniSearch from 'minisearch'` | `import FrozenMiniSearch from '@yoch/frozenminisearch'` (+ lucaong `minisearch` only if you still build mutable indexes) |
 
 ---
 
@@ -133,15 +131,15 @@ Indexing is **not** available on a frozen instance — use `fromDocuments`, the 
 
 ---
 
-## Binary snapshots (MSv5)
+## Binary snapshots
 
 ```javascript
 const buf = index.saveBinarySync()
-const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded in MSv5
+const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded in snapshot
 ```
 
 - **Node ≥ 22.15.0** (zstd via `node:zlib`)
-- Only **MSv5** is supported; older `MSv1`–`MSv4` snapshots must be re-saved from lucaong JSON or a mutable index
+- Snapshots produced by this package version are forward-compatible; re-build from lucaong JSON if an older binary fails to load
 - `tokenize` / `processTerm` are not stored — pass the same functions at load when customized
 
 ---
@@ -169,6 +167,8 @@ node scripts/verify-npm-pack.cjs
 
 Parity tests import `minisearch` as a devDependency (reference). Optional upstream clone: `git submodule update --init vendor/minisearch`.
 
+Design notes (freq adaptive, AND gating): [dev/docs/README.md](dev/docs/README.md).
+
 ---
 
 ## Changelog & credits
@@ -176,6 +176,6 @@ Parity tests import `minisearch` as a devDependency (reference). Optional upstre
 See [CHANGELOG.md](./CHANGELOG.md).
 
 - **MiniSearch** — [Luca Ongaro](https://github.com/lucaong/minisearch) (MIT)
-- **@yoch/frozenminisearch** — frozen indexes, packed radix tree, MSv5 binary format
+- **@yoch/frozenminisearch** — frozen indexes, packed radix tree, compact binary snapshots
 
 Upstream docs: [MiniSearch](https://lucaong.github.io/minisearch/)

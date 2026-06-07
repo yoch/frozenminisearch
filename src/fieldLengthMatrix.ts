@@ -30,9 +30,9 @@ export function materializeFieldLengthMatrix(data: ArrayLike<number>, length?: n
 }
 
 /**
- * MSv5 encodes adaptive width
- * ({@link fieldLengthMatrixWireFlags}) and {@link readFieldLengthMatrixSection} restores u8/u16/u32.
- * {@link fieldLengthMatrixForWire} widens in-memory u8/u16 matrices to Uint32 for the MSv5 encoder.
+ * Wire encoding uses adaptive width ({@link fieldLengthMatrixWireFlags});
+ * {@link readFieldLengthMatrixSection} restores u8/u16/u32.
+ * {@link fieldLengthMatrixForWire} widens in-memory u8/u16 matrices to Uint32 for the encoder.
  */
 export function fieldLengthMatrixForWire(matrix: FieldLengthArray): Uint32Array {
   if (matrix instanceof Uint32Array) return matrix
@@ -41,7 +41,7 @@ export function fieldLengthMatrixForWire(matrix: FieldLengthArray): Uint32Array 
   return out
 }
 
-/** Global MSv5 flags for {@link FieldLengthArray} wire width. */
+/** Global wire flags for {@link FieldLengthArray} width. */
 export function fieldLengthMatrixWireFlags(matrix: FieldLengthArray): number {
   if (matrix instanceof Uint8Array) return FLAG_FL_U8
   if (matrix instanceof Uint16Array) return FLAG_FL_U16

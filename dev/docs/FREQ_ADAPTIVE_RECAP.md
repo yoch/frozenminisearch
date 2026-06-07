@@ -1,7 +1,7 @@
 # Récapitulatif — fréquences postings adaptatives (u8 / u16)
 
 Document de relecture pour le changement « freq adaptive » sur `FrozenMiniSearch`.  
-Package : `@yoch/minisearch` 8.4.0.
+Package : `@yoch/frozenminisearch` 1.x.
 
 ---
 
@@ -19,14 +19,14 @@ Objectif : corriger la limite artificielle à 255 **sans** doubler la colonne fr
 
 | Paramètre | Valeur |
 |-----------|--------|
-| `MAX_FREQ` | `65535` — [`src/compactPostings.ts`](../src/compactPostings.ts) |
+| `MAX_FREQ` | `65535` — [`src/compactPostings.ts`](../../src/compactPostings.ts) |
 | Type `allFreqs` | `FreqArray = Uint8Array \| Uint16Array` |
 | Seuil allocation u8 | `maxAfterClamp ≤ 255` → `Uint8Array`, sinon `Uint16Array` |
 | Plafond type | **jamais** `Uint32` pour les fréquences de postings |
-| Clamp frozen | `clampFrequencies: true` — [`src/FrozenMiniSearch.ts`](../src/FrozenMiniSearch.ts), [`src/frozenBuild.ts`](../src/frozenBuild.ts) |
-| Flag MSv5 | `FLAG_FREQ_U16 = 32` — [`src/msv5/binaryMsv5Constants.ts`](../src/msv5/binaryMsv5Constants.ts) |
-| Rétrocompat MSv5 | flag absent → section `AllFreqs` lue en u8 (snapshots existants) |
-| Anciens MSv1–MSv4 | rejetés ; re-sauvegarder en MSv5 |
+| Clamp frozen | `clampFrequencies: true` — [`src/FrozenMiniSearch.ts`](../../src/FrozenMiniSearch.ts), [`src/frozenBuild.ts`](../../src/frozenBuild.ts) |
+| Flag wire | `FLAG_FREQ_U16 = 32` — [`src/msv5/binaryMsv5Constants.ts`](../../src/msv5/binaryMsv5Constants.ts) |
+| Rétrocompat | flag absent → section `AllFreqs` lue en u8 (snapshots existants) |
+| Anciens binaires | rejetés ; re-sauvegarder avec `saveBinarySync()` |
 
 ```typescript
 // src/compactPostings.ts
@@ -59,9 +59,9 @@ flowchart TD
   alloc -->|max gt 255| u16 --> wire
 ```
 
-- **Dense** : [`src/flatPostings.ts`](../src/flatPostings.ts) — 2 passes (count+max, write).
-- **Sparse** : [`src/frozenPostings.ts`](../src/frozenPostings.ts) — 2 passes (metadata sparse + count+max, write).
-- **Recherche** : [`SegmentPostingList`](../src/compactPostings.ts) lit `freqs[i]` sans branche de largeur dans la boucle BM25 ([`src/scoring.ts`](../src/scoring.ts)).
+- **Dense** : [`src/flatPostings.ts`](../../src/flatPostings.ts) — 2 passes (count+max, write).
+- **Sparse** : [`src/frozenPostings.ts`](../../src/frozenPostings.ts) — 2 passes (metadata sparse + count+max, write).
+- **Recherche** : [`SegmentPostingList`](../../src/compactPostings.ts) lit `freqs[i]` sans branche de largeur dans la boucle BM25 ([`src/scoring.ts`](../../src/scoring.ts)).
 
 ---
 
@@ -71,41 +71,41 @@ flowchart TD
 
 | Fichier | Rôle |
 |---------|------|
-| [`src/freqPostings.ts`](../src/freqPostings.ts) | `freqWireFlags`, `readFreqsSection` |
-| [`benchmarks/scripts/freq-adaptive-validate.mjs`](../benchmarks/scripts/freq-adaptive-validate.mjs) | Validation smoke ~20 s (3 scénarios) |
+| [`src/freqPostings.ts`](../../src/freqPostings.ts) | `freqWireFlags`, `readFreqsSection` |
+| [`benchmarks/scripts/freq-adaptive-validate.mjs`](../../benchmarks/scripts/freq-adaptive-validate.mjs) | Validation smoke ~20 s (3 scénarios) |
 
 ### Code runtime
 
 | Fichier | Changements |
 |---------|-------------|
-| [`src/compactPostings.ts`](../src/compactPostings.ts) | `MAX_FREQ`, `FreqArray`, `allocateFreqs`, `clampFreq(65535)`, `SegmentPostingList.freqs: FreqArray` |
-| [`src/flatPostings.ts`](../src/flatPostings.ts) | `postingFreqValue`, pass 1 count+max, pass 2 write ; `allFreqs: FreqArray` |
-| [`src/frozenPostings.ts`](../src/frozenPostings.ts) | `FrozenPostingsLayout.allFreqs: FreqArray`, pass 1 metadata+count+max, pass 2 write (sparse) |
-| [`src/msv5/binaryMsv5Constants.ts`](../src/msv5/binaryMsv5Constants.ts) | `FLAG_FREQ_U16 = 32` |
-| [`src/msv5/binaryMsv5Encode.ts`](../src/msv5/binaryMsv5Encode.ts) | `globalFlags \|= freqWireFlags(snap.postings.allFreqs)` (sync + async) |
-| [`src/msv5/binaryMsv5Postings.ts`](../src/msv5/binaryMsv5Postings.ts) | `readFreqsSection(freqs, flags, allDocIds.length)` |
+| [`src/compactPostings.ts`](../../src/compactPostings.ts) | `MAX_FREQ`, `FreqArray`, `allocateFreqs`, `clampFreq(65535)`, `SegmentPostingList.freqs: FreqArray` |
+| [`src/flatPostings.ts`](../../src/flatPostings.ts) | `postingFreqValue`, pass 1 count+max, pass 2 write ; `allFreqs: FreqArray` |
+| [`src/frozenPostings.ts`](../../src/frozenPostings.ts) | `FrozenPostingsLayout.allFreqs: FreqArray`, pass 1 metadata+count+max, pass 2 write (sparse) |
+| [`src/msv5/binaryMsv5Constants.ts`](../../src/msv5/binaryMsv5Constants.ts) | `FLAG_FREQ_U16 = 32` |
+| [`src/msv5/binaryMsv5Encode.ts`](../../src/msv5/binaryMsv5Encode.ts) | `globalFlags \|= freqWireFlags(snap.postings.allFreqs)` (sync + async) |
+| [`src/msv5/binaryMsv5Postings.ts`](../../src/msv5/binaryMsv5Postings.ts) | `readFreqsSection(freqs, flags, allDocIds.length)` |
 
 ### Non modifié (volontairement)
 
 | Fichier | Raison |
 |---------|--------|
-| [`src/binaryDecode.ts`](../src/binaryDecode.ts) | MSv5 uniquement |
-| [`src/scoring.ts`](../src/scoring.ts) | Formule BM25+ inchangée |
+| [`src/binaryDecode.ts`](../../src/binaryDecode.ts) | format binaire courant uniquement |
+| [`src/scoring.ts`](../../src/scoring.ts) | Formule BM25+ inchangée |
 
 ### Tests
 
 | Fichier | Couverture |
 |---------|------------|
-| [`src/FrozenMiniSearch.test.js`](../src/FrozenMiniSearch.test.js) | Bloc `allFreqs adaptive width` : u8 typique, u16 overflow, parité mutable, round-trip binaire |
-| [`src/msv5/binaryMsv5.test.js`](../src/msv5/binaryMsv5.test.js) | `FLAG_FREQ_U16` présent (overflow) / absent (corpus standard) |
+| [`src/FrozenMiniSearch.test.js`](../../src/FrozenMiniSearch.test.js) | Bloc `allFreqs adaptive width` : u8 typique, u16 overflow, parité mutable, round-trip binaire |
+| [`src/msv5/binaryMsv5.test.js`](../../src/msv5/binaryMsv5.test.js) | `FLAG_FREQ_U16` présent (overflow) / absent (corpus standard) |
 
 ### Documentation mise à jour
 
-- [`README.md`](../README.md)
-- [`DESIGN_DOCUMENT.md`](../DESIGN_DOCUMENT.md)
-- [`CHANGELOG.md`](../CHANGELOG.md) (section Unreleased)
-- [`ANALYSE_STRATEGIE_PACKAGE.md`](../ANALYSE_STRATEGIE_PACKAGE.md)
-- [`benchmarks/README.md`](../benchmarks/README.md)
+- [`README.md`](../../README.md)
+- [`DESIGN_DOCUMENT.md`](../../DESIGN_DOCUMENT.md)
+- [`CHANGELOG.md`](../../CHANGELOG.md) (section Unreleased)
+- [`ANALYSE_STRATEGIE_PACKAGE.md`](../../ANALYSE_STRATEGIE_PACKAGE.md)
+- [`benchmarks/README.md`](../../benchmarks/README.md)
 
 ### Baseline (`reference.json`)
 
@@ -121,7 +121,7 @@ Scénario **`extreme-overflowFrequency`** uniquement (patch manuel, pas de re-re
 
 ---
 
-## 5. Wire MSv5
+## 5. Wire (snapshot binaire)
 
 - Section inchangée : `Msv5SectionId.AllFreqs` (index 11).
 - **Encode** : `bufferFromView(postings.allFreqs)` ; bit global `FLAG_FREQ_U16` si `Uint16Array`.
@@ -137,7 +137,7 @@ Scénario **`extreme-overflowFrequency`** uniquement (patch manuel, pas de re-re
 | 16 | `FLAG_FL_U16` | fieldLengthMatrix u16 |
 | **32** | **`FLAG_FREQ_U16`** | **allFreqs u16** |
 
-Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots MSv5 existants).
+Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots existants).
 
 ---
 
@@ -175,7 +175,7 @@ Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots MSv5 exist
 - `freezeMs`, `saveBinaryMs`, `loadBinaryMs`
 - search frozen p50 par requête (1 run vs référence médiane 3 runs)
 
-**Seuils heap floor** ([`benchmarks/regressionPolicy.js`](../benchmarks/regressionPolicy.js)) :
+**Seuils heap floor** ([`benchmarks/regressionPolicy.js`](../../benchmarks/regressionPolicy.js)) :
 
 - `HEAP_MB_FLOOR` = 0,05 MB
 - +256 KB absolu → fail ; +128 KB → warn
@@ -196,10 +196,10 @@ Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots MSv5 exist
 | `yarn benchmark:targeted` | défauts `benchmarkUtils` ; `--runs` CLI | médiane si runs>1 | 7 scénarios |
 | `yarn benchmark:compare` | 3×15 via `compare.js` | — | rapport lisible |
 
-**Protocole search** ([`benchmarks/baselines/reference.json`](../benchmarks/baselines/reference.json)) :
+**Protocole search** ([`benchmarks/baselines/reference.json`](../../benchmarks/baselines/reference.json)) :
 
 - `searchBenchProtocol` v1 : `batchTargetMs` 0,3 ; `maxBatch` 32
-- Batches fixes : [`benchmarks/searchBenchBatches.json`](../benchmarks/searchBenchBatches.json)
+- Batches fixes : [`benchmarks/searchBenchBatches.json`](../../benchmarks/searchBenchBatches.json)
 - Référence capturée : **2026-06-03**, commit `6278ba1`, Node **v22.22.0**, `runs=3`, `searchIterations=25`
 
 **Seuils `benchmark:diff`** :
@@ -213,7 +213,7 @@ Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots MSv5 exist
 | saveBinaryMs | +30 % | +15 % |
 | search p50 | +50 % (sauf `--strict`) | +20 % |
 
-Règles floor (&lt; 10 ms structurel, &lt; 0,1 ms search) : voir [`regressionPolicy.js`](../benchmarks/regressionPolicy.js).
+Règles floor (&lt; 10 ms structurel, &lt; 0,1 ms search) : voir [`regressionPolicy.js`](../../benchmarks/regressionPolicy.js).
 
 ---
 
@@ -272,9 +272,9 @@ Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary
 
 - Uint16 fixe pour tous les index
 - `Uint32` pour les fréquences de postings
-- MSv6 dédié (extension MSv5 par flags suffit)
+- Nouvelle révision wire dédiée (extension par flags suffit)
 - Encodage vbyte / delta
-- Re-sauvegarde requise pour les snapshots antérieurs à MSv5
+- Re-sauvegarde requise pour les snapshots binaires obsolètes
 
 ---
 

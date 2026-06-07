@@ -33,11 +33,11 @@ function validateMsv5Container(buf: Buffer): {
   directory: ReturnType<typeof readMsv5SectionDirectory>
 } {
   if (!isMsv5Buffer(buf)) {
-    throw invalidFrozenIndex('not an MSv5 buffer')
+    throw invalidFrozenIndex('not a frozen binary snapshot')
   }
   const version = buf.readUInt16LE(4)
   if (version !== 5) {
-    throw invalidFrozenIndex(`MSv5 version=${version}`)
+    throw invalidFrozenIndex(`unsupported frozen snapshot version=${version}`)
   }
 
   const globalFlags = readMsv5GlobalFlags(buf)
@@ -46,7 +46,7 @@ function validateMsv5Container(buf: Buffer): {
   const payloadOff = buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_OFFSET)
   const compressedLen = buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)
   if (payloadOff !== MSV5_HEADER_SIZE || payloadOff + compressedLen > buf.length) {
-    throw invalidFrozenIndex('MSv5 payload out of bounds')
+    throw invalidFrozenIndex('frozen snapshot payload out of bounds')
   }
 
   return { globalFlags, directory }

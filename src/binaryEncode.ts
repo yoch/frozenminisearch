@@ -3,7 +3,7 @@ import { encodeFrozenSnapshotMsv5, encodeFrozenSnapshotMsv5Async } from './msv5/
 import type { FrozenTermIndex } from './frozenTermIndex'
 import type { FrozenSnapshot } from './binaryStructures'
 
-/** Encode a frozen snapshot as **MSv5** (the only supported write format). */
+/** Encode a frozen snapshot as a binary buffer. */
 export function encodeFrozenSnapshot(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
@@ -12,7 +12,7 @@ export function encodeFrozenSnapshot(
   return encodeFrozenSnapshotMsv5(snap, termTree, packedTermIndex)
 }
 
-/** Async MSv5 encoder; uses non-blocking zstd compression for large payloads. */
+/** Async encoder; uses non-blocking zstd compression for large payloads. */
 export function encodeFrozenSnapshotAsync(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,

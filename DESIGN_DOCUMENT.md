@@ -257,7 +257,7 @@ see the sections above), but changes how that tree and the postings are stored:
 
   - **Leaves hold a numeric term index, not a posting structure.** The tree maps
     each term string to a small integer used to index the flat postings.
-  - **The term tree is packed in memory.** At runtime and on disk (MSv5 columnar wire),
+  - **The term tree is packed in memory.** At runtime and on disk (columnar wire),
     frozen indexes use `PackedRadixTree`, an internal module under
     `src/PackedRadixTree/`: typed arrays for nodes and edges, a shared label heap,
     and the same sibling/leaf traversal order as `SearchableMap` so prefix,
@@ -282,7 +282,7 @@ The element widths are chosen adaptively to save further space:
   - Term frequencies use adaptive `Uint8` / `Uint16` (never `Uint32`), chosen
     from the index max after clamping at 65535 on frozen paths. Typical corpora
     stay on one byte per posting; indexes with any `(term, field)` tf > 255 use
-    `Uint16` and set `FLAG_FREQ_U16` in MSv5. Values above 65535 are clamped
+    `Uint16` and set `FLAG_FREQ_U16` on the wire. Values above 65535 are clamped
     (rare; BM25+ is already flat well before that).
 
 ### Dense and sparse posting layouts
@@ -344,9 +344,9 @@ field-length data, and the flat postings. **`termCount` is stored in the 16-byte
 core header** (no separate dictionary section; term strings live only in the
 term-tree section).
 
-**MSv5** (written by **`saveBinarySync()`**) lives in `src/msv5/`: columnar packed
+The binary encoder (written by **`saveBinarySync()`**) lives in `src/msv5/`: columnar packed
 radix tree (`packedRadixBinaryMsv5.ts`), unified postings wire (dense or sparse via
-flags, same semantics as MSv4), adaptive `fieldLengthMatrix` width on disk, and
+flags), adaptive `fieldLengthMatrix` width on disk, and
 optional **single-payload zstd** (`node:zlib`): the 12 logical sections are
 concatenated (with 4-byte alignment gaps), then compressed as **one** stream for a
 better ratio than per-section compression. Raw payload when &lt; 64 B or when zstd does not strictly shrink the payload. The catalogue stores
@@ -359,8 +359,8 @@ columnar wire in `packedRadixBinaryMsv5.ts`.
 On load, the reader verifies section CRCs, monotonic file offsets, posting bounds,
 and leaf invariants via `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts`.
 
-**`loadBinarySync()`** reads **MSv5** synchronously. **`loadBinaryAsync()`** is the
-memory-bounded streaming path for compressed MSv5. Older `MSv1`–`MSv4` buffers are rejected.
+**`loadBinarySync()`** reads synchronously. **`loadBinaryAsync()`** is the
+memory-bounded streaming path for compressed payloads. Unsupported older binaries are rejected.
 Use **`saveBinarySync()`** / **`saveBinaryAsync()`** and **`loadBinarySync()`** / **`loadBinaryAsync()`** explicitly.
 
 ### PackedRadixTree module (internal)
@@ -373,7 +373,7 @@ follows:
     prefix, fuzzy, `entries`).
   - **`adapters/searchableMap.ts`** — build from a mutable `RadixTree` via
     `fromRadixTree` (numeric leaves or custom `mapLeaf`).
-  - **`src/msv5/packedRadixBinaryMsv5.ts`** — MSv5 columnar term-tree section (on-disk wire).
+  - **`src/msv5/packedRadixBinaryMsv5.ts`** — columnar term-tree section (on-disk wire).
   - **`frozenTermIndex.ts`** — `FrozenTermIndex` type alias and
     `validateFrozenTermIndexLeaves` (frozen-only invariants: leaf count, term-index
     range, array bounds).

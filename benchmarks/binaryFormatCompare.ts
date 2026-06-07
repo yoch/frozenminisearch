@@ -1,5 +1,5 @@
 /**
- * MSv5 save benchmarks: saveBinarySync vs saveBinaryAsync (size + wall-clock).
+ * Binary save benchmarks: saveBinarySync vs saveBinaryAsync (size + wall-clock).
  *
  *   npm run benchmark:binary-format
  */
@@ -127,7 +127,7 @@ function pad (s: string, n: number): string {
 
 function printSaveSyncVsAsync (rows: SaveResult[]): void {
   console.log('\n═══════════════════════════════════════════════════════════════════════════════')
-  console.log('  SAVE — saveBinarySync vs saveBinaryAsync (MSv5)')
+  console.log('  SAVE — saveBinarySync vs saveBinaryAsync')
   console.log(`  median wall-clock, ${SAVE_RUNS} runs (+${SAVE_WARMUP} warmup)  |  baseline = sync`)
   console.log('═══════════════════════════════════════════════════════════════════════════════\n')
 
@@ -181,13 +181,13 @@ function printNotes (): void {
 Notes
 ─────
 • saveBinarySync  — zstdCompressSync sur le payload concaténé.
-• saveBinaryAsync — zstd via callback async (même sémantique MSv5 ; taille compressée ± quelques octets).
-• Seul le format MSv5 est supporté (dense/sparse postings, radix columnar, field lengths adaptatifs).
+• saveBinaryAsync — zstd via callback async (même sémantique ; taille compressée ± quelques octets).
+• Format courant uniquement (dense/sparse postings, radix columnar, field lengths adaptatifs).
 `)
 }
 
 async function main (): Promise<void> {
-  console.log('Binary format SAVE benchmark (MSv5)')
+  console.log('Binary format SAVE benchmark')
   console.log(`Node ${process.version}  ${new Date().toISOString()}`)
 
   const rows: SaveResult[] = []

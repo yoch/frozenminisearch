@@ -2,7 +2,7 @@ import { invalidFrozenIndex } from './binaryIo'
 import type { FreqArray } from './compactPostings'
 import { FLAG_FREQ_U16 } from './msv5/binaryMsv5Constants'
 
-/** Global MSv5 flags for {@link FreqArray} wire width. */
+/** Global wire flags for {@link FreqArray} width. */
 export function freqWireFlags(freqs: FreqArray): number {
   if (freqs instanceof Uint16Array) return FLAG_FREQ_U16
   return 0

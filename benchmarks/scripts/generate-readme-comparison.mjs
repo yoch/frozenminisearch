@@ -145,14 +145,14 @@ ${levels ? `${levels}\n` : ''}
 |---|------------------------|---------------------------|
 | **Sweet spot** | Live index mutations | Fixed corpus, deploy from binary |
 | **Production path** | \`addAll\` → \`toJSON\` | \`fromDocuments\` / \`fromMiniSearch\` → \`saveBinarySync\` → \`loadBinarySync\` |
-| **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact MSv5 |
+| **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact binary |
 
 <details>
 <summary><strong>How to read these numbers (limits &amp; protocol)</strong></summary>
 
 - **Captured:** ${captured} · commit \`${commit}\` · Node ${node} · minisearch **${minisearch}** · **${runs}** run(s)/scenario · protocol **v${proto.protocolVersion ?? 2}** (${proto.timing ?? 'hrtime-paired'}, batch target ${proto.batchTargetMs ?? 3} ms).
 - ¹ **Index RAM** — \`measureHeap\` with \`--expose-gc\`, one index alive. V8 overhead is extra; treat as **trend**, not accounting. Sporadic outliers happen (e.g. index-only Divina).
-- ² **Disk** — \`JSON.stringify(mutable)\` vs MSv5 \`saveBinarySync\`.
+- ² **Disk** — \`JSON.stringify(mutable)\` vs \`saveBinarySync\`.
 - ³ **Cold load** — median wall time to searchable index after read from disk format.
 - ⁴ **Search p50** — paired mutable/frozen samples per iteration; sub-0.1 ms baselines reported in **µs** in full reports. Fast queries use **${proto.fastIterations ?? 50}** iterations, others **${proto.defaultIterations ?? 20}**.
 - **Not shown:** mutable \`add\`/\`remove\` (frozen is read-only by design). Freeze time is offline — see full suite for build metrics.

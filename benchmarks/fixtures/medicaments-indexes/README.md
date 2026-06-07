@@ -1,6 +1,6 @@
 # Index FrozenMiniSearch (BDPM / vétérinaire)
 
-Copie locale des snapshots MSv5 exportés depuis [fr.gouv.medicaments.rest](https://github.com/yoch/fr.gouv.medicaments.rest) (`data/search-indexes`).
+Copie locale des snapshots binaires exportés depuis [fr.gouv.medicaments.rest](https://github.com/yoch/fr.gouv.medicaments.rest) (`data/search-indexes`).
 
 | Fichier | termCount (manifest) | Intérêt bench |
 |---------|---------------------|---------------|

@@ -262,7 +262,7 @@ export default class FrozenMiniSearch<T = any> {
     return autoSuggestFromSearch((q, o) => this.search(q, o), queryString, merged)
   }
 
-  /** Serialize this index as an **MSv5** frozen snapshot buffer (synchronous). */
+  /** Serialize this index as a frozen binary snapshot (synchronous). */
   saveBinarySync(): Buffer {
     return encodeFrozenSnapshot({
       documentCount: this._documentCount,
@@ -279,7 +279,7 @@ export default class FrozenMiniSearch<T = any> {
     }, undefined, this._index)
   }
 
-  /** Non-blocking zstd compression; same MSv5 output as {@link saveBinarySync}. */
+  /** Non-blocking zstd compression; same output as {@link saveBinarySync}. */
   async saveBinaryAsync(): Promise<Buffer> {
     return encodeFrozenSnapshotAsync({
       documentCount: this._documentCount,
@@ -296,15 +296,13 @@ export default class FrozenMiniSearch<T = any> {
     }, undefined, this._index)
   }
 
-  /** Load a frozen snapshot from an **MSv5** buffer. */
+  /** Load a frozen binary snapshot. */
   static loadBinarySync<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     const snap = decodeFrozenSnapshot(buffer)
     return FrozenMiniSearch.fromBinarySnapshot(snap, options)
   }
 
-  /**
-   * Load MSv5 with streaming zstd decompression (bounded memory).
-   */
+  /** Load a frozen binary snapshot with streaming zstd decompression (bounded memory). */
   static async loadBinaryAsync<T>(
     buffer: Buffer,
     options: Options<T> = {} as Options<T>,

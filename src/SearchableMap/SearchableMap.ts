@@ -12,7 +12,7 @@ import type { RadixTree, Entry, Path } from './types'
  * (compressed prefix tree).
  *
  * Since this class can be of general utility beyond _MiniSearch_, it is
- * internal to `@yoch/minisearch` (not a separate public entry point).
+ * internal to `@yoch/frozenminisearch` (not a separate public entry point).
  *
  * @typeParam T  The type of the values stored in the map.
  */

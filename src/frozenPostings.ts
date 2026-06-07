@@ -400,28 +400,37 @@ function findSparseSlotByFieldId(
   return -1
 }
 
-type FrozenPostingSlice = { offset: number, length: number }
+/** Reusable scratch for {@link resolvePostingSlice} (scoring is synchronous). */
+const postingSliceScratch = { offset: 0, length: 0 }
 
-/** Resolve one (termIndex, fieldId) posting run in flat buffers; shared by flyweight and docId collect. */
-function frozenPostingSlice(
+/**
+ * Resolve one (termIndex, fieldId) posting run in flat buffers; writes into `out` without allocating.
+ * @returns false when the slot is empty or missing
+ */
+function resolvePostingSlice(
   layout: FrozenPostingsLayout,
   termIndex: number,
   fieldId: number,
-): FrozenPostingSlice | undefined {
+  out: { offset: number, length: number },
+): boolean {
   if (layout.layout === 'dense') {
     const base = termIndex * layout.fieldCount + fieldId
     const len = layout.denseLengths![base]
-    if (len === 0) return undefined
-    return { offset: layout.denseOffsets![base], length: len }
+    if (len === 0) return false
+    out.offset = layout.denseOffsets![base]
+    out.length = len
+    return true
   }
 
   const start = layout.sparseTermStarts![termIndex]
   const end = layout.sparseTermStarts![termIndex + 1]
   const slot = findSparseSlotByFieldId(layout.sparseFieldIds!, start, end, fieldId)
-  if (slot < 0) return undefined
+  if (slot < 0) return false
   const len = layout.sparseLengths![slot]
-  if (len === 0) return undefined
-  return { offset: layout.sparseOffsets![slot], length: len }
+  if (len === 0) return false
+  out.offset = layout.sparseOffsets![slot]
+  out.length = len
+  return true
 }
 
 /** Single rebindable {@link FieldTermDataLike} per frozen index (O(1) RAM). */
@@ -444,9 +453,8 @@ export function createFrozenFieldTermFlyweight(layout: FrozenPostingsLayout): Fr
       return flyweight
     },
     get(fieldId: number) {
-      const slice = frozenPostingSlice(layout, termIndex, fieldId)
-      if (slice == null) return undefined
-      return segment.rebind(slice.offset, slice.length)
+      if (!resolvePostingSlice(layout, termIndex, fieldId, postingSliceScratch)) return undefined
+      return segment.rebind(postingSliceScratch.offset, postingSliceScratch.length)
     },
   }
   return flyweight
@@ -480,12 +488,11 @@ export function collectDocIdsFromFrozenLayout(
   const { fieldIds } = context
 
   for (const field of fieldBoosts.names) {
-    const slice = frozenPostingSlice(layout, termIndex, fieldIds[field])
-    if (slice == null) continue
+    if (!resolvePostingSlice(layout, termIndex, fieldIds[field], postingSliceScratch)) continue
     collectDocIdsFromFrozenSegment(
       layout.allDocIds,
-      slice.offset,
-      slice.length,
+      postingSliceScratch.offset,
+      postingSliceScratch.length,
       context,
       docIds,
       allowedDocs,

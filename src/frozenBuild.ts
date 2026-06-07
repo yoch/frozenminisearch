@@ -9,10 +9,15 @@ import {
   buildFieldIds,
   collectFieldTermFreqsFromFieldInto,
   resolveIndexingOptions,
-  saveStoredFieldsForDocument,
   updateAvgFieldLength,
   type IndexingOptions,
 } from './indexingCore'
+import {
+  createStoredFieldsLayout,
+  resizeStoredFields,
+  writeStoredField,
+  type StoredFieldsLayout,
+} from './storedFieldsLayout'
 
 export interface FrozenIndexBuilderHints {
   /** Pre-size per-document arrays when the final document count is known. */
@@ -43,7 +48,7 @@ export class FrozenIndexBuilder<T> {
   private readonly _postings: IncrementalPostingsAccumulator
   private readonly _termCount = { value: 0 }
   private readonly _externalIds: unknown[]
-  private readonly _storedFields: (Record<string, unknown> | undefined)[]
+  private readonly _storedFields: StoredFieldsLayout
   private readonly _fieldLengthData: number[]
   private readonly _avgFieldLength: number[]
   private readonly _seenIds: Set<unknown>
@@ -68,13 +73,12 @@ export class FrozenIndexBuilder<T> {
     this._frozen = false
 
     const estimated = hints?.estimatedDocumentCount
+    this._storedFields = createStoredFieldsLayout(this._options.storeFields, estimated ?? 0)
     if (estimated != null && estimated > 0) {
       this._externalIds = new Array(estimated)
-      this._storedFields = new Array(estimated)
       this._fieldLengthData = new Array(estimated * this._fieldCount).fill(0)
     } else {
       this._externalIds = []
-      this._storedFields = []
       this._fieldLengthData = []
     }
   }
@@ -101,7 +105,7 @@ export class FrozenIndexBuilder<T> {
 
     const shortId = this._nextId++
     this._externalIds[shortId] = id
-    this._storedFields[shortId] = saveStoredFieldsForDocument(storeFields, extractField, document)
+    writeStoredField(this._storedFields, shortId, storeFields, extractField, document)
 
     const documentCount = shortId + 1
 
@@ -205,9 +209,7 @@ export class FrozenIndexBuilder<T> {
     const externalIds = this._externalIds.length > documentCount
       ? this._externalIds.slice(0, documentCount)
       : this._externalIds
-    const storedFields = this._storedFields.length > documentCount
-      ? this._storedFields.slice(0, documentCount)
-      : this._storedFields
+    const storedFields = resizeStoredFields(this._storedFields, documentCount)
 
     const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 

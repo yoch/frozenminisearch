@@ -2,6 +2,7 @@
  * Test helpers (not published) — frozen query engine oracle.
  */
 import FrozenMiniSearch from '../../src/FrozenMiniSearch'
+import { readStoredFields } from '../../src/storedFieldsLayout'
 import { finalizeRawSearchResults } from '../../src/scoring'
 import { executeQueryWithRunOptions } from '../../src/queryEngine'
 
@@ -15,7 +16,7 @@ export function searchNaive(frozen, query, searchOptions = {}) {
     searchOptions,
     priv._options.searchOptions,
     docId => priv._externalIds[docId],
-    docId => priv._storedFields[docId],
+    docId => readStoredFields(priv._storedFields, docId),
   )
 }
 
@@ -29,6 +30,6 @@ export function searchWithRunOptions(frozen, query, searchOptions = {}, run) {
     searchOptions,
     priv._options.searchOptions,
     docId => priv._externalIds[docId],
-    docId => priv._storedFields[docId],
+    docId => readStoredFields(priv._storedFields, docId),
   )
 }

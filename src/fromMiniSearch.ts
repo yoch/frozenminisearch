@@ -4,6 +4,7 @@ import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { materializeFrozenPostings } from './frozenPostings'
 import { resolveIndexingOptions } from './indexingCore'
+import { storedFieldsFromRows } from './storedFieldsLayout'
 import { DISCARDED_DOC_ID } from './flatPostings'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { Options } from './searchTypes'
@@ -143,7 +144,7 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   let shortIdRemap: Uint32Array | null = null
   const resolvedNextId = useDense ? documentCount : nextId
   const externalIds: unknown[] = new Array(resolvedNextId)
-  const storedFields: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
+  const storedFieldRows: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
 
   if (useDense) {
     shortIdRemap = new Uint32Array(nextId)
@@ -156,14 +157,14 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
       const shortIdStr = String(shortId)
       shortIdRemap[shortId] = dense
       externalIds[dense] = snapshot.documentIds[shortIdStr]
-      storedFields[dense] = snapshot.storedFields[shortIdStr]
+      storedFieldRows[dense] = snapshot.storedFields[shortIdStr]
       dense++
     }
   } else {
     for (const [shortIdStr, id] of Object.entries(snapshot.documentIds)) {
       const shortId = parseInt(shortIdStr, 10)
       externalIds[shortId] = id
-      storedFields[shortId] = snapshot.storedFields[shortIdStr]
+      storedFieldRows[shortId] = snapshot.storedFields[shortIdStr]
     }
   }
 
@@ -194,6 +195,8 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     resolvedNextId,
     shortIdRemap,
   )
+
+  const storedFields = storedFieldsFromRows(storedFieldRows, opts.storeFields)
 
   return {
     options: opts,

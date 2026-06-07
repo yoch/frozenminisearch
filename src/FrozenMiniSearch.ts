@@ -56,6 +56,14 @@ import type {
 export type { FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
 export type { MiniSearchSnapshot } from './fromMiniSearch'
 import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
+import {
+  readStoredFields,
+  storedFieldsFromRows,
+  storedFieldsJsonBytes,
+  storedFieldsSlotCount,
+  storedFieldsToWireRows,
+  type StoredFieldsLayout,
+} from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
 
 export function frozenMemoryBreakdown(frozen: FrozenMiniSearch): FrozenMemoryBreakdown {
@@ -128,7 +136,7 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _fieldCount: number
   private readonly _fieldLengthMatrix: FieldLengthArray
   private readonly _avgFieldLength: Float32Array
-  private readonly _storedFields: (Record<string, unknown> | undefined)[]
+  private readonly _storedFields: StoredFieldsLayout
   private readonly _termCount: number
   private readonly _postings: FrozenPostingsLayout
   private readonly _fieldTermFlyweight: FrozenFieldTermFlyweight
@@ -157,7 +165,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldIds: this._fieldIds,
       getFieldLength: (docId, fieldId) => this.getFieldLength(docId, fieldId),
       getExternalId: docId => this._externalIds[docId],
-      getStoredFields: docId => this._storedFields[docId],
+      getStoredFields: docId => readStoredFields(this._storedFields, docId),
     }
     this._queryEngineParams = {
       fields: this._options.fields,
@@ -172,7 +180,7 @@ export default class FrozenMiniSearch<T = any> {
           for (let shortId = 0; shortId < this._nextId; shortId++) {
             const id = this._externalIds[shortId]
             if (id === undefined) continue
-            callback(shortId, id, this._storedFields[shortId])
+            callback(shortId, id, readStoredFields(this._storedFields, shortId))
           }
         },
       ),
@@ -189,10 +197,7 @@ export default class FrozenMiniSearch<T = any> {
     const termCount = this.termCount
     const postingsStats = postingsTypedBytes(this._postings)
 
-    let storedJson = 0
-    for (const row of this._storedFields) {
-      if (row != null) storedJson += JSON.stringify(row).length
-    }
+    const storedJson = storedFieldsJsonBytes(this._storedFields)
 
     const radixEst = this._index.packedByteLength()
     const idMapBytes = this._idLookup.mode === 'lazy-map' ? this._idLookup.mapEntryCount * 32 : 0
@@ -226,7 +231,7 @@ export default class FrozenMiniSearch<T = any> {
       },
       documents: {
         externalIdsSlots: this._externalIds.length,
-        storedFieldsSlots: this._storedFields.length,
+        storedFieldsSlots: storedFieldsSlotCount(this._storedFields),
         idLookupMode: this._idLookup.mode,
         idToShortIdEntries: this._idLookup.mapEntryCount,
         fieldLengthMatrixBytes: this._fieldLengthMatrix.byteLength,
@@ -243,7 +248,7 @@ export default class FrozenMiniSearch<T = any> {
 
   getStoredFields(id: unknown): Record<string, unknown> | undefined {
     const shortId = this._idLookup.get(id)
-    return shortId == null ? undefined : this._storedFields[shortId]
+    return shortId == null ? undefined : readStoredFields(this._storedFields, shortId)
   }
 
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
@@ -253,7 +258,7 @@ export default class FrozenMiniSearch<T = any> {
       searchOptions,
       this._options.searchOptions,
       docId => this._externalIds[docId],
-      docId => this._storedFields[docId],
+      docId => readStoredFields(this._storedFields, docId),
     )
   }
 
@@ -272,7 +277,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldNames: fieldNamesFromFieldIds(this._fieldIds),
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
-      storedFields: this._storedFields,
+      storedFields: storedFieldsToWireRows(this._storedFields, this._nextId),
       fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
@@ -289,7 +294,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldNames: fieldNamesFromFieldIds(this._fieldIds),
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
-      storedFields: this._storedFields,
+      storedFields: storedFieldsToWireRows(this._storedFields, this._nextId),
       fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
@@ -346,7 +351,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldCount: snap.fieldCount,
       externalIds: snap.externalIds,
       idLookup,
-      storedFields: snap.storedFields,
+      storedFields: storedFieldsFromRows(snap.storedFields, opts.storeFields),
       fieldLengthMatrix: snap.fieldLengthMatrix,
       avgFieldLength: snap.avgFieldLength,
       index,

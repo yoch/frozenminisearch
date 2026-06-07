@@ -172,7 +172,6 @@ export function collectFieldTermFreqsFromFieldInto(
   return collectFieldTermFreqsInto(localFreqs, tokenScratch, fieldName, processTerm)
 }
 
-/** Same running average as {@link MiniSearch} private addFieldLength. */
 export function updateAvgFieldLength(
   avgFieldLength: number[],
   fieldId: number,
@@ -182,18 +181,4 @@ export function updateAvgFieldLength(
   const averageFieldLength = avgFieldLength[fieldId] || 0
   const totalFieldLength = (averageFieldLength * count) + length
   avgFieldLength[fieldId] = totalFieldLength / (count + 1)
-}
-
-export function saveStoredFieldsForDocument<T>(
-  storeFields: string[],
-  extractField: IndexingOptions<T>['extractField'],
-  document: T,
-): Record<string, unknown> | undefined {
-  if (storeFields.length === 0) return undefined
-  const documentFields: Record<string, unknown> = {}
-  for (const fieldName of storeFields) {
-    const fieldValue = extractField(document, fieldName)
-    if (fieldValue !== undefined) documentFields[fieldName] = fieldValue
-  }
-  return documentFields
 }

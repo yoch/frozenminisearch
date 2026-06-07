@@ -4,6 +4,7 @@ import type { FieldLengthArray } from './fieldLengthMatrix'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { OptionsWithDefaults } from './searchTypes'
+import { cloneStoredFields } from './storedFieldsLayout'
 
 export type SnapshotOwnershipMode = 'trusted-build' | 'minisearch-json' | 'binary-load'
 
@@ -80,7 +81,7 @@ function shallowCopyJsSnapshotFields<T>(
   return {
     fieldIds: { ...params.fieldIds },
     options: shallowCopyOptions(params.options),
-    storedFields: params.storedFields.slice(),
+    storedFields: cloneStoredFields(params.storedFields),
   }
 }
 

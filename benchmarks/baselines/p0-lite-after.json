@@ -1,0 +1,19 @@
+{
+  "note": "After P0-lite storedFields columnar (build-peak-heap)",
+  "capturedAt": "2026-06-07",
+  "baseline": {
+    "divinaStoreFieldsRetainedHeapMb": 1.0367,
+    "divinaIndexOnlyRetainedHeapMb": 0.2808
+  },
+  "after": {
+    "divinaStoreFieldsRetainedHeapMb": 0.2876,
+    "divinaIndexOnlyRetainedHeapMb": 0.1839
+  },
+  "deltaStoreFieldsRetainedMb": -0.7491,
+  "deltaStoreFieldsRetainedPct": -72.3,
+  "storeFieldsOverheadMb": {
+    "before": 0.7559,
+    "after": 0.1037,
+    "saved": 0.6522
+  }
+}

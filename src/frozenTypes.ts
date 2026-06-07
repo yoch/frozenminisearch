@@ -2,6 +2,7 @@ import type { FrozenTermIndex } from './frozenTermIndex'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import type { FieldLengthArray } from './fieldLengthMatrix'
+import type { StoredFieldsLayout } from './storedFieldsLayout'
 import type { OptionsWithDefaults } from './searchTypes'
 
 export type { OptionsWithDefaults } from './searchTypes'
@@ -51,7 +52,7 @@ export interface FrozenAssembleParams<T = any> {
   fieldCount: number
   externalIds: unknown[]
   idLookup: IdToShortIdLookup
-  storedFields: (Record<string, unknown> | undefined)[]
+  storedFields: StoredFieldsLayout
   fieldLengthMatrix: FieldLengthArray
   avgFieldLength: Float32Array
   index: FrozenTermIndex

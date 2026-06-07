@@ -10,7 +10,7 @@ import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { measureStructuredBytes } from './packedRadixMetrics.js'
 import { fuzzyCasesFromProbe } from './packedRadixFuzzyCases.js'
 
-function resolveFixturesDir () {
+export function resolveFixturesDir () {
   const here = dirname(fileURLToPath(import.meta.url))
   const candidates = [
     join(here, 'fixtures/medicaments-indexes'),
@@ -58,7 +58,7 @@ let manifestCache
 /** @type {Map<string, object>} */
 const corpusCache = new Map()
 
-function loadManifests () {
+export function loadManifests () {
   if (manifestCache) return manifestCache
   const bdpm = JSON.parse(readFileSync(join(FIXTURES_DIR, 'bdpm-manifest.json'), 'utf8'))
   const vet = JSON.parse(readFileSync(join(FIXTURES_DIR, 'vet-manifest.json'), 'utf8'))

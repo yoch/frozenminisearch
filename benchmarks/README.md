@@ -20,7 +20,17 @@ npm run bench:history                      # history analysis
 npm run bench:micro                        # Benchmark.js micro suites (Divina corpus)
 npm run bench -- micro --only=fuzzy,ranking
 npm run bench:micro -- --list
+npm run bench:build-peak                   # transient heap peak during FrozenIndexBuilder (OPT-1 prep)
+npm run bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
 ```
+
+`bench:build-peak` writes `benchmarks/baselines/build-peak-heap.json` (peak vs retained heap, radix share estimate).
+
+`bench:medicaments-build-peak` measures `FrozenIndexBuilder` peak on real post-parse JSONL when available (`/home/yoch/fr.gouv.medicaments.rest/data/corpus-export`, override with `CORPUS_EXPORT_DIR`). Documents contain **indexed fields + `id` only** (`buildIndexDocument`). Fallback: invert `.msbin` fixtures (`SOURCE=msbin`). Output: `medicaments-build-peak-heap.json` (jsonl) or `medicaments-build-peak-heap-msbin.json`. Filter: `ONLY=bdpm-presentations`.
+
+**Dev** : préférer `npm test` + `ONLY=bdpm-presentations npm run bench:medicaments-build-peak`. Réserver `benchmark:diff:run` (suite complète, long) à la CI / pré-merge.
+
+`bench:build-heap-profile` — profil rapide add vs freeze (réel vs synthétique few-terms / 1-field) → `benchmarks/baselines/build-heap-profile.json`.
 
 ## Micro-benchmarks (`benchmarks/micro/`)
 

@@ -199,6 +199,9 @@ export function materializeFrozenPostingsFromBuilder(
           allFreqs[write] = freqs![i]
           write++
         }
+        // Drop references so V8 can reclaim per-slot number[] after copy (sparse array slots stay allocated).
+        postingsDocIds[slot] = undefined
+        postingsFreqs[slot] = undefined
       }
     }
     return {
@@ -246,6 +249,9 @@ export function materializeFrozenPostingsFromBuilder(
         allFreqs[write] = freqs[i]
         write++
       }
+      // Drop references so V8 can reclaim per-slot number[] after copy (sparse array slots stay allocated).
+      postingsDocIds[slot] = undefined
+      postingsFreqs[slot] = undefined
     }
     termStarts[ti + 1] = sparseFieldIdsScratch.length
   }

@@ -1,0 +1,73 @@
+{
+  "capturedAt": "2026-06-07T14:11:22.335Z",
+  "node": "v24.16.0",
+  "note": "One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ radix growth. synthetic-1field isolates multi-field per-doc cost.",
+  "scenarios": {
+    "real": {
+      "id": "bdpm-presentations",
+      "documentCount": 20905,
+      "termCount": 37288,
+      "fieldCount": 5,
+      "corpusTextMb": 2.263,
+      "corpusHoldMb": 0.001,
+      "peakAfterAddMb": 77.052,
+      "peakTotalMb": 77.052,
+      "peakFreezeDeltaMb": 0,
+      "retainedMb": 0.0009,
+      "transientMb": 77.051,
+      "structuredMb": 2.541,
+      "componentsMb": {
+        "postings": 1.436,
+        "radixTree": 0.777,
+        "storedFieldsJson": 0.229,
+        "fieldLengthMatrix": 0.1
+      }
+    },
+    "synthetic": {
+      "id": "bdpm-presentations-synthetic-few-terms",
+      "documentCount": 20905,
+      "termCount": 6,
+      "fieldCount": 5,
+      "corpusTextMb": 2.492,
+      "corpusHoldMb": 0.001,
+      "peakAfterAddMb": 68.311,
+      "peakTotalMb": 68.405,
+      "peakFreezeDeltaMb": 0.094,
+      "retainedMb": 0.0007,
+      "transientMb": 68.404,
+      "structuredMb": 1.525,
+      "componentsMb": {
+        "postings": 1.196,
+        "radixTree": 0,
+        "storedFieldsJson": 0.229,
+        "fieldLengthMatrix": 0.1
+      }
+    },
+    "syntheticOneField": {
+      "id": "bdpm-presentations-synthetic-1field",
+      "documentCount": 20905,
+      "termCount": 4,
+      "fieldCount": 1,
+      "corpusTextMb": 0.498,
+      "corpusHoldMb": 0.001,
+      "peakAfterAddMb": 31.15,
+      "peakTotalMb": 31.216,
+      "peakFreezeDeltaMb": 0.066,
+      "retainedMb": 0,
+      "transientMb": 31.216,
+      "structuredMb": 0.488,
+      "componentsMb": {
+        "postings": 0.239,
+        "radixTree": 0,
+        "storedFieldsJson": 0.229,
+        "fieldLengthMatrix": 0.02
+      }
+    }
+  },
+  "inference": {
+    "radixHeavyTransientMb": 8.647,
+    "multiFieldPremiumMb": 45.835,
+    "structuredPostingsPct": 56.5,
+    "transientVsStructuredRatio": 30.3
+  }
+}

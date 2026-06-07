@@ -1,0 +1,88 @@
+{
+  "capturedAt": "2026-06-07T11:20:15.544Z",
+  "node": "v24.16.0",
+  "gcExposed": true,
+  "runs": 3,
+  "note": "peakHeapMb is max heapUsed above post-gc baseline during build; retainedHeapMb is measureHeap delta after gc.",
+  "opt1Hint": "OPT-1 targets freezeDeltaMb and radix overlap at freeze. If peakAfterAdd ≈ peak total, prioritize postings/storedFields pressure over radix pack.",
+  "scenarios": [
+    {
+      "id": "divina-indexOnly",
+      "name": "Divina Commedia — index only",
+      "documentCount": 14097,
+      "runs": 3,
+      "build": {
+        "peakHeapMb": 32.8111,
+        "peakHeapKb": 33598.6,
+        "peakAfterAddMb": 32.811,
+        "freezeDeltaMb": 0.0001,
+        "peakRssMb": 141.949,
+        "retainedHeapMb": 0.2643,
+        "retainedHeapKb": 270.6,
+        "peakVsRetainedRatio": 124.14,
+        "breakdownMb": {
+          "postings": 0.386,
+          "radixTree": 0.227,
+          "storedFieldsJson": 0,
+          "structuredTotal": 0.626
+        },
+        "radixShareOfStructuredPct": 36.3,
+        "peakRadixShareEstimatePct": 0.7,
+        "termCount": 13497,
+        "documentCount": 14097
+      }
+    },
+    {
+      "id": "divina-storeFields",
+      "name": "Divina Commedia — with storeFields",
+      "documentCount": 14097,
+      "runs": 3,
+      "build": {
+        "peakHeapMb": 55.0098,
+        "peakHeapKb": 56330.1,
+        "peakAfterAddMb": 55.01,
+        "freezeDeltaMb": -0.0002,
+        "peakRssMb": 207.156,
+        "retainedHeapMb": 1.0072,
+        "retainedHeapKb": 1031.3,
+        "peakVsRetainedRatio": 54.62,
+        "breakdownMb": {
+          "postings": 0.386,
+          "radixTree": 0.227,
+          "storedFieldsJson": 0.641,
+          "structuredTotal": 1.268
+        },
+        "radixShareOfStructuredPct": 17.9,
+        "peakRadixShareEstimatePct": 0.4,
+        "termCount": 13497,
+        "documentCount": 14097
+      }
+    },
+    {
+      "id": "extreme-highFrequency",
+      "name": "High-frequency terms (10k docs)",
+      "documentCount": 10000,
+      "runs": 3,
+      "build": {
+        "peakHeapMb": 46.5252,
+        "peakHeapKb": 47641.8,
+        "peakAfterAddMb": 46.202,
+        "freezeDeltaMb": 0.3232,
+        "peakRssMb": 205.668,
+        "retainedHeapMb": 0.1619,
+        "retainedHeapKb": 165.8,
+        "peakVsRetainedRatio": 287.37,
+        "breakdownMb": {
+          "postings": 0.288,
+          "radixTree": 0.003,
+          "storedFieldsJson": 0,
+          "structuredTotal": 0.301
+        },
+        "radixShareOfStructuredPct": 1,
+        "peakRadixShareEstimatePct": 0,
+        "termCount": 258,
+        "documentCount": 10000
+      }
+    }
+  ]
+}

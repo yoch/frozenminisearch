@@ -55,6 +55,39 @@ export function pctDeltaRound (base, value, digits = 1) {
   return d == null ? null : Number(d.toFixed(digits))
 }
 
+/**
+ * Tracks max `heapUsed` above a post-gc baseline while a build runs.
+ * Use for transient peak during `add` / `freezeParams` (not retained heap after gc).
+ */
+export function createPeakHeapSampler () {
+  gc()
+  const baselineHeap = heapBytes()
+  const baselineRss = process.memoryUsage().rss
+  let peakHeap = baselineHeap
+  let peakRss = baselineRss
+
+  return {
+    sample () {
+      const u = process.memoryUsage()
+      if (u.heapUsed > peakHeap) peakHeap = u.heapUsed
+      if (u.rss > peakRss) peakRss = u.rss
+    },
+    peakHeapMb () {
+      return mbRound(peakHeap - baselineHeap)
+    },
+    finish (value) {
+      return {
+        value,
+        baselineHeapMb: mbRound(baselineHeap),
+        peakHeapMb: mbRound(peakHeap - baselineHeap),
+        peakHeapBytes: peakHeap - baselineHeap,
+        peakRssMb: mbRound(peakRss),
+        peakRssDeltaMb: mbRound(peakRss - baselineRss),
+      }
+    },
+  }
+}
+
 export function measureHeap (fn) {
   gc()
   const before = memorySnapshot()

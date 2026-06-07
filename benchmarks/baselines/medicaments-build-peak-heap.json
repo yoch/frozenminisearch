@@ -1,0 +1,60 @@
+{
+  "capturedAt": "2026-06-07T14:10:14.701Z",
+  "node": "v24.16.0",
+  "gcExposed": true,
+  "runs": 1,
+  "corpusSource": "jsonl",
+  "corpusExportDir": null,
+  "note": "Corpus JSONL post-parse (indexed fields + id only). Bench models fromDocuments after ETL, not loadBinary.",
+  "scenarios": [
+    {
+      "id": "bdpm-presentations",
+      "source": "jsonl",
+      "file": "bdpm_presentations.jsonl",
+      "indexedFields": [
+        "cis",
+        "cip7",
+        "cip13",
+        "libelle",
+        "indications"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 2.263,
+      "corpusHeapMb": 2.697,
+      "corpusMeta": {
+        "documentCount": 20905,
+        "fields": [
+          "cis",
+          "cip7",
+          "cip13",
+          "libelle",
+          "indications"
+        ],
+        "corpusTextBytes": 2372847,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_presentations.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 78.5255,
+        "peakAfterAddMb": 78.525,
+        "freezeDeltaMb": 0.0005,
+        "peakRssMb": 210.195,
+        "retainedHeapMb": 3.0163,
+        "peakVsRetainedRatio": 26.03,
+        "breakdownMb": {
+          "postings": 1.436,
+          "radixTree": 0.777,
+          "storedFieldsJson": 0.229,
+          "structuredTotal": 2.541
+        },
+        "termCount": 37288,
+        "documentCount": 20905
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    }
+  ]
+}

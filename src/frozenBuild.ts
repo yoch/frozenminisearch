@@ -3,12 +3,11 @@ import { fromRadixTree } from './PackedRadixTree'
 import type { Options } from './searchTypes'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
-import { materializeFrozenPostingsFromBuilder } from './frozenPostings'
-import { clampFreq } from './compactPostings'
+import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import {
   buildFieldIds,
-  collectFieldTermFreqs,
+  collectFieldTermFreqsFromFieldInto,
   resolveIndexingOptions,
   saveStoredFieldsForDocument,
   updateAvgFieldLength,
@@ -18,56 +17,21 @@ import {
 export interface FrozenIndexBuilderHints {
   /** Pre-size per-document arrays when the final document count is known. */
   estimatedDocumentCount?: number
+  /** Hint for initial growable posting column capacity per (term, field) slot. */
+  estimatedPostingsPerSlot?: number
 }
 
-interface PostingsBuildState {
-  fieldCount: number
-  terms: string[]
-  postingsDocIds: (number[] | undefined)[]
-  postingsFreqs: (number[] | undefined)[]
-  totalPostings: number
-  maxFreq: number
-}
-
-function getOrCreateTermIndex(state: PostingsBuildState, index: SearchableMap<number>, term: string): number {
+function getOrCreateTermIndex(
+  termCount: { value: number },
+  index: SearchableMap<number>,
+  term: string,
+): number {
   const existing = index.get(term)
   if (existing != null) return existing
-  const ti = state.terms.length
-  state.terms.push(term)
+  const ti = termCount.value
+  termCount.value++
   index.set(term, ti)
   return ti
-}
-
-function appendPosting(
-  state: PostingsBuildState,
-  termIndex: number,
-  fieldId: number,
-  docId: number,
-  freq: number,
-): void {
-  const slot = termIndex * state.fieldCount + fieldId
-  let docIds = state.postingsDocIds[slot]
-  if (docIds == null) {
-    docIds = []
-    state.postingsDocIds[slot] = docIds
-    state.postingsFreqs[slot] = []
-  }
-  docIds.push(docId)
-  state.postingsFreqs[slot]!.push(freq)
-  const v = clampFreq(freq)
-  if (v > state.maxFreq) state.maxFreq = v
-  state.totalPostings++
-}
-
-function finalizeFlatPostings(state: PostingsBuildState, nextId: number) {
-  return materializeFrozenPostingsFromBuilder({
-    fieldCount: state.fieldCount,
-    termCount: state.terms.length,
-    postingsDocIds: state.postingsDocIds,
-    postingsFreqs: state.postingsFreqs,
-    totalPostings: state.totalPostings,
-    maxFreq: state.maxFreq,
-  }, nextId)
 }
 
 /** Incremental builder for {@link FrozenMiniSearch} without materializing a full `documents[]` array. */
@@ -75,16 +39,16 @@ export class FrozenIndexBuilder<T> {
   private readonly _options: IndexingOptions<T>
   private readonly _fieldIds: { [key: string]: number }
   private readonly _fieldCount: number
-  private readonly _index: SearchableMap<number>
-  private readonly _terms: string[]
-  private readonly _postingsDocIds: (number[] | undefined)[]
-  private readonly _postingsFreqs: (number[] | undefined)[]
+  private _index: SearchableMap<number> | null
+  private readonly _postings: IncrementalPostingsAccumulator
+  private readonly _termCount = { value: 0 }
   private readonly _externalIds: unknown[]
   private readonly _storedFields: (Record<string, unknown> | undefined)[]
   private readonly _fieldLengthData: number[]
   private readonly _avgFieldLength: number[]
-  private readonly _postingsState: PostingsBuildState
   private readonly _seenIds: Set<unknown>
+  private readonly _fieldTermFreqScratch = new Map<string, number>()
+  private readonly _tokenScratch: string[] = []
   private _nextId: number
   private _frozen: boolean
 
@@ -93,9 +57,11 @@ export class FrozenIndexBuilder<T> {
     this._fieldIds = buildFieldIds(this._options.fields)
     this._fieldCount = this._options.fields.length
     this._index = new SearchableMap<number>()
-    this._terms = []
-    this._postingsDocIds = []
-    this._postingsFreqs = []
+    const estimatedDocs = hints?.estimatedDocumentCount ?? 0
+    const perSlot = hints?.estimatedPostingsPerSlot ?? 4
+    this._postings = new IncrementalPostingsAccumulator(this._fieldCount, {
+      estimatedTotalPostings: estimatedDocs > 0 ? estimatedDocs * perSlot : undefined,
+    })
     this._avgFieldLength = []
     this._seenIds = new Set()
     this._nextId = 0
@@ -110,15 +76,6 @@ export class FrozenIndexBuilder<T> {
       this._externalIds = []
       this._storedFields = []
       this._fieldLengthData = []
-    }
-
-    this._postingsState = {
-      fieldCount: this._fieldCount,
-      terms: this._terms,
-      postingsDocIds: this._postingsDocIds,
-      postingsFreqs: this._postingsFreqs,
-      totalPostings: 0,
-      maxFreq: 0,
     }
   }
 
@@ -152,18 +109,26 @@ export class FrozenIndexBuilder<T> {
       const fieldValue = extractField(document, field)
       if (fieldValue == null) continue
 
-      const tokens = tokenize(stringifyField(fieldValue, field), field)
+      const fieldText = typeof fieldValue === 'string'
+        ? fieldValue
+        : stringifyField(fieldValue, field)
       const fieldId = this._fieldIds[field]
-      const uniqueTerms = new Set(tokens).size
-      const localFreqs = collectFieldTermFreqs(tokens, field, processTerm)
+      const uniqueTerms = collectFieldTermFreqsFromFieldInto(
+        this._fieldTermFreqScratch,
+        this._tokenScratch,
+        tokenize,
+        fieldText,
+        field,
+        processTerm,
+      )
 
       this._fieldLengthData[shortId * this._fieldCount + fieldId] = uniqueTerms
       updateAvgFieldLength(this._avgFieldLength, fieldId, documentCount - 1, uniqueTerms)
 
-      for (const [term, freq] of localFreqs) {
-        const ti = getOrCreateTermIndex(this._postingsState, this._index, term)
-        appendPosting(this._postingsState, ti, fieldId, shortId, freq)
-      }
+      this._fieldTermFreqScratch.forEach((freq, term) => {
+        const ti = getOrCreateTermIndex(this._termCount, this._index!, term)
+        this._postings.append(ti, fieldId, shortId, freq)
+      })
     }
   }
 
@@ -223,7 +188,12 @@ export class FrozenIndexBuilder<T> {
     this._frozen = true
 
     const documentCount = this._nextId
-    const postings = finalizeFlatPostings(this._postingsState, documentCount)
+    const termCount = this._termCount.value
+    const postings = this._postings.finalize(termCount, documentCount)
+
+    const radixTree = this._index!.radixTree
+    this._index = null
+    const index = fromRadixTree(radixTree, termCount)
 
     const avgFieldLength = new Float32Array(this._fieldCount)
     for (let f = 0; f < this._fieldCount; f++) {
@@ -241,8 +211,6 @@ export class FrozenIndexBuilder<T> {
 
     const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 
-    // Incremental builder: numeric radix leaves + build-time terms[] for postings.
-    // freezeFromMiniSearch packs Map leaves in one radix pass (no resident terms[]).
     return {
       options: this._options,
       documentCount,
@@ -254,8 +222,8 @@ export class FrozenIndexBuilder<T> {
       storedFields,
       fieldLengthMatrix: materializeFieldLengthMatrix(this._fieldLengthData, documentCount * this._fieldCount),
       avgFieldLength,
-      index: fromRadixTree(this._index.radixTree, this._terms.length),
-      termCount: this._terms.length,
+      index,
+      termCount,
       postings,
     }
   }

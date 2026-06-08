@@ -1,5 +1,5 @@
 /**
- * Build comparable reference (lucaong minisearch) + frozen pair for parity tests.
+ * Build comparable reference MiniSearch + frozen pair for parity tests.
  */
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../src/FrozenMiniSearch'

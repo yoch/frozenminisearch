@@ -4,7 +4,7 @@ Modular harness under `benchmarks/framework/` with three **profiles**:
 
 | Profile | CLI flag | Purpose |
 |---------|----------|---------|
-| `vs-reference` | `--profile=vs-reference` | Compare frozen vs lucaong `minisearch` (memory, build, search, migrate, drift) |
+| `vs-reference` | `--profile=vs-reference` | Compare frozen vs MiniSearch (memory, build, search, migrate, drift) |
 | `regression` | `--profile=regression` (default) | Full suite vs committed baselines |
 | `dev` | `--profile=dev` or `--quick` | Fast search-only smoke (1 run × 10 iterations) |
 
@@ -46,7 +46,7 @@ Fast **ops/sec** probes on the Divine Commedia corpus via [Benchmark.js](https:/
 | `filter` | `MiniSearch#search` with filter |
 | `autosuggest` | `MiniSearch#autoSuggest` |
 
-Corpus fixture: `benchmarks/divinaCommedia.js` (lucaong `minisearch`). Suite modules live alongside under `benchmarks/*.js`; registry in `benchmarks/micro/registry.mjs`.
+Corpus fixture: `benchmarks/divinaCommedia.js` (MiniSearch). Suite modules live alongside under `benchmarks/*.js`; registry in `benchmarks/micro/registry.mjs`.
 
 ### Search timing protocol (v2)
 

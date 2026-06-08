@@ -74,7 +74,7 @@ export function cloneStoredFields(layout: StoredFieldsLayout): StoredFieldsLayou
   return { kind: 'multi', rows: layout.rows.slice() }
 }
 
-/** Import from wire rows or lucaong snapshot. Empty storeFields + non-empty rows → multi (binary load without options). */
+/** Import from wire rows or MiniSearch snapshot. Empty storeFields + non-empty rows → multi (binary load without options). */
 export function storedFieldsFromRows(
   rows: (Record<string, unknown> | undefined)[],
   storeFields: readonly string[],

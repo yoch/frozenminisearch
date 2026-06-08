@@ -42,7 +42,7 @@ export interface FrozenMemoryBreakdown {
 /**
  * Low-level parameters for {@link assembleFrozen} (custom frozen index pipelines).
  * Field types are part of the public surface for advanced assembly; typical apps use
- * {@link buildFrozenFromDocuments}, {@link FrozenMiniSearch.fromMiniSearchJson}, or binary load instead.
+ * {@link buildFrozenFromDocuments}, {@link FrozenMiniSearch.fromJson}, or binary load instead.
  */
 export interface FrozenAssembleParams<T = any> {
   options: OptionsWithDefaults<T>

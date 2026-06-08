@@ -476,7 +476,7 @@ function executeQueryInternal(
   }
 
   if (isQueryCombination(query)) {
-    // Spread inherits parent combineWith into child branches (lucaong 7.2 behavior).
+    // Spread inherits parent combineWith into child branches (MiniSearch 7.2 behavior).
     const options = { ...searchOptions, ...query, queries: undefined }
     const operator = (
       query.combineWith

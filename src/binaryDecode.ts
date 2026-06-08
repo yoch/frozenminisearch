@@ -22,7 +22,7 @@ export function decodeFrozenSnapshot(buf: Buffer, hints?: FrozenDecodeHints): Fr
   }
   if (LEGACY_MAGICS.has(magic)) {
     throw invalidFrozenIndex(
-      'Unsupported frozen binary snapshot; re-build with saveBinarySync() or from lucaong JSON',
+      'Unsupported frozen binary snapshot; re-build with saveBinarySync() or from MiniSearch JSON',
     )
   }
   throw invalidFrozenIndex('Unsupported frozen binary snapshot')

@@ -2,19 +2,20 @@
 
 [![npm version](https://img.shields.io/npm/v/@yoch/frozenminisearch.svg)](https://www.npmjs.com/package/@yoch/frozenminisearch)
 [![coverage](https://codecov.io/gh/yoch/frozenminisearch/graph/badge.svg)](https://codecov.io/gh/yoch/frozenminisearch)
-[![CI](https://img.shields.io/github/actions/workflow/status/yoch/frozenminisearch/main.yml?branch=master)](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml)
+[![CI](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml/badge.svg)](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml)
+[![Socket Badge](https://socket.dev/api/badge/npm/package/@yoch/frozenminisearch)](https://socket.dev/npm/package/%40yoch%2Ffrozenminisearch)
 
 **Memory-optimized, read-only full-text search for Node.js** — the same BM25, prefix/fuzzy, and `autoSuggest` API as [MiniSearch](https://github.com/lucaong/minisearch), with **up to ~98% less index RAM** on real corpora and compact binary snapshots you ship instead of JSON.
 
-**Why it exists:** lucaong `minisearch` optimizes for a mutable in-memory index. FrozenMiniSearch optimizes for **retained heap, disk footprint, and cold load** once the corpus is fixed — packed radix postings, columnar `storeFields`, typed-array layouts, and MSv5 binary wire format instead of per-document JS objects.
+**Why it exists:** [MiniSearch](https://github.com/lucaong/minisearch) optimizes for a mutable in-memory index. FrozenMiniSearch optimizes for **retained heap, disk footprint, and cold load** once the corpus is fixed — packed radix postings, columnar `storeFields`, typed-array layouts, and MSv5 binary wire format instead of per-document JS objects.
 
-**Design goal:** migrate with minimal code change — package name and index construction only; serving code stays the same. Build with `fromDocuments`, the incremental builder, or `fromMiniSearchJson`; no mutable `MiniSearch` class is published here.
+**Design goal:** migrate with minimal code change — package name and index construction only; serving code stays the same. Build with `fromDocuments`, the incremental builder, or `fromJson`; no mutable `MiniSearch` class is published here.
 
 ---
 
 ## Why frozen instead of MiniSearch?
 
-Choose **mutable** lucaong `minisearch` when documents change at runtime (`add`, `remove`, `discard`). Choose **frozen** when memory and snapshot size matter: fixed corpus, deploy from binary, many replicas loading the same index. Search semantics stay the same — BM25, prefix/fuzzy, `autoSuggest`, wildcard, `AND` / `OR` / `AND_NOT` — with parity vs `minisearch@7` validated in `dev/parity/` (scores `toBeCloseTo` precision 6).
+Choose **mutable MiniSearch** when documents change at runtime (`add`, `remove`, `discard`). Choose **frozen** when memory and snapshot size matter: fixed corpus, deploy from binary, many replicas loading the same index. Search semantics stay the same — BM25, prefix/fuzzy, `autoSuggest`, wildcard, `AND` / `OR` / `AND_NOT` — with parity vs MiniSearch 7 validated in `dev/parity/` (scores `toBeCloseTo` precision 6).
 
 ### Memory-first design
 
@@ -22,12 +23,12 @@ Choose **mutable** lucaong `minisearch` when documents change at runtime (`add`,
 |-----------|---------------|
 | **Packed radix tree + flat postings** | Term dictionary and posting lists without per-entry JS wrappers |
 | **Columnar `storeFields`** | One dense column per field instead of a `Record` per document (~75% less heap for a single stored field) |
-| **MSv5 binary snapshots** | ~73–94% smaller on disk than lucaong JSON; faster cold load |
+| **MSv5 binary snapshots** | ~73–94% smaller on disk than MiniSearch JSON; faster cold load |
 | **Read-only freeze** | No mutation bookkeeping — layouts sized for serve-time, not incremental edit |
 | **Incremental builder** | Typed-array accumulators during build; lower peak heap than materializing `number[][]` per term |
 
 <!-- vs-reference:start — npm run bench:readme -->
-### Measured vs lucaong MiniSearch (reference baseline)
+### Measured vs MiniSearch (reference baseline)
 
 Same BM25 queries on identical corpora. **Index RAM is the headline metric** — frozen uses a fraction of mutable heap on every scenario below; disk and cold load follow from the compact binary format.
 
@@ -43,7 +44,7 @@ Same BM25 queries on identical corpora. **Index RAM is the headline metric** —
 
 Decomposition (Divina exact): L0 lookup ~300 ns frozen, L1 `executeQuery` ~8.3 µs, L2 full `search` ~11.6 µs (finalize ≈ 3 µs).
 
-| | lucaong `minisearch` | `@yoch/frozenminisearch` |
+| | MiniSearch | `@yoch/frozenminisearch` |
 |---|------------------------|---------------------------|
 | **Optimizes for** | Live mutations, flexibility | **Retained RAM**, snapshot size, cold load |
 | **Sweet spot** | Documents change at runtime | Fixed corpus, many replicas, tight memory budget |
@@ -106,17 +107,17 @@ ESM and CommonJS are both supported (`main` → CJS, `module` → ESM).
 
 ## Drop-in
 
-For **fixed corpora** (build once, serve read-only), treat this package as a drop-in replacement for lucaong `minisearch` on the serving path — same queries, far less memory per replica.
+For **fixed corpora** (build once, serve read-only), treat this package as a drop-in replacement for MiniSearch on the serving path — same queries, far less memory per replica.
 
 **Change only:**
 
 | What | Before | After |
 |------|--------|-------|
-| Package | lucaong `minisearch` | `@yoch/frozenminisearch` |
+| Package | `minisearch` | `@yoch/frozenminisearch` |
 | Construction | `new MiniSearch(opts).addAll(docs)` | `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)` |
-| JSON snapshot | `MiniSearch.loadJSON(json)` / `toJSON()` wire format | `FrozenMiniSearch.fromMiniSearchJson(json, opts)` or `fromMiniSearchSnapshot(obj)` — no runtime dependency on lucaong `minisearch` |
+| JSON snapshot | `toJSON()` / `loadJSON()` wire format | `FrozenMiniSearch.toJSON()` / `fromJson(json, opts)` or `fromMiniSearchSnapshot(obj)` — no runtime dependency on `minisearch` |
 
-**Keep unchanged** after load: `search`, `autoSuggest`, `has`, `getStoredFields`, query options (`prefix`, `fuzzy`, `AND` / `OR` / `AND_NOT`, filters, boosts). Parity vs `minisearch@7` is enforced in `dev/parity/`.
+**Keep unchanged** after load: `search`, `autoSuggest`, `has`, `getStoredFields`, query options (`prefix`, `fuzzy`, `AND` / `OR` / `AND_NOT`, filters, boosts). Parity vs MiniSearch 7 is enforced in `dev/parity/`.
 
 **Imports** — default and named both work (ESM and CJS):
 
@@ -136,7 +137,7 @@ const { FrozenMiniSearch } = require('@yoch/frozenminisearch')
 
 ## Migration
 
-### From lucaong `minisearch` JSON
+### From MiniSearch JSON
 
 ```javascript
 import MiniSearch from 'minisearch' // build-time only
@@ -150,18 +151,18 @@ const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
 
 // Option B — serialized index (offline / ETL)
 const json = JSON.stringify(mutable)
-const frozen2 = FrozenMiniSearch.fromMiniSearchJson(json, options)
+const frozen2 = FrozenMiniSearch.fromJson(json, options)
 ```
 
 `options.fields` must match the indexed fields in the snapshot when provided.
 
-### From lucaong `minisearch` (mutable → frozen)
+### From MiniSearch (mutable → frozen)
 
 | Before (mutable) | After (`@yoch/frozenminisearch`) |
 |------------------|----------------------------------|
 | `new MiniSearch(opts).addAll(docs)` then serve | `FrozenMiniSearch.fromDocuments(docs, opts)` or `fromMiniSearch(mutable, opts)` |
-| lucaong JSON snapshot | `FrozenMiniSearch.fromMiniSearchJson(json)` or `fromMiniSearchSnapshot(obj)` |
-| `import MiniSearch from 'minisearch'` | `import FrozenMiniSearch from '@yoch/frozenminisearch'` (+ lucaong `minisearch` only if you still build mutable indexes) |
+| MiniSearch JSON snapshot | `FrozenMiniSearch.fromJson(json)` or `fromMiniSearchSnapshot(obj)` |
+| `import MiniSearch from 'minisearch'` | `import FrozenMiniSearch from '@yoch/frozenminisearch'` (+ `minisearch` only if you still build mutable indexes) |
 
 ---
 
@@ -178,7 +179,7 @@ Indexing is **not** available on a frozen instance — use `fromDocuments`, the 
 
 ## Binary snapshots
 
-The primary way to **persist and ship a memory-compact index** — smaller than lucaong JSON and faster to load into a low-RAM serving process.
+The primary way to **persist and ship a memory-compact index** — smaller than MiniSearch JSON and faster to load into a low-RAM serving process.
 
 ```javascript
 const buf = index.saveBinarySync()
@@ -186,7 +187,7 @@ const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded 
 ```
 
 - **Node ≥ 22.15.0** (zstd via `node:zlib`)
-- Snapshots produced by this package version are forward-compatible; re-build from lucaong JSON if an older binary fails to load
+- Snapshots produced by this package version are forward-compatible; re-build from MiniSearch JSON if an older binary fails to load
 - `tokenize` / `processTerm` are not stored — pass the same functions at load when customized
 
 ---

@@ -9,7 +9,7 @@ import { DISCARDED_DOC_ID } from './flatPostings'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { Options } from './searchTypes'
 
-/** Lucaong MiniSearch JSON snapshot (`toJSON` / `loadJSON` wire format). */
+/** MiniSearch JSON snapshot (`toJSON` wire format, `serializationVersion` 1 or 2). */
 export type SerializedIndexEntry = Record<string, number>
 
 export type MiniSearchSnapshot = {
@@ -119,7 +119,7 @@ function buildFlatPostingsFromSearchableMap(
   return { termCount, index: packedIndex, postings }
 }
 
-/** Build frozen assemble params from a lucaong MiniSearch JSON snapshot. */
+/** Build frozen assemble params from a MiniSearch JSON snapshot. */
 export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   snapshot: MiniSearchSnapshot,
   options: Options<T>,

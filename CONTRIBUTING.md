@@ -6,7 +6,7 @@ Thank you for helping improve this package. Issues and pull requests are welcome
 
 ```bash
 yarn install
-yarn test       # src/ unit tests + dev/parity/ vs lucaong minisearch
+yarn test       # src/ unit tests + dev/parity/ vs MiniSearch
 yarn build
 node scripts/verify-npm-pack.cjs
 ```
@@ -37,4 +37,4 @@ See [`benchmarks/README.md`](benchmarks/README.md).
 
 ## Upstream MiniSearch
 
-Search behaviour is derived from [lucaong/minisearch](https://github.com/lucaong/minisearch) (MIT). For bugs in the **mutable** API, consider reporting upstream; for frozen-specific issues, open an issue here.
+Search behaviour is derived from [MiniSearch](https://github.com/lucaong/minisearch) (MIT). For bugs in the **mutable** API, consider reporting upstream; for frozen-specific issues, open an issue here.

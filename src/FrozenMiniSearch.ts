@@ -53,6 +53,8 @@ import type {
 } from './frozenTypes'
 export type { FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
 export type { MiniSearchSnapshot } from './fromMiniSearch'
+import { forEachLiveShortId } from './forEachLiveShortId'
+import { miniSearchSnapshotFromFrozen } from './toMiniSearch'
 import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
 import {
   readStoredFields,
@@ -174,11 +176,9 @@ export default class FrozenMiniSearch<T = any> {
         this._postings,
         this._fieldTermFlyweight,
         (callback) => {
-          for (let shortId = 0; shortId < this._nextId; shortId++) {
-            const id = this._externalIds[shortId]
-            if (id === undefined) continue
+          forEachLiveShortId(this._nextId, this._externalIds, (shortId, id) => {
             callback(shortId, id, readStoredFields(this._storedFields, shortId))
-          }
+          })
         },
       ),
       aggregateContext: this._aggregateContext,
@@ -367,15 +367,38 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   /**
-   * Convert a lucaong MiniSearch JSON snapshot (`toJSON` / `loadJSON` wire format) into a
-   * frozen index. No runtime dependency on the `minisearch` package.
+   * Export this index as a MiniSearch wire snapshot (`serializationVersion: 2`).
+   * Use for migration or interchange with the `minisearch` package (`JSON.stringify` works via this method).
+   * Not the primary persistence format — prefer {@link saveBinarySync} for production (size and load time).
+   * Term order in `index` may differ from MiniSearch native `toJSON`; search scores stay equivalent.
    */
-  static fromMiniSearchJson<T>(json: string, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
+  toJSON(): MiniSearchSnapshot {
+    return miniSearchSnapshotFromFrozen({
+      documentCount: this._documentCount,
+      nextId: this._nextId,
+      fieldIds: this._fieldIds,
+      fieldCount: this._fieldCount,
+      externalIds: this._externalIds,
+      fieldLengthMatrix: this._fieldLengthMatrix,
+      avgFieldLength: this._avgFieldLength,
+      storedFields: this._storedFields,
+      index: this._index,
+      fieldTermFlyweight: this._fieldTermFlyweight,
+    })
+  }
+
+  /**
+   * Build a new frozen index **from** a MiniSearch JSON snapshot string (import / migration).
+   * Accepts the wire format produced by MiniSearch `toJSON` or by {@link toJSON} on this class.
+   * Distinct from {@link loadBinarySync}: JSON is MiniSearch interchange, not the native frozen binary.
+   * No runtime dependency on the `minisearch` package.
+   */
+  static fromJson<T>(json: string, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     return FrozenMiniSearch.fromMiniSearchSnapshot(JSON.parse(json) as MiniSearchSnapshot, options)
   }
 
   /**
-   * Same as {@link fromMiniSearchJson} with a pre-parsed snapshot object.
+   * Same as {@link fromJson} with a pre-parsed snapshot object.
    * `storedFields` are shallow-copied; callers must not mutate nested values
    * after load if they intend to keep the index immutable.
    */
@@ -389,7 +412,7 @@ export default class FrozenMiniSearch<T = any> {
     )
   }
 
-  /** Accepts any object exposing `toJSON()` in lucaong MiniSearch snapshot shape. */
+  /** Accepts any object exposing `toJSON()` in MiniSearch snapshot shape. */
   static fromMiniSearch<T>(
     source: { toJSON(): MiniSearchSnapshot },
     options: Options<T> = {} as Options<T>,

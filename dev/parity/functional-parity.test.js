@@ -157,7 +157,7 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
   })
 
   test('AND_NOT inherits combineWith into nested combination without explicit operator', () => {
-    // Per lucaong 7.2 behavior: a child QueryCombination that does not
+    // Per MiniSearch 7.2 behavior: a child QueryCombination that does not
     // specify `combineWith` inherits the parent's `combineWith`. Here the
     // parent is AND_NOT, so the inner { queries: ['matrix', 'whale'] }
     // becomes effectively AND_NOT, not OR.
@@ -235,6 +235,11 @@ describe('FrozenMiniSearch custom indexing options', () => {
     const frozen = FrozenMiniSearch.fromMiniSearch(mutable, customOpts)
     const direct = FrozenMiniSearch.fromDocuments(customDocs, customOpts)
     expectSameResults(frozen, direct, 'hello')
+    expect(frozen.has('a')).toBe(true)
+    expect(frozen.has('b')).toBe(true)
+    expect(frozen.has('c')).toBe(false)
+    expect(direct.has('a')).toBe(true)
+    expect(direct.has('b')).toBe(true)
   })
 
   test('custom stringifyField parity', () => {
@@ -334,6 +339,36 @@ describe('FrozenMiniSearch binary round-trip', () => {
     expect(buf.readUInt16LE(4)).toBe(5)
   })
 
+  test('Uint32 doc ids when document count exceeds 65535', () => {
+    // Synthetic snapshot keeps nextId > 65535 without indexing 65k docs.
+    const snapshot = {
+      documentCount: 65536,
+      nextId: 65536,
+      documentIds: { 65535: 'max' },
+      fieldIds: { txt: 0 },
+      fieldLength: { 65535: [1] },
+      averageFieldLength: [1],
+      storedFields: {},
+      dirtCount: 0,
+      index: [
+        ['alpha', { 0: { 65535: 1 } }],
+        ['beta', { 0: { 65535: 1 } }],
+      ],
+      serializationVersion: 2,
+    }
+    const opts = { fields: ['txt'] }
+    const frozen = FrozenMiniSearch.fromMiniSearchSnapshot(snapshot, opts)
+    expect(frozen.documentCount).toBe(65536)
+    expect(frozen.search('alpha').map(r => r.id)).toEqual(['max'])
+    expect(frozen.memoryBreakdown().postings.docIdWidth).toBe(32)
+    const buf = frozen.saveBinarySync()
+    expect(buf.toString('ascii', 0, 4)).toBe('MSv5')
+    expect(buf.readUInt16LE(6) & 1).toBe(0)
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, opts)
+    expect(loaded.search('alpha').map(r => r.id)).toEqual(['max'])
+    expect(loaded.search('beta').map(r => r.id)).toEqual(['max'])
+  })
+
   test('saveBinary writes MSv5 with Uint16 doc ids when nextId <= 65535', () => {
     const docsBig = Array.from({ length: 1000 }, (_, i) => ({
       id: i,
@@ -392,6 +427,32 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const direct = FrozenMiniSearch.fromDocuments(sparseDocs, sparseOpts)
     expectSameResults(frozen, direct, 'three')
     expectSameResults(frozen, direct, 'alpha gamma', { combineWith: 'OR' })
+  })
+
+  test('processTerm returning false/null skips terms during indexing', () => {
+    const corpus = [
+      { id: 1, text: 'the quick brown fox' },
+      { id: 2, text: 'a lazy dog' },
+    ]
+    const opts = {
+      fields: ['text'],
+      processTerm: term => {
+        const lower = term.toLowerCase()
+        if (lower === 'the') return false
+        if (lower === 'a') return null
+        return lower
+      },
+    }
+    const mutable = new MiniSearch(opts)
+    mutable.addAll(corpus)
+    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const direct = FrozenMiniSearch.fromDocuments(corpus, opts)
+    expect(mutable.search('the')).toEqual([])
+    expect(frozen.search('the')).toEqual([])
+    expect(direct.search('the')).toEqual([])
+    expectSameResults(mutable, frozen, 'quick')
+    expectSameResults(mutable, frozen, 'dog')
+    expectSameResults(mutable, frozen, 'lazy')
   })
 
   test('processTerm returning array', () => {

@@ -317,7 +317,7 @@ export function validateFrozenPostingsLayout(
   layout: FrozenPostingsLayout,
   documentCount: number,
   nextId: number,
-  fail: (detail: string) => never = detail => { throw new Error(detail) },
+  fail: (detail: string) => never = (detail) => { throw new Error(detail) },
 ): void {
   if (layout.fieldCount <= 0) fail('fieldCount must be positive')
   if (layout.nextId !== nextId) fail('nextId mismatch')

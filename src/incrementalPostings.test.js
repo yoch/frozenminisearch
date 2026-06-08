@@ -9,7 +9,7 @@ import {
 import { readDocId } from './compactPostings'
 
 /** Each (term, field) slot occupies one contiguous [offset, offset+length) in global SoA buffers. */
-function assertSegmentsPartitionBuffers (layout) {
+function assertSegmentsPartitionBuffers(layout) {
   expect(layout.allDocIds.length).toBe(layout.allFreqs.length)
 
   if (layout.layout === 'dense') {
@@ -32,7 +32,7 @@ function assertSegmentsPartitionBuffers (layout) {
 }
 
 /** Hot path: flyweight segment is a single sequential scan over allDocIds[offset+i]. */
-function assertHotPathSequentialAccess (layout, termIndex, fieldId) {
+function assertHotPathSequentialAccess(layout, termIndex, fieldId) {
   const fly = createFrozenFieldTermFlyweight(layout).bind(termIndex)
   const seg = fly.get(fieldId)
   if (seg == null) return
@@ -45,7 +45,7 @@ function assertHotPathSequentialAccess (layout, termIndex, fieldId) {
   }
 }
 
-function layoutsEqual (a, b) {
+function layoutsEqual(a, b) {
   expect(a.fieldCount).toBe(b.fieldCount)
   expect(a.termCount).toBe(b.termCount)
   expect(a.nextId).toBe(b.nextId)
@@ -69,7 +69,7 @@ function layoutsEqual (a, b) {
   }
 }
 
-function buildLegacy (fieldCount, postings) {
+function buildLegacy(fieldCount, postings) {
   const postingsDocIds = []
   const postingsFreqs = []
   let totalPostings = 0
@@ -98,7 +98,7 @@ function buildLegacy (fieldCount, postings) {
   }, 100)
 }
 
-function buildIncremental (fieldCount, postings, nextId = 100) {
+function buildIncremental(fieldCount, postings, nextId = 100) {
   const acc = new IncrementalPostingsAccumulator(fieldCount)
   for (const { termIndex, fieldId, docId, freq } of postings) {
     acc.append(termIndex, fieldId, docId, freq)
@@ -153,7 +153,7 @@ describe('IncrementalPostingsAccumulator', () => {
     const seg = fly.get(0)
     expect(seg.length).toBe(3)
     const docIds = []
-    seg.forEachDoc((docId) => docIds.push(docId))
+    seg.forEachDoc(docId => docIds.push(docId))
     expect(docIds).toEqual([1, 3, 5])
   })
 
@@ -182,7 +182,7 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 })
 
-function buildIncrementally (documents, options) {
+function buildIncrementally(documents, options) {
   const { createFrozenIndexBuilder } = require('./frozenBuild')
   const { freezeFrozenIndexBuilder } = require('./FrozenMiniSearch')
   const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: documents.length })
@@ -190,7 +190,7 @@ function buildIncrementally (documents, options) {
   return freezeFrozenIndexBuilder(builder)
 }
 
-function buildDocByDoc (documents, options) {
+function buildDocByDoc(documents, options) {
   const { createFrozenIndexBuilder } = require('./frozenBuild')
   const { freezeFrozenIndexBuilder } = require('./FrozenMiniSearch')
   const builder = createFrozenIndexBuilder(options)
@@ -198,19 +198,19 @@ function buildDocByDoc (documents, options) {
   return freezeFrozenIndexBuilder(builder)
 }
 
-function searchSnapshot (index, query) {
-  return index.search(query).map((r) => ({ id: r.id, score: r.score }))
+function searchSnapshot(index, query) {
+  return index.search(query).map(r => ({ id: r.id, score: r.score }))
 }
 
 describe('IncrementalPostingsAccumulator medicaments golden (incremental build only)', () => {
   const corpusDir = process.env.CORPUS_EXPORT_DIR
     ?? '/home/yoch/fr.gouv.medicaments.rest/data/corpus-export'
 
-  function loadJsonl (file) {
+  function loadJsonl(file) {
     return readFileSync(join(corpusDir, file), 'utf8')
       .split('\n')
-      .filter((line) => line.trim().length > 0)
-      .map((line) => JSON.parse(line))
+      .filter(line => line.trim().length > 0)
+      .map(line => JSON.parse(line))
   }
 
   const datasets = [
@@ -296,7 +296,7 @@ describe('IncrementalPostingsAccumulator medicaments golden (incremental build o
       { id: 'c', txt: 'gamma epsilon' },
     ]
 
-    async function* stream () {
+    async function* stream() {
       for (const doc of documents) yield doc
     }
 

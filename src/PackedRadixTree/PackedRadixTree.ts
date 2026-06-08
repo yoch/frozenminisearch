@@ -96,20 +96,20 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   }
 
   * entries(): IterableIterator<[string, number]> {
-    yield *this.emitSubtree(0, '')
+    yield* this.emitSubtree(0, '')
   }
 
   /** @deprecated Internal benchmark/compat wrapper. Prefer `prefixRefs` + `termByIndex`. */
   * prefixEntries(prefix: string): IterableIterator<[string, number]> {
     const start = this.resolvePrefixWalk(prefix)
     if (start == null) return
-    yield *this.emitSubtree(start.node, start.prefix)
+    yield* this.emitSubtree(start.node, start.prefix)
   }
 
   * prefixRefs(prefix: string): IterableIterator<PackedTermRef> {
     const start = this.resolvePrefixWalkRef(prefix)
     if (start == null) return
-    yield *this.emitSubtreeRefs(start.node, start.prefixLength)
+    yield* this.emitSubtreeRefs(start.node, start.prefixLength)
   }
 
   /**
@@ -180,7 +180,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
    * any, sits at `nodeLeafOrder` among the original sibling slots; everything else
    * is an edge. Exact order matters for prefix iteration and autoSuggest parity.
    */
-  private * emitSubtree(startNode: number, startPrefix: string): IterableIterator<[string, number]> {
+  private* emitSubtree(startNode: number, startPrefix: string): IterableIterator<[string, number]> {
     const heap = this.labelHeap
     const frames: EmitFrame[] = []
     pushEmitFrame(frames, this, startNode, startPrefix)
@@ -207,7 +207,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     }
   }
 
-  private * emitSubtreeRefs(startNode: number, startLength: number): IterableIterator<PackedTermRef> {
+  private* emitSubtreeRefs(startNode: number, startLength: number): IterableIterator<PackedTermRef> {
     const frames: EmitRefFrame[] = []
     pushEmitRefFrame(frames, this, startNode, startLength)
 

@@ -121,7 +121,7 @@ function forEachDefaultToken(text: string, onToken: (token: string) => void): vo
 /** Default tokenizer into a reusable buffer (avoids `text.split()` array allocation). */
 export function tokenizeDefaultInto(out: string[], text: string): void {
   out.length = 0
-  forEachDefaultToken(text, (token) => out.push(token))
+  forEachDefaultToken(text, token => out.push(token))
 }
 
 /** Tokenize field text into `out` (reused). Fast path when `tokenize` is the library default. */

@@ -92,22 +92,22 @@ function decodeMsv5Sections(
 
   const storedFieldsLayout = hints != null
     ? readStoredFieldsWireSection(
-      sections[Msv5SectionId.StoredFields],
-      0,
-      nextId,
-      sections[Msv5SectionId.StoredFields].length,
-      hints.storeFields,
-    )
+        sections[Msv5SectionId.StoredFields],
+        0,
+        nextId,
+        sections[Msv5SectionId.StoredFields].length,
+        hints.storeFields,
+      )
     : undefined
 
   const storedFields = storedFieldsLayout != null
     ? new Array(nextId)
     : readStoredFieldsSection(
-      sections[Msv5SectionId.StoredFields],
-      0,
-      nextId,
-      sections[Msv5SectionId.StoredFields].length,
-    )
+        sections[Msv5SectionId.StoredFields],
+        0,
+        nextId,
+        sections[Msv5SectionId.StoredFields].length,
+      )
 
   const packedTermIndex = readPackedTermTreeSectionColumnar(
     sections[Msv5SectionId.TermTree],

@@ -49,7 +49,7 @@ function* runFuzzy(
   const queryCodes = new Uint16Array(n)
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
-  yield *recurse(
+  yield* recurse(
     tree,
     queryLen,
     queryCodes,
@@ -130,7 +130,7 @@ function* recurse(
       }
     }
 
-    yield *recurse(
+    yield* recurse(
       tree,
       queryLen,
       queryCodes,

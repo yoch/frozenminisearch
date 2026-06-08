@@ -4,7 +4,7 @@
  */
 
 /** Dictionary prefix length already exceeds any term within edit distance k. */
-export function isDictPrefixTooLong (
+export function isDictPrefixTooLong(
   dictPrefixLen: number,
   queryLen: number,
   maxDistance: number,
@@ -16,7 +16,7 @@ export function isDictPrefixTooLong (
  * @param prefixLen Dictionary characters on the path before this edge
  * @param edgeLen Compressed edge label length
  */
-export function shouldPruneFuzzyEdge (
+export function shouldPruneFuzzyEdge(
   prefixLen: number,
   edgeLen: number,
   queryLen: number,

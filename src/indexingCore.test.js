@@ -23,7 +23,7 @@ const PARITY_CASES = [
   'tab\there',
 ]
 
-function freqMapFromSplit (text, fieldName, processTerm) {
+function freqMapFromSplit(text, fieldName, processTerm) {
   const freqs = new Map()
   for (const token of text.split(SPACE_OR_PUNCTUATION)) {
     const processed = processTerm(token, fieldName)
@@ -38,7 +38,7 @@ function freqMapFromSplit (text, fieldName, processTerm) {
   return freqs
 }
 
-function mapToObject (map) {
+function mapToObject(map) {
   return Object.fromEntries([...map.entries()].sort((a, b) => a[0].localeCompare(b[0])))
 }
 
@@ -53,7 +53,7 @@ describe('indexingCore default tokenizer', () => {
 
   test('collectFieldTermFreqsFromFieldInto matches split + collectFieldTermFreqsInto', () => {
     const fieldName = 'txt'
-    const processTerm = (term) => term.toLowerCase()
+    const processTerm = term => term.toLowerCase()
     const tokenScratch = []
     const localFreqs = new Map()
 
@@ -83,8 +83,8 @@ describe('indexingCore default tokenizer', () => {
   })
 
   test('isDefaultTokenize accepts split-equivalent custom function', () => {
-    const equivalent = (text) => text.split(SPACE_OR_PUNCTUATION)
+    const equivalent = text => text.split(SPACE_OR_PUNCTUATION)
     expect(isDefaultTokenize(equivalent)).toBe(true)
-    expect(isDefaultTokenize((text) => text.split(','))).toBe(false)
+    expect(isDefaultTokenize(text => text.split(','))).toBe(false)
   })
 })

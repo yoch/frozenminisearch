@@ -540,8 +540,8 @@ interface PreparedPayload {
 /** Shared validation + bounds for both the sync and async load paths. */
 function preparePayload(fileBuf: Buffer, directory: Msv5SectionEntry[]): PreparedPayload {
   assertPayloadFormatRev(fileBuf)
-  const { payloadOffset, compressedLength, uncompressedLength, payloadCrc32, payloadCodec } =
-    readPayloadMeta(fileBuf)
+  const { payloadOffset, compressedLength, uncompressedLength, payloadCrc32, payloadCodec }
+    = readPayloadMeta(fileBuf)
   validatePayloadDirectory(directory, uncompressedLength)
 
   if (payloadOffset !== MSV5_HEADER_SIZE || payloadOffset + compressedLength > fileBuf.length) {

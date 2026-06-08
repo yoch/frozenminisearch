@@ -238,7 +238,7 @@ describe('PackedRadixTree module', () => {
     const nodeValue = new Uint32Array(packed.nodeValue)
     const leafNodes = Array.from(packed.nodeLeafOrder)
       .map((order, node) => order === 0 ? -1 : node)
-      .filter((node) => node >= 0)
+      .filter(node => node >= 0)
     nodeValue[leafNodes[1]] = nodeValue[leafNodes[0]]
     const duplicate = PackedRadixTree.fromData({
       size: packed.size,

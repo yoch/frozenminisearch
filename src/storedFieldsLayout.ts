@@ -6,10 +6,10 @@
 import { invalidFrozenIndex } from './binaryIo'
 import { buildStoredFieldsSection, readStoredFieldsSection } from './binaryStructures'
 
-export type StoredFieldsLayout =
-  | { kind: 'none' }
-  | { kind: 'single', field: string, values: unknown[] }
-  | { kind: 'multi', rows: (Record<string, unknown> | undefined)[] }
+export type StoredFieldsLayout
+  = | { kind: 'none' }
+    | { kind: 'single', field: string, values: unknown[] }
+    | { kind: 'multi', rows: (Record<string, unknown> | undefined)[] }
 
 export function createStoredFieldsLayout(
   storeFields: readonly string[],

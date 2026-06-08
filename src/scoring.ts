@@ -144,9 +144,9 @@ export function mapFieldTermData(data: Map<number, Map<number, number>>): FieldT
 }
 
 /** Eager materialized term, or lazy resolver for indexed derived matches. */
-export type AggregateDerivedTerm =
-  | string
-  | { kind: 'lazy', resolve: () => string }
+export type AggregateDerivedTerm
+  = | string
+    | { kind: 'lazy', resolve: () => string }
 
 export type AggregateTermOptions = {
   /** When set, only score postings whose docId is in this set. Does not affect matchingFields. */

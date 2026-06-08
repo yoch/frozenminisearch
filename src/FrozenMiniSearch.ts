@@ -18,7 +18,6 @@ import {
 import { createIdToShortIdLookup, type IdToShortIdLookup } from './frozenIdLookup'
 import {
   createFrozenFieldTermFlyweight,
-  materializeFrozenPostings,
   postingsTypedBytes,
   validateFrozenPostingsLayout,
   type FrozenFieldTermFlyweight,
@@ -45,7 +44,6 @@ import type {
 } from './searchTypes'
 import {
   fieldLengthMatrixForWire,
-  materializeFieldLengthMatrix,
   type FieldLengthArray,
 } from './fieldLengthMatrix'
 import type {

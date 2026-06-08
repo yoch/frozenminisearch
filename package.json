@@ -87,6 +87,15 @@
       "<rootDir>/src/**/*.test.(ts|js)",
       "<rootDir>/dev/parity/**/*.test.(ts|js)"
     ],
+    "collectCoverageFrom": [
+      "src/**/*.{ts,js}",
+      "!src/**/*.test.{ts,js}"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/benchmarks/",
+      "/dev/",
+      "/testSupport/"
+    ],
     "setupFilesAfterEnv": []
   },
   "scripts": {

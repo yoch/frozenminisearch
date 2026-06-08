@@ -5,6 +5,8 @@
 [![CI](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml/badge.svg)](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml)
 [![Socket Badge](https://socket.dev/api/badge/npm/package/@yoch/frozenminisearch)](https://socket.dev/npm/package/%40yoch%2Ffrozenminisearch)
 
+[API documentation](https://yoch.github.io/frozenminisearch/)
+
 **Memory-optimized, read-only full-text search for Node.js** — the same BM25, prefix/fuzzy, and `autoSuggest` API as [MiniSearch](https://github.com/lucaong/minisearch), with **up to ~98% less index RAM** on real corpora and compact binary snapshots you ship instead of JSON.
 
 **Why it exists:** [MiniSearch](https://github.com/lucaong/minisearch) optimizes for a mutable in-memory index. FrozenMiniSearch optimizes for **retained heap, disk footprint, and cold load** once the corpus is fixed — packed radix postings, columnar `storeFields`, typed-array layouts, and MSv5 binary wire format instead of per-document JS objects.

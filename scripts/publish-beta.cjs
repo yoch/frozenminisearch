@@ -8,6 +8,7 @@
 const { readFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { spawnSync } = require('node:child_process')
+const { assertPublishReady } = require('./release-checks.cjs')
 
 const root = join(__dirname, '..')
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
@@ -20,7 +21,8 @@ function run (cmd, args) {
 }
 
 console.log(`Publishing ${name}@${version} (dist-tag beta)…`)
-console.log('Reminder: if README/API changed, run `npm run build-docs`, commit docs/ HTML, and ensure the Docs GitHub Action has run (docs/media/ is not versioned).\n')
+assertPublishReady({ root, version, channel: 'beta' })
+console.log('Docs deploy from tag v' + version + ' via the Docs workflow.\n')
 run('npm', ['publish', '--tag', 'beta'])
 console.log(`\nDone. beta → ${version} (latest unchanged)`)
 console.log('Verify: npm view', name, 'dist-tags')

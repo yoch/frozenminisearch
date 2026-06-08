@@ -116,7 +116,7 @@ export type SearchOptionsWithDefaults = SearchOptions & {
 }
 
 /**
- * Configuration options passed to the {@link MiniSearch} constructor.
+ * Configuration options compatible with the MiniSearch constructor.
  *
  * @typeParam T  The type of documents being indexed.
  */
@@ -137,7 +137,7 @@ export type Options<T = any> = {
   processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
   /** Function called to log messages from the library. */
   logger?: (level: LogLevel, message: string, code?: string) => void
-  /** Auto-vacuum behaviour after {@link MiniSearch.discard}; defaults to `true`. */
+  /** Auto-vacuum behaviour after MiniSearch `discard`; defaults to `true`. */
   autoVacuum?: boolean | AutoVacuumOptions
   /** Default search options. */
   searchOptions?: SearchOptions

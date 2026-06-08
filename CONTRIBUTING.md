@@ -8,6 +8,7 @@ Thank you for helping improve this package. Issues and pull requests are welcome
 yarn install
 yarn test       # src/ unit tests + dev/parity/ vs MiniSearch
 yarn test:fuzzysearch  # long fuzzy-sweep parity (dev/internal/; also CI nightly)
+yarn test:benchmarks   # benchmarks/*.test (not part of yarn test)
 yarn build
 node scripts/verify-npm-pack.cjs
 ```
@@ -20,6 +21,14 @@ git submodule update --init vendor/minisearch
 ```
 
 Parity expectations are documented in [`dev/parity/PARITY_CONTRACT.md`](dev/parity/PARITY_CONTRACT.md).
+
+## Documentation / GitHub Pages
+
+- **Verify** (PR or push `master` touching doc sources): workflow [Docs](https://github.com/yoch/frozenminisearch/actions/workflows/docs.yml) runs `yarn build-docs` only.
+- **Publish** (https://yoch.github.io/frozenminisearch/): push a release tag `vX.Y.Z` — the site header shows `@yoch/frozenminisearch vX.Y.Z`.
+- Do not commit generated `docs/` HTML. GitHub Pages is built from the tagged commit.
+
+Follow the full release runbook in [`RELEASE.md`](RELEASE.md). Manual docs redeploys are allowed from Actions → Docs → Run workflow, but release tags are the source of truth for published documentation.
 
 ## Benchmarks
 

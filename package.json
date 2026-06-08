@@ -85,12 +85,7 @@
     ],
     "testMatch": [
       "<rootDir>/src/**/*.test.(ts|js)",
-      "<rootDir>/dev/parity/**/*.test.(ts|js)",
-      "<rootDir>/dev/internal/**/*.test.(ts|js)",
-      "<rootDir>/benchmarks/**/*.test.(ts|js)"
-    ],
-    "testPathIgnorePatterns": [
-      "/dev/internal/"
+      "<rootDir>/dev/parity/**/*.test.(ts|js)"
     ],
     "collectCoverageFrom": [
       "src/**/*.{ts,js}",
@@ -106,7 +101,8 @@
   "scripts": {
     "test": "jest",
     "test-watch": "jest --watch",
-    "test:fuzzysearch": "jest dev/internal --testPathIgnorePatterns=/node_modules/",
+    "test:fuzzysearch": "jest --testMatch='<rootDir>/dev/internal/**/*.test.(ts|js)' --testPathIgnorePatterns=/node_modules/",
+    "test:benchmarks": "jest --testMatch='<rootDir>/benchmarks/**/*.test.(ts|js)' --testPathIgnorePatterns=/node_modules/",
     "coverage": "jest --coverage",
     "bench": "npm run build && node --expose-gc benchmarks/framework/cli.mjs",
     "bench:record": "npm run build && node --expose-gc benchmarks/framework/cli.mjs record",
@@ -149,8 +145,8 @@
     "clean-build": "rm -rf dist",
     "build-minified": "MINIFY=true npm run build",
     "sync-docs-media": "node scripts/sync-docs-media.cjs",
-    "build-docs": "typedoc --options typedoc.json && npm run sync-docs-media && npm run build-demo",
-    "build-docs:pages": "typedoc --options typedoc.json --basePath /frozenminisearch/ --hostedBaseUrl https://yoch.github.io/frozenminisearch/ && npm run sync-docs-media && npm run build-demo",
+    "build-docs": "node scripts/build-docs.cjs",
+    "build-docs:pages": "DOCS_PAGES=1 node scripts/build-docs.cjs",
     "build-demo": "rm -rf ./docs/demo && mkdir -p ./docs/demo && cp -rL ./examples/plain_js/. ./docs/demo",
     "lint": "eslint 'src/**/*.{js,ts}'",
     "lintfix": "eslint --fix 'src/**/*.{js,ts}'",

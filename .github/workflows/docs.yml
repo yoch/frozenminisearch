@@ -1,10 +1,11 @@
-# Build TypeDoc on push/PR; publish to GitHub Pages on push to master (and manual dispatch).
+# Verify TypeDoc on push/PR; publish to GitHub Pages on tag v* (and manual dispatch).
 # Pages source: repo Settings → Pages → Build and deployment → GitHub Actions.
 name: Docs
 
 on:
   push:
     branches: [master]
+    tags: ['v*']
     paths:
       - 'src/**'
       - 'README.md'
@@ -16,6 +17,7 @@ on:
       - 'examples/plain_js/**'
       - 'dev/docs/**'
       - 'scripts/sync-docs-media.cjs'
+      - 'scripts/build-docs.cjs'
       - '.github/workflows/docs.yml'
   pull_request:
     branches: [master]
@@ -30,20 +32,16 @@ on:
       - 'typedoc.json'
       - 'examples/plain_js/**'
       - 'scripts/sync-docs-media.cjs'
+      - 'scripts/build-docs.cjs'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
-  build:
+  verify:
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -52,12 +50,7 @@ jobs:
           node-version: '22'
           cache: 'yarn'
       - run: yarn install --frozen-lockfile
-      - name: Build docs for GitHub Pages
-        if: github.event_name != 'pull_request'
-        run: yarn build-docs:pages
-      - name: Build docs (verify only)
-        if: github.event_name == 'pull_request'
-        run: yarn build-docs
+      - run: yarn build-docs
       - name: Verify generated docs/media
         run: |
           test -f docs/media/DESIGN_DOCUMENT.md
@@ -65,19 +58,45 @@ jobs:
           test -f docs/media/README.md
           test -f docs/media/reference.json
           test -f docs/index.html
-      - name: Upload Pages artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: docs
 
   deploy:
-    needs: build
-    if: github.event_name != 'pull_request'
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'yarn'
+      - run: yarn install --frozen-lockfile
+      - name: Set docs version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "DOCS_VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_ENV"
+          else
+            echo "DOCS_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+          fi
+      - name: Build docs for GitHub Pages
+        run: DOCS_PAGES=1 DOCS_VERSION="$DOCS_VERSION" yarn build-docs:pages
+      - name: Verify generated docs/media
+        run: |
+          test -f docs/media/DESIGN_DOCUMENT.md
+          test -f docs/media/CHANGELOG.md
+          test -f docs/media/README.md
+          test -f docs/media/reference.json
+          test -f docs/index.html
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
       - id: deployment
         uses: actions/deploy-pages@v5

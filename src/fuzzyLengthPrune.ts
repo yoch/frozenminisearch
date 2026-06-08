@@ -4,7 +4,7 @@
  */
 
 /** Dictionary prefix length already exceeds any term within edit distance k. */
-export function isDictPrefixTooLong(
+function isDictPrefixTooLong(
   dictPrefixLen: number,
   queryLen: number,
   maxDistance: number,

@@ -7,6 +7,7 @@ Thank you for helping improve this package. Issues and pull requests are welcome
 ```bash
 yarn install
 yarn test       # src/ unit tests + dev/parity/ vs MiniSearch
+yarn test:fuzzysearch  # long fuzzy-sweep parity (dev/internal/; also CI nightly)
 yarn build
 node scripts/verify-npm-pack.cjs
 ```

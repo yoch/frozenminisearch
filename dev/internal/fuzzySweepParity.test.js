@@ -1,11 +1,12 @@
-import SearchableMap from '../../src/SearchableMap/SearchableMap.js'
+/** Long fuzzy-sweep parity (~7000 queries). Excluded from `yarn test`; run via `yarn test:fuzzysearch`. */
+import SearchableMap from '../../src/SearchableMap/SearchableMap'
 import {
   buildFuzzySweepQueries,
   collectTerms,
   planSweepSize,
-} from '../../testSupport/fuzzyQueryMutations.js'
-import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
-import { fromRadixTree } from '../../src/PackedRadixTree/index.js'
+} from '../../testSupport/fuzzyQueryMutations'
+import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity'
+import { fromRadixTree } from '../../src/PackedRadixTree/index'
 
 const PARITY_SEED = 0x50415249 // 'PARI'
 

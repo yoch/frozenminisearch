@@ -85,7 +85,12 @@
     ],
     "testMatch": [
       "<rootDir>/src/**/*.test.(ts|js)",
-      "<rootDir>/dev/parity/**/*.test.(ts|js)"
+      "<rootDir>/dev/parity/**/*.test.(ts|js)",
+      "<rootDir>/dev/internal/**/*.test.(ts|js)",
+      "<rootDir>/benchmarks/**/*.test.(ts|js)"
+    ],
+    "testPathIgnorePatterns": [
+      "/dev/internal/"
     ],
     "collectCoverageFrom": [
       "src/**/*.{ts,js}",
@@ -101,6 +106,7 @@
   "scripts": {
     "test": "jest",
     "test-watch": "jest --watch",
+    "test:fuzzysearch": "jest dev/internal --testPathIgnorePatterns=/node_modules/",
     "coverage": "jest --coverage",
     "bench": "npm run build && node --expose-gc benchmarks/framework/cli.mjs",
     "bench:record": "npm run build && node --expose-gc benchmarks/framework/cli.mjs record",
@@ -144,7 +150,8 @@
     "build-minified": "MINIFY=true npm run build",
     "sync-docs-media": "node scripts/sync-docs-media.cjs",
     "build-docs": "typedoc --options typedoc.json && npm run sync-docs-media && npm run build-demo",
-    "build-demo": "mkdir -p ./docs/demo && cp -r ./examples/plain_js/. ./docs/demo",
+    "build-docs:pages": "typedoc --options typedoc.json --basePath /frozenminisearch/ --hostedBaseUrl https://yoch.github.io/frozenminisearch/ && npm run sync-docs-media && npm run build-demo",
+    "build-demo": "rm -rf ./docs/demo && mkdir -p ./docs/demo && cp -rL ./examples/plain_js/. ./docs/demo",
     "lint": "eslint 'src/**/*.{js,ts}'",
     "lintfix": "eslint --fix 'src/**/*.{js,ts}'",
     "prepublishOnly": "npm test && npm run build && node scripts/verify-npm-pack.cjs",

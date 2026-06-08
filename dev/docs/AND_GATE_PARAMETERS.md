@@ -7,7 +7,7 @@ Document interne (non exposé dans l’API publique). Les constantes vivent dans
 Pour une requête combinée `AND` (ou `AND_NOT` sur la branche négative), le moteur évalue les branches dans l’ordre. Après la branche *i − 1*, l’ensemble des `docId` matchants forme la **gate** passée à la branche *i* :
 
 - **Gate sélective** : on ne score la branche *i* que sur les documents de la gate (`allowedDocs`). Même sémantique de scores que le chemin naïf (score puis intersection), mais moins de travail.
-- **Gate non sélective** : on retombe sur le score complet de la branche *i*, puis `combineResults` — équivalent au chemin sans gating (validé par `src/queryEngine.gate.test.js`).
+- **Gate non sélective** : on retombe sur le score complet de la branche *i*, puis `combineResults` — équivalent au chemin sans gating (validé par `dev/parity/queryEngine.gate.test.js`).
 
 La gate vide est toujours traitée comme sélective (court-circuit utile pour AND+prefix sans match sur la première branche).
 
@@ -45,7 +45,7 @@ La gate après la branche 0 est `|résultat branche 0|`. **Le terme le plus sél
 ## Réglage et validation
 
 - Script optionnel : `benchmarks/and-gate-tuning.mjs` (`npm run benchmark:and-gate-tuning` si le script est présent dans `package.json`).
-- Tests oracle : `src/queryEngine.gate.test.js` (comparaison gated vs chemin naïf via `queryEngineHarness.ts`).
+- Tests oracle : `dev/parity/queryEngine.gate.test.js` (comparaison gated vs chemin naïf via `dev/parity/queryEngineHarness.js`).
 - Suite de régression perf : `npm run benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**).
 
 Ne pas changer les défauts sans refaire le tuning et, si les gains sont intentionnels, mettre à jour `reference.json`.

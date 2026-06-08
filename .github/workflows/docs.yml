@@ -1,5 +1,5 @@
-# Verify TypeDoc + docs/media on push/PR; publish to GitHub Pages on manual dispatch.
-# First-time setup: repo Settings → Pages → Source: GitHub Actions, then run this workflow manually.
+# Build TypeDoc on push/PR; publish to GitHub Pages on push to master (and manual dispatch).
+# Pages source: repo Settings → Pages → Build and deployment → GitHub Actions.
 name: Docs
 
 on:
@@ -33,8 +33,14 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -46,7 +52,12 @@ jobs:
           node-version: '22'
           cache: 'yarn'
       - run: yarn install --frozen-lockfile
-      - run: yarn build-docs
+      - name: Build docs for GitHub Pages
+        if: github.event_name != 'pull_request'
+        run: yarn build-docs:pages
+      - name: Build docs (verify only)
+        if: github.event_name == 'pull_request'
+        run: yarn build-docs
       - name: Verify generated docs/media
         run: |
           test -f docs/media/DESIGN_DOCUMENT.md
@@ -54,28 +65,19 @@ jobs:
           test -f docs/media/README.md
           test -f docs/media/reference.json
           test -f docs/index.html
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs
 
   deploy:
     needs: build
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'yarn'
-      - run: yarn install --frozen-lockfile
-      - run: yarn build-docs
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: docs
       - id: deployment
         uses: actions/deploy-pages@v5

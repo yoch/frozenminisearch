@@ -2,13 +2,17 @@
 
 ## Unreleased
 
+## v1.1.0 — `@yoch/frozenminisearch`
+
+Minor release: MiniSearch JSON wire export and clearer JSON import API. MSv5 binary format unchanged.
+
 ### Added
 
-- **`toJSON()`** — export MiniSearch wire snapshots (`serializationVersion: 2`); import via existing `fromJson` / `fromMiniSearchSnapshot`. Production persistence remains `saveBinarySync`.
+- **`toJSON()`** — export MiniSearch wire snapshots (`serializationVersion: 2`); import via `fromJson` / `fromMiniSearchSnapshot`. Production persistence remains `saveBinarySync`.
 
 ### Breaking
 
-- **`fromMiniSearchJson` → `fromJson`** — rename for clearer semantics (JSON import vs binary load).
+- **`fromMiniSearchJson` → `fromJson`** — rename for clearer semantics (JSON import vs binary load). Update call sites: `FrozenMiniSearch.fromMiniSearchJson(json)` → `FrozenMiniSearch.fromJson(json)`.
 
 ## v1.0.2 — `@yoch/frozenminisearch`
 

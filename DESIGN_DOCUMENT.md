@@ -347,11 +347,18 @@ term-tree section).
 The binary encoder (written by **`saveBinarySync()`**) lives in `src/msv5/`: columnar packed
 radix tree (`packedRadixBinaryMsv5.ts`), unified postings wire (dense or sparse via
 flags), adaptive `fieldLengthMatrix` width on disk, and
-optional **single-payload zstd** (`node:zlib`): the 12 logical sections are
-concatenated (with 4-byte alignment gaps), then compressed as **one** stream for a
-better ratio than per-section compression. Raw payload when &lt; 64 B or when zstd does not strictly shrink the payload. The catalogue stores
-uncompressed offsets and per-section CRC-32. `loadBinaryAsync()` feeds the zstd payload through Node streams and materializes
-**one section at a time** (bounded JS heap).
+optional **single-payload compression** (`node:zlib`): the 12 logical sections are
+concatenated (with 4-byte alignment gaps), then written as **one** stream for a
+better ratio than per-section compression. `saveBinarySync()` / `saveBinaryAsync()`
+accept `{ compression: 'auto' | 'raw' | 'zstd' | 'zlib' }`. In `auto`, payloads smaller
+than 64 B stay raw; larger payloads get one compression attempt (zstd when the runtime
+supports it, otherwise zlib on Node 20+) and stay raw when that attempt does not strictly
+shrink the payload. Explicit `zlib` / `zstd` always write the chosen codec, even when the
+compressed payload is not smaller than raw.
+Explicit `zlib` uses deflate/inflate and stays
+readable on Node 20+; explicit `zstd` requires Node 22.15+ both to write and to read.
+The catalogue stores uncompressed offsets and per-section CRC-32. `loadBinaryAsync()`
+streams compressed payloads and materializes **one section at a time** (bounded JS heap).
 Snapshots larger than 1 GiB (uncompressed payload) are rejected to avoid oversized allocations.
 Each section has a CRC-32 over its uncompressed bytes. The term-tree section uses the
 columnar wire in `packedRadixBinaryMsv5.ts`.

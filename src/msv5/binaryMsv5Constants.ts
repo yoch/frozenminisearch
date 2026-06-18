@@ -11,10 +11,12 @@ export const FLAG_FL_U16 = 16
 export const FLAG_FREQ_U16 = 32
 
 export const CODEC_RAW = 0
+/** Deflate/inflate (`node:zlib`) on the whole payload. */
+export const CODEC_ZLIB = 1
 /** Zstandard (`node:zlib`) on the whole payload. */
 export const CODEC_ZSTD = 3
 
-/** Single concatenated payload, one zstd stream (or raw). */
+/** Single concatenated payload, one compressed stream (or raw). */
 export const MSV5_FORMAT_REV_PAYLOAD = 1
 
 /** Do not compress payloads smaller than this (bytes). */

@@ -1,7 +1,10 @@
 import zlib from 'node:zlib'
+import type { Transform } from 'node:stream'
 import { crc32Buffer, crc32Update } from '../binaryIo'
+import type { BinaryCompression } from '../searchTypes'
 import {
   CODEC_RAW,
+  CODEC_ZLIB,
   CODEC_ZSTD,
   MSV5_FORMAT_REV_OFFSET,
   MSV5_FORMAT_REV_PAYLOAD,
@@ -50,28 +53,40 @@ export interface Msv5AssembledFile {
   compression: Msv5SnapshotCompressionMeta
 }
 
-/** Hard cap on the uncompressed payload, rejected before allocation (zstd-bomb guard).
+/** Hard cap on the uncompressed payload, rejected before allocation (compressed-bomb guard).
  *  This is the single trust boundary for untrusted snapshots: {@link readPayloadMeta} rejects
  *  headers above this size; sync decompress uses the same cap via `maxOutputLength`.
  *  A malicious header can still declare up to 1 GiB — no tighter native limit helps without
  *  trusting `uncompressedLength` from that same header. Semantic integrity (length match,
  *  payload CRC, per-section CRC) is enforced after decode. */
 const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
+const MSV5_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH = 'MSv5 compressed payload exceeds declared length'
+const MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH = 'MSv5 decompressed payload length mismatch'
 
 // zstd landed in node:zlib at Node 22.15.0 (22.x line) / 23.8.0, where the whole family
 // (zstdCompress[Sync], zstdDecompressSync, createZstdDecompress) ships together — so probing one
 // member is enough to know if the runtime supports zstd. Checked at call time (not captured at
-// module load) so it stays mockable in tests. On older runtimes we degrade gracefully: writes fall
-// back to a raw (uncompressed) payload, reads of a zstd payload throw a clear, actionable error.
+// module load) so it stays mockable in tests. On older runtimes we degrade gracefully: `auto`
+// tries zlib once (or raw if it does not help). When zstd is available, `auto` tries zstd once
+// and stays raw if it does not shrink — no second pass. Reads of a zstd payload throw a clear,
+// actionable error on runtimes without zstd.
 function zstdAvailable(): boolean {
   return typeof zlib.zstdCompressSync === 'function'
+}
+
+function zstdUnavailableWriteError(): Error {
+  return new Error(
+    'MSv5 snapshot requested zstd compression, but this Node.js runtime lacks node:zlib zstd '
+    + 'support (added in Node 22.15.0). Upgrade Node.js, or use compression: "auto", "raw", '
+    + 'or "zlib".',
+  )
 }
 
 function zstdUnavailableReadError(): Error {
   return new Error(
     'MSv5 snapshot is zstd-compressed, but this Node.js runtime lacks node:zlib zstd support '
     + '(added in Node 22.15.0). Upgrade Node.js to read this snapshot, or re-save it from a '
-    + 'newer runtime to embed a raw (uncompressed) payload.',
+    + 'newer runtime with compression: "raw" or "zlib".',
   )
 }
 
@@ -80,8 +95,9 @@ function warnZstdSaveFallbackOnce(): void {
   if (warnedZstdSaveFallback) return
   warnedZstdSaveFallback = true
   process.emitWarning(
-    'node:zlib zstd APIs are unavailable (Node.js < 22.15.0); MSv5 snapshots are written with a '
-    + 'raw (uncompressed) payload. Upgrade to Node 22.15.0+ for compressed snapshots.',
+    'node:zlib zstd APIs are unavailable (Node.js < 22.15.0); compression: "auto" falls back to '
+    + 'zlib when it shrinks the payload, otherwise raw (uncompressed). Upgrade to Node 22.15.0+ '
+    + 'for zstd.',
     { code: 'MINISEARCH_MSV5_ZSTD_UNAVAILABLE' },
   )
 }
@@ -163,24 +179,28 @@ interface PayloadCodecChoice {
   zstdLevel: number
 }
 
-/** Raw if below {@link MSV5_MIN_COMPRESS_BYTES}; else zstd when strictly smaller than raw. */
-function pickPayloadCodec(uncompressed: Buffer, compressed: Buffer): PayloadCodecChoice {
-  if (compressed.length < uncompressed.length) {
-    return { payload: compressed, codec: CODEC_ZSTD, zstdLevel: MSV5_ZSTD_LEVEL }
-  }
+function rawPayloadChoice(uncompressed: Buffer): PayloadCodecChoice {
   return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }
 }
 
-function choosePayloadCodecSync(uncompressed: Buffer): PayloadCodecChoice {
-  if (uncompressed.length < MSV5_MIN_COMPRESS_BYTES) {
-    return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }
+/** Auto mode: one compression attempt; keep it only when strictly smaller than raw. */
+function pickAutoPayloadCodec(uncompressed: Buffer, compressed: Buffer, codec: number): PayloadCodecChoice {
+  if (compressed.length < uncompressed.length) {
+    return {
+      payload: compressed,
+      codec,
+      zstdLevel: codec === CODEC_ZSTD ? MSV5_ZSTD_LEVEL : 0,
+    }
   }
+  return rawPayloadChoice(uncompressed)
+}
+
+function zstdPayloadChoiceSync(uncompressed: Buffer): PayloadCodecChoice {
   if (!zstdAvailable()) {
-    warnZstdSaveFallbackOnce()
-    return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }
+    throw zstdUnavailableWriteError()
   }
   const compressed = zlib.zstdCompressSync(uncompressed, msv5ZstdCompressOptions(uncompressed))
-  return pickPayloadCodec(uncompressed, compressed)
+  return { payload: compressed, codec: CODEC_ZSTD, zstdLevel: MSV5_ZSTD_LEVEL }
 }
 
 /**
@@ -205,16 +225,122 @@ function zstdCompressAsync(uncompressed: Buffer): Promise<Buffer> {
   })
 }
 
-async function choosePayloadCodecAsync(uncompressed: Buffer): Promise<PayloadCodecChoice> {
+async function zstdPayloadChoiceAsync(uncompressed: Buffer): Promise<PayloadCodecChoice> {
+  if (!zstdAvailable()) {
+    throw zstdUnavailableWriteError()
+  }
+  const compressed = await zstdCompressAsync(uncompressed)
+  return { payload: compressed, codec: CODEC_ZSTD, zstdLevel: MSV5_ZSTD_LEVEL }
+}
+
+function zlibPayloadChoiceSync(uncompressed: Buffer): PayloadCodecChoice {
+  const compressed = zlib.deflateSync(uncompressed)
+  return { payload: compressed, codec: CODEC_ZLIB, zstdLevel: 0 }
+}
+
+function zlibCompressAsync(uncompressed: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    zlib.deflate(uncompressed, (err, compressed) => {
+      if (err != null) {
+        reject(err)
+        return
+      }
+      resolve(compressed)
+    })
+  })
+}
+
+async function zlibPayloadChoiceAsync(uncompressed: Buffer): Promise<PayloadCodecChoice> {
+  const compressed = await zlibCompressAsync(uncompressed)
+  return { payload: compressed, codec: CODEC_ZLIB, zstdLevel: 0 }
+}
+
+interface AutoPayloadCompressors {
+  zstd: (uncompressed: Buffer) => Buffer
+  zlib: (uncompressed: Buffer) => Buffer
+}
+
+interface AutoPayloadCompressorsAsync {
+  zstd: (uncompressed: Buffer) => Promise<Buffer>
+  zlib: (uncompressed: Buffer) => Promise<Buffer>
+}
+
+const autoSyncCompressors: AutoPayloadCompressors = {
+  zstd: (uncompressed) => zlib.zstdCompressSync(uncompressed, msv5ZstdCompressOptions(uncompressed)),
+  zlib: (uncompressed) => zlib.deflateSync(uncompressed),
+}
+
+const autoAsyncCompressors: AutoPayloadCompressorsAsync = {
+  zstd: zstdCompressAsync,
+  zlib: zlibCompressAsync,
+}
+
+function autoPayloadChoice(
+  uncompressed: Buffer,
+  compressors: AutoPayloadCompressors,
+): PayloadCodecChoice {
   if (uncompressed.length < MSV5_MIN_COMPRESS_BYTES) {
-    return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }
+    return rawPayloadChoice(uncompressed)
   }
   if (!zstdAvailable()) {
     warnZstdSaveFallbackOnce()
-    return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }
+    return pickAutoPayloadCodec(uncompressed, compressors.zlib(uncompressed), CODEC_ZLIB)
   }
-  const compressed = await zstdCompressAsync(uncompressed)
-  return pickPayloadCodec(uncompressed, compressed)
+  return pickAutoPayloadCodec(uncompressed, compressors.zstd(uncompressed), CODEC_ZSTD)
+}
+
+async function autoPayloadChoiceAsync(
+  uncompressed: Buffer,
+  compressors: AutoPayloadCompressorsAsync,
+): Promise<PayloadCodecChoice> {
+  if (uncompressed.length < MSV5_MIN_COMPRESS_BYTES) {
+    return rawPayloadChoice(uncompressed)
+  }
+  if (!zstdAvailable()) {
+    warnZstdSaveFallbackOnce()
+    return pickAutoPayloadCodec(uncompressed, await compressors.zlib(uncompressed), CODEC_ZLIB)
+  }
+  return pickAutoPayloadCodec(uncompressed, await compressors.zstd(uncompressed), CODEC_ZSTD)
+}
+
+function choosePayloadCodecSync(
+  uncompressed: Buffer,
+  compression: BinaryCompression = 'auto',
+): PayloadCodecChoice {
+  switch (compression) {
+    case 'raw':
+      return rawPayloadChoice(uncompressed)
+    case 'zstd':
+      return zstdPayloadChoiceSync(uncompressed)
+    case 'zlib':
+      return zlibPayloadChoiceSync(uncompressed)
+    case 'auto':
+      return autoPayloadChoice(uncompressed, autoSyncCompressors)
+    default: {
+      const _exhaustive: never = compression
+      return _exhaustive
+    }
+  }
+}
+
+async function choosePayloadCodecAsync(
+  uncompressed: Buffer,
+  compression: BinaryCompression = 'auto',
+): Promise<PayloadCodecChoice> {
+  switch (compression) {
+    case 'raw':
+      return rawPayloadChoice(uncompressed)
+    case 'zstd':
+      return await zstdPayloadChoiceAsync(uncompressed)
+    case 'zlib':
+      return await zlibPayloadChoiceAsync(uncompressed)
+    case 'auto':
+      return await autoPayloadChoiceAsync(uncompressed, autoAsyncCompressors)
+    default: {
+      const _exhaustive: never = compression
+      return _exhaustive
+    }
+  }
 }
 
 function concatAndValidateSections(rawSections: Buffer[]): {
@@ -288,14 +414,15 @@ function buildMsv5AssembledFile(
 
 /**
  * MSv5 on disk: header + catalogue (uncompressed offsets) + **one** payload blob
- * (raw concatenation or a single zstd stream over it).
+ * (raw concatenation or a single compressed stream over it).
  */
 export function assembleMsv5File(
   globalFlags: number,
   rawSections: Buffer[],
+  compression: BinaryCompression = 'auto',
 ): Msv5AssembledFile {
   const { uncompressed, entries, payloadCrc32 } = concatAndValidateSections(rawSections)
-  const { payload, codec, zstdLevel } = choosePayloadCodecSync(uncompressed)
+  const { payload, codec, zstdLevel } = choosePayloadCodecSync(uncompressed, compression)
   return buildMsv5AssembledFile(
     globalFlags,
     entries,
@@ -310,9 +437,10 @@ export function assembleMsv5File(
 export async function assembleMsv5FileAsync(
   globalFlags: number,
   rawSections: Buffer[],
+  compression: BinaryCompression = 'auto',
 ): Promise<Msv5AssembledFile> {
   const { uncompressed, entries, payloadCrc32 } = concatAndValidateSections(rawSections)
-  const { payload, codec, zstdLevel } = await choosePayloadCodecAsync(uncompressed)
+  const { payload, codec, zstdLevel } = await choosePayloadCodecAsync(uncompressed, compression)
   return buildMsv5AssembledFile(
     globalFlags,
     entries,
@@ -389,11 +517,11 @@ function sectionsFromPayload(
   })
 }
 
-/** Streaming zstd reader: keeps only one section in memory at a time.
- *  No `maxOutputLength` on {@link createZstdDecompress}: output is bounded by accumulating
- *  `streamOffset` against the header's `uncompressedLength` (same 1 GiB cap checked upfront).
- *  Sync load uses `maxOutputLength` instead because it materializes the whole payload at once. */
-function collectZstdPayloadSections(
+/** Streaming compressed reader: keeps only one section in memory at a time.
+ *  No `maxOutputLength` on Transform streams: output is bounded by accumulating `streamOffset`
+ *  against the header's `uncompressedLength` (same 1 GiB cap checked upfront). Sync load uses
+ *  `maxOutputLength` because it materializes the whole payload at once. */
+function collectCompressedPayloadSections(
   directory: Msv5SectionEntry[],
   uncompressedLength: number,
   payloadCrc32: number,
@@ -425,7 +553,7 @@ function collectZstdPayloadSections(
 
   function consume(chunk: Buffer): void {
     if (streamOffset + chunk.length > uncompressedLength) {
-      throw new Error('MSv5 zstd payload exceeds declared length')
+      throw new Error(MSV5_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH)
     }
 
     payloadCrc = crc32Update(payloadCrc, chunk)
@@ -469,7 +597,7 @@ function collectZstdPayloadSections(
   function finish(): void {
     emitEmptySections()
     if (streamOffset !== uncompressedLength || sectionId !== directory.length) {
-      throw new Error('MSv5 zstd decompressed length mismatch')
+      throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
     if (payloadCrc !== payloadCrc32) {
       throw new Error('MSv5 payload CRC mismatch')
@@ -479,15 +607,46 @@ function collectZstdPayloadSections(
   return { sections, consume, finish }
 }
 
-export function loadMsv5SectionsFromZstdStream(
+function loadMsv5SectionsFromZstdStream(
   compressed: Buffer,
   directory: Msv5SectionEntry[],
   uncompressedLength: number,
   payloadCrc32: number,
 ): Promise<Buffer[]> {
+  return loadMsv5SectionsFromCompressedStream(
+    compressed,
+    directory,
+    uncompressedLength,
+    payloadCrc32,
+    () => zlib.createZstdDecompress(),
+  )
+}
+
+function loadMsv5SectionsFromZlibStream(
+  compressed: Buffer,
+  directory: Msv5SectionEntry[],
+  uncompressedLength: number,
+  payloadCrc32: number,
+): Promise<Buffer[]> {
+  return loadMsv5SectionsFromCompressedStream(
+    compressed,
+    directory,
+    uncompressedLength,
+    payloadCrc32,
+    () => zlib.createInflate(),
+  )
+}
+
+function loadMsv5SectionsFromCompressedStream(
+  compressed: Buffer,
+  directory: Msv5SectionEntry[],
+  uncompressedLength: number,
+  payloadCrc32: number,
+  createStream: () => Transform,
+): Promise<Buffer[]> {
   return new Promise((resolve, reject) => {
-    const collector = collectZstdPayloadSections(directory, uncompressedLength, payloadCrc32)
-    const stream = zlib.createZstdDecompress()
+    const collector = collectCompressedPayloadSections(directory, uncompressedLength, payloadCrc32)
+    const stream = createStream()
     stream.on('data', (chunk: Buffer) => {
       try {
         collector.consume(chunk)
@@ -559,6 +718,35 @@ function preparePayload(fileBuf: Buffer, directory: Msv5SectionEntry[]): Prepare
   }
 }
 
+function decompressPayloadSync(
+  payloadCodec: number,
+  slice: Buffer,
+  uncompressedLength: number,
+): Buffer {
+  if (payloadCodec === CODEC_ZSTD) {
+    if (!zstdAvailable()) {
+      throw zstdUnavailableReadError()
+    }
+    const decoded = zlib.zstdDecompressSync(slice, {
+      maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
+    })
+    if (decoded.length !== uncompressedLength) {
+      throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+    }
+    return decoded
+  }
+  if (payloadCodec === CODEC_ZLIB) {
+    const decoded = zlib.inflateSync(slice, {
+      maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
+    })
+    if (decoded.length !== uncompressedLength) {
+      throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+    }
+    return decoded
+  }
+  throw new Error(`MSv5 unknown payload codec ${payloadCodec}`)
+}
+
 /** Synchronous load; peak RAM ≈ full uncompressed payload (use the async path to bound it). */
 export function loadMsv5Sections(
   fileBuf: Buffer,
@@ -569,22 +757,8 @@ export function loadMsv5Sections(
   if (payloadCodec === CODEC_RAW) {
     return sectionsFromPayload(slice, directory, payloadCrc32)
   }
-  if (payloadCodec === CODEC_ZSTD) {
-    if (!zstdAvailable()) {
-      throw zstdUnavailableReadError()
-    }
-    // Native cap matches readPayloadMeta's 1 GiB limit (see MSV5_MAX_UNCOMPRESSED_BYTES).
-    // Using header `uncompressedLength` here would only help when the header understates
-    // the zstd stream but the attacker can inflate the header too — same worst case.
-    const decoded = zlib.zstdDecompressSync(slice, {
-      maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
-    })
-    if (decoded.length !== uncompressedLength) {
-      throw new Error('MSv5 zstd decompressed length mismatch')
-    }
-    return sectionsFromPayload(decoded, directory, payloadCrc32)
-  }
-  throw new Error(`MSv5 unknown payload codec ${payloadCodec}`)
+  const decoded = decompressPayloadSync(payloadCodec, slice, uncompressedLength)
+  return sectionsFromPayload(decoded, directory, payloadCrc32)
 }
 
 /** Streaming load; peak main-thread RAM ≈ largest single section (+ file buffer). */
@@ -602,6 +776,9 @@ export async function loadMsv5SectionsAsync(
       throw zstdUnavailableReadError()
     }
     return loadMsv5SectionsFromZstdStream(slice, directory, uncompressedLength, payloadCrc32)
+  }
+  if (payloadCodec === CODEC_ZLIB) {
+    return loadMsv5SectionsFromZlibStream(slice, directory, uncompressedLength, payloadCrc32)
   }
   throw new Error(`MSv5 unknown payload codec ${payloadCodec}`)
 }

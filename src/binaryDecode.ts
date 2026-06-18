@@ -28,7 +28,7 @@ export function decodeFrozenSnapshot(buf: Buffer, hints?: FrozenDecodeHints): Fr
   throw invalidFrozenIndex('Unsupported frozen binary snapshot')
 }
 
-/** Async frozen snapshot decode (streaming zstd). */
+/** Async frozen snapshot decode (streaming decompression when needed). */
 export async function decodeFrozenSnapshotAsync(
   buf: Buffer,
   hints?: FrozenDecodeHints,

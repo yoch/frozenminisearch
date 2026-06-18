@@ -17,6 +17,7 @@ import { buildStoredFieldsWireSection } from '../storedFieldsLayout'
 import type { FrozenTermIndex } from '../frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { fromRadixTree } from '../PackedRadixTree'
+import type { BinaryCompression } from '../searchTypes'
 import {
   buildFieldLengthMatrixSection,
   fieldLengthMatrixWireFlags,
@@ -46,6 +47,7 @@ export function encodeFrozenSnapshotMsv5(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
   packedTermIndex?: FrozenTermIndex,
+  compression?: BinaryCompression,
 ): Buffer {
   validateFrozenSnapshotNumeric(snap)
   const fieldNames = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
@@ -79,13 +81,14 @@ export function encodeFrozenSnapshotMsv5(
     postingsWire.freqs,
   ]
 
-  return assembleMsv5File(globalFlags, rawSections).buffer
+  return assembleMsv5File(globalFlags, rawSections, compression).buffer
 }
 
 export async function encodeFrozenSnapshotMsv5Async(
   snap: FrozenSnapshot,
   termTree?: RadixTree<number>,
   packedTermIndex?: FrozenTermIndex,
+  compression?: BinaryCompression,
 ): Promise<Buffer> {
   validateFrozenSnapshotNumeric(snap)
   const fieldNames = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
@@ -119,5 +122,5 @@ export async function encodeFrozenSnapshotMsv5Async(
     postingsWire.freqs,
   ]
 
-  return (await assembleMsv5FileAsync(globalFlags, rawSections)).buffer
+  return (await assembleMsv5FileAsync(globalFlags, rawSections, compression)).buffer
 }

@@ -13,6 +13,7 @@ import {
 } from './binaryFormat'
 import {
   CODEC_RAW,
+  CODEC_ZLIB,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
   MSV5_SECTION_DIR_OFFSET,
@@ -95,6 +96,13 @@ describe('binaryFormat MSv5', () => {
     expect(Array.from(loaded.postings.allDocIds)).toEqual([0, 1])
     expect(Array.from(loaded.postings.allFreqs)).toEqual([1, 1])
     expect(Array.from(loaded.postings.denseLengths)).toEqual([1, 1])
+  })
+
+  test('encodeFrozenSnapshot accepts explicit zlib compression', () => {
+    const snap = buildSnapshotFromFrozen()
+    const buf = encodeFrozenSnapshot(snap, undefined, undefined, 'zlib')
+    expect(buf.readUInt8(8)).toBe(CODEC_ZLIB)
+    expect(decodeFrozenSnapshot(buf).documentCount).toBe(snap.documentCount)
   })
 
   test('encode rejects invalid snapshot', () => {

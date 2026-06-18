@@ -36,6 +36,7 @@ import {
 } from './queryEngine'
 import { autoSuggestFromSearch } from './suggestions'
 import type {
+  SaveBinaryOptions,
   Options,
   Query,
   SearchOptions,
@@ -265,7 +266,7 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   /** Serialize this index as a frozen binary snapshot (synchronous). */
-  saveBinarySync(): Buffer {
+  saveBinarySync(saveOptions: SaveBinaryOptions = {}): Buffer {
     return encodeFrozenSnapshot({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -279,11 +280,11 @@ export default class FrozenMiniSearch<T = any> {
       fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
-    }, undefined, this._index)
+    }, undefined, this._index, saveOptions.compression)
   }
 
-  /** Non-blocking zstd compression; same output as {@link saveBinarySync}. */
-  async saveBinaryAsync(): Promise<Buffer> {
+  /** Non-blocking snapshot serialization with the selected compression codec. */
+  async saveBinaryAsync(saveOptions: SaveBinaryOptions = {}): Promise<Buffer> {
     return encodeFrozenSnapshotAsync({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -297,7 +298,7 @@ export default class FrozenMiniSearch<T = any> {
       fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
       treeShape: [],
       postings: this._postings,
-    }, undefined, this._index)
+    }, undefined, this._index, saveOptions.compression)
   }
 
   /** Load a frozen binary snapshot. */
@@ -307,7 +308,7 @@ export default class FrozenMiniSearch<T = any> {
     return FrozenMiniSearch.fromBinarySnapshot(snap, options)
   }
 
-  /** Load a frozen binary snapshot with streaming zstd decompression (bounded memory). */
+  /** Load a frozen binary snapshot with streaming decompression when needed (bounded memory). */
   static async loadBinaryAsync<T>(
     buffer: Buffer,
     options: Options<T> = {} as Options<T>,

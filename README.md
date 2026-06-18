@@ -188,7 +188,23 @@ const buf = index.saveBinarySync()
 const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded in snapshot
 ```
 
-- **Node ≥ 22.15.0** (zstd via `node:zlib`)
+- **Node ≥ 20**
+- Default snapshot compression (`compression: 'auto'`, one pass):
+  - payloads under 64 B stay raw
+  - `zstd` on Node 22.15+ when it strictly shrinks the payload
+  - otherwise `zlib` on Node 20–22.14 when it strictly shrinks the payload
+  - otherwise `raw` (uncompressed)
+- Explicit snapshot compression always writes the chosen codec, even when compression would not shrink the payload (useful for portability):
+
+```javascript
+const portable = index.saveBinarySync({ compression: 'zlib' })
+const uncompressed = index.saveBinarySync({ compression: 'raw' })
+const bestRatio = index.saveBinarySync({ compression: 'zstd' }) // Node 22.15+
+```
+
+- Snapshot readability depends on the embedded codec:
+  - `raw` and `zlib` snapshots load on Node 20+
+  - `zstd` snapshots require Node 22.15+
 - Snapshots produced by this package version are forward-compatible; re-build from MiniSearch JSON if an older binary fails to load
 - `tokenize` / `processTerm` are not stored — pass the same functions at load when customized
 

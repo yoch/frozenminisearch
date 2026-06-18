@@ -1,11 +1,13 @@
 export { OR, AND, AND_NOT } from './scoring'
 export type {
   BM25Params,
+  BinaryCompression,
   LowercaseCombinationOperator,
   CombinationOperator,
   LogLevel,
   SearchOptions,
   Options,
+  SaveBinaryOptions,
   Suggestion,
   MatchInfo,
   SearchResult,

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v1.2.3 — `@yoch/frozenminisearch`
+
+Patch release: broad-first exact AND / AND_NOT paths, seek-based gated doc-id collection, and README benchmark copy refresh. No API or MSv5 wire-format changes.
+
+### Improved
+
+- **Broad-first exact AND** — on exact-only combined queries where the first branch posting is large and a later branch is selective enough, collect the final doc-id gate by estimated posting length, then score branches in query order (parity with naive score-then-intersect unchanged).
+- **Broad-first AND_NOT** — when the positive branch is large and a negated branch is comparably large, collect exclusions first and score the positive branch only on survivors.
+- **Gated doc-id collection** — `DocIdGate` lazy views and seek over sorted postings when the gate is much smaller than the posting list (`scoring.ts`, `frozenPostings.ts`).
+- **AND gate posting estimate** — skip upfront posting-length estimation on prefix/fuzzy AND branches; keep absolute-gate skip on the sequential path so Divina `AND+fuzzy` stays fast.
+
 ## v1.2.2 — `@yoch/frozenminisearch`
 
 Patch release: faster frozen AND scoring on large posting lists (gated seek + posting-ratio gate) and BM25 segment hoisting. No API or MSv5 wire-format changes.

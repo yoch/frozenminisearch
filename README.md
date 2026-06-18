@@ -32,15 +32,15 @@ Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
 
 | Scenario | Docs | Index RAM | Binary size | Load time | Search p50 |
 |----------|-----:|-----------|------------:|----------:|-----------:|
-| Divina, with stored text | 14,097 | 0.3 vs 16.1 MB (~98% less) | ~73% less | ~72% faster | ~17% faster |
-| Divina, index only | 14,097 | 0.2 vs 14.9 MB (~99% less) | ~77% less | ~83% faster | ~25% faster |
-| High-frequency terms | 10,000 | 0.1 vs 7.4 MB (~99% less) | ~94% less | ~91% faster | ~39% faster |
-| Dense numeric ids | 100,000 | 0.9 vs 91.3 MB (~99% less) | ~88% less | ~92% faster | ~26% faster |
-| Uint16 doc id boundary | 65,535 | 0.6 vs 58.6 MB (~99% less) | ~91% less | ~93% faster | ~39% faster |
+| Divina, with stored text | 14,097 | 0.3 vs 16.1 MB (~98% less) | ~73% less | ~75% faster | ~14% faster |
+| Divina, index only | 14,097 | 0.2 vs 14.9 MB (~99% less) | ~77% less | ~89% faster | ~23% faster |
+| High-frequency terms | 10,000 | 4.4 vs 7.4 MB (~41% less) | ~94% less | ~91% faster | ~40% faster |
+| Dense numeric ids | 100,000 | 0.9 vs 91.3 MB (~99% less) | ~88% less | ~94% faster | ~27% faster |
+| Uint16 doc id boundary | 65,535 | 0.6 vs 58.6 MB (~99% less) | ~91% less | ~93% faster | ~43% faster |
 
-Across this full run, frozen is faster on **24/27** search cases. Divina `inferno` (exact, paired p50): mutable 16.3 µs → frozen 12.5 µs (**-4 µs**, ratio 0.80).
+Across this full run, frozen is faster on **25/27** search cases. Divina `inferno` (exact, paired p50): mutable 15.0 µs → frozen 13.4 µs (**-2 µs**, ratio 0.78).
 
-Numbers are from `benchmarks/baselines/latest.json`, captured 2026-06-18 on Node v24.16.0, 3 runs per scenario. Heap is measured with one index alive and should be read as a trend, not exact accounting.
+Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-18 on Node v24.16.0, 3 runs per scenario. Heap is measured with one index alive and should be read as a trend, not exact accounting.
 <!-- vs-reference:end -->
 
 ---

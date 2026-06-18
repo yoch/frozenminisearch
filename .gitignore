@@ -15,6 +15,9 @@ FORK_NOTES.md
 ANALYSE_STRATEGIE_PACKAGE.md
 benchmarks/baselines/latest.json
 benchmarks/baselines/packed-radix-latest.json
+# Local-only scoring/perf investigation helpers
+benchmarks/scripts/calibrate-seek-vs-scan.mjs
+benchmarks/scripts/perf-stat-scoring.mjs
 # Local-only fuzzy algo A/B (prefix-string candidate vs prod segments)
 benchmarks/fuzzyPrefixVariant.ts
 benchmarks/packedRadixFuzzyAlgoCompare.js

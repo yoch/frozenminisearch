@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## v1.2.1 — `@yoch/frozenminisearch`
+
+Patch release: lower search overhead when stored fields are disabled and fewer query-normalization allocations. No API or MSv5 wire-format changes.
+
+### Improved
+
+- **Search without `storeFields`** — skip stored-field reads during scoring and result finalization when the index has no stored fields (`storeFields: []`).
+- **String query normalization** — pre-allocated term/spec buffers, hoisted per-query field boosts and match weights, and shared `termToQuerySpec` building (fewer intermediate arrays and closures).
+
 ## v1.2.0 — `@yoch/frozenminisearch`
 
 Minor release: configurable MSv5 snapshot compression and Node 20 support.

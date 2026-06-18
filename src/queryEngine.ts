@@ -16,6 +16,7 @@ import {
   type FieldTermDataLike,
   type QuerySpec,
   type RawResult,
+  termToQuerySpec,
 } from './scoring'
 import { defaultSearchOptions } from './searchDefaults'
 import type {
@@ -148,19 +149,10 @@ function normalizeStringQuery(
     }
   }
 
+  const toSpec = termToQuerySpec(options)
   const specs: QuerySpec[] = new Array(terms.length)
   for (let i = 0; i < terms.length; i++) {
-    const term = terms[i]
-    const fuzzy = (typeof options.fuzzy === 'function')
-      ? options.fuzzy(term, i, terms)
-      : (options.fuzzy || false)
-    const prefix = (typeof options.prefix === 'function')
-      ? options.prefix(term, i, terms)
-      : (options.prefix === true)
-    const termBoost = (typeof options.boostTerm === 'function')
-      ? options.boostTerm(term, i, terms)
-      : 1
-    specs[i] = { term, fuzzy, prefix, termBoost }
+    specs[i] = toSpec(terms[i], i, terms)
   }
 
   const { fuzzy: fuzzyWeight, prefix: prefixWeight } = {

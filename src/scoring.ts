@@ -209,8 +209,8 @@ function scorePostingDoc(
   const rawScore = hoistedIdf !== undefined
     ? calcBm25TfWithConstants(termFreq, fieldLength, bm25, hoistedIdf)
     : calcBM25ScoreWithConstants(
-      termFreq, matchingFields, context.documentCount, fieldLength, bm25,
-    )
+        termFreq, matchingFields, context.documentCount, fieldLength, bm25,
+      )
   const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
 
   const result = results.get(docId)

@@ -266,8 +266,8 @@ interface AutoPayloadCompressorsAsync {
 }
 
 const autoSyncCompressors: AutoPayloadCompressors = {
-  zstd: (uncompressed) => zlib.zstdCompressSync(uncompressed, msv5ZstdCompressOptions(uncompressed)),
-  zlib: (uncompressed) => zlib.deflateSync(uncompressed),
+  zstd: uncompressed => zlib.zstdCompressSync(uncompressed, msv5ZstdCompressOptions(uncompressed)),
+  zlib: uncompressed => zlib.deflateSync(uncompressed),
 }
 
 const autoAsyncCompressors: AutoPayloadCompressorsAsync = {

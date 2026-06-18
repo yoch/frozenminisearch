@@ -18,6 +18,7 @@ import {
   type RawResult,
   termToQuerySpec,
 } from './scoring'
+import { SegmentPostingList } from './compactPostings'
 import { defaultSearchOptions } from './searchDefaults'
 import type {
   CombinationOperator,
@@ -30,6 +31,7 @@ import { isWildcardQuery } from './symbols'
 import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
 import {
   gateIsSelectiveEnough,
+  DEFAULT_POSTING_GATE_POLICY,
   type QueryEngineRunOptions,
 } from './queryEngineGateLimits'
 
@@ -177,6 +179,39 @@ function lazyIndexedTerm(
   return { kind: 'lazy', resolve: () => indexView.resolveTermByIndex(termIndex) }
 }
 
+type QuerySpecTermRef
+  = | { kind: 'exact', termIndex: number | undefined }
+    | { kind: 'prefix', termIndex: number, length: number, distance: number }
+    | { kind: 'fuzzy', termIndex: number, length: number, distance: number }
+
+function forEachQuerySpecTermRef(
+  query: QuerySpec,
+  normalized: NormalizedStringQuery,
+  params: QueryEngineParams,
+  visit: (ref: QuerySpecTermRef) => void,
+): void {
+  const { indexView } = params
+  const { options } = normalized
+  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
+
+  visit({ kind: 'exact', termIndex: indexView.resolveTermIndex(query.term) })
+
+  const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
+  if (query.prefix) {
+    for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
+      const distance = length - query.term.length
+      if (!distance) continue
+      seenPrefix?.add(termIndex)
+      visit({ kind: 'prefix', termIndex, length, distance })
+    }
+  }
+  if (!maxDistance) return
+  for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
+    if (!distance || seenPrefix?.has(termIndex)) continue
+    visit({ kind: 'fuzzy', termIndex, length, distance })
+  }
+}
+
 function visitQuerySpecForScoring(
   query: QuerySpec,
   normalized: NormalizedStringQuery,
@@ -188,38 +223,31 @@ function visitQuerySpecForScoring(
   ) => void,
 ): void {
   const { indexView } = params
-  const { fuzzyWeight, options, prefixWeight } = normalized
-  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
+  const { fuzzyWeight, prefixWeight } = normalized
 
-  const exactTi = indexView.resolveTermIndex(query.term)
-  visit(
-    exactTi == null ? undefined : indexView.fieldTermData(exactTi),
-    query.term,
-    1,
-  )
-
-  const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
-  if (query.prefix) {
-    for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
-      const distance = length - query.term.length
-      if (!distance) continue
-      seenPrefix?.add(termIndex)
+  forEachQuerySpecTermRef(query, normalized, params, (ref) => {
+    if (ref.kind === 'exact') {
       visit(
-        indexView.fieldTermData(termIndex),
-        lazyIndexedTerm(indexView, termIndex),
-        prefixWeight * length / (length + 0.3 * distance),
+        ref.termIndex == null ? undefined : indexView.fieldTermData(ref.termIndex),
+        query.term,
+        1,
       )
+      return
     }
-  }
-  if (!maxDistance) return
-  for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-    if (!distance || seenPrefix?.has(termIndex)) continue
+    if (ref.kind === 'prefix') {
+      visit(
+        indexView.fieldTermData(ref.termIndex),
+        lazyIndexedTerm(indexView, ref.termIndex),
+        prefixWeight * ref.length / (ref.length + 0.3 * ref.distance),
+      )
+      return
+    }
     visit(
-      indexView.fieldTermData(termIndex),
-      lazyIndexedTerm(indexView, termIndex),
-      fuzzyWeight * length / (length + distance),
+      indexView.fieldTermData(ref.termIndex),
+      lazyIndexedTerm(indexView, ref.termIndex),
+      fuzzyWeight * ref.length / (ref.length + ref.distance),
     )
-  }
+  })
 }
 
 function executeQuerySpecInternal(
@@ -251,37 +279,94 @@ function executeQuerySpecInternal(
   return results
 }
 
+function maxPostingLengthForFieldTermData(
+  data: FieldTermDataLike | undefined,
+  fieldBoosts: FieldBoostsForQuery,
+  fieldIds: AggregateContext['fieldIds'],
+): number {
+  if (data == null) return 0
+  let maxLen = 0
+  for (const field of fieldBoosts.names) {
+    const fieldId = fieldIds[field]
+    const postingList = data.get(fieldId)
+    if (postingList == null) continue
+    const len = postingList instanceof SegmentPostingList ? postingList.length : postingList.size
+    if (len > maxLen) maxLen = len
+  }
+  return maxLen
+}
+
+function estimateMaxPostingLengthForQuerySpec(
+  query: QuerySpec,
+  normalized: NormalizedStringQuery,
+  params: QueryEngineParams,
+): number {
+  const { indexView, aggregateContext } = params
+  const { fieldBoosts } = normalized
+  const { fieldIds } = aggregateContext
+
+  let maxLen = 0
+  const consider = (data: FieldTermDataLike | undefined) => {
+    maxLen = Math.max(maxLen, maxPostingLengthForFieldTermData(data, fieldBoosts, fieldIds))
+  }
+
+  forEachQuerySpecTermRef(query, normalized, params, (ref) => {
+    if (ref.kind === 'exact') {
+      if (ref.termIndex != null) consider(indexView.fieldTermData(ref.termIndex))
+      return
+    }
+    consider(indexView.fieldTermData(ref.termIndex))
+  })
+  return maxLen
+}
+
+function estimateMaxPostingLengthForQuery(
+  query: Query,
+  searchOptions: SearchOptions,
+  params: QueryEngineParams,
+): number {
+  if (isWildcardQuery(query)) {
+    return params.aggregateContext.documentCount
+  }
+
+  if (isQueryCombination(query)) {
+    const options = { ...searchOptions, ...query, queries: undefined }
+    let maxLen = 0
+    for (const branch of query.queries) {
+      maxLen = Math.max(maxLen, estimateMaxPostingLengthForQuery(branch, options, params))
+    }
+    return maxLen
+  }
+
+  if (typeof query !== 'string') return 0
+
+  const normalized = normalizeStringQuery(query, searchOptions, params)
+  let maxLen = 0
+  for (const spec of normalized.specs) {
+    maxLen = Math.max(maxLen, estimateMaxPostingLengthForQuerySpec(spec, normalized, params))
+  }
+  return maxLen
+}
+
 function collectDocIdsForQuerySpec(
   query: QuerySpec,
   normalized: NormalizedStringQuery,
   params: QueryEngineParams,
   allowedDocs?: Set<number>,
 ): Set<number> {
-  const { fieldBoosts, options } = normalized
+  const { fieldBoosts } = normalized
   const docIds = new Set<number>()
   const { indexView, aggregateContext } = params
-  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
 
-  const exactTi = indexView.resolveTermIndex(query.term)
-  if (exactTi != null) {
-    indexView.collectDocIds(exactTi, fieldBoosts, aggregateContext, docIds, allowedDocs)
-  }
-
-  const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
-  if (query.prefix) {
-    for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
-      const distance = length - query.term.length
-      if (!distance) continue
-      seenPrefix?.add(termIndex)
-      indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+  forEachQuerySpecTermRef(query, normalized, params, (ref) => {
+    if (ref.kind === 'exact') {
+      if (ref.termIndex != null) {
+        indexView.collectDocIds(ref.termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+      }
+      return
     }
-  }
-  if (maxDistance) {
-    for (const { termIndex, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-      if (!distance || seenPrefix?.has(termIndex)) continue
-      indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
-    }
-  }
+    indexView.collectDocIds(ref.termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+  })
   return docIds
 }
 
@@ -349,6 +434,7 @@ function executeCombinedBranches<T>(
   collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
   allowedDocs?: Set<number>,
   run?: QueryEngineRunOptions,
+  estimateBranchPostingLength?: (branch: T) => number,
 ): RawResult {
   if (branches.length === 0) return new Map()
 
@@ -366,8 +452,16 @@ function executeCombinedBranches<T>(
   if (op === 'and') {
     const limits = run?.gateLimits
     const documentCount = params.aggregateContext.documentCount
+    const postingGatePolicy = run?.postingGatePolicy ?? DEFAULT_POSTING_GATE_POLICY
     for (let i = 1; i < branches.length; i++) {
-      const selective = gateIsSelectiveEnough(gate.size, documentCount, limits)
+      const postingListLength = estimateBranchPostingLength?.(branches[i])
+      const selective = gateIsSelectiveEnough(
+        gate.size,
+        documentCount,
+        limits,
+        postingListLength,
+        postingGatePolicy,
+      )
       const branchAllowed = selective ? gate : allowedDocs
       result = combineResults([result, executeBranch(branches[i], branchAllowed)], AND)
       gate = docIdsFromResult(result)
@@ -518,6 +612,7 @@ function executeQueryInternal(
         (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
         allowedDocs,
         run,
+        branch => estimateMaxPostingLengthForQuery(branch, options, params),
       )
     }
 
@@ -544,6 +639,7 @@ function executeQueryInternal(
       (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
       allowedDocs,
       run,
+      spec => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
     )
   }
 

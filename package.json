@@ -123,6 +123,7 @@
     "benchmark:diff:search:run": "npm run build && BENCH_SEARCH_ONLY=1 node --expose-gc benchmarks/diffBaseline.js --run",
     "benchmark:baseline:update": "npm run build && node --expose-gc benchmarks/captureBaseline.js --reference",
     "benchmark:and-gate-tuning": "npx --yes tsx benchmarks/and-gate-tuning.mjs",
+    "benchmark:gate-posting-ratio": "npm run build && npx --yes tsx benchmarks/scripts/calibrate-gate-posting-ratio.mjs",
     "benchmark:diff": "node --expose-gc benchmarks/diffBaseline.js",
     "benchmark:diff:run": "npm run build && node --expose-gc benchmarks/diffBaseline.js --run",
     "benchmark:targeted": "npm run build && node --expose-gc benchmarks/scripts/targeted-failures.mjs",

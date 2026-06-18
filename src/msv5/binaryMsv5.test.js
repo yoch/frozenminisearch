@@ -70,7 +70,7 @@ function stubMissingZstd() {
 function stubIneffectiveZstd() {
   const savedSync = zlib.zstdCompressSync
   const savedAsync = zlib.zstdCompress
-  zlib.zstdCompressSync = (input) => Buffer.from(input)
+  zlib.zstdCompressSync = input => Buffer.from(input)
   zlib.zstdCompress = (input, options, callback) => {
     if (typeof options === 'function') {
       options(null, Buffer.from(input))
@@ -87,7 +87,7 @@ function stubIneffectiveZstd() {
 function stubIneffectiveZlib() {
   const savedSync = zlib.deflateSync
   const savedAsync = zlib.deflate
-  zlib.deflateSync = (input) => Buffer.from(input)
+  zlib.deflateSync = input => Buffer.from(input)
   zlib.deflate = (input, options, callback) => {
     if (typeof options === 'function') {
       options(null, Buffer.from(input))

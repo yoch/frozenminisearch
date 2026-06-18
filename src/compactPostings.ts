@@ -1,4 +1,8 @@
 import type { PostingListLike } from './scoring'
+import {
+  DEFAULT_POSTING_GATE_MIN_LENGTH,
+  passGateByPostingRatio,
+} from './queryEngineGateLimits'
 
 export const MAX_FREQ = 65535
 
@@ -11,8 +15,8 @@ export function readDocId(docIds: DocIdArray, index: number): number {
   return docIds[index] as number
 }
 
-/** Posting list length floor for gated seek (calibrated; prod compromise vs synthetic min=16). */
-export const SEEK_ALLOWED_MIN_LIST_LENGTH = 2048
+/** @deprecated Use {@link DEFAULT_POSTING_GATE_MIN_LENGTH} — seek shares numeric thresholds with AND gate ratio policy. */
+export const SEEK_ALLOWED_MIN_LIST_LENGTH = DEFAULT_POSTING_GATE_MIN_LENGTH
 
 /** Binary search for docId in a sorted segment; returns global index or -1. */
 export function findDocIndexInSortedSegment(
@@ -33,9 +37,12 @@ export function findDocIndexInSortedSegment(
   return -1
 }
 
-/** Seek when gate is selective vs list length (empirical: giant common ~22% gate wins; highFreq 100% loses). */
+/**
+ * Scan vs binary search once `allowedDocs` is already in effect (scoring layer).
+ * Uses the same numeric policy as {@link passGateByPostingRatio} today; distinct decision point.
+ */
 export function shouldSeekAllowedDocs(gateSize: number, listLength: number): boolean {
-  return listLength >= SEEK_ALLOWED_MIN_LIST_LENGTH && gateSize <= (listLength >>> 2)
+  return passGateByPostingRatio(gateSize, listLength)
 }
 
 export function allocateFreqs(length: number, maxValue: number): FreqArray {

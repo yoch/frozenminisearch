@@ -121,6 +121,18 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       }, { expectedIds: [1, 2, 4, 5] })
     })
 
+    test('AND containing inner AND matches naive oracle', () => {
+      const query = {
+        combineWith: 'AND',
+        queries: [
+          'zen',
+          { combineWith: 'AND', queries: ['art', 'practice'] },
+        ],
+      }
+      expectSameResults(mutable, frozen, query, {}, { expectedIds: [4] })
+      expectSameAsNaive(frozen, query)
+    })
+
     test('AND_NOT with nested negated OR', () => {
       expectSameResults(mutable, frozen, {
         combineWith: 'AND_NOT',
@@ -149,6 +161,15 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
           { queries: ['matrix', 'whale'] },
         ],
       }, { expectedIds: [1, 5] })
+    })
+
+    test('AND_NOT with multiple exclusions matches naive oracle', () => {
+      const query = {
+        combineWith: 'AND_NOT',
+        queries: ['zen', 'motorcycle', 'matrix'],
+      }
+      expectSameResults(mutable, frozen, query, {}, { expectedIds: [4] })
+      expectSameAsNaive(frozen, query)
     })
   })
 

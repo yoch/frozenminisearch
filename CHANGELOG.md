@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Improved
+
+- **Frozen AND scoring** — seek gated posting segments when the AND gate is selective (binary search by doc id instead of scanning long lists; threshold calibrated empirically).
+
 ## v1.2.1 — `@yoch/frozenminisearch`
 
 Patch release: lower search overhead when stored fields are disabled and fewer query-normalization allocations. No API or MSv5 wire-format changes.

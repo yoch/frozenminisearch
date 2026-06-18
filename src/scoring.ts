@@ -1,4 +1,9 @@
-import { readDocId, SegmentPostingList } from './compactPostings'
+import {
+  readDocId,
+  SegmentPostingList,
+  findDocIndexInSortedSegment,
+  shouldSeekAllowedDocs,
+} from './compactPostings'
 import type {
   MatchInfo,
   Query,
@@ -249,6 +254,27 @@ function aggregateSegmentPostingList(
     : undefined
   const { docIds, freqs, offset, length } = list
   const derivedTermCache: { value?: string } = {}
+
+  if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
+    for (const docId of allowedDocs) {
+      if (context.isDocActive != null && !context.isDocActive(docId)) {
+        context.onInactiveDoc?.(docId, fieldId, getDerivedTerm(derivedTerm, derivedTermCache))
+        matchingFields -= 1
+        continue
+      }
+
+      const index = findDocIndexInSortedSegment(docIds, offset, length, docId)
+      if (index < 0) continue
+
+      scorePostingDoc(
+        sourceTerm, derivedTerm, field, fieldId, docId, freqs[index],
+        termWeight, termBoost, fieldBoost, matchingFields,
+        context, boostDocumentFn, bm25, results, derivedTermCache,
+        hoistedIdf,
+      )
+    }
+    return matchingFields
+  }
 
   for (let i = 0; i < length; i++) {
     const docId = readDocId(docIds, offset + i)

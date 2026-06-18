@@ -11,6 +11,33 @@ export function readDocId(docIds: DocIdArray, index: number): number {
   return docIds[index] as number
 }
 
+/** Posting list length floor for gated seek (calibrated; prod compromise vs synthetic min=16). */
+export const SEEK_ALLOWED_MIN_LIST_LENGTH = 2048
+
+/** Binary search for docId in a sorted segment; returns global index or -1. */
+export function findDocIndexInSortedSegment(
+  docIds: DocIdArray,
+  offset: number,
+  length: number,
+  docId: number,
+): number {
+  let lo = 0
+  let hi = length - 1
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    const v = readDocId(docIds, offset + mid)
+    if (v < docId) lo = mid + 1
+    else if (v > docId) hi = mid - 1
+    else return offset + mid
+  }
+  return -1
+}
+
+/** Seek when gate is selective vs list length (empirical: giant common ~22% gate wins; highFreq 100% loses). */
+export function shouldSeekAllowedDocs(gateSize: number, listLength: number): boolean {
+  return listLength >= SEEK_ALLOWED_MIN_LIST_LENGTH && gateSize <= (listLength >>> 2)
+}
+
 export function allocateFreqs(length: number, maxValue: number): FreqArray {
   if (maxValue <= 0xff) return new Uint8Array(length)
   return new Uint16Array(length)

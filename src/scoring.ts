@@ -406,7 +406,7 @@ export function combineResults(results: RawResult[], combineWith: CombinationOpe
 export interface FinalizeSearchParams {
   rawResults: RawResult
   getExternalId: (docId: number) => unknown
-  getStoredFields: (docId: number) => Record<string, unknown> | undefined
+  getStoredFields?: (docId: number) => Record<string, unknown> | undefined
   filter?: (result: SearchResult) => boolean
   skipSort?: boolean
 }
@@ -418,7 +418,7 @@ export function finalizeRawSearchResults(
   searchOptions: SearchOptions,
   globalSearchOptions: SearchOptionsWithDefaults,
   getExternalId: (docId: number) => unknown,
-  getStoredFields: (docId: number) => Record<string, unknown> | undefined,
+  getStoredFields?: (docId: number) => Record<string, unknown> | undefined,
 ): SearchResult[] {
   const searchOptionsWithDefaults: SearchOptionsWithDefaults = {
     ...globalSearchOptions,
@@ -447,7 +447,9 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
       queryTerms: terms,
       match,
     }
-    Object.assign(result, getStoredFields(docId))
+    if (getStoredFields != null) {
+      Object.assign(result, getStoredFields(docId))
+    }
     if (filter == null || filter(result)) {
       results.push(result)
     }

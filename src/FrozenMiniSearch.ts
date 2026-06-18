@@ -70,6 +70,8 @@ export function frozenMemoryBreakdown(frozen: FrozenMiniSearch): FrozenMemoryBre
   return frozen.memoryBreakdown()
 }
 
+const noStoredFields = (): undefined => undefined
+
 function assertFieldsMatchSnapshot(
   optionsFields: readonly string[],
   snapFieldIds: { [field: string]: number },
@@ -142,6 +144,7 @@ export default class FrozenMiniSearch<T = any> {
   private readonly _fieldTermFlyweight: FrozenFieldTermFlyweight
   private readonly _aggregateContext: AggregateContext
   private readonly _queryEngineParams: QueryEngineParams
+  private readonly _hasStoredFields: boolean
 
   constructor(params: FrozenAssembleParams<T>) {
     this._options = params.options
@@ -158,6 +161,7 @@ export default class FrozenMiniSearch<T = any> {
     this._termCount = params.termCount
     this._postings = params.postings
     this._fieldTermFlyweight = createFrozenFieldTermFlyweight(this._postings)
+    this._hasStoredFields = this._storedFields.kind !== 'none'
 
     this._aggregateContext = {
       documentCount: this._documentCount,
@@ -165,7 +169,9 @@ export default class FrozenMiniSearch<T = any> {
       fieldIds: this._fieldIds,
       getFieldLength: (docId, fieldId) => this.getFieldLength(docId, fieldId),
       getExternalId: docId => this._externalIds[docId],
-      getStoredFields: docId => readStoredFields(this._storedFields, docId),
+      getStoredFields: this._hasStoredFields
+        ? docId => readStoredFields(this._storedFields, docId)
+        : noStoredFields,
     }
     this._queryEngineParams = {
       fields: this._options.fields,
@@ -176,11 +182,15 @@ export default class FrozenMiniSearch<T = any> {
         this._index,
         this._postings,
         this._fieldTermFlyweight,
-        (callback) => {
-          forEachLiveShortId(this._nextId, this._externalIds, (shortId, id) => {
-            callback(shortId, id, readStoredFields(this._storedFields, shortId))
-          })
-        },
+        this._hasStoredFields
+          ? (callback) => {
+              forEachLiveShortId(this._nextId, this._externalIds, (shortId, id) => {
+                callback(shortId, id, readStoredFields(this._storedFields, shortId))
+              })
+            }
+          : (callback) => {
+              forEachLiveShortId(this._nextId, this._externalIds, callback)
+            },
       ),
       aggregateContext: this._aggregateContext,
     }
@@ -256,7 +266,9 @@ export default class FrozenMiniSearch<T = any> {
       searchOptions,
       this._options.searchOptions,
       docId => this._externalIds[docId],
-      docId => readStoredFields(this._storedFields, docId),
+      this._hasStoredFields
+        ? docId => readStoredFields(this._storedFields, docId)
+        : undefined,
     )
   }
 

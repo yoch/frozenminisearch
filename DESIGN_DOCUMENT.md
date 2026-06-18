@@ -242,6 +242,15 @@ serves both index types. This is a deliberate trade-off in favor of correctness
 and maintainability: a single scoring implementation cannot drift between the
 mutable and frozen variants.
 
+For combined `AND` / `AND_NOT` queries, the frozen engine applies optional
+**doc-id gating** on later branches: when the intersection gate from earlier
+branches is selective enough, only matching documents are scored on the next
+branch (same scores as score-then-intersect). Heuristics include absolute/fraction
+caps and, since v1.2.2, a **posting-length ratio** fallback for large indexes
+where the gate is small relative to the next branch’s posting list; gated
+segments may use binary search instead of scanning full posting lists. Details:
+[`dev/docs/AND_GATE_PARAMETERS.md`](dev/docs/AND_GATE_PARAMETERS.md) (internal, not public API).
+
 ### Index data structure: flat arrays instead of nested maps
 
 This is the core difference from `MiniSearch`. The mutable index stores, at each

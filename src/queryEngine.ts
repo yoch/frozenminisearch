@@ -32,6 +32,7 @@ import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
 import {
   gateIsSelectiveEnough,
   DEFAULT_POSTING_GATE_POLICY,
+  resolveGateMaxSize,
   type QueryEngineRunOptions,
 } from './queryEngineGateLimits'
 
@@ -453,8 +454,15 @@ function executeCombinedBranches<T>(
     const limits = run?.gateLimits
     const documentCount = params.aggregateContext.documentCount
     const postingGatePolicy = run?.postingGatePolicy ?? DEFAULT_POSTING_GATE_POLICY
+    const maxGateSize = resolveGateMaxSize(documentCount, limits)
     for (let i = 1; i < branches.length; i++) {
-      const postingListLength = estimateBranchPostingLength?.(branches[i])
+      if (gate.size === 0) return result
+
+      const ratioPath = gate.size > maxGateSize
+      const postingListLength = ratioPath
+        ? estimateBranchPostingLength?.(branches[i])
+        : undefined
+
       const selective = gateIsSelectiveEnough(
         gate.size,
         documentCount,

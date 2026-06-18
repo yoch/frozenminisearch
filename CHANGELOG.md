@@ -2,9 +2,16 @@
 
 ## Unreleased
 
+## v1.2.2 — `@yoch/frozenminisearch`
+
+Patch release: faster frozen AND scoring on large posting lists (gated seek + posting-ratio gate) and BM25 segment hoisting. No API or MSv5 wire-format changes.
+
 ### Improved
 
-- **Frozen AND scoring** — seek gated posting segments when the AND gate is selective (binary search by doc id instead of scanning long lists; threshold calibrated empirically).
+- **AND gate posting-ratio** — when the absolute gate cap would disable filtering, pass `allowedDocs` to later AND branches if the gate is small relative to the branch posting length (calibrated: min length 2048, max 25% of posting). Applies to string AND and nested `QueryCombination` AND. Parity with naive score-then-intersect unchanged.
+- **Gated posting seek** — on selective AND paths, score gated segments with binary search by doc id instead of scanning full sorted posting lists (same numeric thresholds as the ratio gate; distinct decision point).
+- **BM25 IDF hoisting** — compute document-frequency IDF once per posting segment on frozen paths when doc activity filtering is inactive; lowers work on high-frequency AND queries.
+- **Posting layout selection** — cost-based choice between dense and sparse frozen posting layouts from field/term statistics at build time.
 
 ## v1.2.1 — `@yoch/frozenminisearch`
 

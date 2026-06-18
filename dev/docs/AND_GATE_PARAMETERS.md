@@ -19,7 +19,11 @@ Pour un index de `N` documents :
 maxGateSize = min(maxAbsolute, max(100, floor(N × maxFraction)))
 ```
 
-La gate de taille `G` est **sélective** si `G === 0` ou `G ≤ maxGateSize`.
+La gate de taille `G` est **sélective** si `G === 0`, si `G ≤ maxGateSize`, ou si le [ratio posting](#ratio-posting) passe pour la branche suivante.
+
+Quand `G > maxGateSize`, la longueur posting max (exact + prefix + fuzzy) est estimée pour le ratio. Sur le chemin absolu (`G ≤ maxGateSize`), cette estimation **n’est pas** refaite : la sélectivité est déjà fixée par `G ≤ maxGateSize` (évite un walk fuzzy/prefix coûteux avant chaque branche AND, ex. Divina AND+fuzzy).
+
+La gate sélective est **toujours** passée en `allowedDocs` à la branche suivante. Ne pas conditionner ce passage à `postingListLength > G` : sur un AND exact courant (ex. `inferno paradiso`, 0 résultat), le filtre `allowedDocs.has` évite de scorer des docs hors gate — retirer la gate dans ce cas coûte plus cher qu’il ne rapporte.
 
 | Paramètre | Valeur actuelle | Rôle |
 |-----------|-----------------|------|
@@ -28,6 +32,29 @@ La gate de taille `G` est **sélective** si `G === 0` ou `G ≤ maxGateSize`.
 | Plancher `100` | fixe dans le code | Sur les petits index, évite un `maxGateSize` ridiculement bas (ex. 30 docs → gate max 100). |
 
 **Défauts** : `maxAbsolute = 5000`, `maxFraction = 0.1` (`DEFAULT_AND_GATE_LIMITS`).
+
+## Ratio posting
+
+Quand la gate dépasse `maxGateSize` mais reste **petite par rapport au posting** de la branche suivante, le gating reste actif (`allowedDocs` passé à la branche). Calibration empirique (script `benchmark:gate-posting-ratio`, non CI) :
+
+| Paramètre | Valeur | Rôle |
+|-----------|--------|------|
+| `minLength` | `2048` | Posting trop court → pas de ratio (évite bruit sur petites listes) |
+| `ratioShift` | `2` | Gate OK si `G ≤ postingLength >>> 2` (max **25 %** du posting) |
+
+Helper : `passGateByPostingRatio` dans `queryEngineGateLimits.ts`, intégrée à `gateIsSelectiveEnough` quand `estimateMaxPostingLengthForQuery` fournit la longueur max du posting de la branche (chemin ratio uniquement).
+
+**Exemples** :
+
+| Cas | gate | posting | Ratio | Abs OK ? | Ratio OK ? |
+|-----|------|---------|-------|----------|------------|
+| giant AND+prefix branche 2 | 11 111 | 50 000 | 22 % | non | **oui** → seek + scan filtré |
+| highFrequency AND | 10 000 | 10 000 | 100 % | non | non |
+| parity 6000-doc alpha∧beta | ~6000 | ~6000 | ~100 % | non | non |
+
+**Seek scoring** (`shouldSeekAllowedDocs` dans `compactPostings.ts`) réutilise les **mêmes seuils numériques** une fois `allowedDocs` actif : décision distincte (scan séquentiel vs binary search), pas la même fonction métier.
+
+**Estimation posting** : `forEachQuerySpecTermRef` / `estimateMaxPostingLengthForQuery` — uniquement quand `G > maxGateSize` (chemin ratio).
 
 ## Pourquoi ces valeurs
 
@@ -44,7 +71,8 @@ La gate après la branche 0 est `|résultat branche 0|`. **Le terme le plus sél
 
 ## Réglage et validation
 
-- Script optionnel : `benchmarks/and-gate-tuning.mjs` (`npm run benchmark:and-gate-tuning` si le script est présent dans `package.json`).
+- Script calibration ratio : `npm run benchmark:gate-posting-ratio` (`benchmarks/scripts/calibrate-gate-posting-ratio.mjs`).
+- Script optionnel : `benchmarks/and-gate-tuning.mjs` (`npm run benchmark:and-gate-tuning`).
 - Tests oracle : `dev/parity/queryEngine.gate.test.js` (comparaison gated vs chemin naïf via `dev/parity/queryEngineHarness.js`).
 - Suite de régression perf : `npm run benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**).
 

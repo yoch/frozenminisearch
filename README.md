@@ -30,33 +30,32 @@ Choose **mutable MiniSearch** when documents change at runtime (`add`, `remove`,
 | **Incremental builder** | Typed-array accumulators during build; lower peak heap than materializing `number[][]` per term |
 
 <!-- vs-reference:start — npm run bench:readme -->
-### Measured vs MiniSearch (reference baseline)
+### Measured vs lucaong MiniSearch (reference baseline)
 
-Same BM25 queries on identical corpora. **Index RAM is the headline metric** — frozen uses a fraction of mutable heap on every scenario below; disk and cold load follow from the compact binary format.
+Same BM25 queries on identical corpora. **Frozen wins on what we optimize for**: RAM, disk, cold load, and search throughput on real workloads.
 
 | Scenario | Docs | Index RAM¹ | Disk (binary vs JSON)² | Cold load³ | Search p50⁴ |
 |----------|-----:|------------|------------------------:|-----------:|------------:|
-| Divina with storeFields | 14,097 | 1.1 vs 16.0 MB (~93% less) | ~73% less | ~70% faster | ~13% faster |
-| Divina index only | 14,097 | 0.3 vs 14.9 MB (~98% less) | ~77% less | ~86% faster | ~8% faster |
-| high-frequency terms (10k docs) | 10,000 | 0.2 vs 7.4 MB (~98% less) | ~94% less | ~93% faster | ~29% faster |
-| Dense numeric ids (100k, identity lookup) | 100,000 | 1.6 vs 91.2 MB (~98% less) | ~88% less | ~91% faster | ~18% faster |
-| Doc id Uint16 boundary (65535 docs) | 65,535 | 1.1 vs 58.6 MB (~98% less) | ~91% less | ~93% faster | ~43% faster |
+| Divina with storeFields | 14,097 | 0.3 vs 16.1 MB (~98% less) | ~73% less | ~65% faster | ~21% faster |
+| Divina index only | 14,097 | 0.2 vs 14.9 MB (~99% less) | ~77% less | ~85% faster | ~17% faster |
+| high-frequency terms (10k docs) | 10,000 | 0.1 vs 7.4 MB (~99% less) | ~94% less | ~90% faster | ~38% faster |
+| Dense numeric ids (100k, identity lookup) | 100,000 | 0.9 vs 91.3 MB (~99% less) | ~88% less | ~90% faster | ~27% faster |
+| Doc id Uint16 boundary (65535 docs) | 65,535 | 0.6 vs 58.6 MB (~99% less) | ~91% less | ~93% faster | ~44% faster |
 
-**Headline:** 22/27 query benchmarks favor frozen (paired **hrtime** protocol v2). Divina `inferno` (exact, paired p50): mutable 16.2 µs → frozen 13.7 µs (**-2 µs**, ratio 0.90).
+**Headline:** 26/27 query benchmarks favor frozen (paired **hrtime** protocol v2). Divina `inferno` (exact, paired p50): mutable 15.7 µs → frozen 13.4 µs (**-2 µs**, ratio 0.80).
 
-Decomposition (Divina exact): L0 lookup ~300 ns frozen, L1 `executeQuery` ~8.3 µs, L2 full `search` ~11.6 µs (finalize ≈ 3 µs).
+Decomposition (Divina exact): L0 lookup ~300 ns frozen, L1 `executeQuery` ~6.6 µs, L2 full `search` ~10.1 µs (finalize ≈ 3 µs).
 
-| | MiniSearch | `@yoch/frozenminisearch` |
+| | lucaong `minisearch` | `@yoch/frozenminisearch` |
 |---|------------------------|---------------------------|
-| **Optimizes for** | Live mutations, flexibility | **Retained RAM**, snapshot size, cold load |
-| **Sweet spot** | Documents change at runtime | Fixed corpus, many replicas, tight memory budget |
+| **Sweet spot** | Live index mutations | Fixed corpus, deploy from binary |
 | **Production path** | `addAll` → `toJSON` | `fromDocuments` / `fromMiniSearch` → `saveBinarySync` → `loadBinarySync` |
 | **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact binary |
 
 <details>
 <summary><strong>How to read these numbers (limits &amp; protocol)</strong></summary>
 
-- **Captured:** 2026-06-07 · commit `9f32207` · Node v24.16.0 · minisearch **7.2.0** · **3** run(s)/scenario · protocol **v2** (hrtime-paired, batch target 3 ms).
+- **Captured:** 2026-06-18 · commit `d05d8e9` · Node v24.16.0 · minisearch **7.2.0** · **3** run(s)/scenario · protocol **v2** (hrtime-paired, batch target 3 ms).
 - ¹ **Index RAM** — `measureHeap` with `--expose-gc`, one index alive. V8 overhead is extra; treat as **trend**, not accounting. Sporadic outliers happen (e.g. index-only Divina).
 - ² **Disk** — `JSON.stringify(mutable)` vs `saveBinarySync`.
 - ³ **Cold load** — median wall time to searchable index after read from disk format.

@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v1.2.0 — `@yoch/frozenminisearch`
+
+Minor release: configurable MSv5 snapshot compression and Node 20 support.
+
+### Added
+
+- **`SaveBinaryOptions`** — `saveBinarySync()` / `saveBinaryAsync()` accept `{ compression: 'auto' | 'raw' | 'zstd' | 'zlib' }`.
+- **`CODEC_ZLIB`** — portable deflate snapshots readable on Node 20+; explicit `compression: 'zlib'` always writes zlib on disk.
+- **Exported types** — `BinaryCompression`, `SaveBinaryOptions`.
+
+### Improved
+
+- **`compression: 'auto'`** — one compression pass: zstd when available (Node 22.15+), otherwise zlib on Node 20–22.14, otherwise raw when compression does not strictly shrink the payload (including payloads under 64 B).
+- **Node engine** — `>=20` (was `>=22.15`); zstd remains available on Node 22.15+ and is required to read zstd snapshots.
+
 ## v1.1.0 — `@yoch/frozenminisearch`
 
 Minor release: MiniSearch JSON wire export and clearer JSON import API. MSv5 binary format unchanged.

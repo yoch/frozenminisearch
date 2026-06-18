@@ -1,11 +1,13 @@
 import {
   allocateFreqs,
+  findDocIndexInSortedSegment,
   readDocId,
   SegmentPostingList,
+  shouldSeekAllowedDocs,
   type DocIdArray,
   type FreqArray,
 } from './compactPostings'
-import type { AggregateContext, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
+import type { AggregateContext, DocIdGate, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
 import {
   DISCARDED_DOC_ID,
   postingFreqValue,
@@ -414,8 +416,18 @@ function collectDocIdsFromFrozenSegment(
   length: number,
   context: AggregateContext,
   docIds: Set<number>,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): void {
+  if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
+    for (const docId of allowedDocs) {
+      if (context.isDocActive != null && !context.isDocActive(docId)) continue
+      if (findDocIndexInSortedSegment(allDocIds, offset, length, docId) >= 0) {
+        docIds.add(docId)
+      }
+    }
+    return
+  }
+
   for (let i = 0; i < length; i++) {
     const docId = readDocId(allDocIds, offset + i)
     if (context.isDocActive != null && !context.isDocActive(docId)) continue
@@ -431,7 +443,7 @@ export function collectDocIdsFromFrozenLayout(
   fieldBoosts: FieldBoostsForQuery,
   context: AggregateContext,
   docIds: Set<number>,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): void {
   const { fieldIds } = context
 

@@ -12,6 +12,7 @@ import {
   type AggregateContext,
   type AggregateDerivedTerm,
   type AggregateTermOptions,
+  type DocIdGate,
   type FieldBoostsForQuery,
   type FieldTermDataLike,
   type QuerySpec,
@@ -31,8 +32,11 @@ import { isWildcardQuery } from './symbols'
 import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
 import {
   gateIsSelectiveEnough,
+  DEFAULT_POSTING_GATE_MIN_LENGTH,
   DEFAULT_POSTING_GATE_POLICY,
+  DEFAULT_POSTING_GATE_RATIO_SHIFT,
   resolveGateMaxSize,
+  shouldPassGateAsAllowedDocs,
   type QueryEngineRunOptions,
 } from './queryEngineGateLimits'
 
@@ -55,7 +59,7 @@ export interface QueryIndexView {
     fieldBoosts: FieldBoostsForQuery,
     context: AggregateContext,
     docIds: Set<number>,
-    allowedDocs?: Set<number>,
+    allowedDocs?: DocIdGate,
   ): void
   getPrefixMatchesByIndex(term: string): Iterable<PackedTermRef>
   getFuzzyMatchesByIndex(term: string, maxDistance: number): Iterable<PackedFuzzyRef>
@@ -90,8 +94,18 @@ function useGatedEvaluation(
   return shouldUseGatedEvaluation(branchCount, operator, hasWildcard)
 }
 
-function docIdsFromResult(result: RawResult): Set<number> {
-  return new Set(result.keys())
+function gateFromResult(result: RawResult): DocIdGate {
+  return {
+    get size() {
+      return result.size
+    },
+    has(docId) {
+      return result.has(docId)
+    },
+    [Symbol.iterator]() {
+      return result.keys()
+    },
+  }
 }
 
 function isQueryCombination(query: Query): query is QueryCombination {
@@ -185,6 +199,8 @@ type QuerySpecTermRef
     | { kind: 'prefix', termIndex: number, length: number, distance: number }
     | { kind: 'fuzzy', termIndex: number, length: number, distance: number }
 
+const TWO_PHASE_AND_NOT_MIN_FRACTION = 0.5
+
 function forEachQuerySpecTermRef(
   query: QuerySpec,
   normalized: NormalizedStringQuery,
@@ -255,7 +271,7 @@ function executeQuerySpecInternal(
   query: QuerySpec,
   normalized: NormalizedStringQuery,
   params: QueryEngineParams,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): RawResult {
   const { fieldBoosts, options } = normalized
   const termOptions: AggregateTermOptions | undefined = allowedDocs == null ? undefined : { allowedDocs }
@@ -353,7 +369,7 @@ function collectDocIdsForQuerySpec(
   query: QuerySpec,
   normalized: NormalizedStringQuery,
   params: QueryEngineParams,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): Set<number> {
   const { fieldBoosts } = normalized
   const docIds = new Set<number>()
@@ -371,25 +387,113 @@ function collectDocIdsForQuerySpec(
   return docIds
 }
 
-function intersectDocIdsInPlace(docIds: Set<number>, branchDocIds: Set<number>): void {
+function intersectDocIdsInPlace(docIds: Set<number>, branchDocIds: DocIdGate): void {
   for (const docId of docIds) {
     if (!branchDocIds.has(docId)) docIds.delete(docId)
   }
 }
 
-function subtractDocIdsInPlace(docIds: Set<number>, excludedDocIds: Set<number>): void {
+function subtractDocIdsInPlace(docIds: Set<number>, excludedDocIds: DocIdGate): void {
   for (const docId of excludedDocIds) docIds.delete(docId)
 }
 
-function subtractDocIdsFromResult(result: RawResult, excludedDocIds: Set<number>): void {
+function subtractDocIdsFromResult(result: RawResult, excludedDocIds: DocIdGate): void {
   for (const docId of excludedDocIds) result.delete(docId)
+}
+
+function twoPhasePostingLengths<T>(
+  branches: readonly T[],
+  allowTwoPhase: boolean,
+  estimateBranchPostingLength: ((branch: T) => number) | undefined,
+): number[] | undefined {
+  if (!allowTwoPhase || estimateBranchPostingLength == null) return undefined
+  const lengths = new Array<number>(branches.length)
+  for (let i = 0; i < branches.length; i++) {
+    lengths[i] = estimateBranchPostingLength(branches[i])
+  }
+  return lengths
+}
+
+function shouldUseTwoPhaseAnd(
+  branchPostingLengths: readonly number[],
+  allowedDocs: DocIdGate | undefined,
+): boolean {
+  if (branchPostingLengths.length <= 1) return false
+
+  const firstLength = branchPostingLengths[0]
+  const effectiveFirstLength = allowedDocs == null
+    ? firstLength
+    : Math.min(firstLength, allowedDocs.size)
+  if (effectiveFirstLength < DEFAULT_POSTING_GATE_MIN_LENGTH) return false
+
+  const targetLength = effectiveFirstLength >>> DEFAULT_POSTING_GATE_RATIO_SHIFT
+  for (let i = 1; i < branchPostingLengths.length; i++) {
+    const len = branchPostingLengths[i]
+    if (len > 0 && len <= targetLength) return true
+  }
+  return false
+}
+
+function shouldUseTwoPhaseAndNot(
+  branchPostingLengths: readonly number[],
+  allowedDocs: DocIdGate | undefined,
+  documentCount: number,
+): boolean {
+  if (branchPostingLengths.length <= 1) return false
+
+  const firstLength = branchPostingLengths[0]
+  const effectiveFirstLength = allowedDocs == null
+    ? firstLength
+    : Math.min(firstLength, allowedDocs.size)
+  const largeThreshold = Math.max(
+    DEFAULT_POSTING_GATE_MIN_LENGTH,
+    Math.floor(documentCount * TWO_PHASE_AND_NOT_MIN_FRACTION),
+  )
+  if (effectiveFirstLength < largeThreshold) return false
+
+  for (let i = 1; i < branchPostingLengths.length; i++) {
+    if (branchPostingLengths[i] >= largeThreshold) return true
+  }
+  return false
+}
+
+function executeAndWithFinalGate<T>(
+  branches: readonly T[],
+  finalGate: Set<number>,
+  executeBranch: (branch: T, allowedDocs?: DocIdGate) => RawResult,
+): RawResult {
+  if (finalGate.size === 0) return new Map()
+
+  let result = executeBranch(branches[0], finalGate)
+  for (let i = 1; i < branches.length; i++) {
+    if (result.size === 0) return result
+    result = combineResults([result, executeBranch(branches[i], finalGate)], AND)
+  }
+  return result
+}
+
+function collectAndDocIdsByEstimatedLength<T>(
+  branches: readonly T[],
+  branchPostingLengths: readonly number[],
+  collectBranch: (branch: T, allowedDocs?: DocIdGate) => Set<number>,
+  allowedDocs?: DocIdGate,
+): Set<number> {
+  const order = branches.map((_, i) => i)
+  order.sort((a, b) => branchPostingLengths[a] - branchPostingLengths[b] || a - b)
+
+  const docIds = collectBranch(branches[order[0]], allowedDocs)
+  for (let i = 1; i < order.length; i++) {
+    if (docIds.size === 0) return docIds
+    intersectDocIdsInPlace(docIds, collectBranch(branches[order[i]], docIds))
+  }
+  return docIds
 }
 
 function collectCombinedDocIds<T>(
   branches: readonly T[],
   operator: CombinationOperator,
-  collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
-  allowedDocs?: Set<number>,
+  collectBranch: (branch: T, allowedDocs?: DocIdGate) => Set<number>,
+  allowedDocs?: DocIdGate,
 ): Set<number> {
   if (branches.length === 0) return new Set()
 
@@ -423,19 +527,21 @@ function collectCombinedDocIds<T>(
 }
 
 /**
- * AND: score every branch (with optional docId gate on later branches), then intersect scores.
+ * AND: normally score left-to-right with optional docId gates; for broad-first selective
+ * exact queries, collect the final gate first, then score branches in original order.
  * AND_NOT: score the positive branch only; negated branches are collected as docId sets and
- * subtracted without scoring (avoids term materialization on excluded branches).
+ * subtracted without scoring. Large exact exclusions may collect survivors before positive scoring.
  */
 function executeCombinedBranches<T>(
   branches: readonly T[],
   operator: CombinationOperator,
   params: QueryEngineParams,
-  executeBranch: (branch: T, allowedDocs?: Set<number>) => RawResult,
-  collectBranch: (branch: T, allowedDocs?: Set<number>) => Set<number>,
-  allowedDocs?: Set<number>,
+  executeBranch: (branch: T, allowedDocs?: DocIdGate) => RawResult,
+  collectBranch: (branch: T, allowedDocs?: DocIdGate) => Set<number>,
+  allowedDocs?: DocIdGate,
   run?: QueryEngineRunOptions,
   estimateBranchPostingLength?: (branch: T) => number,
+  allowTwoPhase = false,
 ): RawResult {
   if (branches.length === 0) return new Map()
 
@@ -447,10 +553,20 @@ function executeCombinedBranches<T>(
     )
   }
 
-  let result = executeBranch(branches[0], allowedDocs)
-  let gate = docIdsFromResult(result)
-
   if (op === 'and') {
+    const branchPostingLengths = twoPhasePostingLengths(branches, allowTwoPhase, estimateBranchPostingLength)
+    if (branchPostingLengths != null && shouldUseTwoPhaseAnd(branchPostingLengths, allowedDocs)) {
+      const finalGate = collectAndDocIdsByEstimatedLength(
+        branches,
+        branchPostingLengths,
+        collectBranch,
+        allowedDocs,
+      )
+      return executeAndWithFinalGate(branches, finalGate, executeBranch)
+    }
+
+    let result = executeBranch(branches[0], allowedDocs)
+    let gate = gateFromResult(result)
     const limits = run?.gateLimits
     const documentCount = params.aggregateContext.documentCount
     const postingGatePolicy = run?.postingGatePolicy ?? DEFAULT_POSTING_GATE_POLICY
@@ -458,10 +574,10 @@ function executeCombinedBranches<T>(
     for (let i = 1; i < branches.length; i++) {
       if (gate.size === 0) return result
 
-      const ratioPath = gate.size > maxGateSize
-      const postingListLength = ratioPath
-        ? estimateBranchPostingLength?.(branches[i])
-        : undefined
+      const absoluteSelective = gate.size <= maxGateSize
+      const postingListLength = absoluteSelective
+        ? undefined
+        : estimateBranchPostingLength?.(branches[i])
 
       const selective = gateIsSelectiveEnough(
         gate.size,
@@ -470,17 +586,36 @@ function executeCombinedBranches<T>(
         postingListLength,
         postingGatePolicy,
       )
-      const branchAllowed = selective ? gate : allowedDocs
+      const branchAllowed = absoluteSelective || shouldPassGateAsAllowedDocs(selective, gate.size, postingListLength)
+        ? gate
+        : allowedDocs
       result = combineResults([result, executeBranch(branches[i], branchAllowed)], AND)
-      gate = docIdsFromResult(result)
+      gate = gateFromResult(result)
     }
     return result
   }
 
   if (op === 'and_not') {
+    const branchPostingLengths = twoPhasePostingLengths(branches, allowTwoPhase, estimateBranchPostingLength)
+    if (branchPostingLengths != null && shouldUseTwoPhaseAndNot(
+      branchPostingLengths,
+      allowedDocs,
+      params.aggregateContext.documentCount,
+    )) {
+      const finalGate = collectCombinedDocIds(
+        branches,
+        operator,
+        collectBranch,
+        allowedDocs,
+      )
+      return finalGate.size === 0 ? new Map() : executeBranch(branches[0], finalGate)
+    }
+
+    const result = executeBranch(branches[0], allowedDocs)
+    let gate = gateFromResult(result)
     for (let i = 1; i < branches.length; i++) {
       subtractDocIdsFromResult(result, collectBranch(branches[i], gate))
-      gate = docIdsFromResult(result)
+      gate = gateFromResult(result)
     }
     return result
   }
@@ -527,7 +662,7 @@ function collectDocIdsForQueryInternal(
   query: Query,
   searchOptions: SearchOptions,
   params: QueryEngineParams,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): Set<number> {
   if (isWildcardQuery(query)) {
     const docIds = new Set<number>()
@@ -595,7 +730,7 @@ function executeQueryInternal(
   query: Query,
   searchOptions: SearchOptions,
   params: QueryEngineParams,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
   run?: QueryEngineRunOptions,
 ): RawResult {
   if (isWildcardQuery(query)) {
@@ -648,6 +783,7 @@ function executeQueryInternal(
       allowedDocs,
       run,
       spec => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
+      specs.every(spec => !spec.prefix && !spec.fuzzy),
     )
   }
 

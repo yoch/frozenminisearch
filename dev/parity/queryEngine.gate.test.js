@@ -67,6 +67,10 @@ function buildUniformCorpus(docCount, textFn = i => `common token${i}`) {
   return docs
 }
 
+function buildCommonUniqueCorpus(docCount) {
+  return buildUniformCorpus(docCount, i => `common alpha unique${i}`)
+}
+
 describe('Gate docId scoring (AND / AND_NOT)', () => {
   let mutable
   let frozen
@@ -248,6 +252,42 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       const opts = { combineWith: 'AND', prefix: true }
       expectSameAsNaive(frozen, 'zen uniq', opts)
     })
+
+    test('broad-first AND exact matches naive oracle', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND' })
+    })
+
+    test('broad-first AND prefix matches naive oracle', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND', prefix: true })
+    })
+
+    test('broad-first nested AND matches naive oracle', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const query = {
+        combineWith: 'AND',
+        queries: [
+          'common',
+          { combineWith: 'AND', queries: ['alpha', 'unique1'] },
+        ],
+      }
+      expectSameAsNaive(frozen, query, {})
+    })
+
+    test('broad AND_NOT exclusion removing all matches naive oracle', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      expectSameAsNaive(frozen, 'common alpha', { combineWith: 'AND_NOT' })
+      expect(frozen.search('common alpha', { combineWith: 'AND_NOT' })).toEqual([])
+    })
   })
 
   describe('boostDocument (results only, not call-count contract)', () => {
@@ -255,6 +295,15 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       const boostDocument = (id, term) => (id === 2 || term === 'archery' ? 2 : 1)
       const opts = { combineWith: 'AND', boostDocument }
       expectSameAsNaive(frozen, 'zen art', opts)
+    })
+
+    test('broad-first AND with zero boostDocument matches naive oracle', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const boostDocument = (id) => (id === 1 ? 0 : 1)
+      expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND', boostDocument })
+      expect(frozen.search('common unique1', { combineWith: 'AND', boostDocument })).toEqual([])
     })
   })
 
@@ -318,6 +367,37 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
 
       // Positive branch may resolve zen-derived prefix terms; negated exclude* branch must not.
       expect(resolveCount).toBeLessThan(50)
+    })
+
+    test('broad-first AND avoids scoring the full first branch', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      let boostCalls = 0
+      const boostDocument = () => {
+        boostCalls++
+        return 1
+      }
+
+      frozen.search('common unique1', { combineWith: 'AND', boostDocument })
+
+      expect(boostCalls).toBeLessThan(100)
+    })
+
+    test('broad AND_NOT exclusion can return empty without scoring positive branch', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      let boostCalls = 0
+      const boostDocument = () => {
+        boostCalls++
+        return 1
+      }
+
+      const results = frozen.search('common alpha', { combineWith: 'AND_NOT', boostDocument })
+
+      expect(results).toEqual([])
+      expect(boostCalls).toBe(0)
     })
   })
 })

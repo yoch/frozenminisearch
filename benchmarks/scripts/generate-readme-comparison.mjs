@@ -75,7 +75,13 @@ function heroRow (scenario) {
   const disk = fmtSaving(scenario.diskMb?.binaryVsJsonSavingPct)
   const load = fmtFaster(scenario.loadMs?.binaryVsJsonSavingPct)
   const search = fmtFaster(searchGainPct(scenario))
-  const label = scenario.name.replace(/^Divina Commedia — /, 'Divina ').replace(/^Extreme — /, '')
+  const label = {
+    'divina-storeFields': 'Divina, with stored text',
+    'divina-indexOnly': 'Divina, index only',
+    'extreme-highFrequency': 'High-frequency terms',
+    'denseNumericIds-100k': 'Dense numeric ids',
+    'docIdUint16Boundary-65535': 'Uint16 doc id boundary',
+  }[scenario.id] ?? scenario.name.replace(/^Divina Commedia — /, 'Divina ').replace(/^Extreme — /, '')
   return `| ${label} | ${docs} | ${heap} | ${disk} | ${load} | ${search} |`
 }
 
@@ -86,17 +92,6 @@ function divinaExactLine () {
   const delta = formatFrozenVsMutableDelta(ex.mutableP50, ex.frozenP50)
   const ratio = ex.pairedRatioP50?.toFixed(2) ?? '—'
   return `Divina \`inferno\` (exact, paired p50): mutable ${fmtMs(ex.mutableP50)} → frozen ${fmtMs(ex.frozenP50)} (**${delta}**, ratio ${ratio}).`
-}
-
-function levelInsight () {
-  const lv = scenarioById('divina-storeFields')?.searchLevels?.exact
-  if (!lv) return null
-  const finalizeUs = Math.round((lv.L2.frozenP50 - lv.L1.frozenP50) * 1000)
-  return (
-    `Decomposition (Divina exact): L0 lookup ~${fmtMs(lv.L0.frozenP50)} frozen, `
-    + `L1 \`executeQuery\` ~${fmtMs(lv.L1.frozenP50)}, L2 full \`search\` ~${fmtMs(lv.L2.frozenP50)} `
-    + `(finalize ≈ ${finalizeUs} µs).`
-  )
 }
 
 function aggregateSearchWins () {
@@ -113,11 +108,7 @@ function aggregateSearchWins () {
 }
 
 function buildBlock () {
-  const proto = payload.searchBenchProtocol ?? {}
   const captured = payload.capturedAt?.slice(0, 10) ?? '—'
-  const commit = (payload.baselineCommit ?? payload.git?.commit ?? '').slice(0, 7)
-    || payload.git?.commitShort
-    || '—'
   const node = payload.node ?? '—'
   const minisearch = payload.minisearchVersion ?? '—'
   const runs = payload.runs ?? '—'
@@ -125,40 +116,20 @@ function buildBlock () {
 
   const heroes = HERO_IDS.map(scenarioById).filter(Boolean)
   const tableRows = heroes.map(heroRow).join('\n')
-
   const exactLine = divinaExactLine()
-  const levels = levelInsight()
 
   return `${START} — npm run bench:readme -->
-### Measured vs lucaong MiniSearch (reference baseline)
+### Measured vs MiniSearch
 
-Same BM25 queries on identical corpora. **Frozen wins on what we optimize for**: RAM, disk, cold load, and search throughput on real workloads.
+Same corpora, same BM25-style queries, MiniSearch ${minisearch} as the reference.
 
-| Scenario | Docs | Index RAM¹ | Disk (binary vs JSON)² | Cold load³ | Search p50⁴ |
-|----------|-----:|------------|------------------------:|-----------:|------------:|
+| Scenario | Docs | Index RAM | Binary size | Load time | Search p50 |
+|----------|-----:|-----------|------------:|----------:|-----------:|
 ${tableRows}
 
-**Headline:** ${wins}/${total} query benchmarks favor frozen (paired **hrtime** protocol v${proto.protocolVersion ?? 2}). ${exactLine ?? ''}
+Across this full run, frozen is faster on **${wins}/${total}** search cases. ${exactLine ?? ''}
 
-${levels ? `${levels}\n` : ''}
-| | lucaong \`minisearch\` | \`@yoch/frozenminisearch\` |
-|---|------------------------|---------------------------|
-| **Sweet spot** | Live index mutations | Fixed corpus, deploy from binary |
-| **Production path** | \`addAll\` → \`toJSON\` | \`fromDocuments\` / \`fromMiniSearch\` → \`saveBinarySync\` → \`loadBinarySync\` |
-| **Typical trade-off** | Higher RAM, JSON snapshots | One-time freeze, then compact binary |
-
-<details>
-<summary><strong>How to read these numbers (limits &amp; protocol)</strong></summary>
-
-- **Captured:** ${captured} · commit \`${commit}\` · Node ${node} · minisearch **${minisearch}** · **${runs}** run(s)/scenario · protocol **v${proto.protocolVersion ?? 2}** (${proto.timing ?? 'hrtime-paired'}, batch target ${proto.batchTargetMs ?? 3} ms).
-- ¹ **Index RAM** — \`measureHeap\` with \`--expose-gc\`, one index alive. V8 overhead is extra; treat as **trend**, not accounting. Sporadic outliers happen (e.g. index-only Divina).
-- ² **Disk** — \`JSON.stringify(mutable)\` vs \`saveBinarySync\`.
-- ³ **Cold load** — median wall time to searchable index after read from disk format.
-- ⁴ **Search p50** — paired mutable/frozen samples per iteration; sub-0.1 ms baselines reported in **µs** in full reports. Fast queries use **${proto.fastIterations ?? 50}** iterations, others **${proto.defaultIterations ?? 20}**.
-- **Not shown:** mutable \`add\`/\`remove\` (frozen is read-only by design). Freeze time is offline — see full suite for build metrics.
-- **Reproduce:** \`npm run bench -- run --profile=vs-reference\` · **Update this block:** \`npm run bench:readme\` after refreshing \`benchmarks/baselines/reference.json\`.
-
-</details>
+Numbers are from \`${baselinePath.replace(`${root}/`, '')}\`, captured ${captured} on Node ${node}, ${runs} runs per scenario. Heap is measured with one index alive and should be read as a trend, not exact accounting.
 ${END}`
 }
 

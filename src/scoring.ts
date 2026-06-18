@@ -30,6 +30,12 @@ export interface RawResultValue {
 
 export type RawResult = Map<number, RawResultValue>
 
+/** Minimal docId membership view used by gated query execution. */
+export interface DocIdGate extends Iterable<number> {
+  readonly size: number
+  has(docId: number): boolean
+}
+
 /** Posting list for one (term, field): docId -> term frequency */
 export interface PostingListLike {
   readonly size: number
@@ -168,8 +174,8 @@ export type AggregateDerivedTerm
     | { kind: 'lazy', resolve: () => string }
 
 export type AggregateTermOptions = {
-  /** When set, only score postings whose docId is in this set. Does not affect matchingFields. */
-  allowedDocs?: Set<number>
+  /** When set, only score postings whose docId is in this gate. Does not affect matchingFields. */
+  allowedDocs?: DocIdGate
 }
 
 function getDerivedTerm(
@@ -245,7 +251,7 @@ function aggregateSegmentPostingList(
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25params: BM25Params,
   results: RawResult,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): number {
   let matchingFields = list.length
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
@@ -363,9 +369,19 @@ function collectDocIdsFromSegmentPostingList(
   list: SegmentPostingList,
   context: AggregateContext,
   docIds: Set<number>,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): void {
   const { docIds: ids, offset, length } = list
+  if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
+    for (const docId of allowedDocs) {
+      if (context.isDocActive != null && !context.isDocActive(docId)) continue
+      if (findDocIndexInSortedSegment(ids, offset, length, docId) >= 0) {
+        docIds.add(docId)
+      }
+    }
+    return
+  }
+
   for (let i = 0; i < length; i++) {
     const docId = readDocId(ids, offset + i)
     if (context.isDocActive != null && !context.isDocActive(docId)) continue
@@ -380,7 +396,7 @@ export function collectDocIdsFromFieldTermData(
   fieldBoosts: FieldBoostsForQuery,
   context: AggregateContext,
   docIds: Set<number>,
-  allowedDocs?: Set<number>,
+  allowedDocs?: DocIdGate,
 ): void {
   if (fieldTermData == null) return
 

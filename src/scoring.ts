@@ -64,6 +64,20 @@ function bm25FieldConstants(bm25params: BM25Params, avgFieldLength: number): Bm2
   return { k, d, k1: k + 1, oneMinusB: 1 - b, bOverAvg: b / avgFieldLength }
 }
 
+function bm25Idf(matchingCount: number, totalCount: number): number {
+  return Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
+}
+
+function calcBm25TfWithConstants(
+  termFreq: number,
+  fieldLength: number,
+  constants: Bm25FieldConstants,
+  idf: number,
+): number {
+  const { k, d, k1, oneMinusB, bOverAvg } = constants
+  return idf * (d + termFreq * k1 / (termFreq + k * (oneMinusB + bOverAvg * fieldLength)))
+}
+
 function calcBM25ScoreWithConstants(
   termFreq: number,
   matchingCount: number,
@@ -71,9 +85,9 @@ function calcBM25ScoreWithConstants(
   fieldLength: number,
   constants: Bm25FieldConstants,
 ): number {
-  const { k, d, k1, oneMinusB, bOverAvg } = constants
-  const invDocFreq = Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
-  return invDocFreq * (d + termFreq * k1 / (termFreq + k * (oneMinusB + bOverAvg * fieldLength)))
+  return calcBm25TfWithConstants(
+    termFreq, fieldLength, constants, bm25Idf(matchingCount, totalCount),
+  )
 }
 
 export const calcBM25Score = (
@@ -178,6 +192,7 @@ function scorePostingDoc(
   bm25: Bm25FieldConstants,
   results: RawResult,
   derivedTermCache: { value?: string },
+  hoistedIdf?: number,
 ): void {
   const resolvedDerivedTerm = getDerivedTerm(derivedTerm, derivedTermCache)
   const docBoost = boostDocumentFn
@@ -186,9 +201,11 @@ function scorePostingDoc(
   if (!docBoost) return
 
   const fieldLength = context.getFieldLength(docId, fieldId)
-  const rawScore = calcBM25ScoreWithConstants(
-    termFreq, matchingFields, context.documentCount, fieldLength, bm25,
-  )
+  const rawScore = hoistedIdf !== undefined
+    ? calcBm25TfWithConstants(termFreq, fieldLength, bm25, hoistedIdf)
+    : calcBM25ScoreWithConstants(
+      termFreq, matchingFields, context.documentCount, fieldLength, bm25,
+    )
   const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
 
   const result = results.get(docId)
@@ -227,6 +244,9 @@ function aggregateSegmentPostingList(
 ): number {
   let matchingFields = list.length
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
+  const hoistedIdf = context.isDocActive == null
+    ? bm25Idf(matchingFields, context.documentCount)
+    : undefined
   const { docIds, freqs, offset, length } = list
   const derivedTermCache: { value?: string } = {}
 
@@ -246,6 +266,7 @@ function aggregateSegmentPostingList(
       sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
       termWeight, termBoost, fieldBoost, matchingFields,
       context, boostDocumentFn, bm25, results, derivedTermCache,
+      hoistedIdf,
     )
   }
   return matchingFields
@@ -286,6 +307,9 @@ export function aggregateTerm(
 
     let matchingFields = postingList.size
     const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
+    const hoistedIdf = context.isDocActive == null
+      ? bm25Idf(matchingFields, context.documentCount)
+      : undefined
     const derivedTermCache: { value?: string } = {}
 
     postingList.forEachDoc((docId, termFreq) => {
@@ -301,6 +325,7 @@ export function aggregateTerm(
         sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
         termWeight, termBoost, fieldBoost, matchingFields,
         context, boostDocumentFn, bm25, results, derivedTermCache,
+        hoistedIdf,
       )
     })
   }

@@ -27,6 +27,9 @@ import { applySearchBenchBatchesToScenarios, getSearchBenchBatchEntry } from './
 import { benchSearchLevels, primaryLookupTerm } from './searchLevels.js'
 import { ALL_SURFACES, computeSurfaceNeeds } from './framework/surfaces.mjs'
 
+const EXPENSIVE_SEARCH_PROBE_MS = 20
+const VERY_EXPENSIVE_SEARCH_PROBE_MS = 50
+
 function avgFrozenP50GainPct (search) {
   return search.length > 0
     ? Number((search.reduce((s, r) => s + (1 - r.frozenP50 / r.mutableP50), 0) / search.length * 100).toFixed(1))
@@ -322,6 +325,64 @@ function aggregateScenarioRuns (runs) {
       loadBinaryVsJsonSavingPct: loadSavingPct,
       searchFrozenP50AvgGainPct: avgFrozenP50GainPct(search),
     }
+  }
+}
+
+function runCapsDisabled () {
+  const env = process.env.BENCH_NO_RUN_CAPS
+  return env === '1' || env === 'true' || env === 'yes' || process.argv.includes('--no-run-caps')
+}
+
+function maxCalibratedSearchProbeMs (scenario) {
+  let max = 0
+  for (const { label } of scenario.queries ?? []) {
+    const entry = getSearchBenchBatchEntry(scenario.id, label)
+    const probe = entry.calibratedProbeP50Ms
+    if (!probe) continue
+    max = Math.max(max, probe.mutable ?? 0, probe.frozen ?? 0)
+  }
+  return max
+}
+
+function resolveScenarioRuns (scenario, requestedRuns, surfaces) {
+  if (requestedRuns <= 1 || runCapsDisabled()) {
+    return { runs: requestedRuns, reason: null }
+  }
+
+  const need = computeSurfaceNeeds(surfaces)
+  if (!need.search) return { runs: requestedRuns, reason: null }
+
+  const maxProbeMs = maxCalibratedSearchProbeMs(scenario)
+  if (maxProbeMs >= VERY_EXPENSIVE_SEARCH_PROBE_MS) {
+    return {
+      runs: 1,
+      reason: `very expensive calibrated search (${maxProbeMs.toFixed(1)} ms >= ${VERY_EXPENSIVE_SEARCH_PROBE_MS} ms)`,
+    }
+  }
+  if (need.searchLevels && maxProbeMs >= EXPENSIVE_SEARCH_PROBE_MS) {
+    return {
+      runs: 1,
+      reason: `expensive search-levels scenario (${maxProbeMs.toFixed(1)} ms >= ${EXPENSIVE_SEARCH_PROBE_MS} ms)`,
+    }
+  }
+  if (need.searchOnly && maxProbeMs >= EXPENSIVE_SEARCH_PROBE_MS) {
+    return {
+      runs: Math.min(requestedRuns, 2),
+      reason: `expensive search-only scenario (${maxProbeMs.toFixed(1)} ms >= ${EXPENSIVE_SEARCH_PROBE_MS} ms)`,
+    }
+  }
+  return { runs: requestedRuns, reason: null }
+}
+
+function withRunPolicy (result, requestedRuns, effectiveRuns, reason) {
+  if (requestedRuns === effectiveRuns && reason == null) return result
+  return {
+    ...result,
+    benchmarkRuns: {
+      requested: requestedRuns,
+      effective: effectiveRuns,
+      ...(reason == null ? {} : { reason }),
+    },
   }
 }
 
@@ -767,25 +828,30 @@ export function runBenchmarkSuite (
   } else if (surfaces.length < ALL_SURFACES.length) {
     console.log(`Benchmark surfaces: ${surfaces.join(', ')}\n`)
   }
-  if (runs <= 1) {
-    return scenarios.map((scenario, index) => {
+  return scenarios.map((scenario, index) => {
+    const runPolicy = resolveScenarioRuns(scenario, runs, surfaces)
+    const scenarioRuns = runPolicy.runs
+    const runLabel = runPolicy.reason == null
+      ? profileLabel
+      : `${profileLabel}; ${scenarioRuns}/${runs} runs: ${runPolicy.reason}`
+
+    if (scenarioRuns <= 1) {
       const t0 = performance.now()
-      console.log(`[bench ${index + 1}/${total}] ${scenario.id} (${profileLabel}) …`)
+      console.log(`[bench ${index + 1}/${total}] ${scenario.id} (${runLabel}) …`)
       const result = runScenario(scenario, benchOptions)
       console.log(`[bench ${index + 1}/${total}] ${scenario.id} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`)
-      return result
-    })
-  }
-  return scenarios.map((scenario, index) => {
+      return withRunPolicy(result, runs, scenarioRuns, runPolicy.reason)
+    }
+
     const results = []
-    for (let i = 0; i < runs; i++) {
+    for (let i = 0; i < scenarioRuns; i++) {
       const t0 = performance.now()
-      console.log(`[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${runs} (${profileLabel}) …`)
+      console.log(`[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${scenarioRuns} (${runLabel}) …`)
       results.push(runScenario(scenario, benchOptions))
       console.log(
-        `[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${runs} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
+        `[bench ${index + 1}/${total}] ${scenario.id} run ${i + 1}/${scenarioRuns} done in ${((performance.now() - t0) / 1000).toFixed(1)}s`,
       )
     }
-    return aggregateScenarioRuns(results)
+    return withRunPolicy(aggregateScenarioRuns(results), runs, scenarioRuns, runPolicy.reason)
   })
 }

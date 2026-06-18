@@ -53,6 +53,7 @@ Corpus fixture: `benchmarks/divinaCommedia.js` (MiniSearch). Suite modules live 
 - Calibration: `npm run benchmark:calibrate-batches` → `searchBenchBatches.json` (target **3 ms** per sample, batch up to **256**)
 - Runtime: **paired** samples (mutable block then frozen block per iteration), `process.hrtime.bigint()`
 - Iterations: **20** default, **50** when probe p50 &lt; 0.1 ms
+- Scenario runs: default captures request 3 runs, but very expensive calibrated search scenarios are capped automatically (logged and stored as `benchmarkRuns`); use `BENCH_NO_RUN_CAPS=1` or `--no-run-caps` for decisive full repeats.
 - Sub-0.1 ms baselines: report **µs** deltas in `compare.js` (not misleading %)
 - Recalibrate after corpus/query changes; diff warns on Node / minisearch version mismatch (non-blocking)
 

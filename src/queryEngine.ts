@@ -9,7 +9,6 @@ import {
   AND,
   combineResults,
   fieldBoostsForQuery,
-  termToQuerySpec,
   type AggregateContext,
   type AggregateDerivedTerm,
   type AggregateTermOptions,
@@ -63,6 +62,9 @@ type NormalizedStringQuery = {
   options: SearchOptionsWithDefaults & Pick<QueryEngineParams, 'tokenize' | 'processTerm'>
   operator: CombinationOperator
   specs: QuerySpec[]
+  fieldBoosts: FieldBoostsForQuery
+  fuzzyWeight: number
+  prefixWeight: number
 }
 
 export interface QueryEngineParams {
@@ -133,13 +135,46 @@ function normalizeStringQuery(
     ...params.globalSearchOptions,
     ...searchOptions,
   }
-  const terms = options.tokenize(query)
-    .flatMap((term: string) => options.processTerm(term))
-    .filter(term => !!term) as string[]
+  const tokens = options.tokenize(query)
+  const terms: string[] = []
+  for (const token of tokens) {
+    const processed = options.processTerm(token)
+    if (Array.isArray(processed)) {
+      for (const term of processed) {
+        if (term) terms.push(term)
+      }
+    } else if (processed) {
+      terms.push(processed)
+    }
+  }
+
+  const specs: QuerySpec[] = new Array(terms.length)
+  for (let i = 0; i < terms.length; i++) {
+    const term = terms[i]
+    const fuzzy = (typeof options.fuzzy === 'function')
+      ? options.fuzzy(term, i, terms)
+      : (options.fuzzy || false)
+    const prefix = (typeof options.prefix === 'function')
+      ? options.prefix(term, i, terms)
+      : (options.prefix === true)
+    const termBoost = (typeof options.boostTerm === 'function')
+      ? options.boostTerm(term, i, terms)
+      : 1
+    specs[i] = { term, fuzzy, prefix, termBoost }
+  }
+
+  const { fuzzy: fuzzyWeight, prefix: prefixWeight } = {
+    ...defaultSearchOptions.weights,
+    ...options.weights,
+  }
+
   return {
     options,
-    specs: terms.map(termToQuerySpec(options)),
+    specs,
     operator: options.combineWith as CombinationOperator,
+    fieldBoosts: fieldBoostsForQuery(options, params.fields),
+    fuzzyWeight,
+    prefixWeight,
   }
 }
 
@@ -152,7 +187,7 @@ function lazyIndexedTerm(
 
 function visitQuerySpecForScoring(
   query: QuerySpec,
-  options: SearchOptionsWithDefaults,
+  normalized: NormalizedStringQuery,
   params: QueryEngineParams,
   visit: (
     data: FieldTermDataLike | undefined,
@@ -161,9 +196,8 @@ function visitQuerySpecForScoring(
   ) => void,
 ): void {
   const { indexView } = params
-  const { weights, maxFuzzy } = options
-  const { fuzzy: fuzzyWeight, prefix: prefixWeight } = { ...defaultSearchOptions.weights, ...weights }
-  const maxDistance = maxFuzzyDistance(query, maxFuzzy)
+  const { fuzzyWeight, options, prefixWeight } = normalized
+  const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
 
   const exactTi = indexView.resolveTermIndex(query.term)
   visit(
@@ -172,12 +206,12 @@ function visitQuerySpecForScoring(
     1,
   )
 
-  const seenPrefix = new Set<number>()
+  const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
   if (query.prefix) {
     for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
       const distance = length - query.term.length
       if (!distance) continue
-      seenPrefix.add(termIndex)
+      seenPrefix?.add(termIndex)
       visit(
         indexView.fieldTermData(termIndex),
         lazyIndexedTerm(indexView, termIndex),
@@ -187,7 +221,7 @@ function visitQuerySpecForScoring(
   }
   if (!maxDistance) return
   for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-    if (!distance || seenPrefix.has(termIndex)) continue
+    if (!distance || seenPrefix?.has(termIndex)) continue
     visit(
       indexView.fieldTermData(termIndex),
       lazyIndexedTerm(indexView, termIndex),
@@ -198,16 +232,15 @@ function visitQuerySpecForScoring(
 
 function executeQuerySpecInternal(
   query: QuerySpec,
-  searchOptions: SearchOptions,
+  normalized: NormalizedStringQuery,
   params: QueryEngineParams,
   allowedDocs?: Set<number>,
 ): RawResult {
-  const options: SearchOptionsWithDefaults = { ...params.globalSearchOptions, ...searchOptions }
-  const fieldBoosts = fieldBoostsForQuery(options, params.fields)
+  const { fieldBoosts, options } = normalized
   const termOptions: AggregateTermOptions | undefined = allowedDocs == null ? undefined : { allowedDocs }
   const results = new Map() as RawResult
 
-  visitQuerySpecForScoring(query, options, params, (data, derivedTerm, termWeight) => {
+  visitQuerySpecForScoring(query, normalized, params, (data, derivedTerm, termWeight) => {
     aggregateTerm(
       query.term,
       derivedTerm,
@@ -228,12 +261,11 @@ function executeQuerySpecInternal(
 
 function collectDocIdsForQuerySpec(
   query: QuerySpec,
-  searchOptions: SearchOptions,
+  normalized: NormalizedStringQuery,
   params: QueryEngineParams,
   allowedDocs?: Set<number>,
 ): Set<number> {
-  const options: SearchOptionsWithDefaults = { ...params.globalSearchOptions, ...searchOptions }
-  const fieldBoosts = fieldBoostsForQuery(options, params.fields)
+  const { fieldBoosts, options } = normalized
   const docIds = new Set<number>()
   const { indexView, aggregateContext } = params
   const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
@@ -243,18 +275,18 @@ function collectDocIdsForQuerySpec(
     indexView.collectDocIds(exactTi, fieldBoosts, aggregateContext, docIds, allowedDocs)
   }
 
-  const seenPrefix = new Set<number>()
+  const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
   if (query.prefix) {
     for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
       const distance = length - query.term.length
       if (!distance) continue
-      seenPrefix.add(termIndex)
+      seenPrefix?.add(termIndex)
       indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
     }
   }
   if (maxDistance) {
     for (const { termIndex, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-      if (!distance || seenPrefix.has(termIndex)) continue
+      if (!distance || seenPrefix?.has(termIndex)) continue
       indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
     }
   }
@@ -431,19 +463,20 @@ function collectDocIdsForQueryInternal(
     throw new Error('FrozenMiniSearch: invalid query')
   }
 
-  const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
+  const normalized = normalizeStringQuery(query, searchOptions, params)
+  const { specs, operator } = normalized
   const combineWith = (operator ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
   if (specs.length <= 1) {
     return specs.length === 1
-      ? collectDocIdsForQuerySpec(specs[0], options, params, allowedDocs)
+      ? collectDocIdsForQuerySpec(specs[0], normalized, params, allowedDocs)
       : new Set<number>()
   }
 
   return collectCombinedDocIds(
     specs,
     combineWith,
-    (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, options, params, branchAllowed),
+    (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
     allowedDocs,
   )
 }
@@ -506,7 +539,8 @@ function executeQueryInternal(
     throw new Error('FrozenMiniSearch: invalid query')
   }
 
-  const { options, specs, operator } = normalizeStringQuery(query, searchOptions, params)
+  const normalized = normalizeStringQuery(query, searchOptions, params)
+  const { specs, operator } = normalized
   const combineWith = (operator ?? params.globalSearchOptions.combineWith) as CombinationOperator
 
   if (useGatedEvaluation(run, specs.length, combineWith, false)) {
@@ -514,14 +548,14 @@ function executeQueryInternal(
       specs,
       combineWith,
       params,
-      (spec, branchAllowed) => executeQuerySpecInternal(spec, options, params, branchAllowed),
-      (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, options, params, branchAllowed),
+      (spec, branchAllowed) => executeQuerySpecInternal(spec, normalized, params, branchAllowed),
+      (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
       allowedDocs,
       run,
     )
   }
 
-  const results = specs.map(spec => executeQuerySpecInternal(spec, options, params, allowedDocs))
+  const results = specs.map(spec => executeQuerySpecInternal(spec, normalized, params, allowedDocs))
   return combineResults(results, combineWith)
 }
 

@@ -205,6 +205,71 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expectSameResults(mutable, frozen, 'ZEN Art', { tokenize, processTerm })
   })
 
+  test('search processTerm array parity', () => {
+    const corpus = [
+      { id: 1, text: 'alpha beta' },
+      { id: 2, text: 'gamma' },
+    ]
+    const opts = { fields: ['text'] }
+    const ms = new MiniSearch(opts)
+    ms.addAll(corpus)
+    const fr = FrozenMiniSearch.fromMiniSearch(ms, opts)
+    expectSameResults(ms, fr, 'combo', {
+      processTerm: term => term === 'combo' ? ['alpha', 'beta'] : term,
+      combineWith: 'AND',
+    })
+  })
+
+  test('search processTerm falsy values are skipped', () => {
+    const corpus = [
+      { id: 1, text: 'alpha beta' },
+      { id: 2, text: 'beta' },
+    ]
+    const opts = { fields: ['text'] }
+    const ms = new MiniSearch(opts)
+    ms.addAll(corpus)
+    const fr = FrozenMiniSearch.fromMiniSearch(ms, opts)
+    const processTerm = term => {
+      if (term === 'false') return false
+      if (term === 'null') return null
+      if (term === 'undefined') return undefined
+      if (term === 'empty') return ''
+      if (term === 'array') return ['', 'alpha']
+      return term
+    }
+    expectSameResults(ms, fr, 'false null undefined empty array', {
+      processTerm,
+    })
+  })
+
+  test('functional query options receive normalized terms array', () => {
+    const seen = { prefix: [], fuzzy: [], boostTerm: [] }
+    const record = key => (term, index, terms) => {
+      seen[key].push([term, index, [...terms]])
+      return key === 'boostTerm' ? 1 : false
+    }
+    frozen.search('ZEN Art', {
+      tokenize: q => q.split(/\s+/),
+      processTerm: term => term.toLowerCase(),
+      prefix: record('prefix'),
+      fuzzy: record('fuzzy'),
+      boostTerm: record('boostTerm'),
+    })
+    const expected = [
+      ['zen', 0, ['zen', 'art']],
+      ['art', 1, ['zen', 'art']],
+    ]
+    expect(seen.prefix).toEqual(expected)
+    expect(seen.fuzzy).toEqual(expected)
+    expect(seen.boostTerm).toEqual(expected)
+  })
+
+  test('prefix and fuzzy combinations remain unchanged', () => {
+    expectSameResults(mutable, frozen, 'neur', { prefix: true, fuzzy: false })
+    expectSameResults(mutable, frozen, 'neuromancr', { prefix: false, fuzzy: 0.3 })
+    expectSameResults(mutable, frozen, 'neur', { prefix: true, fuzzy: 0.3 })
+  })
+
   test('explicit weights parity', () => {
     expectSameResults(mutable, frozen, 'neur', {
       prefix: true,

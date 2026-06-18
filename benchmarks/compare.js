@@ -5,7 +5,7 @@
  * Run: yarn benchmark:compare
  * Requires: yarn build && node --expose-gc
  */
-import { buildScenarioList, runBenchmarkSuite } from './benchmarkSuite.js'
+import { buildBenchmarkScenarios, runBenchmarkSuite } from './benchmarkSuite.js'
 import { parseBenchmarkArgs, loadBenchmarkPayload, argValue, formatFrozenVsMutableDelta } from './benchmarkUtils.js'
 
 const mb = (bytes) => (bytes / 1024 / 1024).toFixed(2)
@@ -172,7 +172,7 @@ if (fromPath) {
     console.log('Tip: run with --expose-gc for accurate heap numbers.\n')
   }
   console.log(`${runs} run(s)/scenario, ${searchIterations} search iterations (median)\n`)
-  scenarios = runBenchmarkSuite(buildScenarioList(), runs, { surfaces })
+  scenarios = runBenchmarkSuite(buildBenchmarkScenarios(), runs, { surfaces })
 }
 
 for (const result of scenarios) {

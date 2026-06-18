@@ -8,7 +8,6 @@ import {
 import type { AggregateContext, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
 import {
   DISCARDED_DOC_ID,
-  materializeFlatPostings,
   postingFreqValue,
   type FlatPostingsMaterializeParams,
 } from './flatPostings'
@@ -41,139 +40,55 @@ export interface FrozenPostingsLayout {
   sparseLengths: Uint32Array | null
 }
 
-export function choosePostingsLayout(fieldCount: number): PostingsLayoutKind {
-  return fieldCount === 1 ? 'dense' : 'sparse'
-}
-
 export function chooseSparseFieldIdWidth(fieldCount: number): 8 | 16 {
   return fieldCount > 255 ? 16 : 8
 }
 
-export function materializeFrozenPostings(
-  params: FlatPostingsMaterializeParams & { nextId: number },
-): FrozenPostingsLayout {
-  const { fieldCount, termCount, nextId } = params
-  const layout = choosePostingsLayout(fieldCount)
-  const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
-
-  if (layout === 'dense') {
-    const flat = materializeFlatPostings({ ...params, nextId })
-    return {
-      fieldCount,
-      termCount,
-      nextId,
-      layout,
-      docIdWidth,
-      sparseFieldIdWidth: null,
-      allDocIds: flat.allDocIds,
-      allFreqs: flat.allFreqs,
-      denseOffsets: flat.postingsOffsets,
-      denseLengths: flat.postingsLengths,
-      sparseTermStarts: null,
-      sparseFieldIds: null,
-      sparseOffsets: null,
-      sparseLengths: null,
-    }
-  }
-
-  const sparseFieldIdWidth = chooseSparseFieldIdWidth(fieldCount)
-  const sparseFieldIdsScratch: number[] = []
-  const sparseOffsets: number[] = []
-  const sparseLengths: number[] = []
-  const termStarts: number[] = new Array(termCount + 1).fill(0)
-  const { forEachPosting, remapDocId, clampFrequencies } = params
-
-  // Non-empty slots per term are emitted with fieldId in ascending order (f loops 0..fieldCount-1).
-  let totalPostings = 0
-  let maxFreq = 0
-  for (let ti = 0; ti < termCount; ti++) {
-    termStarts[ti] = sparseFieldIdsScratch.length
-    for (let f = 0; f < fieldCount; f++) {
-      let count = 0
-      forEachPosting(ti, f, (rawDocId, freq) => {
-        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId === DISCARDED_DOC_ID) return
-        count++
-        const v = postingFreqValue(freq, clampFrequencies)
-        if (v > maxFreq) maxFreq = v
-      })
-      if (count === 0) continue
-      sparseFieldIdsScratch.push(f)
-      sparseOffsets.push(totalPostings)
-      sparseLengths.push(count)
-      totalPostings += count
-    }
-    termStarts[ti + 1] = sparseFieldIdsScratch.length
-  }
-
-  const allDocIds: DocIdArray = docIdWidth === 16
-    ? new Uint16Array(totalPostings)
-    : new Uint32Array(totalPostings)
-  const allFreqs = allocateFreqs(totalPostings, maxFreq)
-
-  const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
-    ? new Uint16Array(sparseFieldIdsScratch)
-    : new Uint8Array(sparseFieldIdsScratch)
-
-  let write = 0
-  for (let ti = 0; ti < termCount; ti++) {
-    const start = termStarts[ti]
-    const end = termStarts[ti + 1]
-    for (let s = start; s < end; s++) {
-      const f = readFieldId(sparseFieldIds, s)
-      forEachPosting(ti, f, (rawDocId, freq) => {
-        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId === DISCARDED_DOC_ID) return
-        if (docIdWidth === 16) {
-          (allDocIds as Uint16Array)[write] = docId
-        } else {
-          (allDocIds as Uint32Array)[write] = docId
-        }
-        allFreqs[write] = postingFreqValue(freq, clampFrequencies)
-        write++
-      })
-    }
-  }
-
-  return {
-    fieldCount,
-    termCount,
-    nextId,
-    layout,
-    docIdWidth,
-    sparseFieldIdWidth,
-    allDocIds,
-    allFreqs,
-    denseOffsets: null,
-    denseLengths: null,
-    sparseTermStarts: new Uint32Array(termStarts),
-    sparseFieldIds,
-    sparseOffsets: new Uint32Array(sparseOffsets),
-    sparseLengths: new Uint32Array(sparseLengths),
-  }
+export function choosePostingsLayout(
+  fieldCount: number,
+  termCount: number,
+  nonEmptySlots: number,
+): PostingsLayoutKind {
+  const denseBytes = termCount * fieldCount * 8
+  const sparseFieldIdBytes = chooseSparseFieldIdWidth(fieldCount) === 16 ? 2 : 1
+  const sparseBytes = (termCount + 1) * 4 + nonEmptySlots * (sparseFieldIdBytes + 8)
+  return denseBytes <= sparseBytes ? 'dense' : 'sparse'
 }
 
-type BuilderPostingsInput = {
-  fieldCount: number
-  termCount: number
-  postingsDocIds: (number[] | undefined)[]
-  postingsFreqs: (number[] | undefined)[]
-  totalPostings: number
-  maxFreq: number
+export interface PostingsSlotTargets {
+  allDocIds: DocIdArray
+  allFreqs: FreqArray
+  docIdWidth: 16 | 32
 }
 
-/** One-pass materialize from {@link FrozenIndexBuilder} scratch (counts known upfront). */
-export function materializeFrozenPostingsFromBuilder(
-  state: BuilderPostingsInput,
+/** Slot source for {@link buildFrozenPostingsLayout} (callback or incremental paths). */
+export interface PostingsSlotSource {
+  readonly nonEmptySlots: number
+  slotLength(termIndex: number, fieldId: number): number
+  writeSlot(
+    termIndex: number,
+    fieldId: number,
+    writeOffset: number,
+    targets: PostingsSlotTargets,
+  ): number
+}
+
+/** Shared dense/sparse layout emission; callers supply per-slot length and copy. */
+export function buildFrozenPostingsLayout(
+  fieldCount: number,
+  termCount: number,
   nextId: number,
+  totalPostings: number,
+  maxFreq: number,
+  source: PostingsSlotSource,
 ): FrozenPostingsLayout {
-  const { fieldCount, termCount, postingsDocIds, postingsFreqs, totalPostings, maxFreq } = state
-  const layout = choosePostingsLayout(fieldCount)
+  const layout = choosePostingsLayout(fieldCount, termCount, source.nonEmptySlots)
   const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
   const allDocIds: DocIdArray = docIdWidth === 16
     ? new Uint16Array(totalPostings)
     : new Uint32Array(totalPostings)
   const allFreqs = allocateFreqs(totalPostings, maxFreq)
+  const targets: PostingsSlotTargets = { allDocIds, allFreqs, docIdWidth }
 
   if (layout === 'dense') {
     const slotCount = termCount * fieldCount
@@ -184,24 +99,12 @@ export function materializeFrozenPostingsFromBuilder(
       const base = ti * fieldCount
       for (let f = 0; f < fieldCount; f++) {
         const slot = base + f
-        const docIds = postingsDocIds[slot]
-        const freqs = postingsFreqs[slot]
-        const len = docIds?.length ?? 0
+        const len = source.slotLength(ti, f)
         denseOffsets[slot] = write
         denseLengths[slot] = len
-        for (let i = 0; i < len; i++) {
-          const docId = docIds![i]
-          if (docIdWidth === 16) {
-            (allDocIds as Uint16Array)[write] = docId
-          } else {
-            (allDocIds as Uint32Array)[write] = docId
-          }
-          allFreqs[write] = freqs![i]
-          write++
+        if (len > 0) {
+          write = source.writeSlot(ti, f, write, targets)
         }
-        // Drop references so V8 can reclaim per-slot number[] after copy (sparse array slots stay allocated).
-        postingsDocIds[slot] = undefined
-        postingsFreqs[slot] = undefined
       }
     }
     return {
@@ -232,26 +135,12 @@ export function materializeFrozenPostingsFromBuilder(
   for (let ti = 0; ti < termCount; ti++) {
     termStarts[ti] = sparseFieldIdsScratch.length
     for (let f = 0; f < fieldCount; f++) {
-      const slot = ti * fieldCount + f
-      const docIds = postingsDocIds[slot]
-      if (docIds == null || docIds.length === 0) continue
-      const freqs = postingsFreqs[slot]!
+      const len = source.slotLength(ti, f)
+      if (len === 0) continue
       sparseFieldIdsScratch.push(f)
       sparseOffsets.push(write)
-      sparseLengths.push(docIds.length)
-      for (let i = 0; i < docIds.length; i++) {
-        const docId = docIds[i]
-        if (docIdWidth === 16) {
-          (allDocIds as Uint16Array)[write] = docId
-        } else {
-          (allDocIds as Uint32Array)[write] = docId
-        }
-        allFreqs[write] = freqs[i]
-        write++
-      }
-      // Drop references so V8 can reclaim per-slot number[] after copy (sparse array slots stay allocated).
-      postingsDocIds[slot] = undefined
-      postingsFreqs[slot] = undefined
+      sparseLengths.push(len)
+      write = source.writeSlot(ti, f, write, targets)
     }
     termStarts[ti + 1] = sparseFieldIdsScratch.length
   }
@@ -276,6 +165,65 @@ export function materializeFrozenPostingsFromBuilder(
     sparseOffsets: new Uint32Array(sparseOffsets),
     sparseLengths: new Uint32Array(sparseLengths),
   }
+}
+
+export function materializeFrozenPostings(
+  params: FlatPostingsMaterializeParams & { nextId: number },
+): FrozenPostingsLayout {
+  const { fieldCount, termCount, nextId } = params
+  const { forEachPosting, remapDocId, clampFrequencies } = params
+  const slotCount = termCount * fieldCount
+  const slotLengths = new Uint32Array(slotCount)
+
+  let totalPostings = 0
+  let maxFreq = 0
+  let nonEmptySlots = 0
+  for (let ti = 0; ti < termCount; ti++) {
+    const base = ti * fieldCount
+    for (let f = 0; f < fieldCount; f++) {
+      let count = 0
+      forEachPosting(ti, f, (rawDocId, freq) => {
+        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
+        if (docId === DISCARDED_DOC_ID) return
+        count++
+        const v = postingFreqValue(freq, clampFrequencies)
+        if (v > maxFreq) maxFreq = v
+      })
+      if (count === 0) continue
+      slotLengths[base + f] = count
+      totalPostings += count
+      nonEmptySlots++
+    }
+  }
+
+  return buildFrozenPostingsLayout(
+    fieldCount,
+    termCount,
+    nextId,
+    totalPostings,
+    maxFreq,
+    {
+      nonEmptySlots,
+      slotLength(ti, f) {
+        return slotLengths[ti * fieldCount + f]
+      },
+      writeSlot(ti, f, write, targets) {
+        const { allDocIds: outDocIds, allFreqs: outFreqs, docIdWidth: width } = targets
+        forEachPosting(ti, f, (rawDocId, freq) => {
+          const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
+          if (docId === DISCARDED_DOC_ID) return
+          if (width === 16) {
+            (outDocIds as Uint16Array)[write] = docId
+          } else {
+            (outDocIds as Uint32Array)[write] = docId
+          }
+          outFreqs[write] = postingFreqValue(freq, clampFrequencies)
+          write++
+        })
+        return write
+      },
+    },
+  )
 }
 
 export function postingsTypedBytes(layout: FrozenPostingsLayout): {

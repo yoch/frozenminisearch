@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import {
   createFrozenFieldTermFlyweight,
-  materializeFrozenPostingsFromBuilder,
+  materializeFrozenPostings,
   validateFrozenPostingsLayout,
 } from './frozenPostings'
 import { readDocId } from './compactPostings'
@@ -69,33 +69,21 @@ function layoutsEqual(a, b) {
   }
 }
 
-function buildLegacy(fieldCount, postings) {
-  const postingsDocIds = []
-  const postingsFreqs = []
-  let totalPostings = 0
-  let maxFreq = 0
-  for (const { termIndex, fieldId, docId, freq } of postings) {
-    const slot = termIndex * fieldCount + fieldId
-    let docIds = postingsDocIds[slot]
-    if (docIds == null) {
-      docIds = []
-      postingsDocIds[slot] = docIds
-      postingsFreqs[slot] = []
-    }
-    docIds.push(docId)
-    postingsFreqs[slot].push(freq)
-    if (freq > maxFreq) maxFreq = freq
-    totalPostings++
-  }
+function buildCallback(fieldCount, postings, nextId = 100) {
   const termCount = postings.reduce((m, p) => Math.max(m, p.termIndex + 1), 0)
-  return materializeFrozenPostingsFromBuilder({
+  return materializeFrozenPostings({
     fieldCount,
     termCount,
-    postingsDocIds,
-    postingsFreqs,
-    totalPostings,
-    maxFreq,
-  }, 100)
+    nextId,
+    forEachPosting(termIndex, fieldId, emit) {
+      for (const posting of postings) {
+        if (posting.termIndex === termIndex && posting.fieldId === fieldId) {
+          emit(posting.docId, posting.freq)
+        }
+      }
+    },
+    clampFrequencies: true,
+  })
 }
 
 function buildIncremental(fieldCount, postings, nextId = 100) {
@@ -115,10 +103,12 @@ describe('IncrementalPostingsAccumulator', () => {
       { termIndex: 1, fieldId: 0, docId: 0, freq: 4 },
       { termIndex: 1, fieldId: 0, docId: 2, freq: 1 },
     ]
-    layoutsEqual(buildIncremental(1, postings), buildLegacy(1, postings))
+    const layout = buildIncremental(1, postings)
+    expect(layout.layout).toBe('dense')
+    layoutsEqual(layout, buildCallback(1, postings))
   })
 
-  test('sparse layout matches legacy materialize', () => {
+  test('sparse layout matches legacy materialize when sparse is cheaper', () => {
     const postings = [
       { termIndex: 0, fieldId: 0, docId: 1, freq: 1 },
       { termIndex: 0, fieldId: 2, docId: 1, freq: 3 },
@@ -126,7 +116,24 @@ describe('IncrementalPostingsAccumulator', () => {
       { termIndex: 1, fieldId: 3, docId: 4, freq: 1 },
       { termIndex: 2, fieldId: 0, docId: 2, freq: 5 },
     ]
-    layoutsEqual(buildIncremental(4, postings), buildLegacy(4, postings))
+    const layout = buildIncremental(4, postings)
+    expect(layout.layout).toBe('sparse')
+    layoutsEqual(layout, buildCallback(4, postings))
+  })
+
+  test('multi-field dense layout is selected when dense metadata is cheaper', () => {
+    const postings = []
+    for (let termIndex = 0; termIndex < 3; termIndex++) {
+      for (let fieldId = 0; fieldId < 4; fieldId++) {
+        postings.push({ termIndex, fieldId, docId: termIndex, freq: fieldId + 1 })
+      }
+    }
+    const layout = buildIncremental(4, postings)
+    expect(layout.layout).toBe('dense')
+    layoutsEqual(layout, buildCallback(4, postings))
+    validateFrozenPostingsLayout(layout, 100, 100)
+    assertSegmentsPartitionBuffers(layout)
+    assertHotPathSequentialAccess(layout, 1, 2)
   })
 
   test('interleaved appends per slot preserve order', () => {
@@ -136,7 +143,54 @@ describe('IncrementalPostingsAccumulator', () => {
       { termIndex: 0, fieldId: 1, docId: 2, freq: 1 },
       { termIndex: 5, fieldId: 0, docId: 3, freq: 1 },
     ]
-    layoutsEqual(buildIncremental(3, postings), buildLegacy(3, postings))
+    layoutsEqual(buildIncremental(3, postings), buildCallback(3, postings))
+  })
+
+  test('flat materialization chooses the same dense multi-field layout', () => {
+    const postings = []
+    for (let termIndex = 0; termIndex < 3; termIndex++) {
+      for (let fieldId = 0; fieldId < 4; fieldId++) {
+        postings.push({ termIndex, fieldId, docId: termIndex, freq: fieldId + 1 })
+      }
+    }
+    const flat = materializeFrozenPostings({
+      fieldCount: 4,
+      termCount: 3,
+      nextId: 100,
+      forEachPosting(termIndex, fieldId, emit) {
+        for (const posting of postings) {
+          if (posting.termIndex === termIndex && posting.fieldId === fieldId) {
+            emit(posting.docId, posting.freq)
+          }
+        }
+      },
+      clampFrequencies: true,
+    })
+    expect(flat.layout).toBe('dense')
+    layoutsEqual(flat, buildIncremental(4, postings))
+  })
+
+  test('fromMiniSearch and incremental builder choose the same dense layout', () => {
+    const MiniSearch = require('minisearch')
+    const FrozenMiniSearch = require('./FrozenMiniSearch').default
+    const fields = ['f0', 'f1', 'f2', 'f3']
+    const documents = Array.from({ length: 4 }, (_, id) => ({
+      id,
+      f0: `term${id} common`,
+      f1: `term${id} common`,
+      f2: `term${id} common`,
+      f3: `term${id} common`,
+    }))
+    const options = { fields, storeFields: [] }
+    const mutable = new MiniSearch(options)
+    mutable.addAll(documents)
+
+    const fromMiniSearch = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const fromDocuments = FrozenMiniSearch.fromDocuments(documents, options)
+
+    expect(fromMiniSearch.memoryBreakdown().postings.layout).toBe('dense')
+    expect(fromDocuments.memoryBreakdown().postings.layout).toBe('dense')
+    expect(searchSnapshot(fromDocuments, 'term2')).toEqual(searchSnapshot(fromMiniSearch, 'term2'))
   })
 
   test('non-contiguous scratch ranges compact to one hot-path segment', () => {

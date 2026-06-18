@@ -1,13 +1,10 @@
 import {
-  allocateFreqs,
   clampFreq,
   type DocIdArray,
   type FreqArray,
 } from './compactPostings'
 import {
-  choosePostingsLayout,
-  chooseSparseFieldIdWidth,
-  type FieldIdArray,
+  buildFrozenPostingsLayout,
   type FrozenPostingsLayout,
 } from './frozenPostings'
 
@@ -193,96 +190,30 @@ export class IncrementalPostingsAccumulator {
     const totalPostings = this._totalPostings
     const maxFreq = this._maxFreq
     const slots = this._slots
-    const layout = choosePostingsLayout(fieldCount)
-    const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
-    const allDocIds: DocIdArray = docIdWidth === 16
-      ? new Uint16Array(totalPostings)
-      : new Uint32Array(totalPostings)
-    const allFreqs = allocateFreqs(totalPostings, maxFreq)
 
-    if (layout === 'dense') {
-      const slotCount = termCount * fieldCount
-      const denseOffsets = new Uint32Array(slotCount)
-      const denseLengths = new Uint32Array(slotCount)
-      let write = 0
-      for (let ti = 0; ti < termCount; ti++) {
-        const base = ti * fieldCount
-        for (let f = 0; f < fieldCount; f++) {
-          const slot = base + f
-          const ranges = slots.get(slot)
-          const len = ranges == null ? 0 : this.slotLength(ranges)
-          denseOffsets[slot] = write
-          denseLengths[slot] = len
-          if (len > 0) {
-            write = this.copySlot(ranges!, allDocIds, allFreqs, write, docIdWidth)
-            slots.delete(slot)
-          }
-        }
-      }
-      slots.clear()
-      this.clear()
-      return {
-        fieldCount,
-        termCount,
-        nextId,
-        layout,
-        docIdWidth,
-        sparseFieldIdWidth: null,
-        allDocIds,
-        allFreqs,
-        denseOffsets,
-        denseLengths,
-        sparseTermStarts: null,
-        sparseFieldIds: null,
-        sparseOffsets: null,
-        sparseLengths: null,
-      }
-    }
-
-    const sparseFieldIdWidth = chooseSparseFieldIdWidth(fieldCount)
-    const sparseFieldIdsScratch: number[] = []
-    const sparseOffsets: number[] = []
-    const sparseLengths: number[] = []
-    const termStarts: number[] = new Array(termCount + 1).fill(0)
-    let write = 0
-
-    for (let ti = 0; ti < termCount; ti++) {
-      termStarts[ti] = sparseFieldIdsScratch.length
-      for (let f = 0; f < fieldCount; f++) {
-        const slot = ti * fieldCount + f
-        const ranges = slots.get(slot)
-        const len = ranges == null ? 0 : this.slotLength(ranges)
-        if (len === 0) continue
-        sparseFieldIdsScratch.push(f)
-        sparseOffsets.push(write)
-        sparseLengths.push(len)
-        write = this.copySlot(ranges!, allDocIds, allFreqs, write, docIdWidth)
-        slots.delete(slot)
-      }
-      termStarts[ti + 1] = sparseFieldIdsScratch.length
-    }
-    slots.clear()
-    this.clear()
-
-    const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
-      ? new Uint16Array(sparseFieldIdsScratch)
-      : new Uint8Array(sparseFieldIdsScratch)
-
-    return {
+    const layout = buildFrozenPostingsLayout(
       fieldCount,
       termCount,
       nextId,
-      layout,
-      docIdWidth,
-      sparseFieldIdWidth,
-      allDocIds,
-      allFreqs,
-      denseOffsets: null,
-      denseLengths: null,
-      sparseTermStarts: new Uint32Array(termStarts),
-      sparseFieldIds,
-      sparseOffsets: new Uint32Array(sparseOffsets),
-      sparseLengths: new Uint32Array(sparseLengths),
-    }
+      totalPostings,
+      maxFreq,
+      {
+        nonEmptySlots: slots.size,
+        slotLength: (ti, f) => {
+          const ranges = slots.get(ti * fieldCount + f)
+          return ranges == null ? 0 : this.slotLength(ranges)
+        },
+        writeSlot: (ti, f, write, targets) => {
+          const slot = ti * fieldCount + f
+          const ranges = slots.get(slot)!
+          const next = this.copySlot(ranges, targets.allDocIds, targets.allFreqs, write, targets.docIdWidth)
+          slots.delete(slot)
+          return next
+        },
+      },
+    )
+    slots.clear()
+    this.clear()
+    return layout
   }
 }

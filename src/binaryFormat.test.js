@@ -14,6 +14,7 @@ import {
 import {
   CODEC_RAW,
   CODEC_ZLIB,
+  FLAG_SPARSE_LAYOUT,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
   MSV5_SECTION_DIR_OFFSET,
@@ -211,6 +212,28 @@ describe('binaryFormat MSv5', () => {
 
     const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields })
     expect(loaded.search('value').length).toBeGreaterThan(0)
+  })
+
+  test('adaptive dense multi-field layout round-trips via MSv5', () => {
+    const fields = ['f0', 'f1', 'f2', 'f3']
+    const docs = Array.from({ length: 4 }, (_, id) => ({
+      id,
+      f0: `term${id} common`,
+      f1: `term${id} common`,
+      f2: `term${id} common`,
+      f3: `term${id} common`,
+    }))
+    const options = { fields, storeFields: [] }
+    const frozen = FrozenMiniSearch.fromDocuments(docs, options)
+    expect(frozen.memoryBreakdown().postings.layout).toBe('dense')
+
+    const buf = frozen.saveBinarySync()
+    expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
+    expect(buf.readUInt16LE(6) & FLAG_SPARSE_LAYOUT).toBe(0)
+
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    expect(loaded.memoryBreakdown().postings.layout).toBe('dense')
+    expect(loaded.search('term2')).toEqual(frozen.search('term2'))
   })
 
   test('external id JSON blob round-trip', () => {

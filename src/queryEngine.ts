@@ -36,7 +36,6 @@ import {
   DEFAULT_POSTING_GATE_POLICY,
   DEFAULT_POSTING_GATE_RATIO_SHIFT,
   resolveGateMaxSize,
-  shouldPassGateAsAllowedDocs,
   type QueryEngineRunOptions,
 } from './queryEngineGateLimits'
 
@@ -199,7 +198,8 @@ type QuerySpecTermRef
     | { kind: 'prefix', termIndex: number, length: number, distance: number }
     | { kind: 'fuzzy', termIndex: number, length: number, distance: number }
 
-const TWO_PHASE_AND_NOT_MIN_FRACTION = 0.5
+/** Empirical broad-exclusion cutoff: only collect first when both sides cover much of the corpus. */
+const BROAD_EXCLUSION_TWO_PHASE_MIN_FRACTION = 0.5
 
 function forEachQuerySpecTermRef(
   query: QuerySpec,
@@ -337,6 +337,20 @@ function estimateMaxPostingLengthForQuerySpec(
   return maxLen
 }
 
+function hasCheapTwoPhasePostingEstimate(query: QuerySpec): boolean {
+  return !query.prefix && !query.fuzzy
+}
+
+function estimateCheapTwoPhasePostingLengthForQuerySpec(
+  query: QuerySpec,
+  normalized: NormalizedStringQuery,
+  params: QueryEngineParams,
+): number | undefined {
+  return hasCheapTwoPhasePostingEstimate(query)
+    ? estimateMaxPostingLengthForQuerySpec(query, normalized, params)
+    : undefined
+}
+
 function estimateMaxPostingLengthForQuery(
   query: Query,
   searchOptions: SearchOptions,
@@ -403,13 +417,14 @@ function subtractDocIdsFromResult(result: RawResult, excludedDocIds: DocIdGate):
 
 function twoPhasePostingLengths<T>(
   branches: readonly T[],
-  allowTwoPhase: boolean,
-  estimateBranchPostingLength: ((branch: T) => number) | undefined,
+  estimateTwoPhasePostingLength: ((branch: T) => number | undefined) | undefined,
 ): number[] | undefined {
-  if (!allowTwoPhase || estimateBranchPostingLength == null) return undefined
+  if (estimateTwoPhasePostingLength == null) return undefined
   const lengths = new Array<number>(branches.length)
   for (let i = 0; i < branches.length; i++) {
-    lengths[i] = estimateBranchPostingLength(branches[i])
+    const length = estimateTwoPhasePostingLength(branches[i])
+    if (length == null) return undefined
+    lengths[i] = length
   }
   return lengths
 }
@@ -447,7 +462,7 @@ function shouldUseTwoPhaseAndNot(
     : Math.min(firstLength, allowedDocs.size)
   const largeThreshold = Math.max(
     DEFAULT_POSTING_GATE_MIN_LENGTH,
-    Math.floor(documentCount * TWO_PHASE_AND_NOT_MIN_FRACTION),
+    Math.floor(documentCount * BROAD_EXCLUSION_TWO_PHASE_MIN_FRACTION),
   )
   if (effectiveFirstLength < largeThreshold) return false
 
@@ -527,10 +542,10 @@ function collectCombinedDocIds<T>(
 }
 
 /**
- * AND: normally score left-to-right with optional docId gates; for broad-first selective
- * exact queries, collect the final gate first, then score branches in original order.
+ * AND: normally score left-to-right with optional docId gates; for cheap-estimated broad-first
+ * queries, collect the final gate first, then score branches in original order.
  * AND_NOT: score the positive branch only; negated branches are collected as docId sets and
- * subtracted without scoring. Large exact exclusions may collect survivors before positive scoring.
+ * subtracted without scoring. Large cheap-estimated exclusions may collect survivors first.
  */
 function executeCombinedBranches<T>(
   branches: readonly T[],
@@ -541,7 +556,7 @@ function executeCombinedBranches<T>(
   allowedDocs?: DocIdGate,
   run?: QueryEngineRunOptions,
   estimateBranchPostingLength?: (branch: T) => number,
-  allowTwoPhase = false,
+  estimateTwoPhasePostingLength?: (branch: T) => number | undefined,
 ): RawResult {
   if (branches.length === 0) return new Map()
 
@@ -554,7 +569,7 @@ function executeCombinedBranches<T>(
   }
 
   if (op === 'and') {
-    const branchPostingLengths = twoPhasePostingLengths(branches, allowTwoPhase, estimateBranchPostingLength)
+    const branchPostingLengths = twoPhasePostingLengths(branches, estimateTwoPhasePostingLength)
     if (branchPostingLengths != null && shouldUseTwoPhaseAnd(branchPostingLengths, allowedDocs)) {
       const finalGate = collectAndDocIdsByEstimatedLength(
         branches,
@@ -586,7 +601,7 @@ function executeCombinedBranches<T>(
         postingListLength,
         postingGatePolicy,
       )
-      const branchAllowed = absoluteSelective || shouldPassGateAsAllowedDocs(selective, gate.size, postingListLength)
+      const branchAllowed = selective
         ? gate
         : allowedDocs
       result = combineResults([result, executeBranch(branches[i], branchAllowed)], AND)
@@ -596,7 +611,7 @@ function executeCombinedBranches<T>(
   }
 
   if (op === 'and_not') {
-    const branchPostingLengths = twoPhasePostingLengths(branches, allowTwoPhase, estimateBranchPostingLength)
+    const branchPostingLengths = twoPhasePostingLengths(branches, estimateTwoPhasePostingLength)
     if (branchPostingLengths != null && shouldUseTwoPhaseAndNot(
       branchPostingLengths,
       allowedDocs,
@@ -783,7 +798,7 @@ function executeQueryInternal(
       allowedDocs,
       run,
       spec => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
-      specs.every(spec => !spec.prefix && !spec.fuzzy),
+      spec => estimateCheapTwoPhasePostingLengthForQuerySpec(spec, normalized, params),
     )
   }
 

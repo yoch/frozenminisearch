@@ -75,25 +75,3 @@ export function gateIsSelectiveEnough(
   }
   return false
 }
-
-/** True when passing gate as allowedDocs can skip docs vs scanning the full branch posting. */
-export function gateFilterShrinksScan(
-  gateSize: number,
-  postingListLength: number,
-): boolean {
-  return postingListLength > gateSize
-}
-
-/**
- * Whether to pass the AND gate as allowedDocs to the next branch (perf only; scores unchanged if false).
- * Distinct from gateIsSelectiveEnough: a selective gate may still be too large to filter a short posting.
- */
-export function shouldPassGateAsAllowedDocs(
-  selective: boolean,
-  gateSize: number,
-  postingListLength: number | undefined,
-): boolean {
-  if (!selective || gateSize === 0) return false
-  if (postingListLength == null || postingListLength <= 0) return false
-  return gateFilterShrinksScan(gateSize, postingListLength)
-}

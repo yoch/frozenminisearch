@@ -384,6 +384,36 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       expect(boostCalls).toBeLessThan(100)
     })
 
+    test('prefix broad-first probe stays on sequential gating', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      let boostCalls = 0
+      const boostDocument = () => {
+        boostCalls++
+        return 1
+      }
+
+      expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND', prefix: true, boostDocument })
+
+      expect(boostCalls).toBeGreaterThan(100)
+    })
+
+    test('fuzzy broad-first probe stays on sequential gating', () => {
+      const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false, fuzzy: 0.2 } })
+      ms.addAll(buildCommonUniqueCorpus(6000))
+      const frozen = FrozenMiniSearch.fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false, fuzzy: 0.2 } })
+      let boostCalls = 0
+      const boostDocument = () => {
+        boostCalls++
+        return 1
+      }
+
+      expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND', fuzzy: 0.2, boostDocument })
+
+      expect(boostCalls).toBeGreaterThan(100)
+    })
+
     test('broad AND_NOT exclusion can return empty without scoring positive branch', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))

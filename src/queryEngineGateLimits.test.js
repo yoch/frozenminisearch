@@ -2,11 +2,9 @@ import {
   DEFAULT_AND_GATE_LIMITS,
   DEFAULT_POSTING_GATE_MIN_LENGTH,
   DEFAULT_POSTING_GATE_POLICY,
-  gateFilterShrinksScan,
   gateIsSelectiveEnough,
   passGateByPostingRatio,
   resolveGateMaxSize,
-  shouldPassGateAsAllowedDocs,
 } from './queryEngineGateLimits'
 import { shouldSeekAllowedDocs } from './compactPostings'
 
@@ -47,18 +45,11 @@ describe('queryEngineGateLimits', () => {
     expect(DEFAULT_POSTING_GATE_MIN_LENGTH).toBe(2048)
   })
 
-  test('gateFilterShrinksScan and shouldPassGateAsAllowedDocs', () => {
-    expect(gateFilterShrinksScan(16, 12)).toBe(false)
-    expect(gateFilterShrinksScan(16, 16)).toBe(false)
-    expect(gateFilterShrinksScan(16, 17)).toBe(true)
-    expect(gateFilterShrinksScan(11_111, 50_000)).toBe(true)
-
-    expect(shouldPassGateAsAllowedDocs(true, 16, 12)).toBe(false)
-    expect(shouldPassGateAsAllowedDocs(true, 16, 17)).toBe(true)
-    expect(shouldPassGateAsAllowedDocs(true, 11_111, 50_000)).toBe(true)
-    expect(shouldPassGateAsAllowedDocs(false, 16, 12)).toBe(false)
-    expect(shouldPassGateAsAllowedDocs(true, 0, 100)).toBe(false)
-    expect(shouldPassGateAsAllowedDocs(true, 16, undefined)).toBe(false)
+  test('gateIsSelectiveEnough owns the query-engine gate decision', () => {
+    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 12)).toBe(true)
+    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 16)).toBe(true)
+    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 17)).toBe(true)
+    expect(gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 50_000)).toBe(true)
   })
 
   test('shouldSeekAllowedDocs delegates to passGateByPostingRatio (distinct decision, same numbers)', () => {

@@ -54,16 +54,16 @@ Helper : `passGateByPostingRatio` dans `queryEngineGateLimits.ts`, intégrée à
 
 **Seek scoring** (`shouldSeekAllowedDocs` dans `compactPostings.ts`) réutilise les **mêmes seuils numériques** une fois `allowedDocs` actif : décision distincte (scan séquentiel vs binary search), pas la même fonction métier.
 
-**Estimation posting** : `forEachQuerySpecTermRef` / `estimateMaxPostingLengthForQuery` — uniquement quand `G > maxGateSize` (chemin ratio). Ne pas estimer sur le chemin absolu (`G ≤ maxGateSize`) ni en amont d’un AND prefix/fuzzy (`allowTwoPhase` désactivé).
+**Estimation posting** : `forEachQuerySpecTermRef` / `estimateMaxPostingLengthForQuery` — uniquement quand `G > maxGateSize` (chemin ratio). Ne pas estimer sur le chemin absolu (`G ≤ maxGateSize`). Le broad-first utilise un estimateur séparé, `estimateCheapTwoPhasePostingLength*`, qui refuse les specs prefix/fuzzy pour éviter un walk upfront coûteux.
 
 ## Broad-first (exact-only, v1.2.3)
 
-Quand **toutes** les branches string sont exact-only (pas de `prefix` ni `fuzzy` sur les specs), le moteur peut prendre un chemin **two-phase** avant le gating séquentiel :
+Quand toutes les specs d’une requête string normalisée ont une estimation upfront bon marché (aujourd’hui : exact-only, pas de `prefix` ni `fuzzy`), le moteur peut prendre un chemin **two-phase** avant le gating séquentiel :
 
 - **AND** — si la 1ʳᵉ branche a un posting ≥ `minLength` (2048) et une branche ultérieure a un posting ≤ `firstPosting >>> ratioShift`, collecter les doc ids par longueur posting croissante, puis scorer dans l’ordre de la requête avec la gate finale.
 - **AND_NOT** — si la branche positive est « large » (≥ max(2048, 50 % de N)) et une branche négative l’est aussi, collecter d’abord les exclusions, puis scorer la positive sur les survivants.
 
-`allowTwoPhase` est **false** pour prefix/fuzzy (pas d’estimation upfront coûteuse). Parité : `dev/parity/queryEngine.gate.test.js` (cas `common unique1`, nested AND, AND_NOT vide).
+L’estimateur two-phase renvoie `undefined` pour prefix/fuzzy (pas d’estimation upfront coûteuse). Parité : `dev/parity/queryEngine.gate.test.js` (cas `common unique1`, prefix/fuzzy broad-first probe, nested AND, AND_NOT vide).
 
 ## Pourquoi ces valeurs
 

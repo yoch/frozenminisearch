@@ -503,18 +503,44 @@ export function finalizeRawSearchResults(
 
 export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {
   const { rawResults, getExternalId, getStoredFields, filter, skipSort } = params
-  const results: SearchResult[] = []
   let allScoresEqual = true
   let firstScore: number | undefined
 
+  if (filter == null) {
+    const results = new Array<SearchResult>(rawResults.size)
+    let write = 0
+    for (const [docId, { score, terms, match }] of rawResults) {
+      const quality = terms.length || 1
+      const finalScore = score * quality
+      if (firstScore == null) {
+        firstScore = finalScore
+      } else if (allScoresEqual && finalScore !== firstScore) {
+        allScoresEqual = false
+      }
+      const result: SearchResult = {
+        id: getExternalId(docId),
+        score: finalScore,
+        terms: Object.keys(match),
+        queryTerms: terms,
+        match,
+      }
+      if (getStoredFields != null) {
+        const storedFields = getStoredFields(docId)
+        if (storedFields != null) Object.assign(result, storedFields)
+      }
+      results[write++] = result
+    }
+
+    if (!skipSort && !allScoresEqual && results.length > 1) {
+      results.sort(byScore)
+    }
+    return results
+  }
+
+  const results: SearchResult[] = []
   for (const [docId, { score, terms, match }] of rawResults) {
     const quality = terms.length || 1
     const finalScore = score * quality
-    if (firstScore == null) {
-      firstScore = finalScore
-    } else if (allScoresEqual && finalScore !== firstScore) {
-      allScoresEqual = false
-    }
     const result: SearchResult = {
       id: getExternalId(docId),
       score: finalScore,
@@ -523,14 +549,20 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
       match,
     }
     if (getStoredFields != null) {
-      Object.assign(result, getStoredFields(docId))
+      const storedFields = getStoredFields(docId)
+      if (storedFields != null) Object.assign(result, storedFields)
     }
-    if (filter == null || filter(result)) {
+    if (filter(result)) {
+      if (firstScore == null) {
+        firstScore = finalScore
+      } else if (allScoresEqual && finalScore !== firstScore) {
+        allScoresEqual = false
+      }
       results.push(result)
     }
   }
 
-  if (!skipSort && !allScoresEqual) {
+  if (!skipSort && !allScoresEqual && results.length > 1) {
     results.sort(byScore)
   }
   return results

@@ -54,6 +54,22 @@ export function readStoredFields(
   return { [layout.field]: value }
 }
 
+/** Copy stored fields onto a public search result without materializing a row object. */
+export function assignStoredFields(
+  layout: StoredFieldsLayout,
+  shortId: number,
+  target: Record<string, unknown>,
+): void {
+  if (layout.kind === 'none') return
+  if (layout.kind === 'single') {
+    const value = layout.values[shortId]
+    if (value !== undefined) target[layout.field] = value
+    return
+  }
+  const row = layout.rows[shortId]
+  if (row != null) Object.assign(target, row)
+}
+
 export function resizeStoredFields(layout: StoredFieldsLayout, length: number): StoredFieldsLayout {
   if (layout.kind === 'none') return layout
   if (layout.kind === 'single') {

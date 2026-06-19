@@ -1,6 +1,7 @@
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { createFrozenIndexBuilder } from './frozenBuild'
 import { finalizeSearchResults } from './scoring'
+import { assignStoredFields } from './storedFieldsLayout'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea', category: 'fiction' },
@@ -136,5 +137,53 @@ describe('FrozenMiniSearch core', () => {
     })
 
     expect(results.map(r => r.id)).toEqual([3, 1, 2])
+  })
+
+  test('single stored field is copied without materializing missing values', () => {
+    const index = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 1, text: 'alpha beta', category: 'fiction' },
+        { id: 2, text: 'alpha gamma' },
+      ],
+      { fields: ['text'], storeFields: ['category'] },
+    )
+
+    const results = index.search('alpha')
+
+    expect(results).toHaveLength(2)
+    expect(results[0]).toHaveProperty('category', 'fiction')
+    expect(results[1]).not.toHaveProperty('category')
+  })
+
+  test('multi stored fields are visible to filter and final results', () => {
+    const index = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 1, text: 'alpha beta', title: 'One', category: 'fiction' },
+        { id: 2, text: 'alpha gamma', title: 'Two', category: 'sci-fi' },
+      ],
+      { fields: ['text'], storeFields: ['title', 'category'] },
+    )
+
+    const inspected = []
+    const results = index.search('alpha', {
+      filter: (result) => {
+        inspected.push({ id: result.id, title: result.title, category: result.category })
+        return result.category === 'sci-fi'
+      },
+    })
+
+    expect(inspected).toEqual([
+      { id: 1, title: 'One', category: 'fiction' },
+      { id: 2, title: 'Two', category: 'sci-fi' },
+    ])
+    expect(results.map(r => ({ id: r.id, title: r.title, category: r.category }))).toEqual([
+      { id: 2, title: 'Two', category: 'sci-fi' },
+    ])
+  })
+
+  test('assignStoredFields skips undefined single-column values', () => {
+    const target = { id: 1 }
+    assignStoredFields({ kind: 'single', field: 'category', values: [] }, 0, target)
+    expect(target).toEqual({ id: 1 })
   })
 })

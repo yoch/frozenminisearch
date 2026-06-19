@@ -1,8 +1,7 @@
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
-import { type AggregateContext, type RawResult } from './scoring'
-import { finalizeRawSearchResults } from './scoring'
+import { byScore, type AggregateContext, type RawResult } from './scoring'
 import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
@@ -58,6 +57,7 @@ import { forEachLiveShortId } from './forEachLiveShortId'
 import { miniSearchSnapshotFromFrozen } from './toMiniSearch'
 import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
 import {
+  assignStoredFields,
   readStoredFields,
   storedFieldsFromRows,
   storedFieldsJsonBytes,
@@ -260,15 +260,10 @@ export default class FrozenMiniSearch<T = any> {
   }
 
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
-    return finalizeRawSearchResults(
+    return this.finalizeRawSearchResults(
       this.executeQuery(query, searchOptions),
       query,
       searchOptions,
-      this._options.searchOptions,
-      docId => this._externalIds[docId],
-      this._hasStoredFields
-        ? docId => readStoredFields(this._storedFields, docId)
-        : undefined,
     )
   }
 
@@ -454,6 +449,82 @@ export default class FrozenMiniSearch<T = any> {
 
   private getFieldLength(docId: number, fieldId: number): number {
     return this._fieldLengthMatrix[docId * this._fieldCount + fieldId] ?? 0
+  }
+
+  private finalizeRawSearchResults(
+    rawResults: RawResult,
+    query: Query,
+    searchOptions: SearchOptions,
+  ): SearchResult[] {
+    // Keep this loop specialized for frozen indexes: it mirrors the generic
+    // finalizer in scoring.ts but avoids per-result callback indirection and
+    // single-field row materialization on broad-result queries.
+    const searchOptionsWithDefaults = {
+      ...this._options.searchOptions,
+      ...searchOptions,
+    }
+    const { filter } = searchOptionsWithDefaults
+    const skipSort = query === WILDCARD_QUERY && searchOptionsWithDefaults.boostDocument == null
+    const externalIds = this._externalIds
+    const storedFields = this._storedFields
+    const hasStoredFields = this._hasStoredFields
+    let allScoresEqual = true
+    let firstScore: number | undefined
+
+    if (filter == null) {
+      const results = new Array<SearchResult>(rawResults.size)
+      let write = 0
+      for (const [docId, { score, terms, match }] of rawResults) {
+        const quality = terms.length || 1
+        const finalScore = score * quality
+        if (firstScore == null) {
+          firstScore = finalScore
+        } else if (allScoresEqual && finalScore !== firstScore) {
+          allScoresEqual = false
+        }
+        const result: SearchResult = {
+          id: externalIds[docId],
+          score: finalScore,
+          terms: Object.keys(match),
+          queryTerms: terms,
+          match,
+        }
+        if (hasStoredFields) assignStoredFields(storedFields, docId, result)
+        results[write++] = result
+      }
+
+      if (!skipSort && !allScoresEqual && results.length > 1) {
+        results.sort(byScore)
+      }
+      return results
+    }
+
+    const results: SearchResult[] = []
+    for (const [docId, { score, terms, match }] of rawResults) {
+      const quality = terms.length || 1
+      const finalScore = score * quality
+      const result: SearchResult = {
+        id: externalIds[docId],
+        score: finalScore,
+        terms: Object.keys(match),
+        queryTerms: terms,
+        match,
+      }
+      if (hasStoredFields) assignStoredFields(storedFields, docId, result)
+      if (filter(result)) {
+        if (firstScore == null) {
+          firstScore = finalScore
+        } else if (allScoresEqual && finalScore !== firstScore) {
+          allScoresEqual = false
+        }
+        results.push(result)
+      }
+    }
+
+    if (!skipSort && !allScoresEqual && results.length > 1) {
+      results.sort(byScore)
+    }
+    return results
   }
 
   private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {

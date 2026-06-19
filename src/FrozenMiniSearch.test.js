@@ -122,4 +122,19 @@ describe('FrozenMiniSearch core', () => {
     expect(inspected[0].match).toEqual({ beta: ['text'] })
     expect(results.map(r => r.id)).toEqual([2])
   })
+
+  test('finalizeSearchResults preserves insertion order when all scores tie', () => {
+    const rawResults = new Map([
+      [2, { score: 1, terms: ['alpha'], match: { alpha: ['text'] } }],
+      [0, { score: 1, terms: ['alpha'], match: { alpha: ['text'] } }],
+      [1, { score: 1, terms: ['alpha'], match: { alpha: ['text'] } }],
+    ])
+
+    const results = finalizeSearchResults({
+      rawResults,
+      getExternalId: docId => docId + 1,
+    })
+
+    expect(results.map(r => r.id)).toEqual([3, 1, 2])
+  })
 })

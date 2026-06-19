@@ -87,7 +87,7 @@ const CASES = {
 function buildPair (corpus, options) {
   const ms = new MiniSearch(options)
   ms.addAll(corpus)
-  const frozen = ms.freeze()
+  const frozen = FrozenMiniSearch.fromMiniSearch(ms, options)
   return { ms, frozen }
 }
 
@@ -161,7 +161,7 @@ function runCase (id) {
   const heapFrozen = measureHeap(() => {
     const m = new MiniSearch(spec.options)
     m.addAll(spec.corpus)
-    return m.freeze()
+    return FrozenMiniSearch.fromMiniSearch(m, spec.options)
   })
   const heapMutable = measureHeap(() => {
     const m = new MiniSearch(spec.options)

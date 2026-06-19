@@ -504,12 +504,20 @@ export function finalizeRawSearchResults(
 export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {
   const { rawResults, getExternalId, getStoredFields, filter, skipSort } = params
   const results: SearchResult[] = []
+  let allScoresEqual = true
+  let firstScore: number | undefined
 
   for (const [docId, { score, terms, match }] of rawResults) {
     const quality = terms.length || 1
+    const finalScore = score * quality
+    if (firstScore == null) {
+      firstScore = finalScore
+    } else if (allScoresEqual && finalScore !== firstScore) {
+      allScoresEqual = false
+    }
     const result: SearchResult = {
       id: getExternalId(docId),
-      score: score * quality,
+      score: finalScore,
       terms: Object.keys(match),
       queryTerms: terms,
       match,
@@ -522,7 +530,7 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
     }
   }
 
-  if (!skipSort) {
+  if (!skipSort && !allScoresEqual) {
     results.sort(byScore)
   }
   return results

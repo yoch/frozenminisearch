@@ -103,7 +103,28 @@ function rollupExports () {
   return [
   config({ format: 'es', input: 'src/index.ts', output: 'es6', dir: 'es' }),
   config({ format: 'cjs', input: 'src/index.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),
-  config({ format: 'es', input: 'src/index.ts', output: 'dts', dir: 'es', extension: 'd.ts' })
+  config({ format: 'es', input: 'src/index.ts', output: 'dts', dir: 'es', extension: 'd.ts' }),
+  {
+    input: 'src/browser.ts',
+    output: {
+      sourcemap: !production,
+      file: 'dist/browser/index.js',
+      format: 'es',
+    },
+    plugins: [
+      typescript(production
+        ? { sourceMap: false, compilerOptions: { outDir: 'dist/browser', sourceMap: false } }
+        : { sourceMap: true, compilerOptions: { outDir: 'dist/browser', sourceMap: true } }),
+    ],
+  },
+  {
+    input: 'src/browser.ts',
+    output: {
+      file: 'dist/browser/index.d.ts',
+      format: 'es',
+    },
+    plugins: [dts()],
+  },
   ]
 }
 

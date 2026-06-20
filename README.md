@@ -6,7 +6,7 @@
 
 [API documentation](https://yoch.github.io/frozenminisearch/)
 
-**Memory-optimized, read-only full-text search for Node.js.** FrozenMiniSearch keeps the serving API close to [MiniSearch](https://github.com/lucaong/minisearch) while using compact, immutable indexes for fixed corpora.
+**Memory-optimized, read-only full-text search for Node.js and browsers.** FrozenMiniSearch keeps the serving API close to [MiniSearch](https://github.com/lucaong/minisearch) while using compact, immutable indexes for fixed corpora.
 
 Use it when your documents are built offline, shipped to production, and queried many times. In that shape, frozen indexes use **~98-99% less index RAM** in the main benchmark set, save to compact binary snapshots, and load faster than MiniSearch JSON.
 
@@ -77,7 +77,16 @@ for (const doc of rows) builder.add(doc)
 const index = freezeFrozenIndexBuilder(builder)
 ```
 
-ESM and CommonJS are both supported (`main` → CJS, `module` → ESM).
+ESM and CommonJS are both supported on Node (`main` → CJS, `module` → ESM). For browsers and bundlers, use the dedicated browser entry (search + build only; no binary I/O):
+
+```javascript
+import FrozenMiniSearch from '@yoch/frozenminisearch/browser'
+
+const index = FrozenMiniSearch.fromDocuments(documents, options)
+index.search('ishmael', { prefix: true })
+```
+
+See [examples/plain_js_frozen/](examples/plain_js_frozen/) for a plain-JS demo (`yarn build` first).
 
 ---
 
@@ -127,15 +136,15 @@ MiniSearch is only needed if you still build mutable indexes. Frozen instances d
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
-- `saveBinarySync` / `loadBinarySync` / async variants
+- `saveBinarySync` / `loadBinarySync` / async variants (**Node only**)
 
 Custom `tokenize` and `processTerm` functions are not stored in snapshots; pass the same functions again when loading.
 
 ---
 
-## Binary snapshots
+## Binary snapshots (Node)
 
-Binary snapshots are the preferred production format.
+Binary snapshots are the preferred production format on Node.js.
 
 ```javascript
 const buf = index.saveBinarySync()

@@ -10,7 +10,7 @@ import {
   validateFrozenSnapshot,
   type FrozenSnapshot,
 } from '../binaryStructures'
-import { readStoredFieldsWireSection } from '../storedFieldsLayout'
+import { readStoredFieldsWireSection } from '../storedFieldsWire'
 import { readFieldLengthMatrixSection } from '../fieldLengthMatrix'
 import {
   isMsv5Buffer,

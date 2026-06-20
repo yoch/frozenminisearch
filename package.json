@@ -1,7 +1,7 @@
 {
   "name": "@yoch/frozenminisearch",
   "version": "1.2.4",
-  "description": "Read-only Node.js full-text search — compact frozen indexes and binary snapshots",
+  "description": "Read-only full-text search — compact frozen indexes and binary snapshots (Node.js and browser)",
   "main": "dist/cjs/index.cjs",
   "module": "dist/es/index.js",
   "type": "module",
@@ -11,6 +11,10 @@
       "require": "./dist/cjs/index.require.cjs",
       "import": "./dist/es/index.js",
       "default": "./dist/es/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.ts",
+      "default": "./dist/browser/index.js"
     }
   },
   "types": "./dist/es/index.d.ts",
@@ -33,7 +37,8 @@
     "index",
     "frozen",
     "binary",
-    "node"
+    "node",
+    "browser"
   ],
   "license": "MIT",
   "engines": {
@@ -100,6 +105,7 @@
   },
   "scripts": {
     "test": "jest",
+    "test:browser": "node scripts/assert-browser-bundle.cjs && jest --testMatch='<rootDir>/dev/browser/**/*.test.js' --runInBand",
     "test-watch": "jest --watch",
     "test:fuzzysearch": "jest --testMatch='<rootDir>/dev/internal/**/*.test.(ts|js)' --testPathIgnorePatterns=/node_modules/",
     "test:benchmarks": "jest --testMatch='<rootDir>/benchmarks/**/*.test.(ts|js)' --testPathIgnorePatterns=/node_modules/",

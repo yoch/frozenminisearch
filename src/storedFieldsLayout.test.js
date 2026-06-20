@@ -1,14 +1,13 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
 import {
-  buildStoredFieldsWireSection,
   createStoredFieldsLayout,
   readStoredFields,
-  readStoredFieldsWireSection,
   storedFieldsFromRows,
   storedFieldsToWireRows,
   writeStoredField,
 } from './storedFieldsLayout'
+import { buildStoredFieldsWireSection, readStoredFieldsWireSection } from './storedFieldsWire'
 import { buildStoredFieldsSection } from './binaryStructures'
 
 describe('storedFieldsLayout', () => {

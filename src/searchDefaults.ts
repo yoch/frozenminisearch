@@ -19,7 +19,7 @@ export const defaultAutoSuggestOptions = {
     i === terms.length - 1,
 }
 
-/** Option defaults applied by {@link FrozenMiniSearch.loadBinarySync} before caller overrides */
+/** Option defaults applied when loading binary snapshots before caller overrides */
 export const defaultFrozenLoadOptions = {
   idField: 'id',
   extractField: (document: any, fieldName: string) => document[fieldName],

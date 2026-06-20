@@ -1,4 +1,4 @@
-import { invalidFrozenIndex } from './binaryIo'
+import { invalidFrozenIndex } from './frozenErrors'
 import { packedIndexArray } from './PackedRadixTree/layout'
 import type { PackedIndexArray } from './PackedRadixTree/types'
 import { FLAG_FL_U8, FLAG_FL_U16 } from './msv5/binaryMsv5Constants'

@@ -1,4 +1,4 @@
-import { invalidFrozenIndex } from './binaryIo'
+import { invalidFrozenIndex } from './frozenErrors'
 import type { FreqArray } from './compactPostings'
 import { FLAG_FREQ_U16 } from './msv5/binaryMsv5Constants'
 

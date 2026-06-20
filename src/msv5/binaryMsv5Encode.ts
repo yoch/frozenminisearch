@@ -13,7 +13,7 @@ import {
   validateTermTreeLeaves,
   type FrozenSnapshot,
 } from '../binaryStructures'
-import { buildStoredFieldsWireSection } from '../storedFieldsLayout'
+import { buildStoredFieldsWireSection } from '../storedFieldsWire'
 import type { FrozenTermIndex } from '../frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { fromRadixTree } from '../PackedRadixTree'

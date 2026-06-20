@@ -15,7 +15,8 @@
 - Float32 `avgFieldLength` vs Float64 upstream.
 - Term frequency clamp (`Uint8` / `Uint16`) on frozen paths vs unbounded maps upstream.
 - `fromJson` / snapshot rebuild: MiniSearch radix sibling order can differ from a live instance after `toJSON` → different `terms` ordering for prefix-heavy hits (scores unchanged).
-- Node.js-only; no browser parity.
+- Node.js and browser search/autosuggest parity for `search`, `autoSuggest`, filters, boosts, prefix/fuzzy (browser via `dist/browser` smoke tests).
+- Binary snapshots (`saveBinary*` / `loadBinary*`) remain Node.js-only; no browser binary parity.
 
 ## Out of scope (not blocking)
 

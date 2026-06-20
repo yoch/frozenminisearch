@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>FrozenMiniSearch Example</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700" rel="stylesheet">
+    <link href='app.css' rel='stylesheet' type='text/css'>
+  </head>
+  <body>
+    <div id="app">
+      <div class="App">
+        <div class="Loader">loading...</div>
+        <article class="main">
+          <header class="Header">
+            <h1>Song Search (Frozen)</h1>
+            <div class="SearchBox">
+              <div class="Search">
+                <input type="text" autoComplete="none" autoCorrect="none" autoCapitalize="none" spellCheck="false" />
+                <button class="clear">&times;</button>
+              </div>
+
+              <ul class="SuggestionList">
+              </ul>
+
+              <details class="AdvancedOptions">
+                <summary>Advanced options</summary>
+                <form class="options">
+                  <div>
+                    <b>Search in fields:</b>
+                    <label>
+                      <input type="checkbox" name="fields" value="title" checked />
+                      Title
+                    </label>
+                    <label>
+                      <input type="checkbox" name="fields" value="artist" checked />
+                      Artist
+                    </label>
+                  </div>
+                  <div>
+                    <b>Search options:</b>
+                    <label><input type="checkbox" name="prefix" value="true" checked /> Prefix</label>
+                    <label><input type="checkbox" name="fuzzy" value="true" checked /> Fuzzy</label>
+                  </div>
+                  <div>
+                    <b>Combine terms with:</b>
+                    <label><input type="radio" name="combineWith" value="OR" checked /> OR</label>
+                    <label><input type="radio" name="combineWith" value="AND" /> AND</label>
+                  </div>
+                  <div>
+                    <b>Filter:</b>
+                    <label>
+                      from year:
+                      <select name="fromYear">
+                      </select>
+                    </label>
+                    <label>
+                      to year:
+                      <select name="toYear">
+                      </select>
+                    </label>
+                    <script type="text/javascript">
+                      const populateYears = (selector, minYear, maxYear, selectedYear) => {
+                        document.querySelector(selector).innerHTML =
+                          Array.from({ length: maxYear - minYear + 1 }, (_, i) => i + minYear)
+                          .map(y => `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>${y}</option>`)
+                          .join('\n')
+                      }
+
+                      populateYears('select[name=fromYear]', 1965, 2015, 1965)
+                      populateYears('select[name=toYear]', 1965, 2015, 2015)
+                    </script>
+                  </div>
+                </form>
+              </details>
+            </div>
+          </header>
+          <p class="Explanation">
+            This demo uses the browser build of
+            <a href="https://github.com/yoch/frozenminisearch">FrozenMiniSearch</a>:
+            the index is built once from JSON with <code>fromDocuments</code>, then queried
+            in-memory with the same search and auto-suggest API as MiniSearch.
+          </p>
+          <ul class="SongList">
+          </ul>
+        </article>
+      </div>
+    </div>
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

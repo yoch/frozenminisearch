@@ -1,4 +1,4 @@
-import { invalidFrozenIndex } from '../binaryIo'
+import { invalidFrozenIndex } from '../frozenErrors'
 import PackedRadixTree from '../PackedRadixTree'
 import type { PackedIndexArray, PackedRadixTreeData } from '../PackedRadixTree/types'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'

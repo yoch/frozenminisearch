@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## v1.2.4 — `@yoch/frozenminisearch`
+
+Patch release: faster frozen search and autoSuggest finalization, simplified AND gate heuristics, and small public exports for advanced callers. No MSv5 wire-format changes.
+
+### Added
+
+- **Public finalize/suggest helpers** — export `finalizeRawSearchResults`, `finalizeSearchResults`, `suggestFromRawResults`, and `suggestFromSearchResults` from the package entry.
+
+### Improved
+
+- **Tied-score finalization** — skip result sorting when every hit shares the same final score (search and suggestions).
+- **Frozen search finalize** — copy stored fields in place via `assignStoredFields` (no per-document row allocation for single-column layouts).
+- **AutoSuggest without `filter`** — aggregate suggestions from raw query hits instead of materializing full `SearchResult` objects.
+- **AND gate heuristics** — pass selective gates as `allowedDocs` consistently; keep prefix/fuzzy on sequential gating via a cheap two-phase posting estimator.
+- **CPU-only benchmarks** — `benchmark:finalize` and `benchmark:autosuggest` scripts; clearer reporting when benchmark payloads omit structural metrics.
+
 ## v1.2.3 — `@yoch/frozenminisearch`
 
 Patch release: broad-first exact AND / AND_NOT paths, seek-based gated doc-id collection, and README benchmark copy refresh. No API or MSv5 wire-format changes.

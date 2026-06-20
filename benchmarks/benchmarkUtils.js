@@ -2,9 +2,9 @@ import { execSync } from 'node:child_process'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { ALL_SURFACES, surfacesFromEnv, hasStructuralSurfaces } from './framework/surfaces.mjs'
+import { ALL_SURFACES, surfacesFromEnv, hasStructuralSurfaces, isCpuOnlySurfaces } from './framework/surfaces.mjs'
 
-export { hasStructuralSurfaces }
+export { hasStructuralSurfaces, isCpuOnlySurfaces }
 
 function findRepoRoot () {
   const starts = [process.cwd(), dirname(fileURLToPath(import.meta.url))]
@@ -225,7 +225,7 @@ export function parseBenchSurfaces (args = process.argv) {
 
 export function parseBenchProfile (args = process.argv) {
   const surfaces = parseBenchSurfaces(args)
-  if (surfaces.length === 1 && surfaces[0] === 'search') return 'search'
+  if (isCpuOnlySurfaces(surfaces)) return 'search'
   return 'full'
 }
 
@@ -427,4 +427,3 @@ export function collectRunMetadata () {
     }
   }
 }
-

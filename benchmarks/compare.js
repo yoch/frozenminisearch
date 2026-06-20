@@ -68,20 +68,17 @@ function printScenario (data) {
     }
   }
 
-  if (!data.heapMb) {
-    if (data.search) printSearchTable(data)
-    return
+  if (data.heapMb && data.diskMb) {
+    const baseHeap = data.heapMb.mutable
+    printTable([
+      { label: 'Mutable MiniSearch', heapMb: data.heapMb.mutable.toFixed(2), diskMb: data.diskMb.json?.toFixed(2), loadMs: data.loadMs?.json, vsMutable: 'baseline' },
+      { label: 'FrozenMiniSearch', heapMb: data.heapMb.frozen.toFixed(2), diskMb: data.diskMb.binary?.toFixed(2), loadMs: null, vsMutable: pct(baseHeap, data.heapMb.frozen) },
+      { label: 'loadJSON → MiniSearch', heapMb: data.heapMb.loadJson?.toFixed(2), diskMb: data.diskMb.json?.toFixed(2), loadMs: data.loadMs?.json, vsMutable: data.heapMb.loadJson != null ? pct(baseHeap, data.heapMb.loadJson) : '—' },
+      { label: 'loadBinary → Frozen', heapMb: data.heapMb.loadBinary?.toFixed(2), diskMb: data.diskMb.binary?.toFixed(2), loadMs: data.loadMs?.binary, vsMutable: data.heapMb.loadBinary != null ? pct(baseHeap, data.heapMb.loadBinary) : '—' }
+    ])
   }
 
-  const baseHeap = data.heapMb.mutable
-  printTable([
-    { label: 'Mutable MiniSearch', heapMb: data.heapMb.mutable.toFixed(2), diskMb: data.diskMb.json.toFixed(2), loadMs: data.loadMs.json, vsMutable: 'baseline' },
-    { label: 'FrozenMiniSearch', heapMb: data.heapMb.frozen.toFixed(2), diskMb: data.diskMb.binary.toFixed(2), loadMs: null, vsMutable: pct(baseHeap, data.heapMb.frozen) },
-    { label: 'loadJSON → MiniSearch', heapMb: data.heapMb.loadJson.toFixed(2), diskMb: data.diskMb.json.toFixed(2), loadMs: data.loadMs.json, vsMutable: pct(baseHeap, data.heapMb.loadJson) },
-    { label: 'loadBinary → Frozen', heapMb: data.heapMb.loadBinary.toFixed(2), diskMb: data.diskMb.binary.toFixed(2), loadMs: data.loadMs.binary, vsMutable: pct(baseHeap, data.heapMb.loadBinary) }
-  ])
-
-  if (data.loadMs) {
+  if (data.loadMs?.json != null && data.loadMs?.binary != null) {
     console.log('\nCold load:')
     console.log(`  loadJSON:   ${data.loadMs.json.toFixed(1)} ms`)
     console.log(`  loadBinary: ${data.loadMs.binary.toFixed(1)} ms  (${pct(data.loadMs.json, data.loadMs.binary)} vs loadJSON)`)

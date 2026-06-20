@@ -16,6 +16,7 @@ import {
   loadBenchmarkPayload,
   argValue,
   hasStructuralSurfaces,
+  isCpuOnlySurfaces,
   DEFAULT_BENCHMARK_RUNS,
   DEFAULT_SEARCH_ITERATIONS,
 } from './benchmarkUtils.js'
@@ -55,6 +56,20 @@ function loadJson (path) {
     process.exit(1)
   }
   return loadBenchmarkPayload(path)
+}
+
+function payloadHasStructuralData(payload) {
+  const surfaces = payload.benchSurfaces ?? payload.scenarios?.[0]?.benchSurfaces
+  if (Array.isArray(surfaces) && surfaces.length > 0) {
+    return hasStructuralSurfaces(surfaces)
+  }
+  return (payload.scenarios ?? []).some(scenario =>
+    scenario.heapMb != null
+    || scenario.indexing != null
+    || scenario.loadMs != null
+    || scenario.diskMb != null
+    || scenario.memoryBreakdown != null,
+  )
 }
 
 function classifyRegression (metricKey, deltaPct, deltaPoints) {
@@ -112,12 +127,24 @@ function compareScenario (ref, cur, { structural = true } = {}) {
   }
 
   if (structural) {
-    const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
-    compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
-    compareTimingMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs', bump)
-    compareTimingMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs', bump)
-    compareTimingMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
-    bump(compareMetric('disk binary (MB)', ref.diskMb.binary, cur.diskMb.binary, 'heapFrozenMb'))
+    if (ref.heapMb?.frozen != null && cur.heapMb?.frozen != null) {
+      const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
+      compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
+    } else {
+      console.log('  (heap metrics unavailable for one side; skipped)')
+    }
+    if (ref.loadMs?.binary != null && cur.loadMs?.binary != null) {
+      compareTimingMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs', bump)
+    }
+    if (ref.indexing?.saveBinaryMs != null && cur.indexing?.saveBinaryMs != null) {
+      compareTimingMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs', bump)
+    }
+    if (ref.indexing?.freezeMs != null && cur.indexing?.freezeMs != null) {
+      compareTimingMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
+    }
+    if (ref.diskMb?.binary != null && cur.diskMb?.binary != null) {
+      bump(compareMetric('disk binary (MB)', ref.diskMb.binary, cur.diskMb.binary, 'heapFrozenMb'))
+    }
     if (ref.memoryBreakdown?.postings && cur.memoryBreakdown?.postings) {
       bump(compareMetric('postings typed (MB)', mb(ref.memoryBreakdown.postings.totalTypedBytes), mb(cur.memoryBreakdown.postings.totalTypedBytes), 'heapFrozenMb'))
       bump(compareMetric('radix est. (MB)', mb(ref.memoryBreakdown.radixTree.estimatedBytes), mb(cur.memoryBreakdown.radixTree.estimatedBytes), 'heapFrozenMb'))
@@ -200,8 +227,11 @@ function main () {
   const curIters = current.searchIterations ?? '(legacy)'
   const curProfile = current.benchProfile ?? current.scenarios[0]?.benchProfile ?? 'full'
   const refProfile = reference.benchProfile ?? reference.scenarios[0]?.benchProfile ?? 'full'
-  const diffSearchOnly = benchProfile === 'search' || curProfile === 'search'
-    || !hasStructuralSurfaces(surfaces)
+  const currentSurfaces = current.benchSurfaces ?? current.scenarios[0]?.benchSurfaces ?? []
+  const referenceSurfaces = reference.benchSurfaces ?? reference.scenarios[0]?.benchSurfaces ?? []
+  const diffSearchOnly = !payloadHasStructuralData(current)
+    || !payloadHasStructuralData(reference)
+    || isCpuOnlySurfaces(surfaces)
   if (forceRun) {
     console.log(`Measured:  ${runs} run(s)/scenario, ${searchIterations} search iterations, profile=${curProfile}`)
   } else {

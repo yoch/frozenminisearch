@@ -46,3 +46,7 @@ export function computeSurfaceNeeds(surfaces) {
 export function hasStructuralSurfaces(surfaces) {
   return surfaces.some(name => STRUCTURAL_SURFACES.has(name))
 }
+
+export function isCpuOnlySurfaces(surfaces) {
+  return !hasStructuralSurfaces(surfaces)
+}

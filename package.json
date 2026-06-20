@@ -128,6 +128,7 @@
     "benchmark:diff:run": "npm run build && node --expose-gc benchmarks/diffBaseline.js --run",
     "benchmark:targeted": "npm run build && node --expose-gc benchmarks/scripts/targeted-failures.mjs",
     "benchmark:finalize": "npm run build && node --expose-gc benchmarks/scripts/finalize-search.mjs",
+    "benchmark:autosuggest": "npm run build && node --expose-gc benchmarks/scripts/autosuggest-search.mjs",
     "benchmark:targeted:compare": "node benchmarks/scripts/targeted-failures.mjs --compare",
     "benchmark:history:analyze": "node benchmarks/scripts/analyze-history.mjs",
     "benchmark:history:vs-mutable": "node benchmarks/scripts/analyze-history.mjs --vs-mutable",

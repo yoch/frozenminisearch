@@ -1,7 +1,9 @@
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { createFrozenIndexBuilder } from './frozenBuild'
 import { finalizeSearchResults } from './scoring'
+import { defaultAutoSuggestOptions } from './searchDefaults'
 import { assignStoredFields } from './storedFieldsLayout'
+import { suggestFromRawResults, suggestFromSearchResults } from './suggestions'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea', category: 'fiction' },
@@ -185,5 +187,63 @@ describe('FrozenMiniSearch core', () => {
     const target = { id: 1 }
     assignStoredFields({ kind: 'single', field: 'category', values: [] }, 0, target)
     expect(target).toEqual({ id: 1 })
+  })
+
+  test('suggestFromRawResults matches finalized hit ordering and scores', () => {
+    const rawResults = new Map([
+      [1, { score: 2, terms: ['zen', 'ar'], match: { zen: ['text'], archery: ['text'], art: ['text'] } }],
+      [0, { score: 1, terms: ['zen', 'ar'], match: { zen: ['text'], art: ['text'] } }],
+      [2, { score: 1, terms: ['zen', 'ar'], match: { zen: ['text'], archery: ['text'], art: ['text'] } }],
+    ])
+
+    const finalized = finalizeSearchResults({
+      rawResults,
+      getExternalId: docId => docId,
+    })
+
+    expect(suggestFromRawResults(rawResults)).toEqual(suggestFromSearchResults(finalized))
+  })
+
+  test('suggestFromRawResults preserves insertion order when hit scores tie', () => {
+    const rawResults = new Map([
+      [2, { score: 1, terms: ['zen'], match: { zen: ['text'], archery: ['text'] } }],
+      [0, { score: 1, terms: ['zen'], match: { zen: ['text'], art: ['text'] } }],
+    ])
+
+    expect(suggestFromRawResults(rawResults)).toEqual([
+      { suggestion: 'zen archery', terms: ['zen', 'archery'], score: 1 },
+      { suggestion: 'zen art', terms: ['zen', 'art'], score: 1 },
+    ])
+  })
+
+  test('autoSuggest with filter matches the search-derived fallback path', () => {
+    const index = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 1, title: 'Zen Motorcycle', text: 'zen art motorcycle maintenance', category: 'fiction' },
+        { id: 2, title: 'Zen Archery', text: 'zen archery art practice', category: 'non-fiction' },
+      ],
+      { fields: ['title', 'text'], storeFields: ['category'] },
+    )
+    const filter = result => result.category === 'fiction'
+    const options = { ...defaultAutoSuggestOptions, filter }
+
+    expect(index.autoSuggest('zen ar', { filter })).toEqual(
+      suggestFromSearchResults(index.search('zen ar', options)),
+    )
+  })
+
+  test('autoSuggest without stored fields matches the search-derived path', () => {
+    const index = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 1, text: 'zen art motorcycle maintenance' },
+        { id: 2, text: 'zen archery art practice' },
+      ],
+      { fields: ['text'], storeFields: [] },
+    )
+    const options = { ...defaultAutoSuggestOptions }
+
+    expect(index.autoSuggest('zen ar')).toEqual(
+      suggestFromSearchResults(index.search('zen ar', options)),
+    )
   })
 })

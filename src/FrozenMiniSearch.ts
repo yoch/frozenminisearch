@@ -33,7 +33,7 @@ import {
   executeQuery as runQuery,
   type QueryEngineParams,
 } from './queryEngine'
-import { autoSuggestFromSearch } from './suggestions'
+import { suggestFromRawResults, suggestFromSearchResults } from './suggestions'
 import type {
   SaveBinaryOptions,
   Options,
@@ -269,7 +269,10 @@ export default class FrozenMiniSearch<T = any> {
 
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
     const merged = { ...this._options.autoSuggestOptions, ...options }
-    return autoSuggestFromSearch((q, o) => this.search(q, o), queryString, merged)
+    if (merged.filter == null) {
+      return suggestFromRawResults(this.executeQuery(queryString, merged))
+    }
+    return suggestFromSearchResults(this.search(queryString, merged))
   }
 
   /** Serialize this index as a frozen binary snapshot (synchronous). */

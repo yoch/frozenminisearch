@@ -15,6 +15,7 @@ import type {
   BM25Params,
 } from './searchTypes'
 import { isWildcardQuery } from './symbols'
+import { assignStoredFields, type StoredFieldsLayout } from './storedFieldsLayout'
 
 export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
 
@@ -474,8 +475,26 @@ export interface FinalizeSearchParams {
   rawResults: RawResult
   getExternalId: (docId: number) => unknown
   getStoredFields?: (docId: number) => Record<string, unknown> | undefined
+  /** When set, copies stored fields in place (no per-doc row allocation for single-column layouts). */
+  storedFieldsLayout?: StoredFieldsLayout
   filter?: (result: SearchResult) => boolean
   skipSort?: boolean
+}
+
+function writeStoredFieldsOntoResult(
+  docId: number,
+  result: SearchResult,
+  storedFieldsLayout?: StoredFieldsLayout,
+  getStoredFields?: (docId: number) => Record<string, unknown> | undefined,
+): void {
+  if (storedFieldsLayout != null) {
+    assignStoredFields(storedFieldsLayout, docId, result)
+    return
+  }
+  if (getStoredFields != null) {
+    const storedFields = getStoredFields(docId)
+    if (storedFields != null) Object.assign(result, storedFields)
+  }
 }
 
 /** Merge search options, apply wildcard skipSort, then {@link finalizeSearchResults}. */
@@ -486,6 +505,7 @@ export function finalizeRawSearchResults(
   globalSearchOptions: SearchOptionsWithDefaults,
   getExternalId: (docId: number) => unknown,
   getStoredFields?: (docId: number) => Record<string, unknown> | undefined,
+  storedFieldsLayout?: StoredFieldsLayout,
 ): SearchResult[] {
   const searchOptionsWithDefaults: SearchOptionsWithDefaults = {
     ...globalSearchOptions,
@@ -496,13 +516,14 @@ export function finalizeRawSearchResults(
     rawResults,
     getExternalId,
     getStoredFields,
+    storedFieldsLayout,
     filter: searchOptionsWithDefaults.filter,
     skipSort,
   })
 }
 
 export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {
-  const { rawResults, getExternalId, getStoredFields, filter, skipSort } = params
+  const { rawResults, getExternalId, getStoredFields, storedFieldsLayout, filter, skipSort } = params
   let allScoresEqual = true
   let firstScore: number | undefined
 
@@ -524,10 +545,7 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
         queryTerms: terms,
         match,
       }
-      if (getStoredFields != null) {
-        const storedFields = getStoredFields(docId)
-        if (storedFields != null) Object.assign(result, storedFields)
-      }
+      writeStoredFieldsOntoResult(docId, result, storedFieldsLayout, getStoredFields)
       results[write++] = result
     }
 
@@ -548,10 +566,7 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
       queryTerms: terms,
       match,
     }
-    if (getStoredFields != null) {
-      const storedFields = getStoredFields(docId)
-      if (storedFields != null) Object.assign(result, storedFields)
-    }
+    writeStoredFieldsOntoResult(docId, result, storedFieldsLayout, getStoredFields)
     if (filter(result)) {
       if (firstScore == null) {
         firstScore = finalScore

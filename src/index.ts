@@ -1,4 +1,6 @@
 export { OR, AND, AND_NOT } from './scoring'
+export { finalizeRawSearchResults, finalizeSearchResults } from './scoring'
+export { suggestFromRawResults, suggestFromSearchResults } from './suggestions'
 export type {
   BM25Params,
   BinaryCompression,

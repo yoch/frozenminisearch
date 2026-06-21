@@ -5,12 +5,14 @@ import type { FrozenPostingsLayout } from './frozenPostings'
 import { validateFrozenPostingsLayout } from './frozenPostings'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
+import { invalidFrozenIndex } from './frozenErrors'
 import {
-  invalidFrozenIndex,
   readExternalId,
   readLengthPrefixedUtf8,
   writeExternalId,
-} from './binaryIo'
+} from './binaryWireIo'
+import { readU32LE, readUtf8 } from './binaryBytes'
+import type { BinaryBytes } from './binaryBytes'
 import type { StoredFieldsLayout } from './storedFieldsLayout'
 
 export type TreeShape = Array<[string, number | TreeShape]>
@@ -107,7 +109,7 @@ export function validateFrozenSnapshotNumeric(snap: {
 }
 
 export function readFieldNamesSection(
-  buf: Buffer,
+  buf: BinaryBytes,
   fieldNamesOff: number,
   fieldCount: number,
   externalIdsOff: number,
@@ -126,7 +128,7 @@ export function readFieldNamesSection(
 }
 
 export function readExternalIdsSection(
-  buf: Buffer,
+  buf: BinaryBytes,
   externalIdsOff: number,
   nextId: number,
   storedOff: number,
@@ -145,7 +147,7 @@ export function readExternalIdsSection(
 }
 
 export function readStoredFieldsSection(
-  buf: Buffer,
+  buf: BinaryBytes,
   storedOff: number,
   nextId: number,
   sectionEnd: number,
@@ -156,7 +158,7 @@ export function readStoredFieldsSection(
     throw invalidFrozenIndex('stored fields table out of bounds')
   }
   for (let i = 0; i < nextId; i++) {
-    const rel = buf.readUInt32LE(storedOff + i * 4)
+    const rel = readU32LE(buf, storedOff + i * 4)
     if (rel === 0) {
       storedFields[i] = undefined
       continue
@@ -165,13 +167,13 @@ export function readStoredFieldsSection(
     if (entryOff + 4 > sectionEnd) {
       throw invalidFrozenIndex('stored fields entry offset out of bounds')
     }
-    const jsonLen = buf.readUInt32LE(entryOff)
+    const jsonLen = readU32LE(buf, entryOff)
     const jsonStart = entryOff + 4
     const jsonEnd = jsonStart + jsonLen
     if (jsonEnd > sectionEnd) {
       throw invalidFrozenIndex('stored fields JSON out of bounds')
     }
-    storedFields[i] = JSON.parse(buf.toString('utf8', jsonStart, jsonEnd)) as Record<string, unknown>
+    storedFields[i] = JSON.parse(readUtf8(buf, jsonStart, jsonEnd)) as Record<string, unknown>
   }
   return storedFields
 }

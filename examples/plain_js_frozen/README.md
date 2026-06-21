@@ -24,6 +24,12 @@ In your app, import the browser entry explicitly:
 
 ```javascript
 import FrozenMiniSearch from '@yoch/frozenminisearch/browser'
+
+const index = FrozenMiniSearch.fromDocuments(documents, options)
+
+// Optional: load a pre-built zlib snapshot from your CDN
+const buf = new Uint8Array(await (await fetch('/path/to/index.frozen')).arrayBuffer())
+const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
 ```
 
-Binary snapshots (`loadBinarySync`, etc.) are **not** available in the browser build; use Node for MSv5 snapshots.
+The browser build supports **sync** binary only (`saveBinarySync` / `loadBinarySync` on `Uint8Array`, codecs `raw` / `zlib` / `auto`). Use Node to produce CDN snapshots with `compression: 'zlib'` (or rely on `auto`, which now defaults to zlib).

@@ -34,7 +34,7 @@ describe('storedFieldsLayout', () => {
     writeStoredField(layout, 1, ['txt'], (d, f) => d[f], { txt: 'y' })
     const legacy = buildStoredFieldsSection(storedFieldsToWireRows(layout, 2), 2)
     const direct = buildStoredFieldsWireSection(layout, 2)
-    expect(direct.equals(legacy)).toBe(true)
+    expect(Buffer.from(direct)).toEqual(legacy)
   })
 
   test('wire section read → single column', () => {

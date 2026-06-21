@@ -6,6 +6,7 @@ import {
   ID_TAG_NUMBER,
   ID_TAG_STRING,
 } from './binaryConstants'
+import { crc32Update as crc32UpdateWire } from './crc32Wire'
 import { invalidFrozenIndex } from './frozenErrors'
 
 export { invalidFrozenIndex } from './frozenErrors'
@@ -33,30 +34,13 @@ export function assertSectionOffsets(buf: Buffer, headerSize: number, offsets: n
   }
 }
 
-const CRC_TABLE = new Uint32Array(256)
-for (let i = 0; i < 256; i++) {
-  let c = i
-  for (let j = 0; j < 8; j++) {
-    c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1)
-  }
-  CRC_TABLE[i] = c
-}
-
-function crc32BufferFallback(buf: Buffer, start: number, end: number, seed = 0): number {
-  let crc = (seed ^ 0xffffffff) >>> 0
-  for (let i = start; i < end; i++) {
-    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ buf[i]) & 0xff]
-  }
-  return (crc ^ 0xffffffff) >>> 0
-}
-
 /** Incremental CRC-32 IEEE update; pass the previous return value as `seed`. */
 export function crc32Update(seed: number, buf: Buffer, start = 0, end = buf.length): number {
   if (typeof zlibCrc32 === 'function') {
     const slice = start === 0 && end === buf.length ? buf : buf.subarray(start, end)
     return zlibCrc32(slice, seed) >>> 0
   }
-  return crc32BufferFallback(buf, start, end, seed)
+  return crc32UpdateWire(seed, buf, start, end)
 }
 
 /** CRC-32 IEEE (zlib polynomial); uses `zlib.crc32` when available. */

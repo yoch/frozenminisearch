@@ -166,17 +166,24 @@ export type OptionsWithDefaults<T = any> = Options<T> & {
 /** Compression codec selection for frozen binary snapshots. */
 export type BinaryCompression = 'auto' | 'raw' | 'zstd' | 'zlib'
 
+/** Browser snapshot compression (`zstd` not supported). */
+export type BrowserBinaryCompression = 'auto' | 'raw' | 'zlib'
+
 /** Options for `saveBinarySync()` / `saveBinaryAsync()`. */
 export type SaveBinaryOptions = {
   /**
    * Compression codec for the payload.
-   * - `auto`: one pass; payloads under 64 B stay raw; otherwise zstd when available
-   *   (else zlib on Node < 22.15), kept only when strictly smaller than raw
+   * - `auto`: one pass; payloads under 64 B stay raw; otherwise zlib when it shrinks
    * - `raw`: never compress
-   * - `zstd`: always zstd-compress, even when larger than raw; requires Node 22.15+ to write
-   * - `zlib`: always deflate, even when larger than raw; readable on Node 20+
+   * - `zstd`: always zstd-compress; requires Node 22.15+ to write
+   * - `zlib`: always deflate; readable on Node 20+ and in the browser build
    */
   compression?: BinaryCompression
+}
+
+/** Browser `saveBinarySync()` options (no zstd). */
+export type BrowserSaveBinaryOptions = {
+  compression?: BrowserBinaryCompression
 }
 
 /**

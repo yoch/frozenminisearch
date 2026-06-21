@@ -3,19 +3,13 @@ import {
   decodeFrozenSnapshotAsync,
   encodeFrozenSnapshot,
   encodeFrozenSnapshotAsync,
-  fieldNamesFromFieldIds,
 } from './binaryFormat'
-import { createIdToShortIdLookup } from './frozenIdLookup'
+import { assembleParamsFromBinarySnapshot, buildBinarySnapshotInput } from './frozenBinaryShared'
 import {
-  defaultSearchOptions,
-  defaultAutoSuggestOptions,
   defaultFrozenLoadOptions,
 } from './searchDefaults'
-import { fieldLengthMatrixForWire } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { SaveBinaryOptions, Options } from './searchTypes'
-import { storedFieldsFromRows } from './storedFieldsLayout'
-import type { OptionsWithDefaults } from './frozenTypes'
 import FrozenMiniSearchCore, {
   assembleFrozenWithCtor,
   frozenMemoryBreakdown,
@@ -43,19 +37,6 @@ export function freezeFrozenIndexBuilder<T>(builder: FrozenIndexBuilder<T>): Fro
   return assembleFrozenWithCtor(builder.freezeParams(), true, 'trusted-build', FrozenMiniSearch)
 }
 
-function assertFieldsMatchSnapshot(
-  optionsFields: readonly string[],
-  snapFieldIds: { [field: string]: number },
-): void {
-  const snapNames = Object.keys(snapFieldIds).sort()
-  const optNames = [...optionsFields].sort()
-  if (snapNames.length !== optNames.length || snapNames.some((name, i) => name !== optNames[i])) {
-    throw new Error(
-      `FrozenMiniSearch: option "fields" must match the indexed fields exactly (expected: ${snapNames.join(', ')})`,
-    )
-  }
-}
-
 /** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts (full validation). */
 export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
   return assembleFrozenWithCtor(params, false, 'binary-load', FrozenMiniSearch)
@@ -73,20 +54,17 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   }
 
   private binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshot>[0] {
-    return {
+    return buildBinarySnapshotInput({
       documentCount: this._documentCount,
       nextId: this._nextId,
       fieldIds: this._fieldIds,
       fieldCount: this._fieldCount,
-      fieldNames: fieldNamesFromFieldIds(this._fieldIds),
       avgFieldLength: this._avgFieldLength,
       externalIds: this._externalIds,
-      storedFields: new Array(this._nextId),
       storedFieldsLayout: this._storedFields,
-      fieldLengthMatrix: fieldLengthMatrixForWire(this._fieldLengthMatrix),
-      treeShape: [],
+      fieldLengthMatrix: this._fieldLengthMatrix,
       postings: this._postings,
-    }
+    })
   }
 
   /** Load a frozen binary snapshot. */
@@ -110,43 +88,6 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
     snap: ReturnType<typeof decodeFrozenSnapshot>,
     options: Options<T>,
   ): FrozenMiniSearch<T> {
-    const snapshotFields = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
-    if (options.fields != null) {
-      assertFieldsMatchSnapshot(options.fields, snap.fieldIds)
-    }
-
-    const opts: OptionsWithDefaults<T> = {
-      ...defaultFrozenLoadOptions,
-      ...options,
-      fields: options.fields ?? snapshotFields,
-      searchOptions: {
-        ...defaultSearchOptions,
-        ...(options.searchOptions || {}),
-      },
-      autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
-    } as OptionsWithDefaults<T>
-
-    const index = snap.packedTermIndex
-    if (index == null) {
-      throw new Error('FrozenMiniSearch: binary snapshot missing packed term index')
-    }
-
-    const idLookup = createIdToShortIdLookup(snap.externalIds, snap.nextId)
-
-    return assembleFrozen({
-      options: opts,
-      documentCount: snap.documentCount,
-      nextId: snap.nextId,
-      fieldIds: snap.fieldIds,
-      fieldCount: snap.fieldCount,
-      externalIds: snap.externalIds,
-      idLookup,
-      storedFields: snap.storedFieldsLayout ?? storedFieldsFromRows(snap.storedFields, opts.storeFields),
-      fieldLengthMatrix: snap.fieldLengthMatrix,
-      avgFieldLength: snap.avgFieldLength,
-      index,
-      termCount: snap.postings.termCount,
-      postings: snap.postings,
-    })
+    return assembleFrozen(assembleParamsFromBinarySnapshot(snap, options))
   }
 }

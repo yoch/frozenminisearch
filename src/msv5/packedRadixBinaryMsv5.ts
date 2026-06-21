@@ -1,3 +1,5 @@
+import { allocBytes, bytesFromView, concatBytes, readU32LE, readUtf8, utf8Bytes, writeU32LE } from '../binaryBytes'
+import type { BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import PackedRadixTree from '../PackedRadixTree'
 import type { PackedIndexArray, PackedRadixTreeData } from '../PackedRadixTree/types'
@@ -35,21 +37,21 @@ function pad4(n: number): number {
   return (n + 3) & ~3
 }
 
-function appendColumn(chunks: Buffer[], arr: PackedIndexArray): void {
-  const raw = Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength)
+function appendColumn(chunks: BinaryBytes[], arr: PackedIndexArray): void {
+  const raw = bytesFromView(arr)
   chunks.push(raw)
   const pad = pad4(raw.length) - raw.length
-  if (pad > 0) chunks.push(Buffer.alloc(pad))
+  if (pad > 0) chunks.push(allocBytes(pad))
 }
 
-export function buildTermTreeSectionColumnar(tree: PackedRadixTree): Buffer {
-  const header = Buffer.alloc(TREE_SECTION_HEADER_BYTES)
-  header.writeUInt32LE(tree.size, 0)
-  header.writeUInt32LE(tree.nodeCount, 4)
-  header.writeUInt32LE(tree.edgeCount, 8)
-  header.writeUInt32LE(columnWidthFlagsFromTree(tree), 12)
+export function buildTermTreeSectionColumnar(tree: PackedRadixTree): Uint8Array {
+  const header = allocBytes(TREE_SECTION_HEADER_BYTES)
+  writeU32LE(header, 0, tree.size)
+  writeU32LE(header, 4, tree.nodeCount)
+  writeU32LE(header, 8, tree.edgeCount)
+  writeU32LE(header, 12, columnWidthFlagsFromTree(tree))
 
-  const chunks: Buffer[] = [header]
+  const chunks: BinaryBytes[] = [header]
   appendColumn(chunks, tree.nodeEdgeOffset)
   appendColumn(chunks, tree.nodeValue)
   appendColumn(chunks, tree.nodeLeafOrder)
@@ -57,9 +59,8 @@ export function buildTermTreeSectionColumnar(tree: PackedRadixTree): Buffer {
   appendColumn(chunks, tree.edgeLabelLength)
   appendColumn(chunks, tree.edgeChild)
 
-  const labelBuf = Buffer.from(tree.labelHeap, 'utf8')
-  chunks.push(labelBuf)
-  return Buffer.concat(chunks)
+  chunks.push(utf8Bytes(tree.labelHeap))
+  return concatBytes(chunks)
 }
 
 function widthFromFlags(flags: number, columnIndex: number): 1 | 2 | 4 {
@@ -71,7 +72,7 @@ function widthFromFlags(flags: number, columnIndex: number): 1 | 2 | 4 {
 }
 
 function readColumn(
-  buf: Buffer,
+  buf: BinaryBytes,
   offset: number,
   elementCount: number,
   width: 1 | 2 | 4,
@@ -106,16 +107,16 @@ function readColumn(
 }
 
 export function readPackedTermTreeSectionColumnar(
-  buf: Buffer,
+  buf: BinaryBytes,
   termCount: number,
 ): PackedRadixTree {
   if (buf.length < TREE_SECTION_HEADER_BYTES) {
     throw invalidFrozenIndex('term tree section too short')
   }
-  const size = buf.readUInt32LE(0)
-  const nodeCount = buf.readUInt32LE(4)
-  const edgeCount = buf.readUInt32LE(8)
-  const widthFlags = buf.readUInt32LE(12)
+  const size = readU32LE(buf, 0)
+  const nodeCount = readU32LE(buf, 4)
+  const edgeCount = readU32LE(buf, 8)
+  const widthFlags = readU32LE(buf, 12)
   if (size !== termCount) {
     throw invalidFrozenIndex('term tree termCount mismatch')
   }
@@ -139,7 +140,7 @@ export function readPackedTermTreeSectionColumnar(
   if (o > buf.length) {
     throw invalidFrozenIndex('term tree label heap out of bounds')
   }
-  const labelHeap = o === buf.length ? '' : buf.toString('utf8', o, buf.length)
+  const labelHeap = o === buf.length ? '' : readUtf8(buf, o, buf.length)
 
   const data: PackedRadixTreeData = {
     size,

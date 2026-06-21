@@ -1,4 +1,5 @@
 import typescript from '@rollup/plugin-typescript'
+import resolve from '@rollup/plugin-node-resolve'
 import dts from 'rollup-plugin-dts'
 import terser from '@rollup/plugin-terser'
 
@@ -112,6 +113,7 @@ function rollupExports () {
       format: 'es',
     },
     plugins: [
+      resolve({ browser: true }),
       typescript(production
         ? { sourceMap: false, compilerOptions: { outDir: 'dist/browser', sourceMap: false } }
         : { sourceMap: true, compilerOptions: { outDir: 'dist/browser', sourceMap: true } }),

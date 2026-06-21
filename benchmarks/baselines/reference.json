@@ -1,30 +1,31 @@
 {
-  "capturedAt": "2026-06-20T20:18:22.305Z",
+  "capturedAt": "2026-06-21T11:42:28.697Z",
   "node": "v24.16.0",
-  "packageVersion": "1.2.4",
+  "packageVersion": "1.3.0",
   "minisearchVersion": "7.2.0",
   "gcExposed": true,
   "git": {
-    "commit": "92b132073bc711dacd19c50a205bb9105b5d2a6c",
-    "commitShort": "92b1320",
+    "commit": "09044ef9970d19f030b2f2a8ed976bfbda2de131",
+    "commitShort": "09044ef",
     "branch": "master",
     "dirty": false,
     "trackedDirty": false,
-    "commitDate": "2026-06-20T23:07:15+03:00",
-    "subject": "Unify frozen finalize with scoring and dedupe CPU benchmark scripts.",
-    "parentCommit": "df29bad5c1acdec24f8c3957b09c7a0e51b37c4e"
+    "commitDate": "2026-06-21T14:32:54+03:00",
+    "subject": "Release v1.3.0: portable zlib auto mode and browser binary I/O.",
+    "parentCommit": "e19cd198abb37998880768ddb5f77bbc1bbabc59"
   },
-  "recordKind": "reference",
+  "recordKind": "reference-forced-dirty",
   "runs": 3,
   "searchIterations": 20,
   "benchProfile": "full",
   "benchSurfaces": [
+    "build",
     "search",
     "search-levels",
-    "memory",
-    "build",
     "save",
     "load",
+    "memory",
+    "breakdown",
     "migrate",
     "drift"
   ],
@@ -51,42 +52,70 @@
         "txt"
       ],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 126.36,
-        "freezeMs": 220.04,
-        "fromDocumentsMs": 257.41,
-        "jsonSerializeMs": 134.97,
-        "saveBinaryMs": 97.15,
+        "addAllMs": 128.41,
+        "freezeMs": 229.78,
+        "fromDocumentsMs": 267.04,
+        "jsonSerializeMs": 148.89,
+        "saveBinaryMs": 120.22,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 16.041,
-        "frozen": 0.301,
-        "buildMutableFreeze": 0.289,
+        "frozen": 0.304,
+        "buildMutableFreeze": 8.056,
         "buildFromDocuments": 0,
         "buildFromDocumentsVsMutableFreezeSavingPct": 100,
-        "loadJson": 15.13,
-        "loadBinary": 1.462,
+        "loadJson": 15.142,
+        "loadBinary": 1.454,
         "frozenVsMutableSavingPct": 98.1
       },
       "diskMb": {
         "json": 2.308,
-        "binary": 0.616,
-        "binaryVsJsonSavingPct": 73.3
+        "binary": 0.67,
+        "binaryVsJsonSavingPct": 71
       },
       "loadMs": {
-        "json": 82.38,
-        "binary": 25.57,
-        "binaryVsJsonSavingPct": 69
+        "json": 80.56,
+        "binary": 35.55,
+        "binaryVsJsonSavingPct": 55.9
+      },
+      "memoryBreakdown": {
+        "termCount": 13497,
+        "documentCount": 14097,
+        "nextId": 14097,
+        "postings": {
+          "slotCount": 13497,
+          "allDocIdsBytes": 197672,
+          "allFreqsBytes": 98836,
+          "offsetsBytes": 53988,
+          "lengthsBytes": 53988,
+          "totalTypedBytes": 404484
+        },
+        "radixTree": {
+          "nodeCount": 17392,
+          "edgeCount": 17391,
+          "estimatedBytes": 237991
+        },
+        "documents": {
+          "externalIdsSlots": 14097,
+          "storedFieldsSlots": 14097,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 14097,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 672538
+        },
+        "estimatedStructuredBytes": 1329114
       },
       "search": [
         {
@@ -94,12 +123,12 @@
           "query": "inferno",
           "batchSize": 97,
           "searchIterations": 50,
-          "mutableP50": 0.015,
-          "frozenP50": 0.0113,
-          "mutableP95": 0.032,
-          "frozenP95": 0.0252,
-          "pairedRatioP50": 0.7368,
-          "frozenP50VsMutablePct": -24.7,
+          "mutableP50": 0.0181,
+          "frozenP50": 0.0114,
+          "mutableP95": 0.0299,
+          "frozenP95": 0.0246,
+          "pairedRatioP50": 0.722,
+          "frozenP50VsMutablePct": -37,
           "belowSearchFloor": true
         },
         {
@@ -107,12 +136,12 @@
           "query": "inferno paradiso",
           "batchSize": 108,
           "searchIterations": 50,
-          "mutableP50": 0.0176,
-          "frozenP50": 0.0153,
-          "mutableP95": 0.0294,
-          "frozenP95": 0.0264,
-          "pairedRatioP50": 0.8802,
-          "frozenP50VsMutablePct": -13.1,
+          "mutableP50": 0.0175,
+          "frozenP50": 0.016,
+          "mutableP95": 0.0316,
+          "frozenP95": 0.0255,
+          "pairedRatioP50": 0.8731,
+          "frozenP50VsMutablePct": -8.6,
           "belowSearchFloor": true
         },
         {
@@ -120,12 +149,12 @@
           "query": "infe para",
           "batchSize": 43,
           "searchIterations": 50,
-          "mutableP50": 0.0461,
-          "frozenP50": 0.0333,
-          "mutableP95": 0.0827,
-          "frozenP95": 0.0542,
-          "pairedRatioP50": 0.7198,
-          "frozenP50VsMutablePct": -27.8,
+          "mutableP50": 0.0489,
+          "frozenP50": 0.0326,
+          "mutableP95": 0.0697,
+          "frozenP95": 0.0551,
+          "pairedRatioP50": 0.701,
+          "frozenP50VsMutablePct": -33.3,
           "belowSearchFloor": true
         },
         {
@@ -133,12 +162,12 @@
           "query": "infern paradis",
           "batchSize": 23,
           "searchIterations": 20,
-          "mutableP50": 0.1307,
-          "frozenP50": 0.1268,
-          "mutableP95": 0.1557,
-          "frozenP95": 0.1773,
-          "pairedRatioP50": 1.0102,
-          "frozenP50VsMutablePct": -3,
+          "mutableP50": 0.1272,
+          "frozenP50": 0.1303,
+          "mutableP95": 0.2155,
+          "frozenP95": 0.1707,
+          "pairedRatioP50": 1.0002,
+          "frozenP50VsMutablePct": 2.4,
           "belowSearchFloor": false
         },
         {
@@ -146,12 +175,12 @@
           "query": "inferno paradiso",
           "batchSize": 111,
           "searchIterations": 50,
-          "mutableP50": 0.0218,
-          "frozenP50": 0.0158,
-          "mutableP95": 0.0306,
-          "frozenP95": 0.0289,
-          "pairedRatioP50": 0.7185,
-          "frozenP50VsMutablePct": -27.5,
+          "mutableP50": 0.0228,
+          "frozenP50": 0.0161,
+          "mutableP95": 0.0491,
+          "frozenP95": 0.0246,
+          "pairedRatioP50": 0.7178,
+          "frozenP50VsMutablePct": -29.4,
           "belowSearchFloor": true
         },
         {
@@ -159,12 +188,12 @@
           "query": "infe para",
           "batchSize": 28,
           "searchIterations": 20,
-          "mutableP50": 0.0507,
-          "frozenP50": 0.0333,
-          "mutableP95": 0.0748,
-          "frozenP95": 0.2383,
-          "pairedRatioP50": 0.6762,
-          "frozenP50VsMutablePct": -34.3,
+          "mutableP50": 0.0504,
+          "frozenP50": 0.0342,
+          "mutableP95": 0.281,
+          "frozenP95": 0.0687,
+          "pairedRatioP50": 0.6627,
+          "frozenP50VsMutablePct": -32.1,
           "belowSearchFloor": true
         },
         {
@@ -172,12 +201,12 @@
           "query": "infe",
           "batchSize": 59,
           "searchIterations": 50,
-          "mutableP50": 0.0357,
-          "frozenP50": 0.0263,
-          "mutableP95": 0.055,
-          "frozenP95": 0.0382,
-          "pairedRatioP50": 0.7084,
-          "frozenP50VsMutablePct": -26.3,
+          "mutableP50": 0.036,
+          "frozenP50": 0.0257,
+          "mutableP95": 0.0534,
+          "frozenP95": 0.0378,
+          "pairedRatioP50": 0.7108,
+          "frozenP50VsMutablePct": -28.6,
           "belowSearchFloor": true
         },
         {
@@ -186,11 +215,11 @@
           "batchSize": 41,
           "searchIterations": 50,
           "mutableP50": 0.0614,
-          "frozenP50": 0.0608,
-          "mutableP95": 0.0923,
-          "frozenP95": 0.0851,
-          "pairedRatioP50": 0.9838,
-          "frozenP50VsMutablePct": -1,
+          "frozenP50": 0.0623,
+          "mutableP95": 0.0788,
+          "frozenP95": 0.0803,
+          "pairedRatioP50": 0.9873,
+          "frozenP50VsMutablePct": 1.5,
           "belowSearchFloor": true
         }
       ],
@@ -198,26 +227,26 @@
         "exact": {
           "term": "inferno",
           "L0": {
-            "mutableP50": 0.0004,
+            "mutableP50": 0.0005,
             "mutableP95": 0.0007,
-            "frozenP50": 0.0003,
+            "frozenP50": 0.0004,
             "frozenP95": 0.0006,
-            "pairedRatioP50": 0.7081,
-            "frozenP50VsMutablePct": -25,
+            "pairedRatioP50": 0.7272,
+            "frozenP50VsMutablePct": -20,
             "batchSize": 97
           },
           "L1": {
-            "frozenP50": 0.0064,
-            "frozenP95": 0.008,
+            "frozenP50": 0.0066,
+            "frozenP95": 0.0101,
             "batchSize": 97
           },
           "L2": {
-            "mutableP50": 0.0145,
-            "mutableP95": 0.0245,
-            "frozenP50": 0.009,
-            "frozenP95": 0.0146,
-            "pairedRatioP50": 0.617,
-            "frozenP50VsMutablePct": -37.9,
+            "mutableP50": 0.015,
+            "mutableP95": 0.0275,
+            "frozenP50": 0.0094,
+            "frozenP95": 0.0165,
+            "pairedRatioP50": 0.6287,
+            "frozenP50VsMutablePct": -37.3,
             "batchSize": 97
           }
         },
@@ -225,25 +254,25 @@
           "term": "inferno",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0006,
+            "mutableP95": 0.0005,
             "frozenP50": 0.0003,
-            "frozenP95": 0.0005,
-            "pairedRatioP50": 0.8378,
+            "frozenP95": 0.0004,
+            "pairedRatioP50": 0.8469,
             "frozenP50VsMutablePct": 0,
             "batchSize": 108
           },
           "L1": {
-            "frozenP50": 0.0131,
-            "frozenP95": 0.02,
+            "frozenP50": 0.0144,
+            "frozenP95": 0.0194,
             "batchSize": 108
           },
           "L2": {
-            "mutableP50": 0.017,
-            "mutableP95": 0.0294,
-            "frozenP50": 0.0134,
-            "frozenP95": 0.0196,
-            "pairedRatioP50": 0.7916,
-            "frozenP50VsMutablePct": -21.2,
+            "mutableP50": 0.0174,
+            "mutableP95": 0.0317,
+            "frozenP50": 0.0139,
+            "frozenP95": 0.0233,
+            "pairedRatioP50": 0.7947,
+            "frozenP50VsMutablePct": -20.1,
             "batchSize": 108
           }
         },
@@ -252,24 +281,24 @@
           "L0": {
             "mutableP50": 0.0003,
             "mutableP95": 0.0005,
-            "frozenP50": 0.0003,
-            "frozenP95": 0.0006,
-            "pairedRatioP50": 0.9806,
-            "frozenP50VsMutablePct": 0,
+            "frozenP50": 0.0002,
+            "frozenP95": 0.0005,
+            "pairedRatioP50": 0.9185,
+            "frozenP50VsMutablePct": -33.3,
             "batchSize": 43
           },
           "L1": {
-            "frozenP50": 0.0291,
-            "frozenP95": 0.0439,
+            "frozenP50": 0.0303,
+            "frozenP95": 0.0487,
             "batchSize": 43
           },
           "L2": {
-            "mutableP50": 0.042,
-            "mutableP95": 0.0723,
-            "frozenP50": 0.0295,
-            "frozenP95": 0.0536,
-            "pairedRatioP50": 0.7096,
-            "frozenP50VsMutablePct": -29.8,
+            "mutableP50": 0.0414,
+            "mutableP95": 0.0578,
+            "frozenP50": 0.0303,
+            "frozenP95": 0.041,
+            "pairedRatioP50": 0.723,
+            "frozenP50VsMutablePct": -26.8,
             "batchSize": 43
           }
         },
@@ -277,25 +306,25 @@
           "term": "infern",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0004,
+            "mutableP95": 0.0008,
             "frozenP50": 0.0003,
-            "frozenP95": 0.0003,
-            "pairedRatioP50": 0.885,
+            "frozenP95": 0.0005,
+            "pairedRatioP50": 0.8944,
             "frozenP50VsMutablePct": 0,
             "batchSize": 23
           },
           "L1": {
-            "frozenP50": 0.1249,
-            "frozenP95": 0.19,
+            "frozenP50": 0.1259,
+            "frozenP95": 0.1942,
             "batchSize": 23
           },
           "L2": {
-            "mutableP50": 0.124,
-            "mutableP95": 0.1649,
-            "frozenP50": 0.1265,
-            "frozenP95": 0.1743,
-            "pairedRatioP50": 0.9966,
-            "frozenP50VsMutablePct": 2,
+            "mutableP50": 0.1251,
+            "mutableP95": 0.1681,
+            "frozenP50": 0.13,
+            "frozenP95": 0.1735,
+            "pairedRatioP50": 1.018,
+            "frozenP50VsMutablePct": 3.9,
             "batchSize": 23
           }
         },
@@ -303,25 +332,25 @@
           "term": "inferno",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0004,
+            "mutableP95": 0.0005,
             "frozenP50": 0.0003,
-            "frozenP95": 0.0005,
-            "pairedRatioP50": 0.858,
+            "frozenP95": 0.0006,
+            "pairedRatioP50": 0.8592,
             "frozenP50VsMutablePct": 0,
             "batchSize": 111
           },
           "L1": {
-            "frozenP50": 0.0126,
-            "frozenP95": 0.0213,
+            "frozenP50": 0.0128,
+            "frozenP95": 0.0205,
             "batchSize": 111
           },
           "L2": {
-            "mutableP50": 0.0209,
-            "mutableP95": 0.0258,
-            "frozenP50": 0.0153,
-            "frozenP95": 0.0213,
-            "pairedRatioP50": 0.71,
-            "frozenP50VsMutablePct": -26.8,
+            "mutableP50": 0.0224,
+            "mutableP95": 0.0368,
+            "frozenP50": 0.015,
+            "frozenP95": 0.0249,
+            "pairedRatioP50": 0.6884,
+            "frozenP50VsMutablePct": -33,
             "batchSize": 111
           }
         },
@@ -331,23 +360,23 @@
             "mutableP50": 0.0003,
             "mutableP95": 0.0003,
             "frozenP50": 0.0002,
-            "frozenP95": 0.0002,
-            "pairedRatioP50": 0.9195,
+            "frozenP95": 0.0003,
+            "pairedRatioP50": 0.9193,
             "frozenP50VsMutablePct": -33.3,
             "batchSize": 28
           },
           "L1": {
-            "frozenP50": 0.0273,
+            "frozenP50": 0.0266,
             "frozenP95": 0.0385,
             "batchSize": 28
           },
           "L2": {
-            "mutableP50": 0.0489,
-            "mutableP95": 0.2937,
-            "frozenP50": 0.034,
-            "frozenP95": 0.0452,
-            "pairedRatioP50": 0.6939,
-            "frozenP50VsMutablePct": -30.5,
+            "mutableP50": 0.0501,
+            "mutableP95": 0.0971,
+            "frozenP50": 0.0334,
+            "frozenP95": 0.2969,
+            "pairedRatioP50": 0.6682,
+            "frozenP50VsMutablePct": -33.3,
             "batchSize": 28
           }
         },
@@ -355,25 +384,25 @@
           "term": "infe",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0005,
+            "mutableP95": 0.0004,
             "frozenP50": 0.0002,
             "frozenP95": 0.0004,
-            "pairedRatioP50": 0.9209,
+            "pairedRatioP50": 0.9133,
             "frozenP50VsMutablePct": -33.3,
             "batchSize": 59
           },
           "L1": {
-            "frozenP50": 0.0196,
-            "frozenP95": 0.0341,
+            "frozenP50": 0.0195,
+            "frozenP95": 0.0266,
             "batchSize": 59
           },
           "L2": {
-            "mutableP50": 0.0356,
-            "mutableP95": 0.0515,
-            "frozenP50": 0.0251,
-            "frozenP95": 0.0384,
-            "pairedRatioP50": 0.7043,
-            "frozenP50VsMutablePct": -29.5,
+            "mutableP50": 0.0367,
+            "mutableP95": 0.0499,
+            "frozenP50": 0.0259,
+            "frozenP95": 0.0366,
+            "pairedRatioP50": 0.7037,
+            "frozenP50VsMutablePct": -29.4,
             "batchSize": 59
           }
         },
@@ -383,32 +412,32 @@
             "mutableP50": 0.0003,
             "mutableP95": 0.0004,
             "frozenP50": 0.0003,
-            "frozenP95": 0.0004,
-            "pairedRatioP50": 0.8705,
+            "frozenP95": 0.0003,
+            "pairedRatioP50": 0.8969,
             "frozenP50VsMutablePct": 0,
             "batchSize": 41
           },
           "L1": {
-            "frozenP50": 0.0562,
-            "frozenP95": 0.0703,
+            "frozenP50": 0.0594,
+            "frozenP95": 0.0801,
             "batchSize": 41
           },
           "L2": {
             "mutableP50": 0.0607,
-            "mutableP95": 0.0799,
-            "frozenP50": 0.06,
-            "frozenP95": 0.0729,
-            "pairedRatioP50": 0.993,
-            "frozenP50VsMutablePct": -1.2,
+            "mutableP95": 0.0757,
+            "frozenP50": 0.061,
+            "frozenP95": 0.0734,
+            "pairedRatioP50": 0.9764,
+            "frozenP50VsMutablePct": 0.5,
             "batchSize": 41
           }
         }
       },
       "summary": {
         "heapFrozenVsMutableSavingPct": 98.1,
-        "diskBinaryVsJsonSavingPct": 73.3,
-        "loadBinaryVsJsonSavingPct": 69,
-        "searchFrozenP50AvgGainPct": 19.7
+        "diskBinaryVsJsonSavingPct": 71,
+        "loadBinaryVsJsonSavingPct": 55.9,
+        "searchFrozenP50AvgGainPct": 20.6
       }
     },
     {
@@ -420,42 +449,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 122.53,
-        "freezeMs": 208.2,
-        "fromDocumentsMs": 170.16,
-        "jsonSerializeMs": 128.37,
-        "saveBinaryMs": 39.67,
+        "addAllMs": 116.59,
+        "freezeMs": 221.49,
+        "fromDocumentsMs": 168.17,
+        "jsonSerializeMs": 126.75,
+        "saveBinaryMs": 55.2,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 14.863,
-        "frozen": 0.174,
-        "buildMutableFreeze": 7.963,
+        "frozen": 0.16,
+        "buildMutableFreeze": 7.951,
         "buildFromDocuments": 0,
         "buildFromDocumentsVsMutableFreezeSavingPct": 100,
         "loadJson": 13.504,
         "loadBinary": 0.579,
-        "frozenVsMutableSavingPct": 98.8
+        "frozenVsMutableSavingPct": 98.9
       },
       "diskMb": {
         "json": 1.556,
-        "binary": 0.364,
-        "binaryVsJsonSavingPct": 76.6
+        "binary": 0.398,
+        "binaryVsJsonSavingPct": 74.4
       },
       "loadMs": {
-        "json": 73.3,
-        "binary": 11.8,
-        "binaryVsJsonSavingPct": 83.9
+        "json": 74.19,
+        "binary": 15.06,
+        "binaryVsJsonSavingPct": 79.7
+      },
+      "memoryBreakdown": {
+        "termCount": 13497,
+        "documentCount": 14097,
+        "nextId": 14097,
+        "postings": {
+          "slotCount": 13497,
+          "allDocIdsBytes": 197672,
+          "allFreqsBytes": 98836,
+          "offsetsBytes": 53988,
+          "lengthsBytes": 53988,
+          "totalTypedBytes": 404484
+        },
+        "radixTree": {
+          "nodeCount": 17392,
+          "edgeCount": 17391,
+          "estimatedBytes": 237991
+        },
+        "documents": {
+          "externalIdsSlots": 14097,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 14097,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 656576
       },
       "search": [
         {
@@ -464,11 +521,11 @@
           "batchSize": 177,
           "searchIterations": 50,
           "mutableP50": 0.0132,
-          "frozenP50": 0.0108,
-          "mutableP95": 0.0262,
-          "frozenP95": 0.0198,
-          "pairedRatioP50": 0.8011,
-          "frozenP50VsMutablePct": -18.2,
+          "frozenP50": 0.0103,
+          "mutableP95": 0.0279,
+          "frozenP95": 0.0211,
+          "pairedRatioP50": 0.8138,
+          "frozenP50VsMutablePct": -22,
           "belowSearchFloor": true
         },
         {
@@ -476,12 +533,12 @@
           "query": "infe",
           "batchSize": 30,
           "searchIterations": 20,
-          "mutableP50": 0.041,
-          "frozenP50": 0.0332,
-          "mutableP95": 0.0751,
-          "frozenP95": 0.0671,
-          "pairedRatioP50": 0.8075,
-          "frozenP50VsMutablePct": -19,
+          "mutableP50": 0.0448,
+          "frozenP50": 0.0331,
+          "mutableP95": 0.0575,
+          "frozenP95": 0.0428,
+          "pairedRatioP50": 0.7207,
+          "frozenP50VsMutablePct": -26.1,
           "belowSearchFloor": true
         }
       ],
@@ -493,57 +550,57 @@
             "mutableP95": 0.0005,
             "frozenP50": 0.0003,
             "frozenP95": 0.0005,
-            "pairedRatioP50": 0.793,
+            "pairedRatioP50": 0.7819,
             "frozenP50VsMutablePct": -25,
             "batchSize": 177
           },
           "L1": {
-            "frozenP50": 0.0061,
-            "frozenP95": 0.0094,
+            "frozenP50": 0.0058,
+            "frozenP95": 0.0086,
             "batchSize": 177
           },
           "L2": {
-            "mutableP50": 0.012,
-            "mutableP95": 0.0184,
+            "mutableP50": 0.0118,
+            "mutableP95": 0.0161,
             "frozenP50": 0.0086,
-            "frozenP95": 0.0124,
-            "pairedRatioP50": 0.7383,
-            "frozenP50VsMutablePct": -28.3,
+            "frozenP95": 0.0108,
+            "pairedRatioP50": 0.7069,
+            "frozenP50VsMutablePct": -27.1,
             "batchSize": 177
           }
         },
         "prefix": {
           "term": "infe",
           "L0": {
-            "mutableP50": 0.0004,
-            "mutableP95": 0.0007,
-            "frozenP50": 0.0006,
-            "frozenP95": 0.0024,
-            "pairedRatioP50": 1.3742,
-            "frozenP50VsMutablePct": 50,
+            "mutableP50": 0.0003,
+            "mutableP95": 0.0003,
+            "frozenP50": 0.0004,
+            "frozenP95": 0.001,
+            "pairedRatioP50": 1.3749,
+            "frozenP50VsMutablePct": 33.3,
             "batchSize": 30
           },
           "L1": {
-            "frozenP50": 0.0211,
-            "frozenP95": 0.0399,
+            "frozenP50": 0.0197,
+            "frozenP95": 0.0376,
             "batchSize": 30
           },
           "L2": {
-            "mutableP50": 0.0391,
-            "mutableP95": 0.0696,
-            "frozenP50": 0.0282,
-            "frozenP95": 0.0471,
-            "pairedRatioP50": 0.6937,
-            "frozenP50VsMutablePct": -27.9,
+            "mutableP50": 0.0365,
+            "mutableP95": 0.0636,
+            "frozenP50": 0.0262,
+            "frozenP95": 0.0372,
+            "pairedRatioP50": 0.6994,
+            "frozenP50VsMutablePct": -28.2,
             "batchSize": 30
           }
         }
       },
       "summary": {
-        "heapFrozenVsMutableSavingPct": 98.8,
-        "diskBinaryVsJsonSavingPct": 76.6,
-        "loadBinaryVsJsonSavingPct": 83.9,
-        "searchFrozenP50AvgGainPct": 18.6
+        "heapFrozenVsMutableSavingPct": 98.9,
+        "diskBinaryVsJsonSavingPct": 74.4,
+        "loadBinaryVsJsonSavingPct": 79.7,
+        "searchFrozenP50AvgGainPct": 24
       }
     },
     {
@@ -555,64 +612,95 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "summary": {
         "heapFrozenVsMutableSavingPct": 99,
-        "diskBinaryVsJsonSavingPct": 91,
-        "loadBinaryVsJsonSavingPct": 88.3,
-        "searchFrozenP50AvgGainPct": 46.5
+        "diskBinaryVsJsonSavingPct": 81,
+        "loadBinaryVsJsonSavingPct": 89.7,
+        "searchFrozenP50AvgGainPct": 37.3
       },
       "indexing": {
-        "addAllMs": 196.24,
-        "fromDocumentsMs": 244.32,
-        "freezeMs": 461.58,
-        "jsonSerializeMs": 282.71,
-        "saveBinaryMs": 54.39,
+        "addAllMs": 221.65,
+        "fromDocumentsMs": 302.89,
+        "freezeMs": 528.84,
+        "jsonSerializeMs": 306.48,
+        "saveBinaryMs": 106.93,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 47.199,
-        "frozen": 0.465,
-        "buildMutableFreeze": 0.463,
-        "buildFromDocuments": 0.454,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 1.9,
-        "loadJson": 41.071,
-        "loadBinary": 0.722,
+        "frozen": 0.453,
+        "buildMutableFreeze": 0.451,
+        "buildFromDocuments": 0.452,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -0.2,
+        "loadJson": 41.059,
+        "loadBinary": 0.436,
         "frozenVsMutableSavingPct": 99
       },
       "memoryMb": {
         "frozen": {
-          "heapUsed": 0.465,
+          "heapUsed": 0.453,
           "external": 1.669,
           "arrayBuffers": 1.478,
-          "rss": 1.063,
-          "totalResidentApprox": 2.134
+          "rss": 0.953,
+          "totalResidentApprox": 2.122
         },
         "mutable": {
           "heapUsed": 47.199,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 10.598,
+          "rss": 10.523,
           "totalResidentApprox": 47.199
         }
       },
       "diskMb": {
         "json": 4.207,
-        "binary": 0.378,
-        "binaryVsJsonSavingPct": 91
+        "binary": 0.801,
+        "binaryVsJsonSavingPct": 81
       },
       "loadMs": {
-        "json": 220.3,
-        "binary": 25.85,
-        "binaryVsJsonSavingPct": 88.3
+        "json": 219.39,
+        "binary": 22.66,
+        "binaryVsJsonSavingPct": 89.7
+      },
+      "memoryBreakdown": {
+        "termCount": 50003,
+        "documentCount": 50000,
+        "nextId": 50000,
+        "postings": {
+          "slotCount": 50003,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 400000,
+          "allFreqsBytes": 200000,
+          "offsetsBytes": 200012,
+          "lengthsBytes": 200012,
+          "totalTypedBytes": 1000024
+        },
+        "radixTree": {
+          "nodeCount": 50005,
+          "edgeCount": 50004,
+          "estimatedBytes": 600089
+        },
+        "documents": {
+          "externalIdsSlots": 50000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 50000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 1650117
       },
       "search": [
         {
@@ -620,12 +708,12 @@
           "query": "unique12345",
           "batchSize": 256,
           "searchIterations": 50,
-          "mutableP50": 0.0065,
-          "frozenP50": 0.0055,
-          "mutableP95": 0.0122,
-          "frozenP95": 0.0126,
-          "pairedRatioP50": 0.9149,
-          "frozenP50VsMutablePct": -16.4,
+          "mutableP50": 0.0063,
+          "frozenP50": 0.0052,
+          "mutableP95": 0.0099,
+          "frozenP95": 0.0129,
+          "pairedRatioP50": 0.8528,
+          "frozenP50VsMutablePct": -16.9,
           "belowSearchFloor": true
         },
         {
@@ -633,12 +721,12 @@
           "query": "unique1 common",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 119.2975,
-          "frozenP50": 67.5308,
-          "mutableP95": 142.908,
-          "frozenP95": 259.6946,
-          "pairedRatioP50": 0.5949,
-          "frozenP50VsMutablePct": -43.4,
+          "mutableP50": 111.6945,
+          "frozenP50": 68.857,
+          "mutableP95": 223.832,
+          "frozenP95": 101.3723,
+          "pairedRatioP50": 0.6196,
+          "frozenP50VsMutablePct": -38.4,
           "belowSearchFloor": false
         },
         {
@@ -646,11 +734,11 @@
           "query": "unique1 common",
           "batchSize": 4,
           "searchIterations": 20,
-          "mutableP50": 38.1795,
-          "frozenP50": 0.0303,
-          "mutableP95": 41.1926,
-          "frozenP95": 0.0507,
-          "pairedRatioP50": 0.0008,
+          "mutableP50": 43.602,
+          "frozenP50": 0.0351,
+          "mutableP95": 86.8169,
+          "frozenP95": 0.0674,
+          "pairedRatioP50": 0.0007,
           "frozenP50VsMutablePct": -99.9,
           "belowSearchFloor": false
         },
@@ -659,12 +747,12 @@
           "query": "unique1",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 48.6776,
-          "frozenP50": 35.3036,
-          "mutableP95": 117.7982,
-          "frozenP95": 49.6545,
-          "pairedRatioP50": 0.7217,
-          "frozenP50VsMutablePct": -27.5,
+          "mutableP50": 58.4754,
+          "frozenP50": 62.345,
+          "mutableP95": 120.6476,
+          "frozenP95": 99.3609,
+          "pairedRatioP50": 1.0547,
+          "frozenP50VsMutablePct": 6.6,
           "belowSearchFloor": false
         }
       ],
@@ -674,50 +762,50 @@
           "L0": {
             "mutableP50": 0.0004,
             "mutableP95": 0.0008,
-            "frozenP50": 0.0002,
+            "frozenP50": 0.0003,
             "frozenP95": 0.0005,
-            "pairedRatioP50": 0.5718,
-            "frozenP50VsMutablePct": -42.5,
+            "pairedRatioP50": 0.6009,
+            "frozenP50VsMutablePct": -40.3,
             "batchSize": 256
           },
           "L1": {
-            "frozenP50": 0.0022,
-            "frozenP95": 0.0043,
+            "frozenP50": 0.0023,
+            "frozenP95": 0.0042,
             "batchSize": 256
           },
           "L2": {
-            "mutableP50": 0.0044,
-            "mutableP95": 0.0052,
-            "frozenP50": 0.0025,
-            "frozenP95": 0.0036,
-            "pairedRatioP50": 0.6098,
-            "frozenP50VsMutablePct": -41.9,
+            "mutableP50": 0.0045,
+            "mutableP95": 0.0071,
+            "frozenP50": 0.0027,
+            "frozenP95": 0.0044,
+            "pairedRatioP50": 0.5944,
+            "frozenP50VsMutablePct": -40.7,
             "batchSize": 256
           }
         },
         "AND+prefix": {
           "term": "unique1",
           "L0": {
-            "mutableP50": 0.0002,
+            "mutableP50": 0.0004,
             "mutableP95": 0.0006,
-            "frozenP50": 0.0003,
-            "frozenP95": 0.0003,
-            "pairedRatioP50": 1.211,
-            "frozenP50VsMutablePct": 21.4,
+            "frozenP50": 0.0004,
+            "frozenP95": 0.0007,
+            "pairedRatioP50": 1.1544,
+            "frozenP50VsMutablePct": 5.9,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 52.7528,
-            "frozenP95": 71.6636,
+            "frozenP50": 72.9342,
+            "frozenP95": 94.2274,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 128.9183,
-            "mutableP95": 249.0661,
-            "frozenP50": 80.382,
-            "frozenP95": 86.8996,
-            "pairedRatioP50": 0.6277,
-            "frozenP50VsMutablePct": -37.6,
+            "mutableP50": 135.3107,
+            "mutableP95": 217.9787,
+            "frozenP50": 90.4196,
+            "frozenP95": 136.0429,
+            "pairedRatioP50": 0.6823,
+            "frozenP50VsMutablePct": -33.2,
             "batchSize": 1
           }
         },
@@ -725,23 +813,23 @@
           "term": "unique1",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0003,
+            "mutableP95": 0.0004,
             "frozenP50": 0.0004,
-            "frozenP95": 0.0005,
-            "pairedRatioP50": 1.2506,
-            "frozenP50VsMutablePct": 27.7,
+            "frozenP95": 0.0004,
+            "pairedRatioP50": 1.2247,
+            "frozenP50VsMutablePct": 28.2,
             "batchSize": 4
           },
           "L1": {
-            "frozenP50": 0.0084,
-            "frozenP95": 0.0142,
+            "frozenP50": 0.016,
+            "frozenP95": 0.0264,
             "batchSize": 4
           },
           "L2": {
-            "mutableP50": 39.5728,
-            "mutableP95": 58.9351,
-            "frozenP50": 0.0294,
-            "frozenP95": 0.068,
+            "mutableP50": 44.132,
+            "mutableP95": 81.8018,
+            "frozenP50": 0.0291,
+            "frozenP95": 0.0807,
             "pairedRatioP50": 0.0007,
             "frozenP50VsMutablePct": -99.9,
             "batchSize": 4
@@ -751,25 +839,25 @@
           "term": "unique1",
           "L0": {
             "mutableP50": 0.0002,
-            "mutableP95": 0.0004,
+            "mutableP95": 0.0011,
             "frozenP50": 0.0003,
-            "frozenP95": 0.0091,
-            "pairedRatioP50": 1.2123,
-            "frozenP50VsMutablePct": 22.5,
+            "frozenP95": 0.0008,
+            "pairedRatioP50": 1.2361,
+            "frozenP50VsMutablePct": 23.5,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 28.479,
-            "frozenP95": 36.2031,
+            "frozenP50": 60.9595,
+            "frozenP95": 97.9909,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 46.7881,
-            "mutableP95": 53.592,
-            "frozenP50": 47.3656,
-            "frozenP95": 54.6083,
-            "pairedRatioP50": 1.0152,
-            "frozenP50VsMutablePct": 1.2,
+            "mutableP50": 42.4775,
+            "mutableP95": 62.2488,
+            "frozenP50": 54.8413,
+            "frozenP95": 76.4796,
+            "pairedRatioP50": 1.2088,
+            "frozenP50VsMutablePct": 29.1,
             "batchSize": 1
           }
         }
@@ -791,42 +879,70 @@
         "txt"
       ],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 1261.9,
-        "freezeMs": 72.49,
-        "fromDocumentsMs": 1046.1,
-        "jsonSerializeMs": 105.66,
-        "saveBinaryMs": 272.48,
+        "addAllMs": 1300.9,
+        "freezeMs": 74.57,
+        "fromDocumentsMs": 1139.51,
+        "jsonSerializeMs": 112.81,
+        "saveBinaryMs": 388.16,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 6.566,
-        "frozen": 3.718,
+        "frozen": 3.691,
         "buildMutableFreeze": 0,
-        "buildFromDocuments": 0.105,
+        "buildFromDocuments": 0.106,
         "buildFromDocumentsVsMutableFreezeSavingPct": 0,
         "loadJson": 29.509,
         "loadBinary": 23.813,
-        "frozenVsMutableSavingPct": 43.4
+        "frozenVsMutableSavingPct": 43.8
       },
       "diskMb": {
         "json": 24.341,
-        "binary": 0.073,
-        "binaryVsJsonSavingPct": 99.7
+        "binary": 0.157,
+        "binaryVsJsonSavingPct": 99.4
       },
       "loadMs": {
-        "json": 41.15,
-        "binary": 63.02,
-        "binaryVsJsonSavingPct": -53.1
+        "json": 41.7,
+        "binary": 71.09,
+        "binaryVsJsonSavingPct": -70.5
+      },
+      "memoryBreakdown": {
+        "termCount": 5008,
+        "documentCount": 5000,
+        "nextId": 5000,
+        "postings": {
+          "slotCount": 5008,
+          "allDocIdsBytes": 90000,
+          "allFreqsBytes": 45000,
+          "offsetsBytes": 20032,
+          "lengthsBytes": 20032,
+          "totalTypedBytes": 175064
+        },
+        "radixTree": {
+          "nodeCount": 5012,
+          "edgeCount": 5011,
+          "estimatedBytes": 60211
+        },
+        "documents": {
+          "externalIdsSlots": 5000,
+          "storedFieldsSlots": 5000,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 5000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 24838890
+        },
+        "estimatedStructuredBytes": 25079169
       },
       "search": [
         {
@@ -834,12 +950,12 @@
           "query": "lorem",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 3.9922,
-          "frozenP50": 2.127,
-          "mutableP95": 6.6766,
-          "frozenP95": 4.6519,
-          "pairedRatioP50": 0.5297,
-          "frozenP50VsMutablePct": -46.7,
+          "mutableP50": 4,
+          "frozenP50": 2.0695,
+          "mutableP95": 6.7877,
+          "frozenP95": 4.8286,
+          "pairedRatioP50": 0.5182,
+          "frozenP50VsMutablePct": -48.3,
           "belowSearchFloor": false
         },
         {
@@ -847,12 +963,12 @@
           "query": "lorem ipsum",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 8.9158,
-          "frozenP50": 4.8281,
-          "mutableP95": 24.2402,
-          "frozenP95": 18.276,
-          "pairedRatioP50": 0.5793,
-          "frozenP50VsMutablePct": -45.8,
+          "mutableP50": 8.159,
+          "frozenP50": 4.6853,
+          "mutableP95": 22.8983,
+          "frozenP95": 17.9566,
+          "pairedRatioP50": 0.5694,
+          "frozenP50VsMutablePct": -42.6,
           "belowSearchFloor": false
         }
       ],
@@ -860,61 +976,61 @@
         "exact": {
           "term": "lorem",
           "L0": {
-            "mutableP50": 0.0003,
-            "mutableP95": 0.0004,
-            "frozenP50": 0.0012,
-            "frozenP95": 0.0014,
-            "pairedRatioP50": 4.8414,
-            "frozenP50VsMutablePct": 300,
+            "mutableP50": 0.0001,
+            "mutableP95": 0.0006,
+            "frozenP50": 0.0007,
+            "frozenP95": 0.0008,
+            "pairedRatioP50": 5.694,
+            "frozenP50VsMutablePct": 600,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 1.6494,
-            "frozenP95": 3.2194,
+            "frozenP50": 1.7393,
+            "frozenP95": 3.3465,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 4.1711,
-            "mutableP95": 6.9645,
-            "frozenP50": 2.0157,
-            "frozenP95": 4.4733,
-            "pairedRatioP50": 0.5236,
-            "frozenP50VsMutablePct": -51.7,
+            "mutableP50": 4.1033,
+            "mutableP95": 6.8993,
+            "frozenP50": 2.0764,
+            "frozenP95": 4.3785,
+            "pairedRatioP50": 0.5031,
+            "frozenP50VsMutablePct": -49.4,
             "batchSize": 1
           }
         },
         "AND": {
           "term": "lorem",
           "L0": {
-            "mutableP50": 0.0001,
+            "mutableP50": 0.0002,
             "mutableP95": 0.0004,
-            "frozenP50": 0.0002,
-            "frozenP95": 0.0003,
-            "pairedRatioP50": 1.629,
-            "frozenP50VsMutablePct": 100,
+            "frozenP50": 0.0003,
+            "frozenP95": 0.0008,
+            "pairedRatioP50": 1.7855,
+            "frozenP50VsMutablePct": 50,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 4.2812,
-            "frozenP95": 29.0446,
+            "frozenP50": 5.7505,
+            "frozenP95": 32.3465,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 8.3774,
-            "mutableP95": 10.2205,
-            "frozenP50": 4.7264,
-            "frozenP95": 16.6185,
-            "pairedRatioP50": 0.5847,
-            "frozenP50VsMutablePct": -43.6,
+            "mutableP50": 9.4819,
+            "mutableP95": 13.892,
+            "frozenP50": 5.5921,
+            "frozenP95": 18.325,
+            "pairedRatioP50": 0.5853,
+            "frozenP50VsMutablePct": -41,
             "batchSize": 1
           }
         }
       },
       "summary": {
-        "heapFrozenVsMutableSavingPct": 43.4,
-        "diskBinaryVsJsonSavingPct": 99.7,
-        "loadBinaryVsJsonSavingPct": -53.1,
-        "searchFrozenP50AvgGainPct": 46.3
+        "heapFrozenVsMutableSavingPct": 43.8,
+        "diskBinaryVsJsonSavingPct": 99.4,
+        "loadBinaryVsJsonSavingPct": -70.5,
+        "searchFrozenP50AvgGainPct": 45.4
       }
     },
     {
@@ -935,42 +1051,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 59.58,
-        "freezeMs": 253.45,
-        "fromDocumentsMs": 78.02,
-        "jsonSerializeMs": 116.54,
-        "saveBinaryMs": 8.04,
+        "addAllMs": 60.08,
+        "freezeMs": 208.33,
+        "fromDocumentsMs": 81.23,
+        "jsonSerializeMs": 114.33,
+        "saveBinaryMs": 8.96,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
-        "mutable": 7.016,
-        "frozen": 0.054,
-        "buildMutableFreeze": 6.236,
-        "buildFromDocuments": 0.045,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 99.3,
-        "loadJson": 6.962,
+        "mutable": 7.009,
+        "frozen": 0.036,
+        "buildMutableFreeze": 6.206,
+        "buildFromDocuments": 0,
+        "buildFromDocumentsVsMutableFreezeSavingPct": 100,
+        "loadJson": 6.929,
         "loadBinary": 0.022,
-        "frozenVsMutableSavingPct": 99.2
+        "frozenVsMutableSavingPct": 99.5
       },
       "diskMb": {
         "json": 0.854,
-        "binary": 0.056,
-        "binaryVsJsonSavingPct": 93.4
+        "binary": 0.067,
+        "binaryVsJsonSavingPct": 92.2
       },
       "loadMs": {
-        "json": 32.2,
-        "binary": 3.05,
-        "binaryVsJsonSavingPct": 90.5
+        "json": 33.36,
+        "binary": 3.96,
+        "binaryVsJsonSavingPct": 88.1
+      },
+      "memoryBreakdown": {
+        "termCount": 2012,
+        "documentCount": 2000,
+        "nextId": 2000,
+        "postings": {
+          "slotCount": 20120,
+          "allDocIdsBytes": 160000,
+          "allFreqsBytes": 80000,
+          "offsetsBytes": 80480,
+          "lengthsBytes": 80480,
+          "totalTypedBytes": 400960
+        },
+        "radixTree": {
+          "nodeCount": 2014,
+          "edgeCount": 2013,
+          "estimatedBytes": 24189
+        },
+        "documents": {
+          "externalIdsSlots": 2000,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 20000,
+          "avgFieldLengthBytes": 40,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 445189
       },
       "search": [
         {
@@ -978,12 +1122,12 @@
           "query": "sharedterm",
           "batchSize": 2,
           "searchIterations": 20,
-          "mutableP50": 3.8656,
-          "frozenP50": 1.9291,
-          "mutableP95": 4.4891,
-          "frozenP95": 2.2825,
-          "pairedRatioP50": 0.482,
-          "frozenP50VsMutablePct": -50.1,
+          "mutableP50": 4.1815,
+          "frozenP50": 1.954,
+          "mutableP95": 4.6829,
+          "frozenP95": 3.2246,
+          "pairedRatioP50": 0.4655,
+          "frozenP50VsMutablePct": -53.3,
           "belowSearchFloor": false
         },
         {
@@ -991,12 +1135,12 @@
           "query": "share",
           "batchSize": 2,
           "searchIterations": 20,
-          "mutableP50": 3.9944,
-          "frozenP50": 2.1478,
-          "mutableP95": 4.6018,
-          "frozenP95": 2.6217,
-          "pairedRatioP50": 0.5512,
-          "frozenP50VsMutablePct": -46.2,
+          "mutableP50": 3.9992,
+          "frozenP50": 2.1281,
+          "mutableP95": 5.9007,
+          "frozenP95": 2.9532,
+          "pairedRatioP50": 0.5239,
+          "frozenP50VsMutablePct": -46.8,
           "belowSearchFloor": false
         }
       ],
@@ -1004,26 +1148,26 @@
         "exact": {
           "term": "sharedterm",
           "L0": {
-            "mutableP50": 0.0001,
-            "mutableP95": 0.0002,
+            "mutableP50": 0.0002,
+            "mutableP95": 0.0003,
             "frozenP50": 0.0009,
-            "frozenP95": 0.001,
-            "pairedRatioP50": 6.1896,
-            "frozenP50VsMutablePct": 800,
+            "frozenP95": 0.0017,
+            "pairedRatioP50": 5.9472,
+            "frozenP50VsMutablePct": 350,
             "batchSize": 2
           },
           "L1": {
-            "frozenP50": 1.7562,
-            "frozenP95": 2.5859,
+            "frozenP50": 1.7288,
+            "frozenP95": 2.1069,
             "batchSize": 2
           },
           "L2": {
-            "mutableP50": 3.8973,
-            "mutableP95": 4.6541,
-            "frozenP50": 1.9142,
-            "frozenP95": 2.2657,
-            "pairedRatioP50": 0.4796,
-            "frozenP50VsMutablePct": -50.9,
+            "mutableP50": 4.0336,
+            "mutableP95": 5.4718,
+            "frozenP50": 1.9341,
+            "frozenP95": 2.7033,
+            "pairedRatioP50": 0.474,
+            "frozenP50VsMutablePct": -52.1,
             "batchSize": 2
           }
         },
@@ -1031,34 +1175,34 @@
           "term": "share",
           "L0": {
             "mutableP50": 0.0001,
-            "mutableP95": 0.0003,
-            "frozenP50": 0.0004,
-            "frozenP95": 0.0004,
-            "pairedRatioP50": 2.6667,
-            "frozenP50VsMutablePct": 300,
+            "mutableP95": 0.0002,
+            "frozenP50": 0.0003,
+            "frozenP95": 0.0034,
+            "pairedRatioP50": 2.3834,
+            "frozenP50VsMutablePct": 200,
             "batchSize": 2
           },
           "L1": {
-            "frozenP50": 1.9531,
-            "frozenP95": 2.2602,
+            "frozenP50": 1.9154,
+            "frozenP95": 2.3429,
             "batchSize": 2
           },
           "L2": {
-            "mutableP50": 4.0534,
-            "mutableP95": 4.5896,
-            "frozenP50": 2.168,
-            "frozenP95": 2.6348,
-            "pairedRatioP50": 0.5488,
-            "frozenP50VsMutablePct": -46.5,
+            "mutableP50": 4.1647,
+            "mutableP95": 5.2837,
+            "frozenP50": 2.1533,
+            "frozenP95": 2.8596,
+            "pairedRatioP50": 0.5013,
+            "frozenP50VsMutablePct": -48.3,
             "batchSize": 2
           }
         }
       },
       "summary": {
-        "heapFrozenVsMutableSavingPct": 99.2,
-        "diskBinaryVsJsonSavingPct": 93.4,
-        "loadBinaryVsJsonSavingPct": 90.5,
-        "searchFrozenP50AvgGainPct": 48.2
+        "heapFrozenVsMutableSavingPct": 99.5,
+        "diskBinaryVsJsonSavingPct": 92.2,
+        "loadBinaryVsJsonSavingPct": 88.1,
+        "searchFrozenP50AvgGainPct": 50
       }
     },
     {
@@ -1070,64 +1214,95 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 40.3,
-        "diskBinaryVsJsonSavingPct": 94,
-        "loadBinaryVsJsonSavingPct": 88.6,
-        "searchFrozenP50AvgGainPct": 43.1
+        "heapFrozenVsMutableSavingPct": 40.6,
+        "diskBinaryVsJsonSavingPct": 91.8,
+        "loadBinaryVsJsonSavingPct": 85.3,
+        "searchFrozenP50AvgGainPct": 41.2
       },
       "indexing": {
-        "addAllMs": 78.48,
-        "fromDocumentsMs": 73.62,
-        "freezeMs": 85.76,
-        "jsonSerializeMs": 37.51,
-        "saveBinaryMs": 6.8,
+        "addAllMs": 73.65,
+        "fromDocumentsMs": 75.16,
+        "freezeMs": 95.84,
+        "jsonSerializeMs": 35.52,
+        "saveBinaryMs": 17.6,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 7.356,
-        "frozen": 4.392,
+        "frozen": 4.37,
         "buildMutableFreeze": 0,
         "buildFromDocuments": 0.108,
         "buildFromDocumentsVsMutableFreezeSavingPct": 0,
-        "loadJson": 6.093,
+        "loadJson": 6.08,
         "loadBinary": 0.082,
-        "frozenVsMutableSavingPct": 40.3
+        "frozenVsMutableSavingPct": 40.6
       },
       "memoryMb": {
         "frozen": {
-          "heapUsed": 4.392,
+          "heapUsed": 4.37,
           "external": 0.301,
           "arrayBuffers": 0.3,
-          "rss": 4.281,
-          "totalResidentApprox": 4.693
+          "rss": 3.52,
+          "totalResidentApprox": 4.671
         },
         "mutable": {
           "heapUsed": 7.356,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 4.879,
+          "rss": 4.949,
           "totalResidentApprox": 7.356
         }
       },
       "diskMb": {
         "json": 1.079,
-        "binary": 0.065,
-        "binaryVsJsonSavingPct": 94
+        "binary": 0.089,
+        "binaryVsJsonSavingPct": 91.8
       },
       "loadMs": {
-        "json": 29.12,
-        "binary": 3.33,
-        "binaryVsJsonSavingPct": 88.6
+        "json": 26.37,
+        "binary": 3.89,
+        "binaryVsJsonSavingPct": 85.3
+      },
+      "memoryBreakdown": {
+        "termCount": 258,
+        "documentCount": 10000,
+        "nextId": 10000,
+        "postings": {
+          "slotCount": 258,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 200000,
+          "allFreqsBytes": 100000,
+          "offsetsBytes": 1032,
+          "lengthsBytes": 1032,
+          "totalTypedBytes": 302064
+        },
+        "radixTree": {
+          "nodeCount": 262,
+          "edgeCount": 261,
+          "estimatedBytes": 3217
+        },
+        "documents": {
+          "externalIdsSlots": 10000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 10000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 315285
       },
       "search": [
         {
@@ -1135,11 +1310,11 @@
           "query": "alpha",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 7.6,
-          "frozenP50": 4.2657,
-          "mutableP95": 9.6202,
-          "frozenP95": 5.0842,
-          "pairedRatioP50": 0.5433,
+          "mutableP50": 7.4709,
+          "frozenP50": 4.1922,
+          "mutableP95": 12.9548,
+          "frozenP95": 5.0178,
+          "pairedRatioP50": 0.5667,
           "frozenP50VsMutablePct": -43.9,
           "belowSearchFloor": false
         },
@@ -1148,12 +1323,12 @@
           "query": "alpha beta",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 16.269,
-          "frozenP50": 9.398,
-          "mutableP95": 29.5244,
-          "frozenP95": 24.6697,
-          "pairedRatioP50": 0.5793,
-          "frozenP50VsMutablePct": -42.2,
+          "mutableP50": 16.7233,
+          "frozenP50": 10.2911,
+          "mutableP95": 62.6375,
+          "frozenP95": 25.5817,
+          "pairedRatioP50": 0.6132,
+          "frozenP50VsMutablePct": -38.5,
           "belowSearchFloor": false
         }
       ],
@@ -1162,51 +1337,51 @@
           "term": "alpha",
           "L0": {
             "mutableP50": 0.0001,
-            "mutableP95": 0.0002,
+            "mutableP95": 0.0005,
             "frozenP50": 0.0008,
             "frozenP95": 0.0009,
-            "pairedRatioP50": 5.4311,
-            "frozenP50VsMutablePct": 444.9,
+            "pairedRatioP50": 5.3299,
+            "frozenP50VsMutablePct": 437.1,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 3.3781,
-            "frozenP95": 5.8096,
+            "frozenP50": 3.3634,
+            "frozenP95": 5.3439,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 7.8028,
-            "mutableP95": 9.9388,
-            "frozenP50": 4.2519,
-            "frozenP95": 5.2249,
-            "pairedRatioP50": 0.5463,
-            "frozenP50VsMutablePct": -45.5,
+            "mutableP50": 7.6762,
+            "mutableP95": 10.1873,
+            "frozenP50": 4.2459,
+            "frozenP95": 6.6052,
+            "pairedRatioP50": 0.5668,
+            "frozenP50VsMutablePct": -44.7,
             "batchSize": 1
           }
         },
         "AND": {
           "term": "alpha",
           "L0": {
-            "mutableP50": 0.0003,
-            "mutableP95": 0.0004,
-            "frozenP50": 0.0011,
-            "frozenP95": 0.0014,
-            "pairedRatioP50": 4.1918,
-            "frozenP50VsMutablePct": 335.1,
+            "mutableP50": 0.0001,
+            "mutableP95": 0.0003,
+            "frozenP50": 0.0008,
+            "frozenP95": 0.0008,
+            "pairedRatioP50": 5.3299,
+            "frozenP50VsMutablePct": 431.7,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 8.6432,
-            "frozenP95": 31.7446,
+            "frozenP50": 9.0632,
+            "frozenP95": 40.7888,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 17.3419,
-            "mutableP95": 32.8647,
-            "frozenP50": 9.868,
-            "frozenP95": 22.9601,
-            "pairedRatioP50": 0.5695,
-            "frozenP50VsMutablePct": -43.1,
+            "mutableP50": 16.4179,
+            "mutableP95": 29.7798,
+            "frozenP50": 9.6001,
+            "frozenP95": 22.7593,
+            "pairedRatioP50": 0.5917,
+            "frozenP50VsMutablePct": -41.5,
             "batchSize": 1
           }
         }
@@ -1226,42 +1401,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 244.31,
-        "freezeMs": 7.1,
-        "fromDocumentsMs": 207.17,
-        "jsonSerializeMs": 2.45,
-        "saveBinaryMs": 2.12,
+        "addAllMs": 245.02,
+        "freezeMs": 7.66,
+        "fromDocumentsMs": 220.22,
+        "jsonSerializeMs": 2.83,
+        "saveBinaryMs": 3.11,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 0.681,
-        "frozen": 0.177,
-        "buildMutableFreeze": 0.041,
+        "frozen": 0,
+        "buildMutableFreeze": 0.191,
         "buildFromDocuments": 0.035,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 14.6,
+        "buildFromDocumentsVsMutableFreezeSavingPct": 81.7,
         "loadJson": 0.381,
-        "loadBinary": 0.021,
-        "frozenVsMutableSavingPct": 74
+        "loadBinary": 0.02,
+        "frozenVsMutableSavingPct": 100
       },
       "diskMb": {
         "json": 0.091,
-        "binary": 0.007,
-        "binaryVsJsonSavingPct": 92.3
+        "binary": 0.009,
+        "binaryVsJsonSavingPct": 90.1
       },
       "loadMs": {
-        "json": 2.58,
-        "binary": 0.85,
-        "binaryVsJsonSavingPct": 67.1
+        "json": 2.7,
+        "binary": 1.05,
+        "binaryVsJsonSavingPct": 61.1
+      },
+      "memoryBreakdown": {
+        "termCount": 4,
+        "documentCount": 2000,
+        "nextId": 2000,
+        "postings": {
+          "slotCount": 4,
+          "allDocIdsBytes": 12000,
+          "allFreqsBytes": 12000,
+          "offsetsBytes": 16,
+          "lengthsBytes": 16,
+          "totalTypedBytes": 24032
+        },
+        "radixTree": {
+          "nodeCount": 5,
+          "edgeCount": 4,
+          "estimatedBytes": 66
+        },
+        "documents": {
+          "externalIdsSlots": 2000,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 2000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 26102
       },
       "search": [
         {
@@ -1269,12 +1472,12 @@
           "query": "alpha",
           "batchSize": 3,
           "searchIterations": 20,
-          "mutableP50": 1.3038,
-          "frozenP50": 0.9907,
-          "mutableP95": 1.731,
-          "frozenP95": 1.1221,
-          "pairedRatioP50": 0.736,
-          "frozenP50VsMutablePct": -24,
+          "mutableP50": 1.4289,
+          "frozenP50": 0.9927,
+          "mutableP95": 1.7837,
+          "frozenP95": 1.4297,
+          "pairedRatioP50": 0.7287,
+          "frozenP50VsMutablePct": -30.5,
           "belowSearchFloor": false
         }
       ],
@@ -1283,25 +1486,25 @@
           "term": "alpha",
           "L0": {
             "mutableP50": 0.0002,
-            "mutableP95": 0.0003,
-            "frozenP50": 0.0009,
-            "frozenP95": 0.0011,
-            "pairedRatioP50": 4.4974,
-            "frozenP50VsMutablePct": 350,
+            "mutableP95": 0.0002,
+            "frozenP50": 0.0007,
+            "frozenP95": 0.0009,
+            "pairedRatioP50": 3.9157,
+            "frozenP50VsMutablePct": 250,
             "batchSize": 3
           },
           "L1": {
-            "frozenP50": 0.5843,
-            "frozenP95": 0.7134,
+            "frozenP50": 0.5766,
+            "frozenP95": 0.6412,
             "batchSize": 3
           },
           "L2": {
-            "mutableP50": 1.277,
-            "mutableP95": 1.7968,
-            "frozenP50": 0.9774,
-            "frozenP95": 1.2301,
-            "pairedRatioP50": 0.7483,
-            "frozenP50VsMutablePct": -23.5,
+            "mutableP50": 1.2505,
+            "mutableP95": 1.5776,
+            "frozenP50": 0.9584,
+            "frozenP95": 1.3212,
+            "pairedRatioP50": 0.7662,
+            "frozenP50VsMutablePct": -23.4,
             "batchSize": 3
           }
         }
@@ -1317,10 +1520,10 @@
         }
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 74,
-        "diskBinaryVsJsonSavingPct": 92.3,
-        "loadBinaryVsJsonSavingPct": 67.1,
-        "searchFrozenP50AvgGainPct": 24
+        "heapFrozenVsMutableSavingPct": 100,
+        "diskBinaryVsJsonSavingPct": 90.1,
+        "loadBinaryVsJsonSavingPct": 61.1,
+        "searchFrozenP50AvgGainPct": 30.5
       }
     },
     {
@@ -1332,42 +1535,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 407,
-        "freezeMs": 895.98,
-        "fromDocumentsMs": 498.81,
-        "jsonSerializeMs": 911.04,
-        "saveBinaryMs": 129.51,
+        "addAllMs": 395.63,
+        "freezeMs": 896.66,
+        "fromDocumentsMs": 495.51,
+        "jsonSerializeMs": 872.34,
+        "saveBinaryMs": 189.24,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 91.265,
-        "frozen": 0.893,
-        "buildMutableFreeze": 0.858,
-        "buildFromDocuments": 0.885,
-        "buildFromDocumentsVsMutableFreezeSavingPct": -3.1,
-        "loadJson": 79.022,
+        "frozen": 0.882,
+        "buildMutableFreeze": 0.855,
+        "buildFromDocuments": 0.887,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -3.7,
+        "loadJson": 79.009,
         "loadBinary": 0.874,
         "frozenVsMutableSavingPct": 99
       },
       "diskMb": {
         "json": 7.003,
-        "binary": 0.809,
-        "binaryVsJsonSavingPct": 88.4
+        "binary": 1.868,
+        "binaryVsJsonSavingPct": 73.3
       },
       "loadMs": {
-        "json": 491.53,
-        "binary": 50.74,
-        "binaryVsJsonSavingPct": 89.7
+        "json": 485.31,
+        "binary": 63.74,
+        "binaryVsJsonSavingPct": 86.9
+      },
+      "memoryBreakdown": {
+        "termCount": 101001,
+        "documentCount": 100000,
+        "nextId": 100000,
+        "postings": {
+          "slotCount": 101001,
+          "allDocIdsBytes": 1200000,
+          "allFreqsBytes": 300000,
+          "offsetsBytes": 404004,
+          "lengthsBytes": 404004,
+          "totalTypedBytes": 2308008
+        },
+        "radixTree": {
+          "nodeCount": 101003,
+          "edgeCount": 101002,
+          "estimatedBytes": 2020065
+        },
+        "documents": {
+          "externalIdsSlots": 100000,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 100000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 4428077
       },
       "search": [
         {
@@ -1375,12 +1606,12 @@
           "query": "token42",
           "batchSize": 53,
           "searchIterations": 50,
-          "mutableP50": 0.0702,
-          "frozenP50": 0.0469,
-          "mutableP95": 0.107,
-          "frozenP95": 0.0959,
-          "pairedRatioP50": 0.6638,
-          "frozenP50VsMutablePct": -33.2,
+          "mutableP50": 0.0649,
+          "frozenP50": 0.0435,
+          "mutableP95": 0.0976,
+          "frozenP95": 0.0841,
+          "pairedRatioP50": 0.6597,
+          "frozenP50VsMutablePct": -33,
           "belowSearchFloor": true
         }
       ],
@@ -1388,35 +1619,35 @@
         "exact": {
           "term": "token42",
           "L0": {
-            "mutableP50": 0.0003,
+            "mutableP50": 0.0002,
             "mutableP95": 0.0005,
             "frozenP50": 0.0003,
-            "frozenP95": 0.0008,
-            "pairedRatioP50": 1.0729,
-            "frozenP50VsMutablePct": 0,
+            "frozenP95": 0.0006,
+            "pairedRatioP50": 0.9421,
+            "frozenP50VsMutablePct": 50,
             "batchSize": 53
           },
           "L1": {
-            "frozenP50": 0.0331,
-            "frozenP95": 0.047,
+            "frozenP50": 0.0332,
+            "frozenP95": 0.0437,
             "batchSize": 53
           },
           "L2": {
-            "mutableP50": 0.0661,
-            "mutableP95": 0.0919,
-            "frozenP50": 0.0411,
-            "frozenP95": 0.0537,
-            "pairedRatioP50": 0.6228,
-            "frozenP50VsMutablePct": -37.8,
+            "mutableP50": 0.0634,
+            "mutableP95": 0.0865,
+            "frozenP50": 0.0404,
+            "frozenP95": 0.0536,
+            "pairedRatioP50": 0.6323,
+            "frozenP50VsMutablePct": -36.3,
             "batchSize": 53
           }
         }
       },
       "summary": {
         "heapFrozenVsMutableSavingPct": 99,
-        "diskBinaryVsJsonSavingPct": 88.4,
-        "loadBinaryVsJsonSavingPct": 89.7,
-        "searchFrozenP50AvgGainPct": 33.2
+        "diskBinaryVsJsonSavingPct": 73.3,
+        "loadBinaryVsJsonSavingPct": 86.9,
+        "searchFrozenP50AvgGainPct": 33
       }
     },
     {
@@ -1428,42 +1659,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 432.95,
-        "freezeMs": 1062.95,
-        "fromDocumentsMs": 545.71,
-        "jsonSerializeMs": 711.88,
-        "saveBinaryMs": 208.86,
+        "addAllMs": 432.02,
+        "freezeMs": 1173.67,
+        "fromDocumentsMs": 548.76,
+        "jsonSerializeMs": 642.7,
+        "saveBinaryMs": 351.1,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 91.234,
-        "frozen": 0.894,
-        "buildMutableFreeze": 0.866,
-        "buildFromDocuments": 0.886,
-        "buildFromDocumentsVsMutableFreezeSavingPct": -2.3,
-        "loadJson": 81.993,
+        "frozen": 0.884,
+        "buildMutableFreeze": 0.856,
+        "buildFromDocuments": 0.885,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -3.4,
+        "loadJson": 81.981,
         "loadBinary": 3.85,
         "frozenVsMutableSavingPct": 99
       },
       "diskMb": {
         "json": 7.575,
-        "binary": 0.783,
-        "binaryVsJsonSavingPct": 89.7
+        "binary": 1.974,
+        "binaryVsJsonSavingPct": 73.9
       },
       "loadMs": {
-        "json": 527.88,
-        "binary": 54.72,
-        "binaryVsJsonSavingPct": 89.6
+        "json": 515.03,
+        "binary": 72.58,
+        "binaryVsJsonSavingPct": 85.9
+      },
+      "memoryBreakdown": {
+        "termCount": 101001,
+        "documentCount": 100000,
+        "nextId": 100000,
+        "postings": {
+          "slotCount": 101001,
+          "allDocIdsBytes": 1200000,
+          "allFreqsBytes": 300000,
+          "offsetsBytes": 404004,
+          "lengthsBytes": 404004,
+          "totalTypedBytes": 2308008
+        },
+        "radixTree": {
+          "nodeCount": 101003,
+          "edgeCount": 101002,
+          "estimatedBytes": 2020065
+        },
+        "documents": {
+          "externalIdsSlots": 100000,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 100000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 4428077
       },
       "search": [
         {
@@ -1471,12 +1730,12 @@
           "query": "token42",
           "batchSize": 36,
           "searchIterations": 20,
-          "mutableP50": 0.0753,
-          "frozenP50": 0.06,
-          "mutableP95": 0.1315,
-          "frozenP95": 0.1215,
-          "pairedRatioP50": 0.811,
-          "frozenP50VsMutablePct": -20.3,
+          "mutableP50": 0.0709,
+          "frozenP50": 0.055,
+          "mutableP95": 0.1582,
+          "frozenP95": 0.1127,
+          "pairedRatioP50": 0.7901,
+          "frozenP50VsMutablePct": -22.4,
           "belowSearchFloor": true
         }
       ],
@@ -1485,34 +1744,34 @@
           "term": "token42",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0005,
-            "frozenP50": 0.0009,
-            "frozenP95": 0.0028,
-            "pairedRatioP50": 2.766,
-            "frozenP50VsMutablePct": 200,
+            "mutableP95": 0.0007,
+            "frozenP50": 0.0007,
+            "frozenP95": 0.0011,
+            "pairedRatioP50": 2.5568,
+            "frozenP50VsMutablePct": 133.3,
             "batchSize": 36
           },
           "L1": {
-            "frozenP50": 0.0374,
-            "frozenP95": 0.0632,
+            "frozenP50": 0.0352,
+            "frozenP95": 0.0523,
             "batchSize": 36
           },
           "L2": {
-            "mutableP50": 0.0661,
-            "mutableP95": 0.1038,
-            "frozenP50": 0.0465,
-            "frozenP95": 0.0653,
-            "pairedRatioP50": 0.6968,
-            "frozenP50VsMutablePct": -29.7,
+            "mutableP50": 0.0658,
+            "mutableP95": 0.0832,
+            "frozenP50": 0.0425,
+            "frozenP95": 0.0613,
+            "pairedRatioP50": 0.6592,
+            "frozenP50VsMutablePct": -35.4,
             "batchSize": 36
           }
         }
       },
       "summary": {
         "heapFrozenVsMutableSavingPct": 99,
-        "diskBinaryVsJsonSavingPct": 89.7,
-        "loadBinaryVsJsonSavingPct": 89.6,
-        "searchFrozenP50AvgGainPct": 20.3
+        "diskBinaryVsJsonSavingPct": 73.9,
+        "loadBinaryVsJsonSavingPct": 85.9,
+        "searchFrozenP50AvgGainPct": 22.4
       }
     },
     {
@@ -1543,42 +1802,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 26.46,
-        "freezeMs": 78.99,
-        "fromDocumentsMs": 49.98,
-        "jsonSerializeMs": 36.71,
-        "saveBinaryMs": 7.58,
+        "addAllMs": 26.39,
+        "freezeMs": 73.48,
+        "fromDocumentsMs": 61.2,
+        "jsonSerializeMs": 36.49,
+        "saveBinaryMs": 12.56,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 4.287,
-        "frozen": 0.085,
-        "buildMutableFreeze": 0.101,
+        "frozen": 0.086,
+        "buildMutableFreeze": 0.073,
         "buildFromDocuments": 0.068,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 32.7,
-        "loadJson": 4.314,
+        "buildFromDocumentsVsMutableFreezeSavingPct": 6.8,
+        "loadJson": 4.301,
         "loadBinary": 0.048,
         "frozenVsMutableSavingPct": 98
       },
       "diskMb": {
         "json": 0.561,
-        "binary": 0.056,
-        "binaryVsJsonSavingPct": 90
+        "binary": 0.055,
+        "binaryVsJsonSavingPct": 90.2
       },
       "loadMs": {
-        "json": 22.92,
-        "binary": 2.39,
-        "binaryVsJsonSavingPct": 89.6
+        "json": 24.95,
+        "binary": 4.55,
+        "binaryVsJsonSavingPct": 81.8
+      },
+      "memoryBreakdown": {
+        "termCount": 5002,
+        "documentCount": 5000,
+        "nextId": 5000,
+        "postings": {
+          "slotCount": 5040,
+          "allDocIdsBytes": 30000,
+          "allFreqsBytes": 15000,
+          "offsetsBytes": 40172,
+          "lengthsBytes": 25200,
+          "totalTypedBytes": 110372
+        },
+        "radixTree": {
+          "nodeCount": 5005,
+          "edgeCount": 5004,
+          "estimatedBytes": 60077
+        },
+        "documents": {
+          "externalIdsSlots": 5000,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 100000,
+          "avgFieldLengthBytes": 80,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 270529
       },
       "search": [
         {
@@ -1586,12 +1873,12 @@
           "query": "shared",
           "batchSize": 2,
           "searchIterations": 20,
-          "mutableP50": 3.8872,
-          "frozenP50": 2.3113,
-          "mutableP95": 5.8771,
-          "frozenP95": 4.1138,
-          "pairedRatioP50": 0.5868,
-          "frozenP50VsMutablePct": -40.5,
+          "mutableP50": 3.6501,
+          "frozenP50": 2.2184,
+          "mutableP95": 5.2146,
+          "frozenP95": 3.8004,
+          "pairedRatioP50": 0.6018,
+          "frozenP50VsMutablePct": -39.2,
           "belowSearchFloor": false
         }
       ],
@@ -1599,35 +1886,35 @@
         "exact": {
           "term": "shared",
           "L0": {
-            "mutableP50": 0.0003,
-            "mutableP95": 0.0005,
-            "frozenP50": 0.0012,
-            "frozenP95": 0.0015,
-            "pairedRatioP50": 4.4322,
+            "mutableP50": 0.0002,
+            "mutableP95": 0.0002,
+            "frozenP50": 0.0008,
+            "frozenP95": 0.0008,
+            "pairedRatioP50": 4.625,
             "frozenP50VsMutablePct": 300,
             "batchSize": 2
           },
           "L1": {
-            "frozenP50": 1.8157,
-            "frozenP95": 2.6137,
+            "frozenP50": 1.6634,
+            "frozenP95": 2.5223,
             "batchSize": 2
           },
           "L2": {
-            "mutableP50": 4.01,
-            "mutableP95": 5.6069,
-            "frozenP50": 2.2838,
-            "frozenP95": 3.2641,
-            "pairedRatioP50": 0.6167,
-            "frozenP50VsMutablePct": -43,
+            "mutableP50": 3.8295,
+            "mutableP95": 5.2387,
+            "frozenP50": 2.1952,
+            "frozenP95": 3.1796,
+            "pairedRatioP50": 0.5884,
+            "frozenP50VsMutablePct": -42.7,
             "batchSize": 2
           }
         }
       },
       "summary": {
         "heapFrozenVsMutableSavingPct": 98,
-        "diskBinaryVsJsonSavingPct": 90,
-        "loadBinaryVsJsonSavingPct": 89.6,
-        "searchFrozenP50AvgGainPct": 40.5
+        "diskBinaryVsJsonSavingPct": 90.2,
+        "loadBinaryVsJsonSavingPct": 81.8,
+        "searchFrozenP50AvgGainPct": 39.2
       }
     },
     {
@@ -1639,64 +1926,95 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "summary": {
-        "heapFrozenVsMutableSavingPct": 98.9,
-        "diskBinaryVsJsonSavingPct": 90.5,
-        "loadBinaryVsJsonSavingPct": 94,
-        "searchFrozenP50AvgGainPct": 59
+        "heapFrozenVsMutableSavingPct": 99,
+        "diskBinaryVsJsonSavingPct": 77.2,
+        "loadBinaryVsJsonSavingPct": 91.1,
+        "searchFrozenP50AvgGainPct": 53
       },
       "indexing": {
-        "addAllMs": 614.05,
-        "fromDocumentsMs": 370.81,
-        "freezeMs": 639.93,
-        "jsonSerializeMs": 748.33,
-        "saveBinaryMs": 65.68,
+        "addAllMs": 284.44,
+        "fromDocumentsMs": 374.07,
+        "freezeMs": 630.9,
+        "jsonSerializeMs": 737.21,
+        "saveBinaryMs": 117.17,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
-        "mutable": 58.601,
-        "frozen": 0.626,
-        "buildMutableFreeze": 0.586,
-        "buildFromDocuments": 0.59,
-        "buildFromDocumentsVsMutableFreezeSavingPct": -0.7,
-        "loadJson": 50.576,
-        "loadBinary": 0.577,
-        "frozenVsMutableSavingPct": 98.9
+        "mutable": 58.602,
+        "frozen": 0.614,
+        "buildMutableFreeze": 0.574,
+        "buildFromDocuments": 0.588,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -2.4,
+        "loadJson": 50.558,
+        "loadBinary": 0.578,
+        "frozenVsMutableSavingPct": 99
       },
       "memoryMb": {
         "frozen": {
-          "heapUsed": 0.626,
+          "heapUsed": 0.614,
           "external": 2.688,
           "arrayBuffers": 2.438,
-          "rss": 0.68,
-          "totalResidentApprox": 3.314
+          "rss": 0.578,
+          "totalResidentApprox": 3.302
         },
         "mutable": {
-          "heapUsed": 58.601,
+          "heapUsed": 58.602,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 10.535,
-          "totalResidentApprox": 58.601
+          "rss": 10.527,
+          "totalResidentApprox": 58.602
         }
       },
       "diskMb": {
         "json": 5.165,
-        "binary": 0.49,
-        "binaryVsJsonSavingPct": 90.5
+        "binary": 1.176,
+        "binaryVsJsonSavingPct": 77.2
       },
       "loadMs": {
-        "json": 426.09,
-        "binary": 25.57,
-        "binaryVsJsonSavingPct": 94
+        "json": 616.58,
+        "binary": 54.97,
+        "binaryVsJsonSavingPct": 91.1
+      },
+      "memoryBreakdown": {
+        "termCount": 65538,
+        "documentCount": 65535,
+        "nextId": 65535,
+        "postings": {
+          "slotCount": 65538,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 524280,
+          "allFreqsBytes": 262140,
+          "offsetsBytes": 262152,
+          "lengthsBytes": 262152,
+          "totalTypedBytes": 1310724
+        },
+        "radixTree": {
+          "nodeCount": 65540,
+          "edgeCount": 65539,
+          "estimatedBytes": 1310817
+        },
+        "documents": {
+          "externalIdsSlots": 65535,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 65535,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 2687080
       },
       "search": [
         {
@@ -1704,12 +2022,12 @@
           "query": "alpha",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 88.5225,
-          "frozenP50": 36.3056,
-          "mutableP95": 101.2602,
-          "frozenP95": 261.9469,
-          "pairedRatioP50": 0.4668,
-          "frozenP50VsMutablePct": -59,
+          "mutableP50": 67.0994,
+          "frozenP50": 31.539,
+          "mutableP95": 78.0304,
+          "frozenP95": 37.0307,
+          "pairedRatioP50": 0.4688,
+          "frozenP50VsMutablePct": -53,
           "belowSearchFloor": false
         }
       ],
@@ -1717,26 +2035,26 @@
         "exact": {
           "term": "alpha",
           "L0": {
-            "mutableP50": 0.0003,
-            "mutableP95": 0.0006,
-            "frozenP50": 0.0015,
-            "frozenP95": 0.0019,
-            "pairedRatioP50": 5.4267,
-            "frozenP50VsMutablePct": 433.4,
+            "mutableP50": 0.0001,
+            "mutableP95": 0.0005,
+            "frozenP50": 0.0009,
+            "frozenP95": 0.001,
+            "pairedRatioP50": 7.2287,
+            "frozenP50VsMutablePct": 626.6,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 23.6265,
-            "frozenP95": 121.6292,
+            "frozenP50": 24.7549,
+            "frozenP95": 42.0795,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 87.2486,
-            "mutableP95": 132.3096,
-            "frozenP50": 40.5228,
-            "frozenP95": 54.3989,
-            "pairedRatioP50": 0.4586,
-            "frozenP50VsMutablePct": -53.6,
+            "mutableP50": 69.3271,
+            "mutableP95": 106.0414,
+            "frozenP50": 31.7959,
+            "frozenP95": 49.1145,
+            "pairedRatioP50": 0.4577,
+            "frozenP50VsMutablePct": -54.1,
             "batchSize": 1
           }
         }
@@ -1756,64 +2074,95 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "summary": {
         "heapFrozenVsMutableSavingPct": 99,
-        "diskBinaryVsJsonSavingPct": 93,
-        "loadBinaryVsJsonSavingPct": 92.6,
-        "searchFrozenP50AvgGainPct": 49.3
+        "diskBinaryVsJsonSavingPct": 73.9,
+        "loadBinaryVsJsonSavingPct": 90.5,
+        "searchFrozenP50AvgGainPct": 51
       },
       "indexing": {
-        "addAllMs": 298.57,
-        "fromDocumentsMs": 341.55,
-        "freezeMs": 658.53,
-        "jsonSerializeMs": 788.72,
-        "saveBinaryMs": 82.93,
+        "addAllMs": 328.11,
+        "fromDocumentsMs": 342.2,
+        "freezeMs": 763.16,
+        "jsonSerializeMs": 592.83,
+        "saveBinaryMs": 143.35,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 58.602,
-        "frozen": 0.599,
-        "buildMutableFreeze": 0.597,
-        "buildFromDocuments": 0.587,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 1.7,
-        "loadJson": 50.589,
-        "loadBinary": 0.577,
+        "frozen": 0.587,
+        "buildMutableFreeze": 0.584,
+        "buildFromDocuments": 0.589,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -0.9,
+        "loadJson": 50.561,
+        "loadBinary": 0.578,
         "frozenVsMutableSavingPct": 99
       },
       "memoryMb": {
         "frozen": {
-          "heapUsed": 0.599,
+          "heapUsed": 0.587,
           "external": 3.188,
           "arrayBuffers": 2.938,
-          "rss": 0.465,
-          "totalResidentApprox": 3.787
+          "rss": 0.52,
+          "totalResidentApprox": 3.775
         },
         "mutable": {
           "heapUsed": 58.602,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 10.539,
+          "rss": 10.551,
           "totalResidentApprox": 58.602
         }
       },
       "diskMb": {
         "json": 5.165,
-        "binary": 0.362,
-        "binaryVsJsonSavingPct": 93
+        "binary": 1.346,
+        "binaryVsJsonSavingPct": 73.9
       },
       "loadMs": {
-        "json": 374.73,
-        "binary": 27.67,
-        "binaryVsJsonSavingPct": 92.6
+        "json": 386.59,
+        "binary": 36.62,
+        "binaryVsJsonSavingPct": 90.5
+      },
+      "memoryBreakdown": {
+        "termCount": 65539,
+        "documentCount": 65536,
+        "nextId": 65536,
+        "postings": {
+          "slotCount": 65539,
+          "layout": "dense",
+          "docIdWidth": 32,
+          "allDocIdsBytes": 1048576,
+          "allFreqsBytes": 262144,
+          "offsetsBytes": 262156,
+          "lengthsBytes": 262156,
+          "totalTypedBytes": 1835032
+        },
+        "radixTree": {
+          "nodeCount": 65541,
+          "edgeCount": 65540,
+          "estimatedBytes": 1310837
+        },
+        "documents": {
+          "externalIdsSlots": 65536,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 65536,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 3211409
       },
       "search": [
         {
@@ -1821,12 +2170,12 @@
           "query": "alpha",
           "batchSize": 1,
           "searchIterations": 20,
-          "mutableP50": 89.2524,
-          "frozenP50": 45.2807,
-          "mutableP95": 113.2607,
-          "frozenP95": 167.5456,
-          "pairedRatioP50": 0.601,
-          "frozenP50VsMutablePct": -49.3,
+          "mutableP50": 131.4486,
+          "frozenP50": 64.3886,
+          "mutableP95": 233.627,
+          "frozenP95": 315.3512,
+          "pairedRatioP50": 0.6,
+          "frozenP50VsMutablePct": -51,
           "belowSearchFloor": false
         }
       ],
@@ -1835,25 +2184,25 @@
           "term": "alpha",
           "L0": {
             "mutableP50": 0.0003,
-            "mutableP95": 0.0003,
+            "mutableP95": 0.0006,
             "frozenP50": 0.0014,
-            "frozenP95": 0.0017,
-            "pairedRatioP50": 5.3856,
-            "frozenP50VsMutablePct": 432,
+            "frozenP95": 0.0027,
+            "pairedRatioP50": 5.3318,
+            "frozenP50VsMutablePct": 426.9,
             "batchSize": 1
           },
           "L1": {
-            "frozenP50": 33.43,
-            "frozenP95": 51.7495,
+            "frozenP50": 32.1796,
+            "frozenP95": 60.2219,
             "batchSize": 1
           },
           "L2": {
-            "mutableP50": 68.0194,
-            "mutableP95": 79.3397,
-            "frozenP50": 31.3779,
-            "frozenP95": 37.0235,
-            "pairedRatioP50": 0.4654,
-            "frozenP50VsMutablePct": -53.9,
+            "mutableP50": 72.6146,
+            "mutableP95": 83.0922,
+            "frozenP50": 33.6434,
+            "frozenP95": 37.9366,
+            "pairedRatioP50": 0.454,
+            "frozenP50VsMutablePct": -53.7,
             "batchSize": 1
           }
         }
@@ -1873,42 +2222,70 @@
       ],
       "storeFields": [],
       "benchSurfaces": [
+        "build",
         "search",
         "search-levels",
-        "memory",
-        "build",
         "save",
         "load",
+        "memory",
+        "breakdown",
         "migrate",
         "drift"
       ],
       "indexing": {
-        "addAllMs": 209.93,
-        "freezeMs": 633.08,
-        "fromDocumentsMs": 269.79,
-        "jsonSerializeMs": 403.09,
-        "saveBinaryMs": 43.22,
+        "addAllMs": 239.21,
+        "freezeMs": 666.1,
+        "fromDocumentsMs": 265.63,
+        "jsonSerializeMs": 405.06,
+        "saveBinaryMs": 83.8,
         "binaryMagic": "MSv5"
       },
       "heapMb": {
         "mutable": 47.145,
-        "frozen": 0.466,
-        "buildMutableFreeze": 0.463,
-        "buildFromDocuments": 0.455,
-        "buildFromDocumentsVsMutableFreezeSavingPct": 1.7,
-        "loadJson": 41.068,
+        "frozen": 0.454,
+        "buildMutableFreeze": 0.451,
+        "buildFromDocuments": 0.454,
+        "buildFromDocumentsVsMutableFreezeSavingPct": -0.7,
+        "loadJson": 41.054,
         "loadBinary": 0.444,
         "frozenVsMutableSavingPct": 99
       },
       "diskMb": {
         "json": 4.207,
-        "binary": 0.378,
-        "binaryVsJsonSavingPct": 91
+        "binary": 0.801,
+        "binaryVsJsonSavingPct": 81
       },
       "loadMs": {
-        "json": 281.56,
-        "binary": 17.98,
-        "binaryVsJsonSavingPct": 93.6
+        "json": 276.19,
+        "binary": 31.47,
+        "binaryVsJsonSavingPct": 88.6
+      },
+      "memoryBreakdown": {
+        "termCount": 50003,
+        "documentCount": 50000,
+        "nextId": 50000,
+        "postings": {
+          "slotCount": 50003,
+          "allDocIdsBytes": 400000,
+          "allFreqsBytes": 200000,
+          "offsetsBytes": 200012,
+          "lengthsBytes": 200012,
+          "totalTypedBytes": 1000024
+        },
+        "radixTree": {
+          "nodeCount": 50005,
+          "edgeCount": 50004,
+          "estimatedBytes": 600089
+        },
+        "documents": {
+          "externalIdsSlots": 50000,
+          "storedFieldsSlots": 0,
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 50000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 1650117
       },
       "search": [
         {
@@ -1916,12 +2293,12 @@
           "query": "unique9999",
           "batchSize": 256,
           "searchIterations": 50,
-          "mutableP50": 0.0067,
-          "frozenP50": 0.0061,
-          "mutableP95": 0.0128,
-          "frozenP95": 0.0146,
-          "pairedRatioP50": 0.9156,
-          "frozenP50VsMutablePct": -9,
+          "mutableP50": 0.0072,
+          "frozenP50": 0.0064,
+          "mutableP95": 0.014,
+          "frozenP95": 0.0156,
+          "pairedRatioP50": 0.875,
+          "frozenP50VsMutablePct": -11.1,
           "belowSearchFloor": true
         }
       ],
@@ -1930,38 +2307,38 @@
           "term": "unique9999",
           "L0": {
             "mutableP50": 0.0006,
-            "mutableP95": 0.0009,
+            "mutableP95": 0.0011,
             "frozenP50": 0.0002,
-            "frozenP95": 0.0003,
-            "pairedRatioP50": 0.2711,
+            "frozenP95": 0.0004,
+            "pairedRatioP50": 0.2648,
             "frozenP50VsMutablePct": -66.7,
             "batchSize": 256
           },
           "L1": {
-            "frozenP50": 0.0028,
-            "frozenP95": 0.0046,
+            "frozenP50": 0.003,
+            "frozenP95": 0.0045,
             "batchSize": 256
           },
           "L2": {
-            "mutableP50": 0.0048,
-            "mutableP95": 0.0069,
-            "frozenP50": 0.003,
-            "frozenP95": 0.0046,
-            "pairedRatioP50": 0.6158,
-            "frozenP50VsMutablePct": -37.5,
+            "mutableP50": 0.0065,
+            "mutableP95": 0.0092,
+            "frozenP50": 0.0035,
+            "frozenP95": 0.0054,
+            "pairedRatioP50": 0.5801,
+            "frozenP50VsMutablePct": -46.2,
             "batchSize": 256
           }
         }
       },
       "summary": {
         "heapFrozenVsMutableSavingPct": 99,
-        "diskBinaryVsJsonSavingPct": 91,
-        "loadBinaryVsJsonSavingPct": 93.6,
-        "searchFrozenP50AvgGainPct": 9
+        "diskBinaryVsJsonSavingPct": 81,
+        "loadBinaryVsJsonSavingPct": 88.6,
+        "searchFrozenP50AvgGainPct": 11.1
       }
     }
   ],
-  "baselineCommit": "92b132073bc711dacd19c50a205bb9105b5d2a6c",
+  "baselineCommit": "09044ef9970d19f030b2f2a8ed976bfbda2de131",
   "promotedFrom": "latest.json",
-  "promotedAt": "2026-06-20T20:29:10.932Z"
+  "promotedAt": "2026-06-21T11:50:30.580Z"
 }

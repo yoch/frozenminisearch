@@ -32,15 +32,15 @@ Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
 
 | Scenario | Docs | Index RAM | Binary size | Load time | Search p50 |
 |----------|-----:|-----------|------------:|----------:|-----------:|
-| Divina, with stored text | 14,097 | 0.3 vs 16.0 MB (~98% less) | ~73% less | ~69% faster | ~20% faster |
-| Divina, index only | 14,097 | 0.2 vs 14.9 MB (~99% less) | ~77% less | ~84% faster | ~19% faster |
-| High-frequency terms | 10,000 | 4.4 vs 7.4 MB (~40% less) | ~94% less | ~89% faster | ~43% faster |
-| Dense numeric ids | 100,000 | 0.9 vs 91.3 MB (~99% less) | ~88% less | ~90% faster | ~33% faster |
-| Uint16 doc id boundary | 65,535 | 0.6 vs 58.6 MB (~99% less) | ~91% less | ~94% faster | ~59% faster |
+| Divina, with stored text | 14,097 | 0.3 vs 16.0 MB (~98% less) | ~71% less | ~56% faster | ~21% faster |
+| Divina, index only | 14,097 | 0.2 vs 14.9 MB (~99% less) | ~74% less | ~80% faster | ~24% faster |
+| High-frequency terms | 10,000 | 4.4 vs 7.4 MB (~41% less) | ~92% less | ~85% faster | ~41% faster |
+| Dense numeric ids | 100,000 | 0.9 vs 91.3 MB (~99% less) | ~73% less | ~87% faster | ~33% faster |
+| Uint16 doc id boundary | 65,535 | 0.6 vs 58.6 MB (~99% less) | ~77% less | ~91% faster | ~53% faster |
 
-Across this full run, frozen is faster on **26/27** search cases. Divina `inferno` (exact, paired p50): mutable 15.0 µs → frozen 11.3 µs (**-4 µs**, ratio 0.74).
+Across this full run, frozen is faster on **25/27** search cases. Divina `inferno` (exact, paired p50): mutable 18.1 µs → frozen 11.4 µs (**-7 µs**, ratio 0.72).
 
-Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-20 on Node v24.16.0, 3 runs per scenario. Heap is measured with one index alive and should be read as a trend, not exact accounting.
+Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-21 on Node v24.16.0, 3 runs per scenario. Heap is measured with one index alive and should be read as a trend, not exact accounting.
 <!-- vs-reference:end -->
 
 ---
@@ -77,13 +77,17 @@ for (const doc of rows) builder.add(doc)
 const index = freezeFrozenIndexBuilder(builder)
 ```
 
-ESM and CommonJS are both supported on Node (`main` → CJS, `module` → ESM). For browsers and bundlers, use the dedicated browser entry (search + build only; no binary I/O):
+ESM and CommonJS are both supported on Node (`main` → CJS, `module` → ESM). For browsers and bundlers, use the dedicated browser entry (search, build, and **sync** binary I/O):
 
 ```javascript
 import FrozenMiniSearch from '@yoch/frozenminisearch/browser'
 
 const index = FrozenMiniSearch.fromDocuments(documents, options)
 index.search('ishmael', { prefix: true })
+
+// Load a zlib snapshot from CDN (Uint8Array)
+const buf = new Uint8Array(await (await fetch('/index.frozen')).arrayBuffer())
+const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
 ```
 
 See [examples/plain_js_frozen/](examples/plain_js_frozen/) for a plain-JS demo (`yarn build` first).
@@ -136,7 +140,7 @@ MiniSearch is only needed if you still build mutable indexes. Frozen instances d
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
-- `saveBinarySync` / `loadBinarySync` / async variants (**Node only**)
+- `saveBinarySync` / `loadBinarySync` on **Node** (async variants too); browser entry supports **sync** binary only (`Uint8Array`, `raw` / `zlib` / `auto`)
 
 Custom `tokenize` and `processTerm` functions are not stored in snapshots; pass the same functions again when loading.
 
@@ -152,16 +156,16 @@ const loaded = FrozenMiniSearch.loadBinarySync(buf, {}) // field names embedded 
 ```
 
 - **Node ≥ 20**
-- `compression: 'auto'` chooses `zstd` on Node 22.15+, otherwise `zlib`, and falls back to raw when compression does not help.
-- Use explicit compression when you need a portable artifact:
+- `compression: 'auto'` uses **zlib** when it shrinks the payload (portable on Node 20+ and in the browser build); falls back to raw when compression does not help.
+- Use explicit compression when you need a specific artifact:
 
 ```javascript
-const portable = index.saveBinarySync({ compression: 'zlib' })
+const portable = index.saveBinarySync({ compression: 'zlib' }) // CDN / browser
 const uncompressed = index.saveBinarySync({ compression: 'raw' })
-const bestRatio = index.saveBinarySync({ compression: 'zstd' }) // Node 22.15+
+const bestRatio = index.saveBinarySync({ compression: 'zstd' }) // Node 22.15+ only
 ```
 
-Raw and zlib snapshots load on Node 20+. zstd snapshots require Node 22.15+.
+Raw and zlib snapshots load on Node 20+ and in the browser build. zstd snapshots require Node 22.15+ (read/write on Node; not supported in the browser build).
 
 ---
 

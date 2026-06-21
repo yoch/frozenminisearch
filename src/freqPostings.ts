@@ -9,7 +9,7 @@ export function freqWireFlags(freqs: FreqArray): number {
 }
 
 export function readFreqsSection(
-  buf: Buffer,
+  buf: Uint8Array,
   globalFlags: number,
   postingCount: number,
 ): FreqArray {

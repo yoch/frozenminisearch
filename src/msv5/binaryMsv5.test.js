@@ -5,7 +5,6 @@ import {
   decodeFrozenSnapshot,
   BINARY_MAGIC_V5,
   readMsv5SnapshotCompressionMeta,
-  MSV5_ZSTD_LEVEL,
 } from '../binaryFormat'
 import {
   CODEC_RAW,
@@ -25,7 +24,6 @@ import { encodeFrozenSnapshotMsv5 } from './binaryMsv5Encode'
 import {
   loadMsv5SectionsAsync,
   readMsv5SectionDirectory,
-  resetMsv5ZstdWarningForTests,
 } from './binaryMsv5Compression'
 
 const options = { fields: ['title', 'text'] }
@@ -64,23 +62,6 @@ function stubMissingZstd() {
   zlib.zstdCompressSync = undefined
   return () => {
     zlib.zstdCompressSync = saved
-  }
-}
-
-function stubIneffectiveZstd() {
-  const savedSync = zlib.zstdCompressSync
-  const savedAsync = zlib.zstdCompress
-  zlib.zstdCompressSync = input => Buffer.from(input)
-  zlib.zstdCompress = (input, options, callback) => {
-    if (typeof options === 'function') {
-      options(null, Buffer.from(input))
-      return
-    }
-    callback(null, Buffer.from(input))
-  }
-  return () => {
-    zlib.zstdCompressSync = savedSync
-    zlib.zstdCompress = savedAsync
   }
 }
 
@@ -237,16 +218,13 @@ describe('binaryMsv5', () => {
     expect(meta.sections.length).toBe(12)
   })
 
-  test('large index uses zstd in auto mode when available and payload shrinks', () => {
-    if (!hasZstd) {
-      return
-    }
+  test('large index uses zlib in auto mode when payload shrinks', () => {
     const buf = bigCompressibleIndex().saveBinarySync()
     const meta = readMsv5SnapshotCompressionMeta(buf)
     expect(meta.formatRev).toBe(MSV5_FORMAT_REV_PAYLOAD)
-    expect(meta.payloadCodec === CODEC_ZSTD || meta.payloadCodec === CODEC_RAW).toBe(true)
-    if (meta.payloadCodec === CODEC_ZSTD) {
-      expect(meta.zstdLevel).toBe(MSV5_ZSTD_LEVEL)
+    expect(meta.payloadCodec === CODEC_ZLIB || meta.payloadCodec === CODEC_RAW).toBe(true)
+    if (meta.payloadCodec === CODEC_ZLIB) {
+      expect(meta.zstdLevel).toBe(0)
       expect(meta.compressedLength).toBeLessThan(meta.uncompressedLength)
     }
     const payloadOff = buf.readUInt32LE(MSV5_PAYLOAD_COMPRESSED_OFFSET)
@@ -362,29 +340,20 @@ describe('binaryMsv5', () => {
 })
 
 describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
-  test('saveBinarySync auto falls back to a zlib payload and warns once', () => {
-    resetMsv5ZstdWarningForTests()
-    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
+  test('saveBinarySync auto uses a zlib payload', () => {
     const frozen = bigCompressibleIndex()
     const restore = stubMissingZstd()
     try {
       const buf = frozen.saveBinarySync()
       expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_ZLIB)
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining('falls back to zlib'),
-        expect.objectContaining({ code: 'MINISEARCH_MSV5_ZSTD_UNAVAILABLE' }),
-      )
       expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('payload').length)
         .toBeGreaterThan(0)
     } finally {
       restore()
-      emitWarning.mockRestore()
     }
   })
 
-  test('saveBinaryAsync auto falls back to a zlib payload', async () => {
-    resetMsv5ZstdWarningForTests()
-    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
+  test('saveBinaryAsync auto uses a zlib payload', async () => {
     const frozen = bigCompressibleIndex()
     const restore = stubMissingZstd()
     try {
@@ -394,14 +363,10 @@ describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
         .toBeGreaterThan(0)
     } finally {
       restore()
-      emitWarning.mockRestore()
     }
   })
 
-  test('auto on legacy Node falls back to raw when zlib does not shrink', async () => {
-    resetMsv5ZstdWarningForTests()
-    const emitWarning = jest.spyOn(process, 'emitWarning').mockImplementation(() => {})
-    const restoreZstd = stubMissingZstd()
+  test('auto falls back to raw when zlib does not shrink', async () => {
     const restoreZlib = stubIneffectiveZlib()
     try {
       const frozen = bigCompressibleIndex()
@@ -409,22 +374,6 @@ describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
       expect(readMsv5SnapshotCompressionMeta(await frozen.saveBinaryAsync()).payloadCodec).toBe(CODEC_RAW)
     } finally {
       restoreZlib()
-      restoreZstd()
-      emitWarning.mockRestore()
-    }
-  })
-
-  test('auto falls back to raw when zstd is available but does not shrink', async () => {
-    if (!hasZstd) {
-      return
-    }
-    const restore = stubIneffectiveZstd()
-    try {
-      const frozen = bigCompressibleIndex()
-      expect(readMsv5SnapshotCompressionMeta(frozen.saveBinarySync()).payloadCodec).toBe(CODEC_RAW)
-      expect(readMsv5SnapshotCompressionMeta(await frozen.saveBinaryAsync()).payloadCodec).toBe(CODEC_RAW)
-    } finally {
-      restore()
     }
   })
 

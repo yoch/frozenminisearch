@@ -8,10 +8,10 @@ const dtsPath = join(__dirname, '..', 'dist', 'browser', 'index.d.ts')
 const forbiddenBundlePatterns = [
   { name: 'Node builtin imports', pattern: /\b(?:from\s*|import\s*\(|require\s*\()\s*['"]node:/ },
   { name: 'Buffer runtime usage', pattern: /\bBuffer\b/ },
-  { name: 'binary format module', pattern: /binaryFormat|binaryIo|binaryMsv5|storedFieldsWire/ },
-  { name: 'binary API names', pattern: /saveBinarySync|saveBinaryAsync|loadBinarySync|loadBinaryAsync/ },
+  { name: 'Node binary I/O module', pattern: /binaryFormat|binaryIo|binaryMsv5Compression\.ts/ },
 ]
-const binaryApiNames = ['saveBinarySync', 'saveBinaryAsync', 'loadBinarySync', 'loadBinaryAsync']
+const forbiddenAsyncBinaryApis = ['saveBinaryAsync', 'loadBinaryAsync']
+const requiredSyncBinaryApis = ['saveBinarySync', 'loadBinarySync']
 
 try {
   accessSync(bundlePath)
@@ -31,9 +31,20 @@ for (const { name, pattern } of forbiddenBundlePatterns) {
   }
 }
 
-for (const apiName of binaryApiNames) {
+for (const apiName of forbiddenAsyncBinaryApis) {
+  if (bundle.includes(apiName)) {
+    console.error(`test:browser: forbidden binary API ${apiName} found in dist/browser/index.js`)
+    process.exit(1)
+  }
   if (dts.includes(apiName)) {
     console.error(`test:browser: forbidden binary API ${apiName} found in dist/browser/index.d.ts`)
+    process.exit(1)
+  }
+}
+
+for (const apiName of requiredSyncBinaryApis) {
+  if (!dts.includes(apiName)) {
+    console.error(`test:browser: missing required binary API ${apiName} in dist/browser/index.d.ts`)
     process.exit(1)
   }
 }
@@ -41,11 +52,23 @@ for (const apiName of binaryApiNames) {
 async function main () {
   const mod = await import(pathToFileURL(bundlePath).href)
   const FrozenMiniSearch = mod.default
-  for (const apiName of binaryApiNames) {
+  for (const apiName of forbiddenAsyncBinaryApis) {
     if (typeof FrozenMiniSearch[apiName] !== 'undefined') {
       console.error(`test:browser: ${apiName} is exposed by the browser default export`)
       process.exit(1)
     }
+    if (typeof FrozenMiniSearch.prototype[apiName] !== 'undefined') {
+      console.error(`test:browser: ${apiName} is exposed on the browser prototype`)
+      process.exit(1)
+    }
+  }
+  if (typeof FrozenMiniSearch.prototype.saveBinarySync !== 'function') {
+    console.error('test:browser: saveBinarySync is missing from the browser prototype')
+    process.exit(1)
+  }
+  if (typeof FrozenMiniSearch.loadBinarySync !== 'function') {
+    console.error('test:browser: loadBinarySync is missing from the browser default export')
+    process.exit(1)
   }
 }
 

@@ -1,5 +1,6 @@
 import { accessSync } from 'node:fs'
 import { join } from 'node:path'
+import { CODEC_ZSTD, MSV5_PAYLOAD_CODEC_OFFSET } from '../../src/msv5/binaryMsv5Constants'
 
 const bundlePath = join(__dirname, '../../dist/browser/index.js')
 
@@ -76,5 +77,52 @@ describe('browser bundle smoke', () => {
     for (const doc of documents) builder.add(doc)
     const index = freezeFrozenIndexBuilder(builder)
     expect(index.search('moby').map(h => h.id)).toEqual(['1'])
+  })
+
+  test('browser binary round-trip zlib', () => {
+    const index = FrozenMiniSearch.fromDocuments(documents, options)
+    const buf = index.saveBinarySync({ compression: 'zlib' })
+    expect(buf).toBeInstanceOf(Uint8Array)
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    expect(loaded.search('ishmael', { prefix: true }).map(h => h.id)).toEqual(['1'])
+  })
+
+  test.each(['raw', 'auto'])('browser binary round-trip %s', (compression) => {
+    const index = FrozenMiniSearch.fromDocuments(documents, options)
+    const buf = index.saveBinarySync({ compression })
+    expect(buf).toBeInstanceOf(Uint8Array)
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    expect(loaded.search('zen', { prefix: true }).map(h => h.id).sort()).toEqual(['2', '4'])
+  })
+
+  test('Node zlib save loads in browser', () => {
+    const nodeIndex = NodeFrozenMiniSearch.fromDocuments(documents, options)
+    const buf = new Uint8Array(nodeIndex.saveBinarySync({ compression: 'zlib' }))
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    expect(loaded.search('zen', { prefix: true }).length).toBeGreaterThan(0)
+    expect(loaded.search('zen', { prefix: true }).map(h => h.id).sort())
+      .toEqual(nodeIndex.search('zen', { prefix: true }).map(h => h.id).sort())
+  })
+
+  test('browser zlib save loads in Node', () => {
+    const browserIndex = FrozenMiniSearch.fromDocuments(documents, options)
+    const buf = Buffer.from(browserIndex.saveBinarySync({ compression: 'zlib' }))
+    const loaded = NodeFrozenMiniSearch.loadBinarySync(buf, options)
+    expect(loaded.search('quixote', { prefix: true }).map(h => h.id)).toEqual(['3'])
+  })
+
+  test('rejects zstd compression in browser save', () => {
+    const index = FrozenMiniSearch.fromDocuments(documents, options)
+    expect(() => index.saveBinarySync({ compression: 'zstd' }))
+      .toThrow(/not supported in the browser/)
+  })
+
+  test('rejects zstd-compressed snapshots in browser load', () => {
+    const index = FrozenMiniSearch.fromDocuments(documents, options)
+    const buf = index.saveBinarySync({ compression: 'raw' })
+    const zstdHeader = new Uint8Array(buf)
+    zstdHeader[MSV5_PAYLOAD_CODEC_OFFSET] = CODEC_ZSTD
+    expect(() => FrozenMiniSearch.loadBinarySync(zstdHeader, options))
+      .toThrow(/zstd-compressed/)
   })
 })

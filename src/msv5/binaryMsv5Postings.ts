@@ -1,25 +1,25 @@
 import type { DocIdArray, FrozenPostingsLayout } from '../frozenPostings'
+import { allocBytes, bytesFromView, readU32LE, writeU32LE } from '../binaryBytes'
+import { invalidFrozenIndex } from '../frozenErrors'
+import {
+  readFieldIdArray,
+  readUint16Array,
+  readUint32Array,
+} from '../binaryWireIo'
 import {
   FLAG_DOC_ID_16,
   FLAG_FIELD_ID_16,
   FLAG_SPARSE_LAYOUT,
 } from './binaryMsv5Constants'
-import {
-  bufferFromView,
-  invalidFrozenIndex,
-  readFieldIdArray,
-  readUint16Array,
-  readUint32Array,
-} from '../binaryIo'
 import { readFreqsSection } from '../freqPostings'
 
 export interface Msv5PostingsWire {
   flags: number
-  meta: Buffer
-  fields: Buffer
-  optional: Buffer
-  docIds: Buffer
-  freqs: Buffer
+  meta: Uint8Array
+  fields: Uint8Array
+  optional: Uint8Array
+  docIds: Uint8Array
+  freqs: Uint8Array
 }
 
 export function msv5PostingsFlags(postings: FrozenPostingsLayout): number {
@@ -37,11 +37,11 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
     }
     return {
       flags: msv5PostingsFlags(postings),
-      meta: bufferFromView(postings.denseOffsets),
-      fields: bufferFromView(postings.denseLengths),
-      optional: Buffer.alloc(0),
-      docIds: bufferFromView(postings.allDocIds),
-      freqs: bufferFromView(postings.allFreqs),
+      meta: bytesFromView(postings.denseOffsets),
+      fields: bytesFromView(postings.denseLengths),
+      optional: allocBytes(0),
+      docIds: bytesFromView(postings.allDocIds),
+      freqs: bytesFromView(postings.allFreqs),
     }
   }
 
@@ -54,20 +54,20 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
     throw invalidFrozenIndex('sparse postings missing tables')
   }
 
-  const offBuf = bufferFromView(postings.sparseOffsets)
-  const lenBuf = bufferFromView(postings.sparseLengths)
-  const optional = Buffer.alloc(4 + offBuf.length + lenBuf.length)
-  optional.writeUInt32LE(offBuf.length, 0)
-  offBuf.copy(optional, 4)
-  lenBuf.copy(optional, 4 + offBuf.length)
+  const offBuf = bytesFromView(postings.sparseOffsets)
+  const lenBuf = bytesFromView(postings.sparseLengths)
+  const optional = allocBytes(4 + offBuf.length + lenBuf.length)
+  writeU32LE(optional, 0, offBuf.length)
+  optional.set(offBuf, 4)
+  optional.set(lenBuf, 4 + offBuf.length)
 
   return {
     flags: msv5PostingsFlags(postings),
-    meta: bufferFromView(postings.sparseTermStarts),
-    fields: bufferFromView(postings.sparseFieldIds),
+    meta: bytesFromView(postings.sparseTermStarts),
+    fields: bytesFromView(postings.sparseFieldIds),
     optional,
-    docIds: bufferFromView(postings.allDocIds),
-    freqs: bufferFromView(postings.allFreqs),
+    docIds: bytesFromView(postings.allDocIds),
+    freqs: bytesFromView(postings.allFreqs),
   }
 }
 
@@ -76,11 +76,11 @@ export function decodeMsv5PostingsSections(
   fieldCount: number,
   termCount: number,
   nextId: number,
-  meta: Buffer,
-  fields: Buffer,
-  optional: Buffer,
-  docIds: Buffer,
-  freqs: Buffer,
+  meta: Uint8Array,
+  fields: Uint8Array,
+  optional: Uint8Array,
+  docIds: Uint8Array,
+  freqs: Uint8Array,
 ): FrozenPostingsLayout {
   const sparse = (flags & FLAG_SPARSE_LAYOUT) !== 0
   const docId16 = (flags & FLAG_DOC_ID_16) !== 0
@@ -97,7 +97,7 @@ export function decodeMsv5PostingsSections(
 
   if (sparse) {
     const sparseFieldIdWidth: 8 | 16 = fieldId16 ? 16 : 8
-    const offLen = optional.readUInt32LE(0)
+    const offLen = readU32LE(optional, 0)
     if (4 + offLen > optional.length) {
       throw invalidFrozenIndex('sparse optional section truncated')
     }

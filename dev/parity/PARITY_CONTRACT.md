@@ -16,7 +16,8 @@
 - Term frequency clamp (`Uint8` / `Uint16`) on frozen paths vs unbounded maps upstream.
 - `fromJson` / snapshot rebuild: MiniSearch radix sibling order can differ from a live instance after `toJSON` → different `terms` ordering for prefix-heavy hits (scores unchanged).
 - Node.js and browser search/autosuggest parity for `search`, `autoSuggest`, filters, boosts, prefix/fuzzy (browser via `dist/browser` smoke tests).
-- Binary snapshots (`saveBinary*` / `loadBinary*`) remain Node.js-only; no browser binary parity.
+- Browser binary snapshots: `saveBinarySync` / `loadBinarySync` on `Uint8Array` with `raw`, `zlib`, or `auto`; zlib round-trip **Node → browser** and **browser → Node** on a representative corpus.
+- Binary snapshots (`saveBinaryAsync` / `loadBinaryAsync`, zstd write/read) remain Node.js-only.
 
 ## Out of scope (not blocking)
 

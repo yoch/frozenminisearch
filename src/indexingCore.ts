@@ -44,23 +44,6 @@ function accumulateProcessedTerm(
   }
 }
 
-/**
- * Accumulate token frequencies for one document field into `localFreqs` (cleared first).
- * Returns the number of distinct processed terms (replaces a separate `Set(tokens)` pass).
- */
-function collectFieldTermFreqsInto(
-  localFreqs: Map<string, number>,
-  tokens: string[],
-  fieldName: string,
-  processTerm: IndexingOptions<unknown>['processTerm'],
-): number {
-  localFreqs.clear()
-  for (const term of tokens) {
-    accumulateProcessedTerm(localFreqs, processTerm(term, fieldName))
-  }
-  return localFreqs.size
-}
-
 /** Global delimiter pattern for incremental `exec` (must not reuse {@link SPACE_OR_PUNCTUATION} — no `g` flag). */
 const DEFAULT_TOKENIZE_DELIMITERS = /[\n\r\p{Z}\p{P}]+/gu
 

@@ -4,6 +4,13 @@ import dts from 'rollup-plugin-dts'
 import terser from '@rollup/plugin-terser'
 
 const production = process.env.NODE_ENV === 'production'
+const terserPlugin = terser({
+  mangle: {
+    properties: {
+      regex: /^_/
+    }
+  }
+})
 
 const config = ({ format, input, output, dir, extension = 'js', exports = undefined }) => {
   const shouldMinify = process.env.MINIFY === 'true' && output !== 'dts'
@@ -20,15 +27,7 @@ const config = ({ format, input, output, dir, extension = 'js', exports = undefi
       exports,
       format,
       entryFileNames: shouldMinify ? `[name].min.${extension}` : `[name].${extension}`,
-      plugins: shouldMinify
-        ? [terser({
-          mangle: {
-            properties: {
-              regex: /^_/
-            }
-          }
-        })]
-        : []
+      plugins: shouldMinify ? [terserPlugin] : []
     },
     plugins: [
       output === 'dts'
@@ -111,6 +110,7 @@ function rollupExports () {
       sourcemap: !production,
       file: 'dist/browser/index.js',
       format: 'es',
+      plugins: production ? [terserPlugin] : [],
     },
     plugins: [
       resolve({ browser: true }),

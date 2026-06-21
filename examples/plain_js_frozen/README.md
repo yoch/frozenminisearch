@@ -29,7 +29,7 @@ const index = FrozenMiniSearch.fromDocuments(documents, options)
 
 // Optional: load a pre-built zlib snapshot from your CDN
 const buf = new Uint8Array(await (await fetch('/path/to/index.frozen')).arrayBuffer())
-const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
-The browser build supports **sync** binary only (`saveBinarySync` / `loadBinarySync` on `Uint8Array`, codecs `raw` / `zlib` / `auto`). Use Node to produce CDN snapshots with `compression: 'zlib'` (or rely on `auto`, which now defaults to zlib).
+The browser build supports **async** binary only (`saveBinaryAsync` / `loadBinaryAsync` on `Uint8Array`, codecs `raw` / `zlib` / `auto`). Use Node to produce CDN snapshots with `compression: 'zlib'` (or rely on `auto`, which now defaults to zlib).

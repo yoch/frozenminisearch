@@ -77,7 +77,7 @@ for (const doc of rows) builder.add(doc)
 const index = freezeFrozenIndexBuilder(builder)
 ```
 
-ESM and CommonJS are both supported on Node (`main` → CJS, `module` → ESM). For browsers and bundlers, use the dedicated browser entry (search, build, and **sync** binary I/O):
+ESM and CommonJS are both supported on Node (`main` → CJS, `module` → ESM). For browsers and bundlers, use the dedicated browser entry (search, build, and **async** binary I/O):
 
 ```javascript
 import FrozenMiniSearch from '@yoch/frozenminisearch/browser'
@@ -87,7 +87,7 @@ index.search('ishmael', { prefix: true })
 
 // Load a zlib snapshot from CDN (Uint8Array)
 const buf = new Uint8Array(await (await fetch('/index.frozen')).arrayBuffer())
-const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
 See [examples/plain_js_frozen/](examples/plain_js_frozen/) for a plain-JS demo (`yarn build` first).
@@ -140,7 +140,7 @@ MiniSearch is only needed if you still build mutable indexes. Frozen instances d
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
-- `saveBinarySync` / `loadBinarySync` on **Node** (async variants too); browser entry supports **sync** binary only (`Uint8Array`, `raw` / `zlib` / `auto`)
+- `saveBinarySync` / `loadBinarySync` on **Node** (async variants too); browser entry supports **async** binary only (`Uint8Array`, `raw` / `zlib` / `auto`)
 
 Custom `tokenize` and `processTerm` functions are not stored in snapshots; pass the same functions again when loading.
 
@@ -165,7 +165,7 @@ const uncompressed = index.saveBinarySync({ compression: 'raw' })
 const bestRatio = index.saveBinarySync({ compression: 'zstd' }) // Node 22.15+ only
 ```
 
-Raw and zlib snapshots load on Node 20+ and in the browser build. zstd snapshots require Node 22.15+ (read/write on Node; not supported in the browser build).
+Raw snapshots load in the browser without native compression APIs. zlib snapshots in the browser require `CompressionStream` / `DecompressionStream`. Browser binary I/O is async because it uses native browser stream APIs, but it still materializes the full compressed/decompressed payload in memory. zstd snapshots require Node 22.15+ (read/write on Node; not supported in the browser build).
 
 ---
 

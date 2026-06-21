@@ -5,7 +5,7 @@ import {
   defaultFrozenLoadOptions,
 } from './searchDefaults'
 import type { FrozenAssembleParams } from './frozenTypes'
-import type { BrowserSaveBinaryOptions, Options } from './searchTypes'
+import type { BrowserSaveBinaryAsyncOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
   assembleFrozenWithCtor,
 } from './FrozenMiniSearchCore'
@@ -15,7 +15,7 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
 }
 
 export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCore<T> {
-  saveBinarySync(saveOptions: BrowserSaveBinaryOptions = {}): Uint8Array {
+  async saveBinaryAsync(saveOptions: BrowserSaveBinaryAsyncOptions = {}): Promise<Uint8Array> {
     return encodeFrozenSnapshotMsv5Browser(
       this.binarySnapshotInput(),
       undefined,
@@ -38,14 +38,17 @@ export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCo
     })
   }
 
-  static loadBinarySync<T>(buffer: Uint8Array, options: Options<T> = {} as Options<T>): FrozenMiniSearchBrowser<T> {
+  static async loadBinaryAsync<T>(
+    buffer: Uint8Array,
+    options: Options<T> = {} as Options<T>,
+  ): Promise<FrozenMiniSearchBrowser<T>> {
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
-    const snap = decodeFrozenSnapshotMsv5Browser(buffer, { storeFields })
+    const snap = await decodeFrozenSnapshotMsv5Browser(buffer, { storeFields })
     return FrozenMiniSearchBrowser.fromBinarySnapshot(snap, options)
   }
 
   private static fromBinarySnapshot<T>(
-    snap: ReturnType<typeof decodeFrozenSnapshotMsv5Browser>,
+    snap: Awaited<ReturnType<typeof decodeFrozenSnapshotMsv5Browser>>,
     options: Options<T>,
   ): FrozenMiniSearchBrowser<T> {
     return assembleFrozen(assembleParamsFromBinarySnapshot(snap, options))

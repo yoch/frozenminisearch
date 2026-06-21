@@ -32,7 +32,7 @@ import {
   MSV5_SECTION_ENTRY_BYTES,
   MSV5_ZSTD_LEVEL_OFFSET,
 } from './binaryMsv5Constants'
-import { browserZlibDeflateSync, browserZlibInflateSync } from './compressionBrowser'
+import { browserZlibDeflateAsync, browserZlibInflateAsync } from './compressionBrowser'
 export type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
 
 export interface Msv5AssembledFileBrowser {
@@ -86,21 +86,21 @@ function pickAutoPayloadCodec(
   return rawPayloadChoice(uncompressed)
 }
 
-function zlibPayloadChoiceSync(uncompressed: BinaryBytes): PayloadCodecChoice {
-  return { payload: browserZlibDeflateSync(uncompressed), codec: CODEC_ZLIB, zstdLevel: 0 }
+async function zlibPayloadChoiceAsync(uncompressed: BinaryBytes): Promise<PayloadCodecChoice> {
+  return { payload: await browserZlibDeflateAsync(uncompressed), codec: CODEC_ZLIB, zstdLevel: 0 }
 }
 
-function autoPayloadChoice(uncompressed: BinaryBytes): PayloadCodecChoice {
+async function autoPayloadChoiceAsync(uncompressed: BinaryBytes): Promise<PayloadCodecChoice> {
   if (uncompressed.length < MSV5_MIN_COMPRESS_BYTES) {
     return rawPayloadChoice(uncompressed)
   }
-  return pickAutoPayloadCodec(uncompressed, browserZlibDeflateSync(uncompressed), CODEC_ZLIB)
+  return pickAutoPayloadCodec(uncompressed, await browserZlibDeflateAsync(uncompressed), CODEC_ZLIB)
 }
 
-function choosePayloadCodecSync(
+async function choosePayloadCodecAsync(
   uncompressed: BinaryBytes,
   compression: BrowserBinaryCompression | 'zstd' = 'auto',
-): PayloadCodecChoice {
+): Promise<PayloadCodecChoice> {
   if (compression === 'zstd') {
     throw zstdUnavailableWriteError()
   }
@@ -108,9 +108,9 @@ function choosePayloadCodecSync(
     case 'raw':
       return rawPayloadChoice(uncompressed)
     case 'zlib':
-      return zlibPayloadChoiceSync(uncompressed)
+      return await zlibPayloadChoiceAsync(uncompressed)
     case 'auto':
-      return autoPayloadChoice(uncompressed)
+      return await autoPayloadChoiceAsync(uncompressed)
     default: {
       const _exhaustive: never = compression
       return _exhaustive
@@ -210,13 +210,13 @@ function buildMsv5AssembledFile(
   }
 }
 
-export function assembleMsv5FileBrowser(
+export async function assembleMsv5FileBrowser(
   globalFlags: number,
   rawSections: BinaryBytes[],
   compression: BrowserBinaryCompression = 'auto',
-): Msv5AssembledFileBrowser {
+): Promise<Msv5AssembledFileBrowser> {
   const { uncompressed, entries, payloadCrc32 } = concatAndValidateSections(rawSections)
-  const { payload, codec, zstdLevel } = choosePayloadCodecSync(uncompressed, compression)
+  const { payload, codec, zstdLevel } = await choosePayloadCodecAsync(uncompressed, compression)
   return buildMsv5AssembledFile(
     globalFlags,
     entries,
@@ -346,16 +346,16 @@ function preparePayload(fileBuf: BinaryBytes, directory: Msv5SectionEntry[]): {
   }
 }
 
-function decompressPayloadSync(
+async function decompressPayloadAsync(
   payloadCodec: number,
   slice: BinaryBytes,
   uncompressedLength: number,
-): BinaryBytes {
+): Promise<BinaryBytes> {
   if (payloadCodec === CODEC_ZSTD) {
     throw zstdUnavailableReadError()
   }
   if (payloadCodec === CODEC_ZLIB) {
-    const decoded = browserZlibInflateSync(slice)
+    const decoded = await browserZlibInflateAsync(slice)
     if (decoded.length !== uncompressedLength) {
       throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
@@ -364,16 +364,16 @@ function decompressPayloadSync(
   throw new Error(`MSv5 unknown payload codec ${payloadCodec}`)
 }
 
-export function loadMsv5SectionsBrowser(
+export async function loadMsv5SectionsBrowser(
   fileBuf: BinaryBytes,
   directory: Msv5SectionEntry[],
-): BinaryBytes[] {
+): Promise<BinaryBytes[]> {
   const { payloadCodec, slice, uncompressedLength, payloadCrc32 } = preparePayload(fileBuf, directory)
 
   if (payloadCodec === CODEC_RAW) {
     return sectionsFromPayload(slice, directory, payloadCrc32)
   }
-  const decoded = decompressPayloadSync(payloadCodec, slice, uncompressedLength)
+  const decoded = await decompressPayloadAsync(payloadCodec, slice, uncompressedLength)
   return sectionsFromPayload(decoded, directory, payloadCrc32)
 }
 

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## v1.3.0 — `@yoch/frozenminisearch`
+
+Minor release: portable default compression (`auto` → zlib), browser MSv5 binary snapshots (async native APIs), and Node ↔ browser zlib interoperability.
+
+### Added
+
+- **Browser binary I/O** — `@yoch/frozenminisearch/browser` exposes `saveBinaryAsync` / `loadBinaryAsync` on `Uint8Array` (`raw`, `zlib`, `auto`). No sync binary APIs and no zstd in the browser build.
+- **Wire portability layer** — `binaryBytes`, `binaryWireIo`, `fieldLengthMatrixWire`, and browser compression via native `CompressionStream` / `DecompressionStream`.
+
+### Changed
+
+- **`compression: 'auto'`** — always tries zlib (then raw if it does not shrink). zstd remains opt-in via `compression: 'zstd'` on Node 22.15+; existing zstd snapshots still load on Node.
+
+### Improved
+
+- **CI** — cross-runtime smoke tests: Node zlib save → browser load and browser zlib save → Node load.
+- **Browser bundle size** — production `dist/browser/index.js` is now `67651` bytes raw, `20944` bytes gzip, and `18667` bytes brotli after removing the sync browser binary path, dropping `fflate`, and minifying the browser bundle.
+
 ## v1.2.4 — `@yoch/frozenminisearch`
 
 Patch release: faster frozen search and autoSuggest finalization, simplified AND gate heuristics, and small public exports for advanced callers. No MSv5 wire-format changes.

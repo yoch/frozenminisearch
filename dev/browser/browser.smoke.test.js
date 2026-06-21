@@ -79,50 +79,91 @@ describe('browser bundle smoke', () => {
     expect(index.search('moby').map(h => h.id)).toEqual(['1'])
   })
 
-  test('browser binary round-trip zlib', () => {
+  test('browser binary round-trip zlib', async () => {
     const index = FrozenMiniSearch.fromDocuments(documents, options)
-    const buf = index.saveBinarySync({ compression: 'zlib' })
+    const buf = await index.saveBinaryAsync({ compression: 'zlib' })
     expect(buf).toBeInstanceOf(Uint8Array)
-    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
     expect(loaded.search('ishmael', { prefix: true }).map(h => h.id)).toEqual(['1'])
   })
 
-  test.each(['raw', 'auto'])('browser binary round-trip %s', (compression) => {
+  test.each(['raw', 'auto'])('browser binary round-trip %s', async (compression) => {
     const index = FrozenMiniSearch.fromDocuments(documents, options)
-    const buf = index.saveBinarySync({ compression })
+    const buf = await index.saveBinaryAsync({ compression })
     expect(buf).toBeInstanceOf(Uint8Array)
-    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
     expect(loaded.search('zen', { prefix: true }).map(h => h.id).sort()).toEqual(['2', '4'])
   })
 
-  test('Node zlib save loads in browser', () => {
+  test('Node zlib save loads in browser', async () => {
     const nodeIndex = NodeFrozenMiniSearch.fromDocuments(documents, options)
     const buf = new Uint8Array(nodeIndex.saveBinarySync({ compression: 'zlib' }))
-    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+    const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
     expect(loaded.search('zen', { prefix: true }).length).toBeGreaterThan(0)
     expect(loaded.search('zen', { prefix: true }).map(h => h.id).sort())
       .toEqual(nodeIndex.search('zen', { prefix: true }).map(h => h.id).sort())
   })
 
-  test('browser zlib save loads in Node', () => {
+  test('browser zlib save loads in Node', async () => {
     const browserIndex = FrozenMiniSearch.fromDocuments(documents, options)
-    const buf = Buffer.from(browserIndex.saveBinarySync({ compression: 'zlib' }))
+    const buf = Buffer.from(await browserIndex.saveBinaryAsync({ compression: 'zlib' }))
     const loaded = NodeFrozenMiniSearch.loadBinarySync(buf, options)
     expect(loaded.search('quixote', { prefix: true }).map(h => h.id)).toEqual(['3'])
   })
 
-  test('rejects zstd compression in browser save', () => {
+  test('rejects zstd compression in browser save', async () => {
     const index = FrozenMiniSearch.fromDocuments(documents, options)
-    expect(() => index.saveBinarySync({ compression: 'zstd' }))
-      .toThrow(/not supported in the browser/)
+    await expect(index.saveBinaryAsync({ compression: 'zstd' }))
+      .rejects.toThrow(/not supported in the browser/)
   })
 
-  test('rejects zstd-compressed snapshots in browser load', () => {
+  test('rejects zstd-compressed snapshots in browser load', async () => {
     const index = FrozenMiniSearch.fromDocuments(documents, options)
-    const buf = index.saveBinarySync({ compression: 'raw' })
+    const buf = await index.saveBinaryAsync({ compression: 'raw' })
     const zstdHeader = new Uint8Array(buf)
     zstdHeader[MSV5_PAYLOAD_CODEC_OFFSET] = CODEC_ZSTD
-    expect(() => FrozenMiniSearch.loadBinarySync(zstdHeader, options))
-      .toThrow(/zstd-compressed/)
+    await expect(FrozenMiniSearch.loadBinaryAsync(zstdHeader, options))
+      .rejects.toThrow(/zstd-compressed/)
+  })
+
+  test('raw browser binary works without native compression streams', async () => {
+    const savedCompression = globalThis.CompressionStream
+    const savedDecompression = globalThis.DecompressionStream
+    globalThis.CompressionStream = undefined
+    globalThis.DecompressionStream = undefined
+    try {
+      const index = FrozenMiniSearch.fromDocuments(documents, options)
+      const buf = await index.saveBinaryAsync({ compression: 'raw' })
+      const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
+      expect(loaded.search('ishmael', { prefix: true }).map(h => h.id)).toEqual(['1'])
+    } finally {
+      globalThis.CompressionStream = savedCompression
+      globalThis.DecompressionStream = savedDecompression
+    }
+  })
+
+  test('zlib browser save rejects when CompressionStream is unavailable', async () => {
+    const savedCompression = globalThis.CompressionStream
+    globalThis.CompressionStream = undefined
+    try {
+      const index = FrozenMiniSearch.fromDocuments(documents, options)
+      await expect(index.saveBinaryAsync({ compression: 'zlib' }))
+        .rejects.toThrow(/CompressionStream is unavailable/)
+    } finally {
+      globalThis.CompressionStream = savedCompression
+    }
+  })
+
+  test('zlib browser load rejects when DecompressionStream is unavailable', async () => {
+    const savedDecompression = globalThis.DecompressionStream
+    const nodeIndex = NodeFrozenMiniSearch.fromDocuments(documents, options)
+    const buf = new Uint8Array(nodeIndex.saveBinarySync({ compression: 'zlib' }))
+    globalThis.DecompressionStream = undefined
+    try {
+      await expect(FrozenMiniSearch.loadBinaryAsync(buf, options))
+        .rejects.toThrow(/DecompressionStream is unavailable/)
+    } finally {
+      globalThis.DecompressionStream = savedDecompression
+    }
   })
 })

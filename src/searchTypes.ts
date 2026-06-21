@@ -181,8 +181,8 @@ export type SaveBinaryOptions = {
   compression?: BinaryCompression
 }
 
-/** Browser `saveBinarySync()` options (no zstd). */
-export type BrowserSaveBinaryOptions = {
+/** Browser `saveBinaryAsync()` options (no zstd). */
+export type BrowserSaveBinaryAsyncOptions = {
   compression?: BrowserBinaryCompression
 }
 

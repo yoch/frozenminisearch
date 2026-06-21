@@ -15,7 +15,7 @@ export type {
   Wildcard,
   Query,
   BrowserBinaryCompression,
-  BrowserSaveBinaryOptions,
+  BrowserSaveBinaryAsyncOptions,
 } from './searchTypes'
 export {
   default,

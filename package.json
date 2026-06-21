@@ -95,7 +95,8 @@
     ],
     "collectCoverageFrom": [
       "src/**/*.{ts,js}",
-      "!src/**/*.test.{ts,js}"
+      "!src/**/*.test.{ts,js}",
+      "!src/browser.ts"
     ],
     "coveragePathIgnorePatterns": [
       "/benchmarks/",

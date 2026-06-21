@@ -4,12 +4,19 @@
 
 ## v1.3.0 — `@yoch/frozenminisearch`
 
-Minor release: portable default compression (`auto` → zlib), browser MSv5 binary snapshots (async native APIs), and Node ↔ browser zlib interoperability.
+Minor release: browser entry (`@yoch/frozenminisearch/browser`), portable default compression (`auto` → zlib), async browser MSv5 binary snapshots, Node ↔ browser zlib interoperability, and indexing parity fixes for custom tokenizers.
 
 ### Added
 
-- **Browser binary I/O** — `@yoch/frozenminisearch/browser` exposes `saveBinaryAsync` / `loadBinaryAsync` on `Uint8Array` (`raw`, `zlib`, `auto`). No sync binary APIs and no zstd in the browser build.
+- **Browser entry** — `@yoch/frozenminisearch/browser` for read-only search and index build in the browser (`fromDocuments`, `fromJson`, `search`, `autoSuggest`, incremental builder).
+- **Browser binary I/O** — `saveBinaryAsync` / `loadBinaryAsync` on `Uint8Array` (`raw`, `zlib`, `auto`). No sync binary APIs and no zstd in the browser build.
 - **Wire portability layer** — `binaryBytes`, `binaryWireIo`, `fieldLengthMatrixWire`, and browser compression via native `CompressionStream` / `DecompressionStream`.
+- **Indexing parity gate** — `dev/parity/indexing-parity.test.js` compares `MiniSearch.addAll` vs `FrozenMiniSearch.fromDocuments` (index fingerprint + scores) across default, camelCase, `processTerm`, `stringifyField`, and Vocs-style profiles; builder, `fromJson`, and binary round-trips included.
+
+### Fixed
+
+- **Custom tokenizer indexing** — `isDefaultTokenize` now requires reference equality with the default tokenizer; split-equivalent wrappers no longer take the default fast path (fixes missing camelCase terms such as `create` from `createUser`).
+- **Field length with `processTerm`** — `fromDocuments` counts unique raw tokens per field (MiniSearch semantics) instead of distinct indexed terms after filtering.
 
 ### Changed
 
@@ -18,7 +25,8 @@ Minor release: portable default compression (`auto` → zlib), browser MSv5 bina
 ### Improved
 
 - **CI** — cross-runtime smoke tests: Node zlib save → browser load and browser zlib save → Node load.
-- **Browser bundle size** — production `dist/browser/index.js` is now `67651` bytes raw, `20944` bytes gzip, and `18667` bytes brotli after removing the sync browser binary path, dropping `fflate`, and minifying the browser bundle.
+- **Browser bundle size** — production `dist/browser/index.js` is ~67.6 KB raw and ~20.9 KB gzip (native compression streams, no `fflate`).
+- **`stringifyField` fast path** — skip redundant `toString()` when the field value is already a string and the default stringifier is in use.
 
 ## v1.2.4 — `@yoch/frozenminisearch`
 

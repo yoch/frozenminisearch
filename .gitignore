@@ -26,6 +26,9 @@ benchmarks/packedRadixFuzzyAlgoCompare.js
 # Local planning and PoC (not versioned)
 ROADMAP.md
 dev/poc-mcp/
+dev/poc-vocs/
 dev/minisearch*
 scripts/poc-mcp*
 scripts/minisearch*
+FrozenMiniSearch-v2.png
+FrozenMiniSearch-v2 (1).png

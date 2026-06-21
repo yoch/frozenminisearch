@@ -48,7 +48,7 @@ function accumulateProcessedTerm(
  * Accumulate token frequencies for one document field into `localFreqs` (cleared first).
  * Returns the number of distinct processed terms (replaces a separate `Set(tokens)` pass).
  */
-export function collectFieldTermFreqsInto(
+function collectFieldTermFreqsInto(
   localFreqs: Map<string, number>,
   tokens: string[],
   fieldName: string,

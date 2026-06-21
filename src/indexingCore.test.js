@@ -1,7 +1,6 @@
 import { defaultFrozenLoadOptions, SPACE_OR_PUNCTUATION } from './searchDefaults'
 import {
   collectFieldTermFreqsFromFieldInto,
-  collectFieldTermFreqsInto,
   isDefaultTokenize,
   tokenizeDefaultInto,
 } from './indexingCore'
@@ -51,9 +50,10 @@ describe('indexingCore default tokenizer', () => {
     }
   })
 
-  test('collectFieldTermFreqsFromFieldInto matches split + collectFieldTermFreqsInto', () => {
+  test('collectFieldTermFreqsFromFieldInto matches split for default and custom-equivalent tokenizers', () => {
     const fieldName = 'txt'
     const processTerm = term => term.toLowerCase()
+    const equivalentTokenize = text => text.split(SPACE_OR_PUNCTUATION)
     const tokenScratch = []
     const rawTokenScratch = new Set()
     const localFreqs = new Map()
@@ -74,13 +74,17 @@ describe('indexingCore default tokenizer', () => {
       expect(unique.fieldLength).toBe(new Set(tokens).size)
       expect(unique.indexedTermCount).toBe(expected.size)
 
-      const fromTwoPhase = collectFieldTermFreqsInto(
+      const fromTwoPhase = collectFieldTermFreqsFromFieldInto(
         localFreqs,
-        tokens,
+        rawTokenScratch,
+        tokenScratch,
+        equivalentTokenize,
+        text,
         fieldName,
         processTerm,
       )
-      expect(fromTwoPhase).toBe(unique.indexedTermCount)
+      expect(fromTwoPhase.fieldLength).toBe(unique.fieldLength)
+      expect(fromTwoPhase.indexedTermCount).toBe(unique.indexedTermCount)
       expect(mapToObject(localFreqs)).toEqual(mapToObject(expected))
     }
   })

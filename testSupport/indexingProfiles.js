@@ -56,11 +56,59 @@ const processTermOptions = {
 
 const processTermQueries = ['quick', 'dog', 'lazy', 'the']
 
+const processTermArrayDocs = [
+  { id: 'combo', text: 'ComboTerm repeated repeated' },
+  { id: 'plain', text: 'plain token' },
+]
+
+const processTermArrayOptions = {
+  fields: ['text'],
+  processTerm: term => {
+    const lower = term.toLowerCase()
+    if (lower === 'comboterm') return ['combo', 'term']
+    return lower
+  },
+  searchOptions: { prefix: true },
+}
+
+const processTermArrayQueries = ['combo', 'term', 'repeated', 'comboterm']
+
+const stringifyFieldDocs = [
+  { id: 'string-title', title: 'VisibleTitle', tags: ['alpha', 'beta'] },
+  { id: 'object-title', title: { label: 'ObjectTitle' }, tags: ['gamma'] },
+]
+
+const stringifyFieldOptions = {
+  fields: ['title', 'tags'],
+  storeFields: ['title'],
+  stringifyField: (value, fieldName) => {
+    if (fieldName === 'title' && typeof value === 'string') return `${value} stringified`
+    if (fieldName === 'title' && value?.label != null) return value.label
+    if (Array.isArray(value)) return value.join(' ')
+    return String(value)
+  },
+  searchOptions: { prefix: true },
+}
+
+const stringifyFieldQueries = ['stringified', 'visibletitle', 'objecttitle', 'alpha']
+
 /** @type {Array<{ name: string, docs: object[], options: object, queries: string[] }>} */
 export const indexingProfiles = [
   { name: 'default', docs: defaultDocs, options: defaultOptions, queries: defaultQueries },
   { name: 'camelCase', docs: camelCaseDocs, options: camelCaseOptions, queries: camelCaseQueries },
   { name: 'processTerm', docs: processTermDocs, options: processTermOptions, queries: processTermQueries },
+  {
+    name: 'processTermArray',
+    docs: processTermArrayDocs,
+    options: processTermArrayOptions,
+    queries: processTermArrayQueries,
+  },
+  {
+    name: 'stringifyField',
+    docs: stringifyFieldDocs,
+    options: stringifyFieldOptions,
+    queries: stringifyFieldQueries,
+  },
   {
     name: 'vocs',
     docs: vocsIndexingDocs,

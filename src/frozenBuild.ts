@@ -5,6 +5,7 @@ import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
+import { defaultFrozenLoadOptions } from './searchDefaults'
 import {
   buildFieldIds,
   collectFieldTermFreqsFromFieldInto,
@@ -114,7 +115,7 @@ export class FrozenIndexBuilder<T> {
       const fieldValue = extractField(document, field)
       if (fieldValue == null) continue
 
-      const fieldText = typeof fieldValue === 'string'
+      const fieldText = typeof fieldValue === 'string' && stringifyField === defaultFrozenLoadOptions.stringifyField
         ? fieldValue
         : stringifyField(fieldValue, field)
       const fieldId = this._fieldIds[field]

@@ -3,6 +3,7 @@ import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
   defaultFrozenLoadOptions,
+  getFrozenDefault,
 } from './searchDefaults'
 
 /**
@@ -54,7 +55,7 @@ const DEFAULT_TOKENIZE_DELIMITERS = /[\n\r\p{Z}\p{P}]+/gu
 export function isDefaultTokenize(
   tokenize: IndexingOptions<unknown>['tokenize'],
 ): boolean {
-  return tokenize === defaultFrozenLoadOptions.tokenize
+  return tokenize === getFrozenDefault('tokenize')
 }
 
 function forEachDefaultToken(text: string, onToken: (token: string) => void): void {

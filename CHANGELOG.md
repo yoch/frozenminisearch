@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- **Hosted browser demo** — `examples/plain_js_frozen/` is published to GitHub Pages at `/demo/` (`yarn build-demo`).
+- **`FrozenMiniSearch.getDefault`** — expose built-in `tokenize`, `processTerm`, `extractField`, and related indexing defaults (MiniSearch-compatible helper).
+
 ### Changed
 
 - **Heap benchmark protocol v3** — retained-heap measurement runs in isolated scenario processes with in-process trials (warm-up once per path, median+MAD, GC×3). CPU/search benchmarks are decoupled from the heap phase (`npm run bench:memory`). See `benchmarks/README.md`.

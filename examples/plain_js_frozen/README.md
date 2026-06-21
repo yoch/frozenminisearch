@@ -2,21 +2,23 @@
 
 Plain JavaScript demo of the **browser build** (`@yoch/frozenminisearch/browser`).
 
+**Hosted:** [yoch.github.io/frozenminisearch/demo/](https://yoch.github.io/frozenminisearch/demo/)
+
 ## Prerequisites
 
-Build the browser bundle from the repository root:
+Build the browser bundle and copy assets into this folder:
 
 ```bash
 yarn build
+node scripts/prepare-frozen-demo.cjs
 ```
 
-## Start
+## Start locally
 
-1. `cd` to this directory (or serve the whole repo).
-2. Start an HTTP server, e.g. `python3 -m http.server 8000` from the repo root.
-3. Open `http://localhost:8000/examples/plain_js_frozen/`.
+1. Serve the repository root over HTTP, e.g. `python3 -m http.server 8000`.
+2. Open `http://localhost:8000/examples/plain_js_frozen/`.
 
-The demo loads Billboard JSON from `examples/plain_js/` and builds a frozen index with `fromDocuments`.
+The page loads `billboard_1965-2015.json` and builds a frozen index with `fromDocuments`.
 
 ## Bundlers
 
@@ -32,4 +34,4 @@ const buf = new Uint8Array(await (await fetch('/path/to/index.frozen')).arrayBuf
 const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
-The browser build supports **async** binary only (`saveBinaryAsync` / `loadBinaryAsync` on `Uint8Array`, codecs `raw` / `zlib` / `auto`). Use Node to produce CDN snapshots with `compression: 'zlib'` (or rely on `auto`, which now defaults to zlib).
+The browser build supports **async** binary only (`saveBinaryAsync` / `loadBinaryAsync` on `Uint8Array`, codecs `raw` / `zlib` / `auto`). Use Node to produce CDN snapshots with `compression: 'zlib'` (or rely on `auto`, which defaults to zlib).

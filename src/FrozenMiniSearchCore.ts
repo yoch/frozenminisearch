@@ -47,6 +47,7 @@ import {
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
+import { getFrozenDefault, type FrozenDefaultOptionName } from './searchDefaults'
 
 export function frozenMemoryBreakdown(frozen: FrozenMiniSearchCore): FrozenMemoryBreakdown {
   return frozen.memoryBreakdown()
@@ -278,7 +279,11 @@ export default class FrozenMiniSearchCore<T = any> {
     return suggestFromSearchResults(this.search(queryString, merged))
   }
 
-  /** Build a read-only index in one pass from documents. */
+  /** Built-in default for indexing / load options (`tokenize`, `processTerm`, `extractField`, …). */
+  static getDefault<K extends FrozenDefaultOptionName>(optionName: K) {
+    return getFrozenDefault(optionName)
+  }
+
   static fromDocuments<T, I extends FrozenMiniSearchCore<T>>(
     this: FrozenMiniSearchCtor<T, I>,
     documents: readonly T[],

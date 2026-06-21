@@ -30,3 +30,15 @@ export const defaultFrozenLoadOptions = {
   logger: (): void => {},
   autoVacuum: false as const,
 }
+
+export type FrozenDefaultOptionName = keyof typeof defaultFrozenLoadOptions
+
+/** Return a built-in default for indexing / load options (same idea as `MiniSearch.getDefault`). */
+export function getFrozenDefault<K extends FrozenDefaultOptionName>(
+  optionName: K,
+): (typeof defaultFrozenLoadOptions)[K] {
+  if (!Object.prototype.hasOwnProperty.call(defaultFrozenLoadOptions, optionName)) {
+    throw new Error(`FrozenMiniSearch: unknown option "${String(optionName)}"`)
+  }
+  return defaultFrozenLoadOptions[optionName]
+}

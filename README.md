@@ -4,9 +4,11 @@
 [![coverage](https://codecov.io/gh/yoch/frozenminisearch/graph/badge.svg)](https://codecov.io/gh/yoch/frozenminisearch)
 [![CI](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml/badge.svg)](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml)
 
-[API documentation](https://yoch.github.io/frozenminisearch/)
+[API documentation](https://yoch.github.io/frozenminisearch/) · [Live demo](https://yoch.github.io/frozenminisearch/demo/)
 
 **Memory-optimized, read-only full-text search for Node.js and browsers.** FrozenMiniSearch keeps the serving API close to [MiniSearch](https://github.com/lucaong/minisearch) while using compact, immutable indexes for fixed corpora.
+
+Try the [demo application](https://yoch.github.io/frozenminisearch/demo/) (Billboard Hot 100 search and auto-suggest in the browser).
 
 Use it when your documents are built offline, shipped to production, and queried many times. In that shape, frozen indexes use **~98-99% less index RAM** in the main benchmark set, save to compact binary snapshots, and load faster than MiniSearch JSON.
 
@@ -90,7 +92,118 @@ const buf = new Uint8Array(await (await fetch('/index.frozen')).arrayBuffer())
 const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
-See [examples/plain_js_frozen/](examples/plain_js_frozen/) for a plain-JS demo (`yarn build` first).
+See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/](examples/plain_js_frozen/) locally (`yarn demo:prepare` then serve the repo root).
+
+---
+
+## Usage
+
+### Basic usage
+
+```javascript
+const documents = [
+  { id: 1, title: 'Moby Dick', text: 'Call me Ishmael. Some years ago...', category: 'fiction' },
+  { id: 2, title: 'Zen and the Art of Motorcycle Maintenance', text: 'I can see by my watch...', category: 'fiction' },
+  // ...
+]
+
+const options = { fields: ['title', 'text'], storeFields: ['title', 'category'] }
+const index = FrozenMiniSearch.fromDocuments(documents, options)
+
+index.search('zen art motorcycle')
+// => [{ id, title, category, score, match, ... }, ...]
+```
+
+Frozen indexes are **read-only**: there is no `add`, `remove`, or `discard`. Rebuild offline or use `createFrozenIndexBuilder` for incremental ingestion before freeze.
+
+### Search options
+
+`MiniSearch`-style options work on `search()` and `autoSuggest()`:
+
+```javascript
+index.search('zen', { fields: ['title'] })
+index.search('zen', { boost: { title: 2 } })
+index.search('moto', { prefix: true })
+index.search('ismael', { fuzzy: 0.2 })
+index.search('zen', { filter: (result) => result.category === 'fiction' })
+index.search('zen', { combineWith: 'AND' }) // OR, AND_NOT
+
+const index = FrozenMiniSearch.fromDocuments(documents, {
+  fields: ['title', 'text'],
+  searchOptions: { prefix: true, fuzzy: 0.2 },
+})
+```
+
+Wildcard and nested query combinations are supported (`FrozenMiniSearch.wildcard`, `QueryCombination`).
+
+### Auto-suggestions
+
+```javascript
+index.autoSuggest('zen ar')
+// => [{ suggestion: 'zen archery art', terms: [...], score }, ...]
+
+index.autoSuggest('neromancer', { fuzzy: 0.2 })
+index.autoSuggest('zen ar', { filter: (result) => result.category === 'fiction' })
+```
+
+### Field extraction
+
+For nested or computed fields, pass `extractField` at **index build** time (and again when loading binary snapshots if you override defaults):
+
+```javascript
+const options = {
+  fields: ['title', 'author.name', 'pubYear'],
+  extractField: (document, fieldName) => {
+    if (fieldName === 'pubYear') {
+      return document.pubDate?.getFullYear().toString()
+    }
+    return fieldName.split('.').reduce((doc, key) => doc && doc[key], document)
+  },
+}
+```
+
+The default extractor is available via `FrozenMiniSearch.getDefault('extractField')`.
+
+### Tokenization
+
+```javascript
+const options = {
+  fields: ['title', 'text'],
+  tokenize: (string, _fieldName) => string.split('-'),
+  searchOptions: {
+    tokenize: (string) => string.split(/[\s-]+/),
+  },
+}
+```
+
+`FrozenMiniSearch.getDefault('tokenize')` returns the built-in Unicode space/punctuation splitter. Only that **exact function reference** enables the fastest indexing path; equivalent wrappers use the general path.
+
+### Term processing
+
+```javascript
+const stopWords = new Set(['and', 'or', 'the'])
+
+const options = {
+  fields: ['title', 'text'],
+  processTerm: (term) => (stopWords.has(term) ? null : term.toLowerCase()),
+  searchOptions: {
+    processTerm: (term) => term.toLowerCase(),
+  },
+}
+```
+
+`FrozenMiniSearch.getDefault('processTerm')` downcases terms (no stemming or stop-word list by default).
+
+### Default helpers
+
+```javascript
+FrozenMiniSearch.getDefault('tokenize')
+FrozenMiniSearch.getDefault('processTerm')
+FrozenMiniSearch.getDefault('extractField')
+FrozenMiniSearch.getDefault('stringifyField')
+```
+
+Use these when wrapping a custom function and delegating to the library default, same as `MiniSearch.getDefault`.
 
 ---
 
@@ -140,9 +253,12 @@ MiniSearch is only needed if you still build mutable indexes. Frozen instances d
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
+- `getDefault(optionName)` — built-in `tokenize`, `processTerm`, `extractField`, `stringifyField`, …
 - `saveBinarySync` / `loadBinarySync` on **Node** (async variants too); browser entry supports **async** binary only (`Uint8Array`, `raw` / `zlib` / `auto`)
 
 Custom `tokenize` and `processTerm` functions are not stored in snapshots; pass the same functions again when loading.
+
+See [Usage](#usage) above for examples.
 
 ---
 

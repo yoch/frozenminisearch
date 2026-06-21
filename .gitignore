@@ -32,5 +32,5 @@ dev/poc-vocs/
 dev/minisearch*
 scripts/poc-mcp*
 scripts/minisearch*
-FrozenMiniSearch-v2.png
+examples/plain_js_frozen/frozenminisearch.js
 FrozenMiniSearch-v2 (1).png

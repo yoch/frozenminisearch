@@ -1,4 +1,5 @@
 import { defaultFrozenLoadOptions, SPACE_OR_PUNCTUATION } from './searchDefaults'
+import FrozenMiniSearch from './FrozenMiniSearch'
 import {
   collectFieldTermFreqsFromFieldInto,
   isDefaultTokenize,
@@ -90,7 +91,7 @@ describe('indexingCore default tokenizer', () => {
   })
 
   test('isDefaultTokenize accepts only the default tokenizer reference', () => {
-    expect(isDefaultTokenize(defaultFrozenLoadOptions.tokenize)).toBe(true)
+    expect(isDefaultTokenize(FrozenMiniSearch.getDefault('tokenize'))).toBe(true)
     const equivalent = text => text.split(SPACE_OR_PUNCTUATION)
     expect(isDefaultTokenize(equivalent)).toBe(false)
     expect(isDefaultTokenize(text => text.split(','))).toBe(false)

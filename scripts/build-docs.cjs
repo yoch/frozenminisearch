@@ -6,7 +6,7 @@
  *   DOCS_PAGES=1  — basePath, hostedBaseUrl, version in header title
  *   DOCS_VERSION  — semver for --name (defaults to package.json version)
  */
-const { cpSync, readFileSync, rmSync } = require('node:fs')
+const { readFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { spawnSync } = require('node:child_process')
 
@@ -32,7 +32,4 @@ if (pages) {
 
 run(process.execPath, typedocArgs)
 run(process.execPath, [join(root, 'scripts', 'sync-docs-media.cjs')])
-
-const demoDir = join(root, 'docs', 'demo')
-rmSync(demoDir, { recursive: true, force: true })
-cpSync(join(root, 'examples', 'plain_js'), demoDir, { recursive: true, dereference: true })
+run(process.execPath, [join(root, 'scripts', 'build-demo.cjs')])

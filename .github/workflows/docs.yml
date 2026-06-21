@@ -15,9 +15,11 @@ on:
       - 'benchmarks/baselines/reference.json'
       - 'typedoc.json'
       - 'examples/plain_js/**'
+      - 'examples/plain_js_frozen/**'
       - 'dev/docs/**'
       - 'scripts/sync-docs-media.cjs'
       - 'scripts/build-docs.cjs'
+      - 'scripts/build-demo.cjs'
       - '.github/workflows/docs.yml'
   pull_request:
     branches: [master]
@@ -31,8 +33,10 @@ on:
       - 'dev/docs/**'
       - 'typedoc.json'
       - 'examples/plain_js/**'
+      - 'examples/plain_js_frozen/**'
       - 'scripts/sync-docs-media.cjs'
       - 'scripts/build-docs.cjs'
+      - 'scripts/build-demo.cjs'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -50,6 +54,7 @@ jobs:
           node-version: '22'
           cache: 'yarn'
       - run: yarn install --frozen-lockfile
+      - run: yarn build
       - run: yarn build-docs
       - name: Verify generated docs/media
         run: |
@@ -58,6 +63,8 @@ jobs:
           test -f docs/media/README.md
           test -f docs/media/reference.json
           test -f docs/index.html
+          test -f docs/demo/index.html
+          test -f docs/demo/frozenminisearch.js
 
   deploy:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -79,6 +86,7 @@ jobs:
           node-version: '22'
           cache: 'yarn'
       - run: yarn install --frozen-lockfile
+      - run: yarn build
       - name: Set docs version
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -95,6 +103,8 @@ jobs:
           test -f docs/media/README.md
           test -f docs/media/reference.json
           test -f docs/index.html
+          test -f docs/demo/index.html
+          test -f docs/demo/frozenminisearch.js
       - uses: actions/upload-pages-artifact@v4
         with:
           path: docs

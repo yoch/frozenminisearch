@@ -4,7 +4,7 @@
     <title>FrozenMiniSearch Example</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:400,700" rel="stylesheet">
-    <link href='app.css' rel='stylesheet' type='text/css'>
+    <link href='../app.css' rel='stylesheet' type='text/css'>
   </head>
   <body>
     <div id="app">
@@ -58,24 +58,14 @@
                       <select name="toYear">
                       </select>
                     </label>
-                    <script type="text/javascript">
-                      const populateYears = (selector, minYear, maxYear, selectedYear) => {
-                        document.querySelector(selector).innerHTML =
-                          Array.from({ length: maxYear - minYear + 1 }, (_, i) => i + minYear)
-                          .map(y => `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>${y}</option>`)
-                          .join('\n')
-                      }
-
-                      populateYears('select[name=fromYear]', 1965, 2015, 1965)
-                      populateYears('select[name=toYear]', 1965, 2015, 2015)
-                    </script>
                   </div>
                 </form>
               </details>
             </div>
           </header>
           <p class="Explanation">
-            This demo uses the browser build of
+            Try the <a href="https://yoch.github.io/frozenminisearch/demo/">hosted demo</a>
+            or run this example locally. This page uses the browser build of
             <a href="https://github.com/yoch/frozenminisearch">FrozenMiniSearch</a>:
             the index is built once from JSON with <code>fromDocuments</code>, then queried
             in-memory with the same search and auto-suggest API as MiniSearch.

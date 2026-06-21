@@ -53,6 +53,7 @@ export class FrozenIndexBuilder<T> {
   private readonly _avgFieldLength: number[]
   private readonly _seenIds: Set<unknown>
   private readonly _fieldTermFreqScratch = new Map<string, number>()
+  private readonly _rawTokenScratch = new Set<string>()
   private readonly _tokenScratch: string[] = []
   private _nextId: number
   private _frozen: boolean
@@ -117,8 +118,9 @@ export class FrozenIndexBuilder<T> {
         ? fieldValue
         : stringifyField(fieldValue, field)
       const fieldId = this._fieldIds[field]
-      const uniqueTerms = collectFieldTermFreqsFromFieldInto(
+      const { fieldLength } = collectFieldTermFreqsFromFieldInto(
         this._fieldTermFreqScratch,
+        this._rawTokenScratch,
         this._tokenScratch,
         tokenize,
         fieldText,
@@ -126,8 +128,8 @@ export class FrozenIndexBuilder<T> {
         processTerm,
       )
 
-      this._fieldLengthData[shortId * this._fieldCount + fieldId] = uniqueTerms
-      updateAvgFieldLength(this._avgFieldLength, fieldId, documentCount - 1, uniqueTerms)
+      this._fieldLengthData[shortId * this._fieldCount + fieldId] = fieldLength
+      updateAvgFieldLength(this._avgFieldLength, fieldId, documentCount - 1, fieldLength)
 
       this._fieldTermFreqScratch.forEach((freq, term) => {
         const ti = getOrCreateTermIndex(this._termCount, this._index!, term)

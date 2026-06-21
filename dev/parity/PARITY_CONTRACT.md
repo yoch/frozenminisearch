@@ -7,6 +7,19 @@
 - `autoSuggest` scores and term sets within tolerance (suggestion phrase order follows `terms`).
 - Options: prefix, fuzzy, wildcard, AND / OR / AND_NOT, filters, boosts, field restrictions.
 
+## Indexing build invariants (CI)
+
+Validated in [`indexing-parity.test.js`](indexing-parity.test.js) — **MiniSearch.addAll** vs **FrozenMiniSearch.fromDocuments** with the same `tokenize`, `processTerm`, and `fields`:
+
+- Same inverted index postings (`term → field → externalDocId → frequency`), modulo freq clamp at 65535.
+- Same `averageFieldLength` per field (`toBeCloseTo`, precision 5).
+- Field length counts **unique raw tokens** before `processTerm` filtering (MiniSearch semantics).
+- Search parity on representative queries per profile (default, camelCase, processTerm, Vocs integration).
+
+`functional-parity.test.js` alone is **not sufficient**: it mostly builds Frozen via `fromMiniSearch(snapshot)` and compares Frozen-vs-Frozen on `fromDocuments`. Native indexing must be checked against upstream.
+
+`isDefaultTokenize` fast path: only the library default tokenizer **reference** (`defaultFrozenLoadOptions.tokenize`). Custom tokenizers always use the two-phase path.
+
 ## Known acceptable drift
 
 - Wildcard: only `FrozenMiniSearch.wildcard` is recognized (strict identity).

@@ -55,12 +55,15 @@ describe('indexingCore default tokenizer', () => {
     const fieldName = 'txt'
     const processTerm = term => term.toLowerCase()
     const tokenScratch = []
+    const rawTokenScratch = new Set()
     const localFreqs = new Map()
 
     for (const text of PARITY_CASES) {
       const expected = freqMapFromSplit(text, fieldName, processTerm)
+      const tokens = text.split(SPACE_OR_PUNCTUATION)
       const unique = collectFieldTermFreqsFromFieldInto(
         localFreqs,
+        rawTokenScratch,
         tokenScratch,
         defaultFrozenLoadOptions.tokenize,
         text,
@@ -68,23 +71,64 @@ describe('indexingCore default tokenizer', () => {
         processTerm,
       )
       expect(mapToObject(localFreqs)).toEqual(mapToObject(expected))
-      expect(unique).toBe(expected.size)
+      expect(unique.fieldLength).toBe(new Set(tokens).size)
+      expect(unique.indexedTermCount).toBe(expected.size)
 
-      const tokens = text.split(SPACE_OR_PUNCTUATION)
       const fromTwoPhase = collectFieldTermFreqsInto(
         localFreqs,
         tokens,
         fieldName,
         processTerm,
       )
-      expect(fromTwoPhase).toBe(unique)
+      expect(fromTwoPhase).toBe(unique.indexedTermCount)
       expect(mapToObject(localFreqs)).toEqual(mapToObject(expected))
     }
   })
 
-  test('isDefaultTokenize accepts split-equivalent custom function', () => {
+  test('isDefaultTokenize accepts only the default tokenizer reference', () => {
+    expect(isDefaultTokenize(defaultFrozenLoadOptions.tokenize)).toBe(true)
     const equivalent = text => text.split(SPACE_OR_PUNCTUATION)
-    expect(isDefaultTokenize(equivalent)).toBe(true)
+    expect(isDefaultTokenize(equivalent)).toBe(false)
     expect(isDefaultTokenize(text => text.split(','))).toBe(false)
+  })
+
+  test('custom camelCase tokenizer indexes split terms via fromFieldInto', () => {
+    const camelCaseLike = (text) => {
+      const tokens = []
+      for (const word of text.split(/[\s\-._/:@]+/)) {
+        if (!word) continue
+        const lower = word.toLowerCase()
+        tokens.push(lower)
+        const split = word
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+          .split(/\s+/)
+          .map(w => w.toLowerCase())
+          .filter(w => w.length > 0)
+        if (split.length > 1) tokens.push(...split)
+      }
+      return tokens.filter(w => w.length > 0)
+    }
+    expect(isDefaultTokenize(camelCaseLike)).toBe(false)
+
+    const localFreqs = new Map()
+    const rawTokenScratch = new Set()
+    const tokenScratch = []
+    const processTerm = term => term.toLowerCase()
+    const collected = collectFieldTermFreqsFromFieldInto(
+      localFreqs,
+      rawTokenScratch,
+      tokenScratch,
+      camelCaseLike,
+      'createUser',
+      'title',
+      processTerm,
+    )
+    expect(collected.indexedTermCount).toBe(3)
+    expect(mapToObject(localFreqs)).toEqual({
+      create: 1,
+      createuser: 1,
+      user: 1,
+    })
   })
 })

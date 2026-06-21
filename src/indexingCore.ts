@@ -3,7 +3,6 @@ import {
   defaultSearchOptions,
   defaultAutoSuggestOptions,
   defaultFrozenLoadOptions,
-  SPACE_OR_PUNCTUATION,
 } from './searchDefaults'
 
 /**
@@ -65,31 +64,14 @@ export function collectFieldTermFreqsInto(
 /** Global delimiter pattern for incremental `exec` (must not reuse {@link SPACE_OR_PUNCTUATION} — no `g` flag). */
 const DEFAULT_TOKENIZE_DELIMITERS = /[\n\r\p{Z}\p{P}]+/gu
 
-const defaultTokenizeProbe = 'a b'
-const defaultTokenizeProbeField = 'f'
-
-const tokenizeBehaviorCache = new WeakMap<
-  IndexingOptions<unknown>['tokenize'],
-  boolean
->()
-
 /**
- * True when `tokenize` matches the library default (reference equality or split-equivalent
- * on a fixed probe). Custom tokenizers that pass the probe but diverge on other inputs
- * (e.g. leading delimiters) still take the fast path — use the default reference in prod.
+ * True only for the library default tokenizer reference. Custom tokenizers — including
+ * split-equivalent wrappers — always take the two-phase indexing path.
  */
 export function isDefaultTokenize(
   tokenize: IndexingOptions<unknown>['tokenize'],
 ): boolean {
-  if (tokenize === defaultFrozenLoadOptions.tokenize) return true
-  const cached = tokenizeBehaviorCache.get(tokenize)
-  if (cached != null) return cached
-  const splitTokens = defaultTokenizeProbe.split(SPACE_OR_PUNCTUATION)
-  const customTokens = tokenize(defaultTokenizeProbe, defaultTokenizeProbeField)
-  const ok = splitTokens.length === customTokens.length
-    && splitTokens.every((t, i) => t === customTokens[i])
-  tokenizeBehaviorCache.set(tokenize, ok)
-  return ok
+  return tokenize === defaultFrozenLoadOptions.tokenize
 }
 
 function forEachDefaultToken(text: string, onToken: (token: string) => void): void {
@@ -140,36 +122,73 @@ export function tokenizeFieldInto(
   out.push(...tokens)
 }
 
+export type FieldTermCollectResult = {
+  /** Unique raw token count (MiniSearch field length semantics). */
+  fieldLength: number
+  /** Distinct indexed terms after `processTerm`. */
+  indexedTermCount: number
+}
+
 function collectDefaultFieldTermFreqsInto(
   localFreqs: Map<string, number>,
+  rawTokenScratch: Set<string>,
   text: string,
   fieldName: string,
   processTerm: IndexingOptions<unknown>['processTerm'],
-): number {
+): FieldTermCollectResult {
   localFreqs.clear()
+  rawTokenScratch.clear()
   forEachDefaultToken(text, (token) => {
+    rawTokenScratch.add(token)
     accumulateProcessedTerm(localFreqs, processTerm(token, fieldName))
   })
-  return localFreqs.size
+  return {
+    fieldLength: rawTokenScratch.size,
+    indexedTermCount: localFreqs.size,
+  }
+}
+
+function collectTokenArrayFieldTermFreqsInto(
+  localFreqs: Map<string, number>,
+  rawTokenScratch: Set<string>,
+  tokens: string[],
+  fieldName: string,
+  processTerm: IndexingOptions<unknown>['processTerm'],
+): FieldTermCollectResult {
+  localFreqs.clear()
+  rawTokenScratch.clear()
+  for (const token of tokens) {
+    rawTokenScratch.add(token)
+    accumulateProcessedTerm(localFreqs, processTerm(token, fieldName))
+  }
+  return {
+    fieldLength: rawTokenScratch.size,
+    indexedTermCount: localFreqs.size,
+  }
 }
 
 /**
- * Tokenize + accumulate field term frequencies in one pass when the default tokenizer is used.
- * `tokenScratch` is only used for custom tokenizers (two-phase fallback).
+ * Tokenize + accumulate field term frequencies. Field length uses unique raw
+ * tokens (matching MiniSearch); postings use terms that survive `processTerm`.
  */
 export function collectFieldTermFreqsFromFieldInto(
   localFreqs: Map<string, number>,
+  rawTokenScratch: Set<string>,
   tokenScratch: string[],
   tokenize: IndexingOptions<unknown>['tokenize'],
   text: string,
   fieldName: string,
   processTerm: IndexingOptions<unknown>['processTerm'],
-): number {
+): FieldTermCollectResult {
   if (isDefaultTokenize(tokenize)) {
-    return collectDefaultFieldTermFreqsInto(localFreqs, text, fieldName, processTerm)
+    return collectDefaultFieldTermFreqsInto(
+      localFreqs, rawTokenScratch, text, fieldName, processTerm,
+    )
   }
   tokenizeFieldInto(tokenScratch, tokenize, text, fieldName)
-  return collectFieldTermFreqsInto(localFreqs, tokenScratch, fieldName, processTerm)
+  return collectTokenArrayFieldTermFreqsInto(
+    localFreqs, rawTokenScratch, tokenScratch, fieldName, processTerm,
+  )
 }
 
 export function updateAvgFieldLength(

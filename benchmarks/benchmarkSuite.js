@@ -1,23 +1,10 @@
 import MiniSearch from 'minisearch'
-import FrozenMiniSearch, { frozenMemoryBreakdown } from '../dist/es/index.js'
-import { loadDivinaLines } from './loadDivinaLines.js'
-import {
-  giantVocabulary,
-  largeDocuments,
-  manyFields,
-  highFrequencyTerms,
-  overflowFrequencies,
-  denseNumericIds,
-  genericStringIds,
-  sparseFields,
-  docIdUint16Boundary
-} from './benchmarkScenarios.js'
+import FrozenMiniSearch from '../dist/es/index.js'
 import { median, medianRound } from './benchStats.js'
 import {
   gc,
   mbRound,
   frozenVsMutablePct,
-  measureHeap,
   benchSearchPaired,
   searchIterationsForBatchEntry,
   timedMs,
@@ -26,6 +13,9 @@ import {
 import { applySearchBenchBatchesToScenarios, getSearchBenchBatchEntry } from './loadSearchBenchBatches.js'
 import { benchSearchLevels, primaryLookupTerm } from './searchLevels.js'
 import { ALL_SURFACES, computeSurfaceNeeds } from './framework/surfaces.mjs'
+import { buildScenarioList, getScenarioById } from './scenarioRegistry.mjs'
+
+export { buildScenarioList, getScenarioById }
 
 const EXPENSIVE_SEARCH_PROBE_MS = 20
 const VERY_EXPENSIVE_SEARCH_PROBE_MS = 50
@@ -228,18 +218,30 @@ function aggregateScenarioRuns (runs) {
     binaryMagic: base.indexing.binaryMagic
   }
 
-  const heapMutable = medianRound(runs.map((r) => r.heapMb.mutable), 3)
-  const heapFrozen = medianRound(runs.map((r) => r.heapMb.frozen), 3)
-  const heapBuildMutableFreeze = medianRound(runs.map((r) => r.heapMb.buildMutableFreeze), 3)
-  const heapBuildFromDocuments = medianRound(runs.map((r) => r.heapMb.buildFromDocuments), 3)
-  const heapLoadJson = medianRound(runs.map((r) => r.heapMb.loadJson), 3)
-  const heapLoadBinary = medianRound(runs.map((r) => r.heapMb.loadBinary), 3)
-  const heapSavingPct = heapMutable > 0
+  const heapMutable = base.heapMb
+    ? medianRound(runs.map((r) => r.heapMb?.mutable).filter((v) => v != null), 3)
+    : undefined
+  const heapFrozen = base.heapMb
+    ? medianRound(runs.map((r) => r.heapMb?.frozen).filter((v) => v != null), 3)
+    : undefined
+  const heapBuildMutableFreeze = base.heapMb?.buildMutableFreeze != null
+    ? medianRound(runs.map((r) => r.heapMb?.buildMutableFreeze).filter((v) => v != null), 3)
+    : undefined
+  const heapBuildFromDocuments = base.heapMb?.buildFromDocuments != null
+    ? medianRound(runs.map((r) => r.heapMb?.buildFromDocuments).filter((v) => v != null), 3)
+    : undefined
+  const heapLoadJson = base.heapMb?.loadJson != null
+    ? medianRound(runs.map((r) => r.heapMb?.loadJson).filter((v) => v != null), 3)
+    : undefined
+  const heapLoadBinary = base.heapMb?.loadBinary != null
+    ? medianRound(runs.map((r) => r.heapMb?.loadBinary).filter((v) => v != null), 3)
+    : undefined
+  const heapSavingPct = heapMutable != null && heapFrozen != null && heapMutable > 0
     ? Number((100 * (1 - heapFrozen / heapMutable)).toFixed(1))
-    : 0
-  const buildHeapSavingPct = heapBuildMutableFreeze > 0
+    : undefined
+  const buildHeapSavingPct = heapBuildMutableFreeze != null && heapBuildFromDocuments != null && heapBuildMutableFreeze > 0
     ? Number((100 * (1 - heapBuildFromDocuments / heapBuildMutableFreeze)).toFixed(1))
-    : 0
+    : undefined
 
   const diskJson = medianRound(runs.map((r) => r.diskMb.json), 3)
   const diskBinary = medianRound(runs.map((r) => r.diskMb.binary), 3)
@@ -295,16 +297,22 @@ function aggregateScenarioRuns (runs) {
     storeFields: base.storeFields,
     benchSurfaces: base.benchSurfaces,
     indexing,
-    heapMb: {
-      mutable: heapMutable,
-      frozen: heapFrozen,
-      buildMutableFreeze: heapBuildMutableFreeze,
-      buildFromDocuments: heapBuildFromDocuments,
-      buildFromDocumentsVsMutableFreezeSavingPct: buildHeapSavingPct,
-      loadJson: heapLoadJson,
-      loadBinary: heapLoadBinary,
-      frozenVsMutableSavingPct: heapSavingPct
-    },
+    ...(heapMutable != null && heapFrozen != null ? {
+      heapMb: {
+        mutable: heapMutable,
+        frozen: heapFrozen,
+        ...(heapBuildMutableFreeze != null && heapBuildFromDocuments != null ? {
+          buildMutableFreeze: heapBuildMutableFreeze,
+          buildFromDocuments: heapBuildFromDocuments,
+          buildFromDocumentsVsMutableFreezeSavingPct: buildHeapSavingPct,
+        } : {}),
+        ...(heapLoadJson != null && heapLoadBinary != null ? {
+          loadJson: heapLoadJson,
+          loadBinary: heapLoadBinary,
+        } : {}),
+        frozenVsMutableSavingPct: heapSavingPct,
+      },
+    } : {}),
     diskMb: {
       json: diskJson,
       binary: diskBinary,
@@ -320,7 +328,7 @@ function aggregateScenarioRuns (runs) {
     ...(searchLevels ? { searchLevels } : {}),
     scoreDrift,
     summary: {
-      heapFrozenVsMutableSavingPct: heapSavingPct,
+      ...(heapSavingPct != null ? { heapFrozenVsMutableSavingPct: heapSavingPct } : {}),
       diskBinaryVsJsonSavingPct: diskSavingPct,
       loadBinaryVsJsonSavingPct: loadSavingPct,
       searchFrozenP50AvgGainPct: avgFrozenP50GainPct(search),
@@ -386,150 +394,6 @@ function withRunPolicy (result, requestedRuns, effectiveRuns, reason) {
   }
 }
 
-export function buildScenarioList () {
-  const divina = loadDivinaLines()
-  const many = manyFields()
-  const sparse = sparseFields(5000, 20)
-
-  return [
-    {
-      id: 'divina-storeFields',
-      name: 'Divina Commedia — with storeFields',
-      corpus: divina,
-      options: { fields: ['txt'], storeFields: ['txt'] },
-      queries: [
-        { label: 'exact', q: 'inferno', opts: {} },
-        { label: 'AND', q: 'inferno paradiso', opts: { combineWith: 'AND' } },
-        { label: 'AND+prefix', q: 'infe para', opts: { combineWith: 'AND', prefix: true } },
-        { label: 'AND+fuzzy', q: 'infern paradis', opts: { combineWith: 'AND', fuzzy: 0.2 } },
-        { label: 'AND_NOT', q: 'inferno paradiso', opts: { combineWith: 'AND_NOT' } },
-        { label: 'AND_NOT+prefix', q: 'infe para', opts: { combineWith: 'AND_NOT', prefix: true } },
-        { label: 'prefix', q: 'infe', opts: { prefix: true } },
-        { label: 'fuzzy', q: 'infern', opts: { fuzzy: 0.2 } }
-      ]
-    },
-    {
-      id: 'divina-indexOnly',
-      name: 'Divina Commedia — index only',
-      corpus: divina,
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'inferno', opts: {} },
-        { label: 'prefix', q: 'infe', opts: { prefix: true } }
-      ]
-    },
-    {
-      id: 'extreme-giantVocabulary',
-      name: 'Extreme — giant vocabulary (50k unique terms)',
-      corpus: giantVocabulary(50000),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'unique12345', opts: {} },
-        { label: 'AND+prefix', q: 'unique1 common', opts: { combineWith: 'AND', prefix: true } },
-        { label: 'AND_NOT', q: 'unique1 common', opts: { combineWith: 'AND_NOT' } },
-        { label: 'prefix', q: 'unique1', opts: { prefix: true } }
-      ]
-    },
-    {
-      id: 'extreme-largeDocuments',
-      name: 'Extreme — large documents (5k × ~5KB, storeFields)',
-      corpus: largeDocuments(5000, 5000),
-      options: { fields: ['txt'], storeFields: ['txt'] },
-      queries: [
-        { label: 'exact', q: 'lorem', opts: {} },
-        { label: 'AND', q: 'lorem ipsum', opts: { combineWith: 'AND' } }
-      ]
-    },
-    {
-      id: 'extreme-manyFields',
-      name: 'Extreme — many fields (2k docs × 10 fields)',
-      corpus: many.docs,
-      options: { fields: many.fields, storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'sharedterm', opts: {} },
-        { label: 'prefix', q: 'share', opts: { prefix: true } }
-      ]
-    },
-    {
-      id: 'extreme-highFrequency',
-      name: 'Extreme — high-frequency terms (10k docs)',
-      corpus: highFrequencyTerms(10000),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'alpha', opts: {} },
-        { label: 'AND', q: 'alpha beta', opts: { combineWith: 'AND' } }
-      ]
-    },
-    {
-      id: 'extreme-overflowFrequency',
-      name: 'Extreme — overflow frequencies (>255)',
-      corpus: overflowFrequencies(2000, 800),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'alpha', opts: {} }
-      ],
-      driftQueries: ['alpha']
-    },
-    {
-      id: 'denseNumericIds-100k',
-      name: 'Dense numeric ids (100k, identity lookup)',
-      corpus: denseNumericIds(100000),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'token42', opts: {} }
-      ]
-    },
-    {
-      id: 'genericStringIds-100k',
-      name: 'Generic string ids (100k, lazy-map lookup)',
-      corpus: genericStringIds(100000),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'token42', opts: {} }
-      ]
-    },
-    {
-      id: 'sparseFields-50kTerms-20Fields',
-      name: 'Sparse fields (5k docs × 20 fields, one active field/doc)',
-      corpus: sparse.docs,
-      options: {
-        fields: sparse.fields,
-        storeFields: []
-      },
-      queries: [
-        { label: 'exact', q: 'shared', opts: {} }
-      ]
-    },
-    {
-      id: 'docIdUint16Boundary-65535',
-      name: 'Doc id Uint16 boundary (65535 docs)',
-      corpus: docIdUint16Boundary(65535),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'alpha', opts: {} }
-      ]
-    },
-    {
-      id: 'docIdUint16Boundary-65536',
-      name: 'Doc id Uint32 boundary (65536 docs)',
-      corpus: docIdUint16Boundary(65536),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'alpha', opts: {} }
-      ]
-    },
-    {
-      id: 'saveBinaryAfterNoTerms',
-      name: 'saveBinary dictionary rebuild (50k terms)',
-      corpus: giantVocabulary(50000),
-      options: { fields: ['txt'], storeFields: [] },
-      queries: [
-        { label: 'exact', q: 'unique9999', opts: {} }
-      ]
-    }
-  ]
-}
-
 /** Scenarios with fixed `benchBatch` per query (from searchBenchBatches.json). */
 export function buildBenchmarkScenarios () {
   return applySearchBenchBatchesToScenarios(buildScenarioList())
@@ -574,6 +438,11 @@ function computeScoreDrift (mutable, frozen, query, limit = 20) {
 export function runScenario (scenario, benchOptions = {}) {
   const surfaces = benchOptions.surfaces ?? [...ALL_SURFACES]
   const need = computeSurfaceNeeds(surfaces)
+  if (need.memory || need.breakdown) {
+    throw new Error(
+      'Surfaces memory/breakdown require the isolated heap phase (captureBaseline or npm run bench:memory), not runScenario.',
+    )
+  }
   const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')
   const levelOpts = { searchLevels: need.searchLevels }
 
@@ -652,60 +521,15 @@ export function runScenario (scenario, benchOptions = {}) {
 
   gc()
 
-  let heapMutable
-  let heapFrozen
-  let heapBuildMutableFreeze
-  let heapBuildFromDocuments
-  if (need.memory || need.breakdown) {
-    heapMutable = measureHeap(() => {
-      const ms = new MiniSearch(options)
-      ms.addAll(corpus)
-      return ms
-    })
-    heapFrozen = measureHeap(() => {
-      const ms = new MiniSearch(options)
-      ms.addAll(corpus)
-      return FrozenMiniSearch.fromMiniSearch(ms, options)
-    })
-    if (need.build) {
-      heapBuildMutableFreeze = measureHeap(() => {
-        const ms = new MiniSearch(options)
-        ms.addAll(corpus)
-        return FrozenMiniSearch.fromMiniSearch(ms, options)
-      })
-      heapBuildFromDocuments = measureHeap(() => FrozenMiniSearch.fromDocuments(corpus, options))
-    }
-  }
-
-  let breakdown
-  if (need.breakdown) {
-    if (!heapFrozen) {
-      heapFrozen = measureHeap(() => {
-        const ms = new MiniSearch(options)
-        ms.addAll(corpus)
-        return FrozenMiniSearch.fromMiniSearch(ms, options)
-      })
-    }
-    breakdown = frozenMemoryBreakdown(heapFrozen.value)
-  }
-
-  let heapJsonLoaded
-  let heapBinaryLoaded
   let loadJson
   let loadBinary
   if (need.load) {
-    heapJsonLoaded = measureHeap(() => MiniSearch.loadJSON(json, options))
-    heapBinaryLoaded = measureHeap(() => FrozenMiniSearch.loadBinarySync(binaryBuf, options))
     gc()
     loadJson = timedMs(() => MiniSearch.loadJSON(json, options))
     gc()
     loadBinary = timedMs(() => FrozenMiniSearch.loadBinarySync(binaryBuf, options))
     gc()
   }
-
-  const heapSavingPct = heapMutable && heapFrozen && heapMutable.heapMb > 0
-    ? Number((100 * (1 - heapFrozen.heapMb / heapMutable.heapMb)).toFixed(1))
-    : 0
 
   let scoreDrift
   if (need.drift && driftQueries && driftQueries.length > 0) {
@@ -744,42 +568,6 @@ export function runScenario (scenario, benchOptions = {}) {
     }
   }
 
-  if (need.memory && heapMutable && heapFrozen) {
-    result.heapMb = {
-      mutable: heapMutable.heapMb,
-      frozen: heapFrozen.heapMb,
-      ...(need.build && heapBuildMutableFreeze && heapBuildFromDocuments ? {
-        buildMutableFreeze: heapBuildMutableFreeze.heapMb,
-        buildFromDocuments: heapBuildFromDocuments.heapMb,
-        buildFromDocumentsVsMutableFreezeSavingPct: heapBuildMutableFreeze.heapMb > 0
-          ? Number((100 * (1 - heapBuildFromDocuments.heapMb / heapBuildMutableFreeze.heapMb)).toFixed(1))
-          : 0,
-      } : {}),
-      ...(need.load && heapJsonLoaded && heapBinaryLoaded ? {
-        loadJson: heapJsonLoaded.heapMb,
-        loadBinary: heapBinaryLoaded.heapMb,
-      } : {}),
-      frozenVsMutableSavingPct: heapSavingPct,
-    }
-    result.memoryMb = {
-      frozen: {
-        heapUsed: heapFrozen.heapMb,
-        external: heapFrozen.externalMb,
-        arrayBuffers: heapFrozen.arrayBuffersMb,
-        rss: heapFrozen.rssMb,
-        totalResidentApprox: heapFrozen.totalResidentApproxMb,
-      },
-      mutable: {
-        heapUsed: heapMutable.heapMb,
-        external: heapMutable.externalMb,
-        arrayBuffers: heapMutable.arrayBuffersMb,
-        rss: heapMutable.rssMb,
-        totalResidentApprox: heapMutable.totalResidentApproxMb,
-      },
-    }
-    result.summary.heapFrozenVsMutableSavingPct = heapSavingPct
-  }
-
   if (need.save && jsonMb != null && binaryMb != null) {
     result.diskMb = {
       json: jsonMb,
@@ -802,7 +590,6 @@ export function runScenario (scenario, benchOptions = {}) {
     result.summary.loadBinaryVsJsonSavingPct = result.loadMs.binaryVsJsonSavingPct
   }
 
-  if (need.breakdown) result.memoryBreakdown = breakdown
   if (need.search) {
     result.search = search
     result.summary.searchFrozenP50AvgGainPct = searchGain

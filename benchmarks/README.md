@@ -21,6 +21,7 @@ npm run bench:micro                        # Benchmark.js micro suites (Divina c
 npm run bench -- micro --only=fuzzy,ranking
 npm run bench:micro -- --list
 npm run bench:build-peak                   # transient heap peak during FrozenIndexBuilder (OPT-1 prep)
+npm run bench:memory                       # isolated heap phase only (protocol v3)
 npm run bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
 ```
 
@@ -67,7 +68,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 | `search` | Paired mutable/frozen `search()` timing (`hrtime`, see `searchBenchBatches.json`) |
 | `search-levels` | L0 lookup / L1 `executeQuery` / L2 `search` decomposition |
 | `save` / `load` | binary snapshot round-trip |
-| `memory` | `memoryBreakdown` + heap estimates |
+| `memory` | Retained heap (protocol **v3**: isolated scenario process, in-process trials, median+MAD) + `memoryBreakdown` |
 | `migrate` | JSON → frozen path |
 | `drift` | Score drift vs reference (`toBeCloseTo` tolerance) |
 
@@ -81,9 +82,21 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 
 Legacy `benchmarks/index.js` orchestrator was replaced by `npm run bench:micro`.
 
+## Heap protocol v3
+
+CPU/search benchmarks and retained-heap measurement run in **separate processes**:
+
+1. `captureBaseline.js` runs the CPU suite (`memory` / `breakdown` surfaces stripped).
+2. `runHeapSuite.mjs` spawns one Node process per allowlisted scenario (`benchmarks/framework/heapScenarios.mjs`).
+3. Each scenario process warms up once per path, then runs in-process trials: GC×3 → allocate one index → GC×3 → delta (median+MAD).
+
+Env overrides: `BENCH_HEAP_TRIALS`, `BENCH_HEAP_SCENARIOS`, `BENCH_HEAP_PATHS`, `BENCH_HEAP_GC_PASSES`, `BENCH_HEAP_WARMUP`.
+
+Optional Chrome validation: `node --expose-gc benchmarks/scripts/heap-snapshot-pair.mjs --scenario=divina-indexOnly`.
+
 ## Baselines
 
-Committed reference: `benchmarks/baselines/reference.json` (protocol **v2**, paired hrtime).
+Committed reference: `benchmarks/baselines/reference.json` (search protocol **v2**, heap protocol **v3**).
 
 ```bash
 npm run bench:reference:update   # RUNS=3 vs-reference → reference.json + README table

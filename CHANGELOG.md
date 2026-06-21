@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Heap benchmark protocol v3** — retained-heap measurement runs in isolated scenario processes with in-process trials (warm-up once per path, median+MAD, GC×3). CPU/search benchmarks are decoupled from the heap phase (`npm run bench:memory`). See `benchmarks/README.md`.
+
 ## v1.3.0 — `@yoch/frozenminisearch`
 
 Minor release: browser entry (`@yoch/frozenminisearch/browser`), portable default compression (`auto` → zlib), async browser MSv5 binary snapshots, Node ↔ browser zlib interoperability, and indexing parity fixes for custom tokenizers.

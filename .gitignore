@@ -13,7 +13,9 @@ isolate-*.log
 FORK_NOTES.md
 # Rapport d'analyse stratégie package (local, non versionné)
 ANALYSE_STRATEGIE_PACKAGE.md
+/benchmarks/tmp/
 benchmarks/baselines/latest.json
+benchmarks/baselines/latest-heap.json
 benchmarks/baselines/packed-radix-latest.json
 # Local-only scoring/perf investigation helpers
 benchmarks/scripts/calibrate-seek-vs-scan.mjs

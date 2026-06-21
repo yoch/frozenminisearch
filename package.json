@@ -114,6 +114,8 @@
     "coverage": "jest --coverage",
     "bench": "npm run build && node --expose-gc benchmarks/framework/cli.mjs",
     "bench:record": "npm run build && node --expose-gc benchmarks/framework/cli.mjs record",
+    "bench:memory": "npm run build && node --expose-gc benchmarks/framework/runHeapSuite.mjs",
+    "benchmark:record:memory": "npm run build && node --expose-gc benchmarks/framework/runHeapSuite.mjs --out=benchmarks/baselines/latest-heap.json",
     "bench:diff": "node --expose-gc benchmarks/framework/cli.mjs diff",
     "bench:history": "node --expose-gc benchmarks/framework/cli.mjs history",
     "bench:micro": "node benchmarks/micro/run.mjs",

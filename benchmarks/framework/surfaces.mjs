@@ -50,3 +50,11 @@ export function hasStructuralSurfaces(surfaces) {
 export function isCpuOnlySurfaces(surfaces) {
   return !hasStructuralSurfaces(surfaces)
 }
+
+export function cpuSurfacesWithoutHeap(surfaces) {
+  return surfaces.filter((s) => s !== 'memory' && s !== 'breakdown')
+}
+
+export function needsHeapPhase(surfaces) {
+  return surfaces.includes('memory') || surfaces.includes('breakdown')
+}

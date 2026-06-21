@@ -57,7 +57,7 @@ function fmtHeapPair (scenario) {
   const mut = scenario.heapMb?.mutable
   const frz = scenario.heapMb?.frozen
   const save = scenario.heapMb?.frozenVsMutableSavingPct
-  if (mut == null || frz == null) return fmtSaving(save)
+  if (mut == null || frz == null) return '—'
   return `${frz.toFixed(1)} vs ${mut.toFixed(1)} MB (${fmtSaving(save)})`
 }
 
@@ -118,6 +118,11 @@ function buildBlock () {
   const tableRows = heroes.map(heroRow).join('\n')
   const exactLine = divinaExactLine()
 
+  const heapProto = payload.heapBenchProtocol?.version
+  const heapNote = heapProto != null
+    ? `Heap protocol v${heapProto} (isolated scenario processes, in-process trials, median+MAD on allowlisted scenarios) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.`
+    : 'Heap is measured with one index alive and should be read as a trend, not exact accounting.'
+
   return `${START} — npm run bench:readme -->
 ### Measured vs MiniSearch
 
@@ -129,7 +134,7 @@ ${tableRows}
 
 Across this full run, frozen is faster on **${wins}/${total}** search cases. ${exactLine ?? ''}
 
-Numbers are from \`${baselinePath.replace(`${root}/`, '')}\`, captured ${captured} on Node ${node}, ${runs} runs per scenario. Heap is measured with one index alive and should be read as a trend, not exact accounting.
+Numbers are from \`${baselinePath.replace(`${root}/`, '')}\`, captured ${captured} on Node ${node}, ${runs} runs per scenario. ${heapNote}
 ${END}`
 }
 

@@ -7,11 +7,11 @@
  *
  * Exit code 1 if regressions exceed thresholds (for CI).
  */
+import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  collectRunMetadata,
   parseBenchmarkArgs,
   loadBenchmarkPayload,
   argValue,
@@ -29,8 +29,7 @@ import {
   SEARCH_MS_FLOOR,
   SEARCH_PCT_FAIL,
 } from './regressionPolicy.js'
-import { runBenchmarkSuite } from './benchmarkSuite.js'
-import { getSearchBenchProtocol } from './loadSearchBenchBatches.js'
+import { HEAP_BENCH_PROTOCOL_VERSION } from './benchStats.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BASELINES_DIR = join(__dirname, 'baselines')
@@ -130,6 +129,14 @@ function compareScenario (ref, cur, { structural = true } = {}) {
     if (ref.heapMb?.frozen != null && cur.heapMb?.frozen != null) {
       const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
       compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
+      if (ref.memoryMb?.frozen?.totalResidentApprox != null && cur.memoryMb?.frozen?.totalResidentApprox != null) {
+        bump(compareMetric(
+          'frozen totalResident (MB)',
+          ref.memoryMb.frozen.totalResidentApprox,
+          cur.memoryMb.frozen.totalResidentApprox,
+          'heapFrozenMb',
+        ))
+      }
     } else {
       console.log('  (heap metrics unavailable for one side; skipped)')
     }
@@ -192,18 +199,13 @@ function main () {
     if (!global.gc) {
       console.warn('Tip: use node --expose-gc for stable heap numbers.\n')
     }
-    current = {
-      ...collectRunMetadata(),
-      runs,
-      searchIterations,
-      benchProfile,
-      searchBenchProtocol: getSearchBenchProtocol(),
-      benchSurfaces: surfaces,
-      scenarios: runBenchmarkSuite(undefined, runs, { benchProfile, surfaces }),
-    }
-    mkdirSync(BASELINES_DIR, { recursive: true })
-    writeFileSync(LATEST_PATH, JSON.stringify(current, null, 2) + '\n')
-    console.log(`Wrote ${LATEST_PATH}\n`)
+    const r = spawnSync(process.execPath, ['--expose-gc', join(__dirname, 'captureBaseline.js')], {
+      stdio: 'inherit',
+      env: process.env,
+    })
+    if (r.status !== 0) process.exit(r.status ?? 1)
+    current = loadJson(LATEST_PATH)
+    console.log('')
   } else {
     console.log(`Comparing ${currentPath} → ${referencePath} (no re-run; use --run to measure again)\n`)
     if (runs !== DEFAULT_BENCHMARK_RUNS || searchIterations !== DEFAULT_SEARCH_ITERATIONS) {
@@ -232,6 +234,17 @@ function main () {
   const diffSearchOnly = !payloadHasStructuralData(current)
     || !payloadHasStructuralData(reference)
     || isCpuOnlySurfaces(surfaces)
+  const refHeapProto = reference.heapBenchProtocol?.version
+  const curHeapProto = current.heapBenchProtocol?.version
+  if (refHeapProto != null && curHeapProto != null && refHeapProto !== curHeapProto) {
+    console.warn(
+      `⚠ heapBenchProtocol v${curHeapProto} vs reference v${refHeapProto} — heap deltas are indicative only.\n`,
+    )
+  } else if (curHeapProto == null && refHeapProto == null && !diffSearchOnly) {
+    console.warn(
+      `⚠ No heapBenchProtocol metadata (pre-v${HEAP_BENCH_PROTOCOL_VERSION} captures) — heap comparison uses legacy method.\n`,
+    )
+  }
   if (forceRun) {
     console.log(`Measured:  ${runs} run(s)/scenario, ${searchIterations} search iterations, profile=${curProfile}`)
   } else {

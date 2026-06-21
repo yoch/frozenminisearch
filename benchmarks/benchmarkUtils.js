@@ -3,6 +3,18 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ALL_SURFACES, surfacesFromEnv, hasStructuralSurfaces, isCpuOnlySurfaces } from './framework/surfaces.mjs'
+import {
+  DEFAULT_BENCH_WARMUP,
+  DEFAULT_HEAP_GC_PASSES,
+  DEFAULT_HEAP_TRIALS,
+  DEFAULT_HEAP_TRIALS_FAST,
+  HEAP_WARMUP_CAP,
+  madMbRound,
+  madOf,
+  madRound,
+  median,
+  medianRound,
+} from './benchStats.js'
 
 export { hasStructuralSurfaces, isCpuOnlySurfaces }
 
@@ -23,6 +35,17 @@ function findRepoRoot () {
 const REPO_ROOT = findRepoRoot()
 
 export const gc = () => { if (global.gc) global.gc() }
+
+/** Run `passes` explicit GC cycles (requires `node --expose-gc`). */
+export function forceGc (passes = 1, { strict = false } = {}) {
+  if (typeof global.gc !== 'function') {
+    if (strict) {
+      throw new Error('forceGc: run Node with --expose-gc')
+    }
+    return
+  }
+  for (let i = 0; i < passes; i++) global.gc()
+}
 
 export const heapBytes = () => process.memoryUsage().heapUsed
 
@@ -88,19 +111,17 @@ export function createPeakHeapSampler () {
   }
 }
 
-export function measureHeap (fn) {
-  gc()
-  const before = memorySnapshot()
-  const value = fn()
-  gc()
-  const after = memorySnapshot()
+export function measureHeap (fn, { gcPasses = 1 } = {}) {
+  return measureRetainedHeap(fn, { gcPasses })
+}
+
+function heapDeltaFromSnapshots (before, after) {
   const delta = (key) => Math.max(0, after[key] - before[key])
   const heapBytesDelta = delta('heapUsed')
   const externalBytes = delta('external')
   const arrayBuffersBytes = delta('arrayBuffers')
   const rssBytes = delta('rss')
   return {
-    value,
     heapMb: mbRound(heapBytesDelta),
     heapBytes: heapBytesDelta,
     externalMb: mbRound(externalBytes),
@@ -110,7 +131,19 @@ export function measureHeap (fn) {
     rssMb: mbRound(rssBytes),
     rssBytes,
     totalResidentApproxMb: mbRound(heapBytesDelta + externalBytes),
-    totalResidentApproxBytes: heapBytesDelta + externalBytes
+    totalResidentApproxBytes: heapBytesDelta + externalBytes,
+  }
+}
+
+export function measureRetainedHeap (fn, { gcPasses = 1 } = {}) {
+  forceGc(gcPasses)
+  const before = memorySnapshot()
+  const value = fn()
+  forceGc(gcPasses)
+  const after = memorySnapshot()
+  return {
+    value,
+    ...heapDeltaFromSnapshots(before, after),
   }
 }
 
@@ -120,8 +153,18 @@ export function medianOf (values) {
   return sorted[Math.floor(sorted.length / 2)]
 }
 
-import { DEFAULT_BENCH_WARMUP, median, medianRound } from './benchStats.js'
-export { DEFAULT_BENCH_WARMUP, median, medianRound }
+export {
+  DEFAULT_BENCH_WARMUP,
+  DEFAULT_HEAP_GC_PASSES,
+  DEFAULT_HEAP_TRIALS,
+  DEFAULT_HEAP_TRIALS_FAST,
+  HEAP_WARMUP_CAP,
+  madMbRound,
+  madOf,
+  madRound,
+  median,
+  medianRound,
+}
 
 export function medianTimed (fn, iters) {
   const samples = []
@@ -135,12 +178,12 @@ export function medianTimed (fn, iters) {
 
 export { mulberry32 } from '../testSupport/mulberry32.js'
 
-export function medianMeasureHeap (fn, runs = 1) {
-  if (runs <= 1) return measureHeap(fn)
+export function medianMeasureHeap (fn, runs = 1, { gcPasses = 1 } = {}) {
+  if (runs <= 1) return measureRetainedHeap(fn, { gcPasses })
   const samples = []
   let lastValue
   for (let i = 0; i < runs; i++) {
-    const sample = measureHeap(fn)
+    const sample = measureRetainedHeap(fn, { gcPasses })
     lastValue = sample.value
     samples.push(sample)
   }
@@ -156,8 +199,63 @@ export function medianMeasureHeap (fn, runs = 1) {
     rssMb: mbRound(pick('rssBytes')),
     rssBytes: pick('rssBytes'),
     totalResidentApproxMb: mbRound(pick('totalResidentApproxBytes')),
-    totalResidentApproxBytes: pick('totalResidentApproxBytes')
+    totalResidentApproxBytes: pick('totalResidentApproxBytes'),
   }
+}
+
+export function aggregateHeapSamples (samples) {
+  const pickMedian = (key) => medianOf(samples.map((s) => s[key]))
+  const heapBytes = pickMedian('heapBytes')
+  const externalBytes = pickMedian('externalBytes')
+  const arrayBuffersBytes = pickMedian('arrayBuffersBytes')
+  const rssBytes = pickMedian('rssBytes')
+  const totalResidentApproxBytes = pickMedian('totalResidentApproxBytes')
+  return {
+    heapMb: mbRound(heapBytes),
+    heapBytes,
+    externalMb: mbRound(externalBytes),
+    externalBytes,
+    arrayBuffersMb: mbRound(arrayBuffersBytes),
+    arrayBuffersBytes,
+    rssMb: mbRound(rssBytes),
+    rssBytes,
+    totalResidentApproxMb: mbRound(totalResidentApproxBytes),
+    totalResidentApproxBytes,
+    heapMadMb: madMbRound(samples.map((s) => s.heapBytes)),
+    externalMadMb: madMbRound(samples.map((s) => s.externalBytes)),
+    totalResidentMadMb: madMbRound(samples.map((s) => s.totalResidentApproxBytes)),
+    samples: samples.map((s) => ({
+      heapMb: s.heapMb,
+      externalMb: s.externalMb,
+      totalResidentApproxMb: s.totalResidentApproxMb,
+    })),
+  }
+}
+
+export function defaultHeapTrials ({ reference = false } = {}) {
+  const fromEnv = Number(process.env.BENCH_HEAP_TRIALS)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
+  return reference ? DEFAULT_HEAP_TRIALS : DEFAULT_HEAP_TRIALS_FAST
+}
+
+export function defaultHeapGcPasses () {
+  const fromEnv = Number(process.env.BENCH_HEAP_GC_PASSES)
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return Math.floor(fromEnv)
+  return DEFAULT_HEAP_GC_PASSES
+}
+
+export function defaultHeapWarmup (documentCount = 0) {
+  const fromEnv = Number(process.env.BENCH_HEAP_WARMUP)
+  if (Number.isFinite(fromEnv) && fromEnv >= 0) return Math.floor(fromEnv)
+  if (documentCount > 10_000) return HEAP_WARMUP_CAP
+  return DEFAULT_BENCH_WARMUP
+}
+
+export function parseHeapPathsArg (args = process.argv) {
+  const fromEnv = process.env.BENCH_HEAP_PATHS
+  const raw = argValue('--heap-paths', args) ?? fromEnv
+  if (!raw) return null
+  return raw.split(',').map((s) => s.trim()).filter(Boolean)
 }
 
 /** Routine defaults: median of 3 scenario runs; per-query iterations from calibration (20 / 50 if probe &lt; 0.1 ms). */

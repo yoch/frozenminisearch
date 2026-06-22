@@ -38,7 +38,7 @@ export default [
   {
     files: ['src/**/*.test.{js,ts}'],
     languageOptions: {
-      globals: globals.jest
+      globals: globals.vitest
     }
   }
 ]

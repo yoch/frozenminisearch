@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import MiniSearch from 'minisearch'
+import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
+import { createFrozenIndexBuilder } from './frozenBuild'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import {
   createFrozenFieldTermFlyweight,
@@ -171,8 +174,6 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('fromMiniSearch and incremental builder choose the same dense layout', () => {
-    const MiniSearch = require('minisearch')
-    const FrozenMiniSearch = require('./FrozenMiniSearch').default
     const fields = ['f0', 'f1', 'f2', 'f3']
     const documents = Array.from({ length: 4 }, (_, id) => ({
       id,
@@ -237,16 +238,12 @@ describe('IncrementalPostingsAccumulator', () => {
 })
 
 function buildIncrementally(documents, options) {
-  const { createFrozenIndexBuilder } = require('./frozenBuild')
-  const { freezeFrozenIndexBuilder } = require('./FrozenMiniSearch')
   const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: documents.length })
   for (const doc of documents) builder.add(doc)
   return freezeFrozenIndexBuilder(builder)
 }
 
 function buildDocByDoc(documents, options) {
-  const { createFrozenIndexBuilder } = require('./frozenBuild')
-  const { freezeFrozenIndexBuilder } = require('./FrozenMiniSearch')
   const builder = createFrozenIndexBuilder(options)
   for (const doc of documents) builder.add(doc)
   return freezeFrozenIndexBuilder(builder)
@@ -316,7 +313,6 @@ describe('IncrementalPostingsAccumulator medicaments golden (incremental build o
       expect(docByDoc.documentCount).toBe(hinted.documentCount)
       expect(searchSnapshot(docByDoc, query)).toEqual(searchSnapshot(hinted, query))
 
-      const { createFrozenIndexBuilder } = require('./frozenBuild')
       const builder = createFrozenIndexBuilder(options)
       for (const doc of documents) builder.add(doc)
       const params = builder.freezeParams()
@@ -332,7 +328,6 @@ describe('IncrementalPostingsAccumulator medicaments golden (incremental build o
         return
       }
 
-      const FrozenMiniSearch = require('./FrozenMiniSearch').default
       const built = buildDocByDoc(documents, options)
       const loaded = FrozenMiniSearch.loadBinarySync(built.saveBinarySync(), options)
 
@@ -342,7 +337,7 @@ describe('IncrementalPostingsAccumulator medicaments golden (incremental build o
   }
 
   test('fromAsyncIterable matches doc-by-doc incremental build', async () => {
-    const FrozenMiniSearch = require('./FrozenMiniSearch').default
+    const { default: FrozenMiniSearch } = await import('./FrozenMiniSearch')
     const options = { fields: ['txt'], storeFields: [] }
     const documents = [
       { id: 'a', txt: 'alpha beta gamma' },

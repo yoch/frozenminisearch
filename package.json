@@ -54,22 +54,21 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/benchmark": "^2.1.1",
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.9",
     "benchmark": "^2.1.4",
     "crc-32": "^1.2.2",
     "eslint": "^9.39.4",
     "fast-check": "^4.8.0",
     "globals": "^17.6.0",
-    "jest": "^30.4.2",
     "minisearch": "^7.2.0",
     "neostandard": "^0.13.0",
     "rollup": "^4.1.0",
     "rollup-plugin-dts": "^6.1.0",
-    "ts-jest": "^29.4.0",
-    "tslib": "^2.0.1",
     "tsx": "^4.22.4",
     "typedoc": "^0.28.19",
     "typedoc-plugin-rename-defaults": "^0.7.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.9"
   },
   "files": [
     "dist",
@@ -77,40 +76,13 @@
     "LICENSE.txt",
     "CHANGELOG.md"
   ],
-  "jest": {
-    "testEnvironmentOptions": {
-      "url": "http://localhost:3000/"
-    },
-    "transform": {
-      "\\.(js|ts)$": "ts-jest"
-    },
-    "moduleFileExtensions": [
-      "ts",
-      "js"
-    ],
-    "testMatch": [
-      "<rootDir>/src/**/*.test.(ts|js)",
-      "<rootDir>/dev/parity/**/*.test.(ts|js)"
-    ],
-    "collectCoverageFrom": [
-      "src/**/*.{ts,js}",
-      "!src/**/*.test.{ts,js}",
-      "!src/browser.ts"
-    ],
-    "coveragePathIgnorePatterns": [
-      "/benchmarks/",
-      "/dev/",
-      "/testSupport/"
-    ],
-    "setupFilesAfterEnv": []
-  },
   "scripts": {
-    "test": "jest",
-    "test:browser": "node scripts/assert-browser-bundle.cjs && jest --testMatch='<rootDir>/dev/browser/**/*.test.js' --runInBand",
-    "test-watch": "jest --watch",
-    "test:fuzzysearch": "jest --testMatch='<rootDir>/dev/internal/**/*.test.(ts|js)' --testPathIgnorePatterns=/node_modules/",
-    "test:benchmarks": "jest --testMatch='<rootDir>/benchmarks/**/*.test.(ts|js)' --testPathIgnorePatterns=/node_modules/",
-    "coverage": "jest --coverage",
+    "test": "vitest run",
+    "test:browser": "node scripts/assert-browser-bundle.cjs && vitest run --config vitest.config.ts dev/browser/",
+    "test-watch": "vitest",
+    "test:fuzzysearch": "vitest run dev/internal/",
+    "test:benchmarks": "vitest run benchmarks/",
+    "coverage": "vitest run --coverage",
     "bench": "pnpm build && node --expose-gc benchmarks/framework/cli.mjs",
     "bench:record": "pnpm build && node --expose-gc benchmarks/framework/cli.mjs record",
     "bench:memory": "pnpm build && node --expose-gc benchmarks/framework/runHeapSuite.mjs",
@@ -169,6 +141,9 @@
   },
   "sideEffects": false,
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "unrs-resolver"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ]
   }
 }

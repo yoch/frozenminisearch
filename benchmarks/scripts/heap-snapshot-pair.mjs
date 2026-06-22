@@ -1,7 +1,7 @@
 /**
  * Write before/after V8 heap snapshots for manual Chrome DevTools comparison.
  *
- *   yarn build && node --expose-gc benchmarks/scripts/heap-snapshot-pair.mjs --scenario=divina-indexOnly --kind=mutable-addAll
+ *   pnpm build && node --expose-gc benchmarks/scripts/heap-snapshot-pair.mjs --scenario=divina-indexOnly --kind=mutable-addAll
  */
 import { mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'

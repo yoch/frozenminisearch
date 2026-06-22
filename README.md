@@ -27,7 +27,7 @@ FrozenMiniSearch is for the common production path where search data changes els
 
 Internally it replaces mutable JavaScript object graphs with packed radix postings, typed arrays, and columnar stored fields. The result is less flexible than MiniSearch, but much cheaper to keep resident.
 
-<!-- vs-reference:start — npm run bench:readme -->
+<!-- vs-reference:start — pnpm bench:readme -->
 ### Measured vs MiniSearch
 
 Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
@@ -50,7 +50,7 @@ Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-21 on N
 ## Quick start
 
 ```bash
-npm install @yoch/frozenminisearch
+pnpm add @yoch/frozenminisearch
 ```
 
 ```javascript
@@ -92,7 +92,7 @@ const buf = new Uint8Array(await (await fetch('/index.frozen')).arrayBuffer())
 const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
-See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/](examples/plain_js_frozen/) locally (`yarn demo:prepare` then serve the repo root).
+See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/](examples/plain_js_frozen/) locally (`pnpm demo:prepare` then serve the repo root).
 
 ---
 
@@ -290,9 +290,9 @@ Raw snapshots load in the browser without native compression APIs. zlib snapshot
 See [benchmarks/README.md](benchmarks/README.md).
 
 ```bash
-npm run bench -- run --profile=vs-reference   # compare frozen vs minisearch
-npm run bench:diff                            # regression vs reference.json
-npm run bench:readme -- --from=benchmarks/baselines/latest.json
+pnpm bench -- run --profile=vs-reference   # compare frozen vs minisearch
+pnpm bench:diff                            # regression vs reference.json
+pnpm bench:readme -- --from=benchmarks/baselines/latest.json
 ```
 
 ---
@@ -300,9 +300,9 @@ npm run bench:readme -- --from=benchmarks/baselines/latest.json
 ## Development
 
 ```bash
-yarn install
-yarn test          # src/ + dev/parity/
-yarn build
+pnpm install
+pnpm test          # src/ + dev/parity/
+pnpm build
 node scripts/verify-npm-pack.cjs
 ```
 

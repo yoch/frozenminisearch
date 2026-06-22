@@ -11,25 +11,25 @@ Modular harness under `benchmarks/framework/` with three **profiles**:
 ## Commands
 
 ```bash
-npm run bench                              # regression run
-npm run bench -- run --profile=vs-reference
-npm run bench -- run --profile=dev --quick
-npm run bench:record                       # capture baseline
-npm run bench:diff                         # diff vs baseline
-npm run bench:history                      # history analysis
-npm run bench:micro                        # Benchmark.js micro suites (Divina corpus)
-npm run bench -- micro --only=fuzzy,ranking
-npm run bench:micro -- --list
-npm run bench:build-peak                   # transient heap peak during FrozenIndexBuilder (OPT-1 prep)
-npm run bench:memory                       # isolated heap phase only (protocol v3)
-npm run bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
+pnpm bench                              # regression run
+pnpm bench -- run --profile=vs-reference
+pnpm bench -- run --profile=dev --quick
+pnpm bench:record                       # capture baseline
+pnpm bench:diff                         # diff vs baseline
+pnpm bench:history                      # history analysis
+pnpm bench:micro                        # Benchmark.js micro suites (Divina corpus)
+pnpm bench -- micro --only=fuzzy,ranking
+pnpm bench:micro -- --list
+pnpm bench:build-peak                   # transient heap peak during FrozenIndexBuilder
+pnpm bench:memory                       # isolated heap phase only (protocol v3)
+pnpm bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
 ```
 
 `bench:build-peak` writes `benchmarks/baselines/build-peak-heap.json` (peak vs retained heap, radix share estimate).
 
 `bench:medicaments-build-peak` measures `FrozenIndexBuilder` peak on real post-parse JSONL when available (`/home/yoch/fr.gouv.medicaments.rest/data/corpus-export`, override with `CORPUS_EXPORT_DIR`). Documents contain **indexed fields + `id` only** (`buildIndexDocument`). Fallback: invert `.msbin` fixtures (`SOURCE=msbin`). Output: `medicaments-build-peak-heap.json` (jsonl) or `medicaments-build-peak-heap-msbin.json`. Filter: `ONLY=bdpm-presentations`.
 
-**Dev** : préférer `npm test` + `ONLY=bdpm-presentations npm run bench:medicaments-build-peak`. Réserver `benchmark:diff:run` (suite complète, long) à la CI / pré-merge.
+**Dev** : préférer `pnpm test` + `ONLY=bdpm-presentations pnpm run bench:medicaments-build-peak`. Réserver `benchmark:diff:run` (suite complète, long) à la CI / pré-merge.
 
 `bench:build-heap-profile` — profil rapide add vs freeze (réel vs synthétique few-terms / 1-field) → `benchmarks/baselines/build-heap-profile.json`.
 
@@ -51,7 +51,7 @@ Corpus fixture: `benchmarks/divinaCommedia.js` (MiniSearch). Suite modules live 
 
 ### Search timing protocol (v2)
 
-- Calibration: `npm run benchmark:calibrate-batches` → `searchBenchBatches.json` (target **3 ms** per sample, batch up to **256**)
+- Calibration: `pnpm benchmark:calibrate-batches` → `searchBenchBatches.json` (target **3 ms** per sample, batch up to **256**)
 - Runtime: **paired** samples (mutable block then frozen block per iteration), `process.hrtime.bigint()`
 - Iterations: **20** default, **50** when probe p50 &lt; 0.1 ms
 - Scenario runs: default captures request 3 runs, but very expensive calibrated search scenarios are capped automatically (logged and stored as `benchmarkRuns`); use `BENCH_NO_RUN_CAPS=1` or `--no-run-caps` for decisive full repeats.
@@ -80,7 +80,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 | `benchmarks/framework/surfaces.mjs` | Surface list + defaults per profile |
 | `benchmarks/benchmarkSuite.js` | Core scenarios (shared by compare/capture) |
 
-Legacy `benchmarks/index.js` orchestrator was replaced by `npm run bench:micro`.
+Legacy `benchmarks/index.js` orchestrator was replaced by `pnpm bench:micro`.
 
 ## Heap protocol v3
 
@@ -99,8 +99,8 @@ Optional Chrome validation: `node --expose-gc benchmarks/scripts/heap-snapshot-p
 Committed reference: `benchmarks/baselines/reference.json` (search protocol **v2**, heap protocol **v3**).
 
 ```bash
-npm run bench:reference:update   # RUNS=3 vs-reference → reference.json + README table
-npm run bench:readme               # regenerate README comparison only
+pnpm run bench:reference:update   # RUNS=3 vs-reference → reference.json + README table
+pnpm run bench:readme               # regenerate README comparison only
 ```
 
-Legacy: `npm run benchmark:baseline:update` (re-runs with default regression surfaces).
+Legacy: `pnpm benchmark:baseline:update` (re-runs with default regression surfaces).

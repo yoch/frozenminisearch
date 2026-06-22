@@ -1,9 +1,9 @@
 /**
  * Compare benchmark results against benchmarks/baselines/reference.json.
  *
- *   yarn benchmark:diff              → latest.json vs reference (no re-run)
- *   yarn benchmark:diff --run          → run suite, write latest.json, then diff
- *   yarn benchmark:diff --current=a.json --reference=b.json
+ *   pnpm benchmark:diff              → latest.json vs reference (no re-run)
+ *   pnpm benchmark:diff --run          → run suite, write latest.json, then diff
+ *   pnpm benchmark:diff --current=a.json --reference=b.json
  *
  * Exit code 1 if regressions exceed thresholds (for CI).
  */
@@ -51,7 +51,7 @@ const THRESHOLDS = {
 
 function loadJson (path) {
   if (!existsSync(path)) {
-    console.error(`Missing ${path}. Run: yarn benchmark:record`)
+    console.error(`Missing ${path}. Run: pnpm benchmark:record`)
     process.exit(1)
   }
   return loadBenchmarkPayload(path)

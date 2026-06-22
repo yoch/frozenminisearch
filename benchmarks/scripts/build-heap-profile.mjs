@@ -1,7 +1,7 @@
 /**
  * Phased heap profile during incremental FrozenIndexBuilder (dev, fast).
  *
- *   ONLY=bdpm-presentations npm run bench:build-heap-profile
+ *   ONLY=bdpm-presentations pnpm bench:build-heap-profile
  */
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

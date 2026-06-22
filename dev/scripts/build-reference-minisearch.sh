@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 if [[ -d "$ROOT/vendor/minisearch" ]]; then
   echo "Building vendor/minisearch submodule..."
-  (cd "$ROOT/vendor/minisearch" && yarn install --frozen-lockfile && yarn build)
+  (cd "$ROOT/vendor/minisearch" && pnpm install --frozen-lockfile && pnpm build)
 else
   echo "No vendor/minisearch submodule; using devDependency minisearch from node_modules."
 fi

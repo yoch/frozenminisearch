@@ -135,7 +135,11 @@ export type Options<T = any> = {
   tokenize?: (text: string, fieldName?: string) => string[]
   /** Function used to process a term before indexing or search (e.g. stemming). */
   processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
-  /** Function called to log messages from the library. */
+  /**
+   *  Function called to log messages from the library. (inherited from MiniSearch upstream).
+   * FrozenMiniSearch never calls this function, whereas MiniSearch calls it for diagnostic messages on mutable operations.
+   * TODO: decide whether to keep or remove this option.
+   */
   logger?: (level: LogLevel, message: string, code?: string) => void
   /** Auto-vacuum behaviour after MiniSearch `discard`; defaults to `true`. */
   autoVacuum?: boolean | AutoVacuumOptions

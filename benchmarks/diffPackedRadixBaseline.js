@@ -2,8 +2,8 @@
  * Compare PackedRadixTree structured-byte captures against the golden reference.
  * Mirrors benchmarks/diffBaseline.js semantics:
  *
- *   yarn benchmark:packed-radix:diff        → packed-radix-latest.json vs reference (no re-run)
- *   yarn benchmark:packed-radix:diff:run    → re-run bench → latest.json, then diff
+ *   pnpm benchmark:packed-radix:diff        → packed-radix-latest.json vs reference (no re-run)
+ *   pnpm benchmark:packed-radix:diff:run    → re-run bench → latest.json, then diff
  *   --current=... --reference=...           → compare arbitrary captures
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -70,7 +70,7 @@ function main () {
   if (forceRun) {
     console.log('Exécution benchmark:packed-radix → packed-radix-latest.json, puis comparaison au golden\n')
     execSync(
-      'npm run build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs --record',
+      'pnpm build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs --record',
       { cwd: join(__dirname, '..'), stdio: 'inherit' },
     )
   } else {
@@ -80,7 +80,7 @@ function main () {
   const reference = loadJson(referencePath)
   const current = loadJson(
     currentPath,
-    'Lancez : yarn benchmark:packed-radix:diff:run (mesure puis compare).',
+    'Lancez : pnpm benchmark:packed-radix:diff:run (mesure puis compare).',
   )
 
   const refMeta = reference.metadata

@@ -24,8 +24,8 @@ git commit -m "Record benchmark history at $(git rev-parse --short HEAD)."
 de release, sur arbre propre — pas dans le même commit que le bump de version :
 
 ```bash
-yarn benchmark:record
-yarn benchmark:baseline:update
+pnpm benchmark:record
+pnpm benchmark:baseline:update
 git add benchmarks/baselines/reference.json
 git commit -m "Refresh benchmark reference for 8.1.0."
 ```

@@ -10,14 +10,14 @@
 | Freq clamp 65535 | Low | overflow tests in functional-parity | Documented acceptable drift |
 | AND-gate internals | Low | [`queryEngine.gate.test.js`](queryEngine.gate.test.js) | Frozen gated vs naive only |
 | HMR `discard`/`add` incremental | Out of scope | — | Vocs dev friction; no upstream oracle |
-| Browser dist smoke | Low | manual / outreach only | optional `dev/poc-vocs/` PoC, not part of `yarn test` |
+| Browser dist smoke | Low | manual / outreach only | optional `dev/poc-vocs/` PoC, not part of `pnpm test` |
 
 ## Coverage audit (manual)
 
 `lcov.info` is aggregated — use it to spot **uncovered** lines, not to assert per-test branch ownership.
 
 ```bash
-yarn jest dev/parity/indexing-parity.test.js --coverage \
+pnpm jest dev/parity/indexing-parity.test.js --coverage \
   --collectCoverageFrom='src/indexingCore.ts' \
   --collectCoverageFrom='src/frozenBuild.ts'
 ```

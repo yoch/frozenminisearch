@@ -2,7 +2,7 @@
 /**
  * Analyse benchmarks/packed-radix-history.jsonl et comparaison pré-Phase 1.
  *
- *   yarn benchmark:packed-radix:history
+ *   pnpm benchmark:packed-radix:history
  *   node benchmarks/scripts/analyze-packed-radix-history.mjs --compare pre-phase1 HEAD
  */
 import { existsSync, readFileSync } from 'node:fs'
@@ -167,7 +167,7 @@ function main () {
   }
 
   console.log('\n## Enregistrement baseline\n')
-  console.log('- `yarn benchmark:packed-radix:record` exige un arbre git propre (fichiers suivis).')
+  console.log('- `pnpm benchmark:packed-radix:record` exige un arbre git propre (fichiers suivis).')
   console.log('- Commit enregistré dans `metadata.baselineCommit` + ligne dans packed-radix-history.jsonl.')
 }
 

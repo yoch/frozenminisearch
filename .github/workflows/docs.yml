@@ -52,10 +52,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'yarn'
-      - run: yarn install --frozen-lockfile
-      - run: yarn build
-      - run: yarn build-docs
+          cache: 'pnpm'
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm build-docs
       - name: Verify generated docs/media
         run: |
           test -f docs/media/DESIGN_DOCUMENT.md
@@ -84,9 +84,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'yarn'
-      - run: yarn install --frozen-lockfile
-      - run: yarn build
+          cache: 'pnpm'
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: pnpm build
       - name: Set docs version
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -95,7 +95,7 @@ jobs:
             echo "DOCS_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
           fi
       - name: Build docs for GitHub Pages
-        run: DOCS_PAGES=1 DOCS_VERSION="$DOCS_VERSION" yarn build-docs:pages
+        run: DOCS_PAGES=1 DOCS_VERSION="$DOCS_VERSION" pnpm build-docs:pages
       - name: Verify generated docs/media
         run: |
           test -f docs/media/DESIGN_DOCUMENT.md

@@ -8,7 +8,7 @@ beforeAll(() => {
   try {
     accessSync(bundlePath)
   } catch {
-    throw new Error('dist/browser/index.js not found — run yarn build before yarn test:browser')
+    throw new Error('dist/browser/index.js not found — run pnpm build before pnpm test:browser')
   }
 })
 

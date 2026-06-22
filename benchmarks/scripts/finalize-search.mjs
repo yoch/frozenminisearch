@@ -9,7 +9,7 @@
  * This is CPU-only instrumentation. It does not sample heap or process memory.
  *
  * Run:
- *   npm run benchmark:finalize -- --runs=5 --warmup=20 --iterations=50
+ *   pnpm benchmark:finalize -- --runs=5 --warmup=20 --iterations=50
  */
 import FrozenMiniSearch, { finalizeRawSearchResults } from '../../dist/es/index.js'
 import { giantVocabulary, highFrequencyTerms } from '../benchmarkScenarios.js'

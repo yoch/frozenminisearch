@@ -147,8 +147,8 @@ Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots existants)
 
 | Script npm | Commande | Paramètres par défaut | Scénarios | Durée observée* |
 |------------|----------|----------------------|-----------|-----------------|
-| `yarn benchmark:validate:freq-adaptive` | `node --expose-gc benchmarks/scripts/freq-adaptive-validate.mjs` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=15` (env dans `package.json`) ; préfixe `yarn build` | 3 : `divina-storeFields`, `extreme-overflowFrequency`, `extreme-giantVocabulary` | **~35–40 s** mesure ; **~50 s** avec build |
-| `yarn benchmark:record:quick` | `captureBaseline.js` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=20` | 13 (suite complète) | Plusieurs minutes (vs `benchmark:record` standard **très long**) |
+| `pnpm benchmark:validate:freq-adaptive` | `node --expose-gc benchmarks/scripts/freq-adaptive-validate.mjs` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=15` (env dans `package.json`) ; préfixe `pnpm build` | 3 : `divina-storeFields`, `extreme-overflowFrequency`, `extreme-giantVocabulary` | **~35–40 s** mesure ; **~50 s** avec build |
+| `pnpm benchmark:record:quick` | `captureBaseline.js` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=20` | 13 (suite complète) | Plusieurs minutes (vs `benchmark:record` standard **très long**) |
 
 \* Machine de dev lors de l’implémentation (Node 24, `--expose-gc`). Les timings structurels du smoke **ne font pas échouer** le script.
 
@@ -180,7 +180,7 @@ Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots existants)
 - `HEAP_MB_FLOOR` = 0,05 MB
 - +256 KB absolu → fail ; +128 KB → warn
 
-**Overrides** : `RUNS=2 SEARCH_ITERATIONS=10 yarn benchmark:validate:freq-adaptive`
+**Overrides** : `RUNS=2 SEARCH_ITERATIONS=10 pnpm benchmark:validate:freq-adaptive`
 
 ---
 
@@ -188,13 +188,13 @@ Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots existants)
 
 | Script | Paramètres défaut | Agrégation | Profil |
 |--------|-------------------|------------|--------|
-| `yarn benchmark:record` | `RUNS=3`, `SEARCH_ITERATIONS=15`, `BENCH_WARMUP=100` | médiane sur 3 runs | `full` |
-| `yarn benchmark:record:search` | idem + `BENCH_SEARCH_ONLY=1` | médiane | `search` (sans timing index/heap/save/load) |
-| `yarn benchmark:diff` | lit `latest.json` vs `reference.json` | — | pas de re-run |
-| `yarn benchmark:diff:run` | record + diff | — | |
-| `yarn benchmark:baseline:update` | record → `reference.json` (git propre) | — | |
-| `yarn benchmark:targeted` | défauts `benchmarkUtils` ; `--runs` CLI | médiane si runs>1 | 7 scénarios |
-| `yarn benchmark:compare` | 3×15 via `compare.js` | — | rapport lisible |
+| `pnpm benchmark:record` | `RUNS=3`, `SEARCH_ITERATIONS=15`, `BENCH_WARMUP=100` | médiane sur 3 runs | `full` |
+| `pnpm benchmark:record:search` | idem + `BENCH_SEARCH_ONLY=1` | médiane | `search` (sans timing index/heap/save/load) |
+| `pnpm benchmark:diff` | lit `latest.json` vs `reference.json` | — | pas de re-run |
+| `pnpm benchmark:diff:run` | record + diff | — | |
+| `pnpm benchmark:baseline:update` | record → `reference.json` (git propre) | — | |
+| `pnpm benchmark:targeted` | défauts `benchmarkUtils` ; `--runs` CLI | médiane si runs>1 | 7 scénarios |
+| `pnpm benchmark:compare` | 3×15 via `compare.js` | — | rapport lisible |
 
 **Protocole search** ([`benchmarks/baselines/reference.json`](../../benchmarks/baselines/reference.json)) :
 
@@ -224,9 +224,9 @@ IDs : `extreme-giantVocabulary`, `extreme-overflowFrequency`, `denseNumericIds-1
 Comparaison before/after :
 
 ```bash
-yarn benchmark:targeted --label before --out /tmp/before.json
-yarn benchmark:targeted --label after --out /tmp/after.json
-yarn benchmark:targeted:compare --compare=/tmp/before.json,/tmp/after.json
+pnpm benchmark:targeted --label before --out /tmp/before.json
+pnpm benchmark:targeted --label after --out /tmp/after.json
+pnpm benchmark:targeted:compare --compare=/tmp/before.json,/tmp/after.json
 ```
 
 Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary.
@@ -264,7 +264,7 @@ Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary
 
 - Métriques fonctionnelles : **OK**
 - Timings structurels : souvent marqués FAIL en log en 1 run (bruit) — **non bloquant** par design
-- **Recommandation** : `yarn benchmark:validate:freq-adaptive` pour valider ce feature ; `yarn benchmark:record` (3×15) pour releases / `baseline:update` intentionnel
+- **Recommandation** : `pnpm benchmark:validate:freq-adaptive` pour valider ce feature ; `pnpm benchmark:record` (3×15) pour releases / `baseline:update` intentionnel
 
 ---
 
@@ -291,15 +291,15 @@ Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary
 
 ```bash
 # Validation rapide de ce changement (~20 s après build)
-yarn benchmark:validate:freq-adaptive
+pnpm benchmark:validate:freq-adaptive
 
 # Suite complète accélérée (plusieurs minutes)
-yarn benchmark:record:quick
+pnpm benchmark:record:quick
 
 # Suite golden complète (long — releases uniquement)
-yarn benchmark:record
-yarn benchmark:diff
+pnpm benchmark:record
+pnpm benchmark:diff
 
 # Tests unitaires
-yarn test
+pnpm test
 ```

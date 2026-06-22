@@ -14,4 +14,4 @@ Copie locale des snapshots binaires exportés depuis [fr.gouv.medicaments.rest](
 
 Non copiés (peu utiles pour le radix fuzzy) : `ruptures` (11 termes), `conditions` (346 termes), avis SMR/ASMR.
 
-Mettre à jour : recopier depuis la source puis `yarn benchmark:packed-fuzzy`.
+Mettre à jour : recopier depuis la source puis `pnpm benchmark:packed-fuzzy`.

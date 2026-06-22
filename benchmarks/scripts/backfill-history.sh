@@ -59,8 +59,8 @@ restore_tree () {
   echo "Restoring ${BRANCH} @ ${HEAD_SHA:0:7}"
   git checkout "$BRANCH" >/dev/null 2>&1 || true
   git reset --hard "$HEAD_SHA" >/dev/null 2>&1 || true
-  if [[ -f yarn.lock ]]; then
-    yarn install --frozen-lockfile
+  if [[ -f pnpm-lock.yaml ]]; then
+    pnpm install --frozen-lockfile
   elif [[ -f package-lock.json ]]; then
     npm ci
   fi

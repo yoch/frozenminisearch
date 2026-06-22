@@ -1,8 +1,8 @@
 /**
  * Run the full benchmark suite and write JSON results.
  *
- *   yarn benchmark:record              → benchmarks/baselines/latest.json
- *   yarn benchmark:record --reference → benchmarks/baselines/reference.json
+ *   pnpm benchmark:record              → benchmarks/baselines/latest.json
+ *   pnpm benchmark:record --reference → benchmarks/baselines/reference.json
  */
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

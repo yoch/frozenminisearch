@@ -2,7 +2,7 @@
  * Detailed L1/L2 profile for extreme-giantVocabulary AND+prefix ("unique1 common").
  * Local dev only — not committed to CI.
  *
- *   npm run build
+ *   pnpm build
  *   node --expose-gc benchmarks/scripts/profile-giant-prefix.mjs [--runs=5] [--warmup=4] [--iterations=12]
  */
 import { performance } from 'node:perf_hooks'

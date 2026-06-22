@@ -14,12 +14,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '22'
-          cache: 'yarn'
-      - run: yarn install --frozen-lockfile
-      - run: yarn lint
-      - run: yarn build
-      - run: yarn test:browser
-      - run: yarn coverage
+          cache: 'pnpm'
+      - run: corepack enable && pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test:browser
+      - run: pnpm coverage
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

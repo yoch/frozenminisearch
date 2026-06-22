@@ -2,8 +2,8 @@
 /**
  * Publish a stable release to npm (dist-tag `latest`).
  *
- * Usage: npm run release:stable
- * Requires: npm login + 2FA OTP when prompted.
+ * Usage: pnpm release:stable
+ * Requires: pnpm login + 2FA OTP when prompted.
  */
 const { readFileSync } = require('node:fs')
 const { join } = require('node:path')
@@ -23,5 +23,5 @@ function run (cmd, args) {
 console.log(`Publishing ${name}@${version} (dist-tag latest)…`)
 assertPublishReady({ root, version, channel: 'stable' })
 console.log('Docs deploy from tag v' + version + ' via the Docs workflow.\n')
-run('npm', ['publish'])
-console.log(`\nDone. Verify: npm view ${name} version dist-tags`)
+run('pnpm', ['publish'])
+console.log(`\nDone. Verify: pnpm view ${name} version dist-tags`)

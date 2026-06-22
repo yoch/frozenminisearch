@@ -27,6 +27,7 @@ export const defaultFrozenLoadOptions = {
   tokenize: (text: string) => text.split(SPACE_OR_PUNCTUATION),
   processTerm: (term: string) => term.toLowerCase(),
   storeFields: [] as string[],
+  /** Logger no-op (never called in read-only frozen indexes). TODO: evaluate removal. */
   logger: (): void => {},
   autoVacuum: false as const,
 }

@@ -22,7 +22,7 @@ export function loadSearchBenchBatches () {
   if (cached) return cached
   if (!existsSync(BATCHES_PATH)) {
     throw new Error(
-      `Missing ${BATCHES_PATH}. Run: yarn benchmark:calibrate-batches`,
+      `Missing ${BATCHES_PATH}. Run: pnpm benchmark:calibrate-batches`,
     )
   }
   cached = JSON.parse(readFileSync(BATCHES_PATH, 'utf8'))
@@ -50,7 +50,7 @@ export function getSearchBenchBatchEntry (scenarioId, label) {
   const entry = file.entries?.[key]
   if (!entry?.batchSize) {
     throw new Error(
-      `No fixed batch for ${key} in searchBenchBatches.json. Run: yarn benchmark:calibrate-batches`,
+      `No fixed batch for ${key} in searchBenchBatches.json. Run: pnpm benchmark:calibrate-batches`,
     )
   }
   return entry
@@ -68,7 +68,7 @@ export function applySearchBenchBatchesToScenarios (scenarios) {
       const entry = entries[key]
       if (!entry?.batchSize) {
         throw new Error(
-          `Missing batch entry ${key}. Run: yarn benchmark:calibrate-batches`,
+          `Missing batch entry ${key}. Run: pnpm benchmark:calibrate-batches`,
         )
       }
       used.add(key)

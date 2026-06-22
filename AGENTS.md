@@ -6,16 +6,16 @@ Core TypeScript sources live in `src/`. Public exports start at `src/index.ts` a
 
 ## Build, Test, and Development Commands
 
-Use Node `>=20`. Install with `yarn install` to match the checked-in `yarn.lock`.
+Use Node `>=20`. Install with `pnpm install` to match the checked-in `pnpm-lock.yaml`.
 
-- `yarn test`: runs Jest tests in `src/` plus `dev/parity/`.
-- `yarn test:fuzzysearch`: runs long fuzzy parity sweeps from `dev/internal/`.
-- `yarn test:benchmarks`: runs benchmark test files, separate from normal CI tests.
-- `yarn coverage`: runs Jest coverage for `src/`.
-- `yarn lint` / `yarn lintfix`: checks or fixes ESLint style issues in `src/`.
-- `yarn build`: cleans `dist/`, builds ESM/CJS bundles with Rollup, and patches CJS output.
+- `pnpm test`: runs Jest tests in `src/` plus `dev/parity/`.
+- `pnpm test:fuzzysearch`: runs long fuzzy parity sweeps from `dev/internal/`.
+- `pnpm test:benchmarks`: runs benchmark test files, separate from normal CI tests.
+- `pnpm coverage`: runs Jest coverage for `src/`.
+- `pnpm lint` / `pnpm lintfix`: checks or fixes ESLint style issues in `src/`.
+- `pnpm build`: cleans `dist/`, builds ESM/CJS bundles with Rollup, and patches CJS output.
 - `node scripts/verify-npm-pack.cjs`: validates package contents before publishing.
-- `npm run bench -- run --profile=dev --quick`: quick local performance check.
+- `pnpm bench -- run --profile=dev --quick`: quick local performance check.
 
 ## Coding Style & Naming Conventions
 
@@ -23,7 +23,7 @@ This repo uses TypeScript/ES modules with neostandard plus `@stylistic/eslint-pl
 
 ## Testing Guidelines
 
-Add or update colocated Jest tests for behavior changes. For search semantics, include parity coverage in `dev/parity/` when behavior should match MiniSearch 7. For binary formats, test round trips and boundary cases, especially typed-array widths, doc id limits, and stored-field layouts. Run `yarn test` before PRs; add targeted benchmark runs when changing postings, query execution, or binary encoding.
+Add or update colocated Jest tests for behavior changes. For search semantics, include parity coverage in `dev/parity/` when behavior should match MiniSearch 7. For binary formats, test round trips and boundary cases, especially typed-array widths, doc id limits, and stored-field layouts. Run `pnpm test` before PRs; add targeted benchmark runs when changing postings, query execution, or binary encoding.
 
 ## Commit & Pull Request Guidelines
 

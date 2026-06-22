@@ -1,7 +1,7 @@
 /**
  * Binary save benchmarks: saveBinarySync vs saveBinaryAsync (size + wall-clock).
  *
- *   npm run benchmark:binary-format
+ *   pnpm benchmark:binary-format
  */
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../dist/es/index.js'

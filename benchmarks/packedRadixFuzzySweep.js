@@ -1,8 +1,8 @@
 /**
  * Fuzzy sweep: many real terms × typo mutations × k — median time per query (map vs packed).
  *
- *   yarn benchmark:packed-fuzzy-sweep
- *   QUERIES=8000 ITERS=5 CORPUS=bdpm-presentations yarn benchmark:packed-fuzzy-sweep
+ *   pnpm benchmark:packed-fuzzy-sweep
+ *   QUERIES=8000 ITERS=5 CORPUS=bdpm-presentations pnpm benchmark:packed-fuzzy-sweep
  */
 import { index as divinaIndex } from './divinaCommedia.js'
 import {

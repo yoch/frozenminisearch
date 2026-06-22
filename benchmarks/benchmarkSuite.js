@@ -440,7 +440,7 @@ export function runScenario (scenario, benchOptions = {}) {
   const need = computeSurfaceNeeds(surfaces)
   if (need.memory || need.breakdown) {
     throw new Error(
-      'Surfaces memory/breakdown require the isolated heap phase (captureBaseline or npm run bench:memory), not runScenario.',
+      'Surfaces memory/breakdown require the isolated heap phase (captureBaseline or pnpm bench:memory), not runScenario.',
     )
   }
   const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')

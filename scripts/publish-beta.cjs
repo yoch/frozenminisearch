@@ -2,8 +2,8 @@
 /**
  * Publish a pre-release to npm with dist-tag `beta` (does not move `latest`).
  *
- * Usage: npm run release:beta
- * Requires: npm login + 2FA OTP when prompted.
+ * Usage: pnpm release:beta
+ * Requires: pnpm login + 2FA OTP when prompted.
  */
 const { readFileSync } = require('node:fs')
 const { join } = require('node:path')
@@ -23,6 +23,6 @@ function run (cmd, args) {
 console.log(`Publishing ${name}@${version} (dist-tag beta)…`)
 assertPublishReady({ root, version, channel: 'beta' })
 console.log('Docs deploy from tag v' + version + ' via the Docs workflow.\n')
-run('npm', ['publish', '--tag', 'beta'])
+run('pnpm', ['publish', '--tag', 'beta'])
 console.log(`\nDone. beta → ${version} (latest unchanged)`)
-console.log('Verify: npm view', name, 'dist-tags')
+console.log('Verify: pnpm view', name, 'dist-tags')

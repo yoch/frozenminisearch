@@ -2,9 +2,9 @@
 /**
  * Micro-benchmarks: Benchmark.js ops/sec on lucaong MiniSearch + SearchableMap (Divina corpus).
  *
- *   npm run bench:micro
- *   npm run bench:micro -- --only=fuzzy,ranking
- *   npm run bench:micro -- --list
+ *   pnpm bench:micro
+ *   pnpm bench:micro -- --only=fuzzy,ranking
+ *   pnpm bench:micro -- --list
  */
 import { lines, miniSearch } from '../divinaCommedia.js'
 import { MICRO_SUITES, resolveMicroSuites } from './registry.mjs'

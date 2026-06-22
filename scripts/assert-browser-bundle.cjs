@@ -17,7 +17,7 @@ try {
   accessSync(bundlePath)
   accessSync(dtsPath)
 } catch {
-  console.error('test:browser: missing dist/browser output — run yarn build first')
+  console.error('test:browser: missing dist/browser output — run pnpm build first')
   process.exit(1)
 }
 

@@ -1,0 +1,1299 @@
+{
+  "capturedAt": "2026-06-22T14:43:26.472Z",
+  "sweep": "quick",
+  "timedIterations": 3,
+  "absGrid": [
+    500,
+    2000,
+    5000,
+    10000
+  ],
+  "fracGrid": [
+    0.05,
+    0.1,
+    0.2
+  ],
+  "cases": [
+    {
+      "id": "and-selective-tiny",
+      "description": "AND bucket5 then shared on 2k docs (~200 doc gate after branch 0); narrow term first",
+      "docCount": 2000,
+      "gateSizeExpected": 200,
+      "expectSelectiveAtDefault": true,
+      "query": "bucket5 shared",
+      "opts": {
+        "combineWith": "AND"
+      }
+    },
+    {
+      "id": "and-selective-medium",
+      "description": "AND bucket3 then shared on 3k docs (~300 doc gate); narrow term first",
+      "docCount": 3000,
+      "gateSizeExpected": 300,
+      "expectSelectiveAtDefault": true,
+      "query": "bucket3 shared",
+      "opts": {
+        "combineWith": "AND"
+      }
+    },
+    {
+      "id": "and-non-selective-full",
+      "description": "AND alpha then beta on 3k docs (gate=3000 after branch 0); exceeds default maxGate (300)",
+      "docCount": 3000,
+      "gateSizeExpected": 3000,
+      "expectSelectiveAtDefault": false,
+      "query": "alpha beta",
+      "opts": {
+        "combineWith": "AND"
+      }
+    },
+    {
+      "id": "and-prefix-divina",
+      "description": "Real Divina subset (1.5k lines): AND+prefix infe para (0 matches, empty gate)",
+      "docCount": 1500,
+      "gateSizeExpected": 0,
+      "expectSelectiveAtDefault": true,
+      "query": "infe para",
+      "opts": {
+        "combineWith": "AND",
+        "prefix": true
+      }
+    },
+    {
+      "id": "and-real-divina",
+      "description": "Real Divina: AND inferno paradiso (small selective gate)",
+      "docCount": 1500,
+      "gateSizeExpected": null,
+      "expectSelectiveAtDefault": true,
+      "query": "inferno paradiso",
+      "opts": {
+        "combineWith": "AND"
+      }
+    },
+    {
+      "id": "and-not-selective",
+      "description": "AND_NOT bucket5 minus shared (positive branch narrow); no AND gate probe on step 0",
+      "docCount": 2000,
+      "gateSizeExpected": 200,
+      "expectSelectiveAtDefault": null,
+      "query": "bucket5 shared",
+      "opts": {
+        "combineWith": "AND_NOT"
+      }
+    }
+  ],
+  "results": [
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": null,
+      "maxFraction": null,
+      "disableGating": true,
+      "p50": 1.4536669999999958,
+      "probe": [],
+      "gateSizeExpected": 200,
+      "maxGateAtDefault": 200
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 500,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 1.5493569999999863,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 500,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.8844080000000076,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 500,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.6009070000000065,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 1.0940560000000232,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.39190200000001596,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.3840680000000134,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.8323650000000384,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.30065799999999854,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.2982659999999555,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 1.282116999999971,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.3225659999999948,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-selective-tiny",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.5868209999999863,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": null,
+      "maxFraction": null,
+      "disableGating": true,
+      "p50": 2.0027800000000298,
+      "probe": [],
+      "gateSizeExpected": 300,
+      "maxGateAtDefault": 300
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 500,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.7771370000000388,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 500,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.5433490000000347,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 500,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.5468539999999393,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 500,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 500
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.5490379999999959,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.5243390000000545,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.530373999999938,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 600,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 600
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.5386720000000196,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.547971000000075,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.5368429999999762,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 600,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 600
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.5489069999999856,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.5581899999999678,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-selective-medium",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.5345690000000332,
+      "probe": [
+        {
+          "gateSize": 300,
+          "maxGateSize": 600,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 300,
+      "maxGateForLimits": 600
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": null,
+      "maxFraction": null,
+      "disableGating": true,
+      "p50": 3.7217059999999265,
+      "probe": [],
+      "gateSizeExpected": 3000,
+      "maxGateAtDefault": 300
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 500,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 2.6607989999999972,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 500,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 2.6302590000000237,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 300,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 500,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 2.524575000000027,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 500,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 500
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 2.3013559999999416,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 2.759254999999939,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 300,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 2.4436829999999645,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 600,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 600
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 2.636914999999931,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 2.6071060000000443,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 300,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 2.496541000000093,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 600,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 600
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 2.502926000000002,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 150,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 2.371219999999994,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 300,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-non-selective-full",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 3.0028499999999667,
+      "probe": [
+        {
+          "gateSize": 3000,
+          "maxGateSize": 600,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 3000,
+      "maxGateForLimits": 600
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": null,
+      "maxFraction": null,
+      "disableGating": true,
+      "p50": 0.6518710000000283,
+      "probe": [],
+      "gateSizeExpected": 0,
+      "maxGateAtDefault": 150
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 500,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.19921399999998357,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 500,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.18287899999995716,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 500,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.2211089999999558,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.1822540000000572,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.17766299999993862,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.1876590000000533,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.20350700000005872,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.19736100000000079,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.17498299999999745,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.1763749999998936,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.17447200000003704,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-prefix-divina",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.24596700000006422,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 0,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": null,
+      "maxFraction": null,
+      "disableGating": true,
+      "p50": 0.2627499999999827,
+      "probe": [],
+      "gateSizeExpected": null,
+      "maxGateAtDefault": 150
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 500,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.2736929999999802,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 500,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.2710260000000062,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 500,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.25299599999993916,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.32642199999997956,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.32917300000008254,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.27005499999995664,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.27204699999992954,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.264953000000105,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.3510310000001482,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.26504899999986264,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 100,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.25819700000010926,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 150,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 150
+    },
+    {
+      "caseId": "and-real-divina",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.29115500000011707,
+      "probe": [
+        {
+          "gateSize": 0,
+          "maxGateSize": 300,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": null,
+      "maxGateForLimits": 300
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": null,
+      "maxFraction": null,
+      "disableGating": true,
+      "p50": 1.3261640000000625,
+      "probe": [],
+      "gateSizeExpected": 200,
+      "maxGateAtDefault": 200
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 500,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.38005500000008396,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 500,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.23342600000000857,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 500,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.2587710000000243,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.21076900000002752,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.2075600000000577,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 2000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.18144199999983357,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.187069000000065,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.2897659999998723,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 5000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.25540700000010474,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.05,
+      "disableGating": false,
+      "p50": 0.17016399999988607,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 100,
+          "selective": false
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 100
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.1,
+      "disableGating": false,
+      "p50": 0.17232199999989462,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 200,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 200
+    },
+    {
+      "caseId": "and-not-selective",
+      "maxAbsolute": 10000,
+      "maxFraction": 0.2,
+      "disableGating": false,
+      "p50": 0.2087739999999485,
+      "probe": [
+        {
+          "gateSize": 200,
+          "maxGateSize": 400,
+          "selective": true
+        }
+      ],
+      "gateSizeExpected": 200,
+      "maxGateForLimits": 400
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 /**
  * Compare MiniSearch (mutable) vs FrozenMiniSearch — human-readable report.
- * JSON metrics: yarn benchmark:record | yarn benchmark:diff
+ * JSON metrics: pnpm benchmark:record | pnpm benchmark:diff
  *
- * Run: yarn benchmark:compare
- * Requires: yarn build && node --expose-gc
+ * Run: pnpm benchmark:compare
+ * Requires: pnpm build && node --expose-gc
  */
 import { buildBenchmarkScenarios, runBenchmarkSuite } from './benchmarkSuite.js'
 import { parseBenchmarkArgs, loadBenchmarkPayload, argValue, formatFrozenVsMutableDelta } from './benchmarkUtils.js'
@@ -179,10 +179,10 @@ for (const result of scenarios) {
 console.log('\n' + '='.repeat(72))
 console.log('JSON baselines')
 console.log('='.repeat(72))
-console.log('• yarn benchmark:record            → benchmarks/baselines/latest.json')
-console.log('• yarn benchmark:diff              → latest.json vs reference (no re-run)')
-console.log('• yarn benchmark:compare --from …  → report from saved JSON')
-console.log('• yarn benchmark:baseline:update   → promote latest to reference')
+console.log('• pnpm benchmark:record            → benchmarks/baselines/latest.json')
+console.log('• pnpm benchmark:diff              → latest.json vs reference (no re-run)')
+console.log('• pnpm benchmark:compare --from …  → report from saved JSON')
+console.log('• pnpm benchmark:baseline:update   → promote latest to reference')
 console.log('='.repeat(72))
 console.log('Notes')
 console.log('='.repeat(72))

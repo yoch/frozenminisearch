@@ -1,7 +1,7 @@
 /**
  * Transient heap peak during FrozenIndexBuilder / fromDocuments (requires --expose-gc).
  *
- *   npm run bench:build-peak
+ *   pnpm bench:build-peak
  *
  * Writes benchmarks/baselines/build-peak-heap.json for OPT-1 go/no-go (radix share of peak).
  */

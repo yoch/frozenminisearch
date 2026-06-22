@@ -80,9 +80,9 @@ La gate après la branche 0 est `|résultat branche 0|`. **Le terme le plus sél
 
 ## Réglage et validation
 
-- Script calibration ratio : `npm run benchmark:gate-posting-ratio` (`benchmarks/scripts/calibrate-gate-posting-ratio.mjs`).
-- Script optionnel : `benchmarks/and-gate-tuning.mjs` (`npm run benchmark:and-gate-tuning`).
+- Script calibration ratio : `pnpm benchmark:gate-posting-ratio` (`benchmarks/scripts/calibrate-gate-posting-ratio.mjs`).
+- Script optionnel : `benchmarks/and-gate-tuning.mjs` (`pnpm benchmark:and-gate-tuning`).
 - Tests oracle : `dev/parity/queryEngine.gate.test.js` (comparaison gated vs chemin naïf via `dev/parity/queryEngineHarness.js`).
-- Suite de régression perf : `npm run benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**).
+- Suite de régression perf : `pnpm benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**).
 
 Ne pas changer les défauts sans refaire le tuning et, si les gains sont intentionnels, mettre à jour `reference.json`.

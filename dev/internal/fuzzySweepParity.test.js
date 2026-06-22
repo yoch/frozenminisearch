@@ -1,4 +1,4 @@
-/** Long fuzzy-sweep parity (~7000 queries). Excluded from `yarn test`; run via `yarn test:fuzzysearch`. */
+/** Long fuzzy-sweep parity (~7000 queries). Excluded from `pnpm test`; run via `pnpm test:fuzzysearch`. */
 import SearchableMap from '../../src/SearchableMap/SearchableMap'
 import {
   buildFuzzySweepQueries,

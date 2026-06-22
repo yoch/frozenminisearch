@@ -6,7 +6,7 @@
  *   2. Policy: sweep minLength × ratioShift; classify synthetic + real cases
  *   3. End-to-end: timed search() on real cases per shortlisted policy
  *
- *   npm run build
+ *   pnpm build
  *   node benchmarks/scripts/calibrate-gate-posting-ratio.mjs [--warmup=20] [--iterations=120]
  *   node benchmarks/scripts/calibrate-gate-posting-ratio.mjs --out=/tmp/gate-ratio-grid.json
  */

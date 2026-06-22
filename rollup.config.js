@@ -55,7 +55,7 @@ const packedRadixBench = {
     entryFileNames: 'packedRadixTree.cjs',
     plugins: [],
   },
-  external: ['benchmark'],
+  external: [/^node:/, 'benchmark'],
   plugins: packedRadixBenchPlugins,
 }
 
@@ -68,6 +68,7 @@ const packedRadixFuzzyBench = {
     entryFileNames: 'packedRadixFuzzy.cjs',
     plugins: [],
   },
+  external: [/^node:/, 'minisearch'],
   plugins: packedRadixBenchPlugins,
 }
 
@@ -80,7 +81,7 @@ const packedRadixFuzzySweepBench = {
     entryFileNames: 'packedRadixFuzzySweep.cjs',
     plugins: [],
   },
-  external: ['benchmark'],
+  external: [/^node:/, 'benchmark', 'minisearch'],
   plugins: packedRadixBenchPlugins,
 }
 
@@ -93,6 +94,7 @@ const packedRadixEmitSubtreeBench = {
     entryFileNames: 'packedRadixEmitSubtree.cjs',
     plugins: [],
   },
+  external: [/^node:/],
   plugins: packedRadixBenchPlugins,
 }
 

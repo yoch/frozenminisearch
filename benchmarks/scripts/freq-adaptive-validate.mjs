@@ -2,8 +2,8 @@
  * Fast validation for adaptive posting frequencies (u8/u16).
  * Runs only the scenarios that matter for this change (~1–3 min vs full suite).
  *
- *   yarn benchmark:validate:freq-adaptive
- *   RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=15 yarn benchmark:validate:freq-adaptive
+ *   pnpm benchmark:validate:freq-adaptive
+ *   RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=15 pnpm benchmark:validate:freq-adaptive
  */
 import { readFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'

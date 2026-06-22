@@ -13,14 +13,12 @@ if ! node --expose-gc -e "if(!global.gc)process.exit(1)" 2>/dev/null; then
   echo "Warning: run with node --expose-gc for stable heap." >&2
 fi
 
-if [[ -f yarn.lock ]]; then
-  # Historical commits may need a non-frozen install (lockfile vs current yarn).
-  yarn install --frozen-lockfile 2>/dev/null || yarn install
-  git checkout -- yarn.lock 2>/dev/null || true
+if [[ -f pnpm-lock.yaml ]]; then
+  pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 elif [[ -f package-lock.json ]]; then
   npm ci 2>/dev/null || npm install
   git checkout -- package-lock.json 2>/dev/null || true
 fi
 
-npm run build
+pnpm build
 exec node --expose-gc "$(dirname "$0")/record-history.mjs" "$@"

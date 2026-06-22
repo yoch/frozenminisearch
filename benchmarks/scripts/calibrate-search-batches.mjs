@@ -2,7 +2,7 @@
  * Calibrate fixed search batch sizes (mutable + frozen probe, max of both).
  * Writes benchmarks/searchBenchBatches.json — commit after corpus/query changes.
  *
- *   yarn benchmark:calibrate-batches
+ *   pnpm benchmark:calibrate-batches
  */
 import { writeFileSync } from 'node:fs'
 import MiniSearch from 'minisearch'

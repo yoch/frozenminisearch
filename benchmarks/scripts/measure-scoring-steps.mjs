@@ -4,7 +4,7 @@
  * Each case includes gateProbe metadata: whether AND gating is selective on branch 1
  * (gate <= maxGate). Optimizations on allowedDocs (seek) only apply when selective=true.
  *
- *   npm run build
+ *   pnpm build
  *   node --expose-gc benchmarks/scripts/measure-scoring-steps.mjs [--step=baseline] [--runs=5]
  */
 import { performance } from 'node:perf_hooks'

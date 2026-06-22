@@ -9,7 +9,7 @@ Plain JavaScript demo of the **browser build** (`@yoch/frozenminisearch/browser`
 Build the browser bundle and copy assets into this folder:
 
 ```bash
-yarn build
+pnpm build
 node scripts/prepare-frozen-demo.cjs
 ```
 

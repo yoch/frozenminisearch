@@ -1,8 +1,8 @@
 /**
  * Fast AND-gate hyperparameter sweep (internal thresholds only — not public API).
  *
- *   npm run benchmark:and-gate-tuning          # quick grid (~15s)
- *   AND_GATE_SWEEP=full npm run benchmark:and-gate-tuning
+ *   pnpm benchmark:and-gate-tuning          # quick grid (~15s)
+ *   AND_GATE_SWEEP=full pnpm benchmark:and-gate-tuning
  *
  * Each case uses terms that exist in the corpus and a known intersection size.
  * Output: benchmarks/baselines/and-gate-tuning.json + console trend summary.
@@ -32,7 +32,7 @@ const ABS_GRID = SWEEP === 'full'
   : [500, 2000, 5000, 10_000]
 
 const FRAC_GRID = SWEEP === 'full'
-  ? [0.02, 0.05, 0.1, 0.15, 0.2]
+  ? [0.02, 0.05, 0.1, 0.15, 0.2, 0.25]
   : [0.05, 0.1, 0.2]
 
 /** Shared + rare bucket: `shared` in every doc, `bucketK` in docCount/bucketMod docs. */

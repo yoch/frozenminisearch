@@ -1,9 +1,9 @@
 /**
  * Heap peak when rebuilding medicaments indexes from a document corpus, not loadBinary().
  *
- *   npm run bench:medicaments-build-peak
- *   CORPUS_EXPORT_DIR=/path/to/corpus-export npm run bench:medicaments-build-peak
- *   SOURCE=msbin npm run bench:medicaments-build-peak   # inverse .msbin fixtures
+ *   pnpm bench:medicaments-build-peak
+ *   CORPUS_EXPORT_DIR=/path/to/corpus-export pnpm bench:medicaments-build-peak
+ *   SOURCE=msbin pnpm bench:medicaments-build-peak   # inverse .msbin fixtures
  *
  * Writes benchmarks/baselines/medicaments-build-peak-heap.json (jsonl)
  * or medicaments-build-peak-heap-msbin.json (msbin fallback).

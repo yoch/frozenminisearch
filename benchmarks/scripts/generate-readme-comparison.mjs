@@ -123,7 +123,7 @@ function buildBlock () {
     ? `Heap protocol v${heapProto} (isolated scenario processes, in-process trials, median+MAD on allowlisted scenarios) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.`
     : 'Heap is measured with one index alive and should be read as a trend, not exact accounting.'
 
-  return `${START} — npm run bench:readme -->
+  return `${START} — pnpm bench:readme -->
 ### Measured vs MiniSearch
 
 Same corpora, same BM25-style queries, MiniSearch ${minisearch} as the reference.

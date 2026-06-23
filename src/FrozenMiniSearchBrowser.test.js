@@ -1,6 +1,10 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
-import FrozenMiniSearchBrowser from './FrozenMiniSearchBrowser'
+import FrozenMiniSearchBrowser, {
+  buildFrozenFromDocuments,
+  freezeFrozenIndexBuilder,
+} from './FrozenMiniSearchBrowser'
+import { createFrozenIndexBuilder } from './frozenBuild'
 import { CODEC_ZSTD, MSV5_PAYLOAD_CODEC_OFFSET } from './msv5/binaryMsv5Constants'
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
 import { encodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5EncodeBrowser'
@@ -16,6 +20,23 @@ describe('FrozenMiniSearchBrowser', () => {
     const index = FrozenMiniSearchBrowser.fromDocuments(docs, options)
     expect(index.search('hello').map(hit => hit.id)).toEqual([1])
     expect(index.getStoredFields(1)).toEqual({ title: 'hello' })
+  })
+
+  test('buildFrozenFromDocuments matches fromDocuments', () => {
+    const built = buildFrozenFromDocuments(docs, options)
+    const direct = FrozenMiniSearchBrowser.fromDocuments(docs, options)
+    expect(built.search('hello').map(hit => hit.id)).toEqual(direct.search('hello').map(hit => hit.id))
+    expect(built.getStoredFields(1)).toEqual({ title: 'hello' })
+  })
+
+  test('freezeFrozenIndexBuilder matches fromDocuments', () => {
+    const builder = createFrozenIndexBuilder(options)
+    for (const doc of docs) builder.add(doc)
+    const built = freezeFrozenIndexBuilder(builder)
+    const direct = FrozenMiniSearchBrowser.fromDocuments(docs, options)
+    expect(built.search('zen', { prefix: true }).map(hit => hit.id))
+      .toEqual(direct.search('zen', { prefix: true }).map(hit => hit.id))
+    expect(built.getStoredFields(2)).toEqual({ title: 'zen' })
   })
 
   test.each(['raw', 'zlib', 'auto'])('saveBinaryAsync + loadBinaryAsync (%s)', async (compression) => {

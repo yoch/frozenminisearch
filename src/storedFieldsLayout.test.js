@@ -8,7 +8,7 @@ import {
   writeStoredField,
 } from './storedFieldsLayout'
 import { buildStoredFieldsWireSection, readStoredFieldsWireSection } from './storedFieldsWire'
-import { buildStoredFieldsSection } from './binaryStructures'
+import { buildStoredFieldsSectionWire } from './binaryWireIo'
 
 describe('storedFieldsLayout', () => {
   test('single store field: column at rest, Record on read', () => {
@@ -28,13 +28,13 @@ describe('storedFieldsLayout', () => {
     expect(readStoredFields(back, 0)).toEqual({ txt: 'x' })
   })
 
-  test('wire section matches legacy row encode (single field)', () => {
+  test('wire section matches row encode (single field)', () => {
     const layout = createStoredFieldsLayout(['txt'], 2)
     writeStoredField(layout, 0, ['txt'], (d, f) => d[f], { txt: 'x' })
     writeStoredField(layout, 1, ['txt'], (d, f) => d[f], { txt: 'y' })
-    const legacy = buildStoredFieldsSection(storedFieldsToWireRows(layout, 2), 2)
+    const fromRows = buildStoredFieldsSectionWire(storedFieldsToWireRows(layout, 2), 2)
     const direct = buildStoredFieldsWireSection(layout, 2)
-    expect(Buffer.from(direct)).toEqual(legacy)
+    expect(Buffer.from(direct)).toEqual(Buffer.from(fromRows))
   })
 
   test('wire section read → single column', () => {

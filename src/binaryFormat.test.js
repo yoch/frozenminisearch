@@ -21,6 +21,8 @@ import {
   Msv5SectionId,
 } from './msv5/binaryMsv5Constants'
 import { loadMsv5Sections, readMsv5SectionDirectory } from './msv5/binaryMsv5Compression'
+import { concatBytes } from './binaryBytes'
+import { readExternalId, writeExternalId } from './binaryWireIo'
 function densePostings(fieldCount, termCount, nextId, offsets, lengths, docIds, freqs) {
   return {
     fieldCount,
@@ -134,6 +136,54 @@ describe('binaryFormat MSv5', () => {
     expect(() => validateFrozenSnapshot(snap)).toThrow(/leaf index out of range/)
   })
 
+  function clonePackedTermIndex(tree, mutate) {
+    const data = {
+      size: tree.size,
+      nodeCount: tree.nodeCount,
+      edgeCount: tree.edgeCount,
+      labelHeap: tree.labelHeap,
+      nodeEdgeOffset: tree.nodeEdgeOffset,
+      nodeValue: new Uint32Array(tree.nodeValue),
+      nodeLeafOrder: new Uint32Array(tree.nodeLeafOrder),
+      edgeLabelStart: tree.edgeLabelStart,
+      edgeLabelLength: tree.edgeLabelLength,
+      edgeChild: new Uint32Array(tree.edgeChild),
+    }
+    mutate(data)
+    return PackedRadixTree.fromData(data)
+  }
+
+  test('validateFrozenSnapshot rejects packed node value without leaf', () => {
+    const snap = buildSnapshotFromFrozen()
+    const tree = snap.packedTermIndex
+    const leafNode = Array.from(tree.nodeLeafOrder).findIndex(order => order !== 0)
+    snap.packedTermIndex = clonePackedTermIndex(tree, (data) => {
+      data.nodeLeafOrder[leafNode] = 0
+      data.nodeValue[leafNode] = 7
+    })
+    expect(() => validateFrozenSnapshot(snap)).toThrow(/has value without leaf/)
+  })
+
+  test('validateFrozenSnapshot rejects packed edge child out of bounds', () => {
+    const snap = buildSnapshotFromFrozen()
+    const tree = snap.packedTermIndex
+    snap.packedTermIndex = clonePackedTermIndex(tree, (data) => {
+      data.edgeChild[0] = data.nodeCount
+    })
+    expect(() => validateFrozenSnapshot(snap)).toThrow(/child out of bounds/)
+  })
+
+  test('validateFrozenSnapshot rejects packed leaf count mismatch', () => {
+    const snap = buildSnapshotFromFrozen()
+    const tree = snap.packedTermIndex
+    const leafNode = Array.from(tree.nodeLeafOrder).findIndex(order => order !== 0)
+    snap.packedTermIndex = clonePackedTermIndex(tree, (data) => {
+      data.nodeLeafOrder[leafNode] = 0
+      data.nodeValue[leafNode] = 0
+    })
+    expect(() => validateFrozenSnapshot(snap)).toThrow(/leaf count/)
+  })
+
   test('rejects legacy MSv1 through MSv4', () => {
     const versions = { MSv1: 1, MSv2: 2, MSv3: 3, MSv4: 4 }
     for (const magic of Object.keys(versions)) {
@@ -242,6 +292,14 @@ describe('binaryFormat MSv5', () => {
     const snap = decodeFrozenSnapshot(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toEqual({ k: 'complex' })
   })
+
+  test('external id undefined round-trip', () => {
+    const snap = buildSnapshotFromFrozen()
+    snap.externalIds = [undefined, snap.externalIds[1]]
+    const loaded = decodeFrozenSnapshot(encodeFrozenSnapshot(snap))
+    expect(loaded.externalIds[0]).toBeUndefined()
+    expect(loaded.externalIds[1]).toBe(2)
+  })
 })
 
 describe('binaryFormat corruption guards', () => {
@@ -266,6 +324,22 @@ describe('binaryFormat corruption guards', () => {
     corrupt.writeUInt32LE(postOff, flDir)
     corrupt.writeUInt32LE(flOff, postDir)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/not monotonic/)
+  })
+
+  test('rejects corrupted external id payloads', () => {
+    const encodeId = (id) => {
+      const chunks = []
+      writeExternalId(chunks, id)
+      return concatBytes(chunks)
+    }
+
+    expect(() => readExternalId(new Uint8Array(0), 0)).toThrow(/external id tag truncated/)
+    expect(() => readExternalId(new Uint8Array([255]), 0)).toThrow(/unknown external id tag/)
+    expect(() => readExternalId(encodeId(12).subarray(0, 5), 0)).toThrow(/external id number truncated/)
+    expect(() => readExternalId(encodeId('abc').subarray(0, 4), 0))
+      .toThrow(/length-prefixed string header truncated/)
+    expect(() => readExternalId(encodeId('abc').subarray(0, 7), 0))
+      .toThrow(/length-prefixed string body out of bounds/)
   })
 
   test('rejects section payload past buffer end', () => {

@@ -9,7 +9,6 @@ import { invalidFrozenIndex } from './frozenErrors'
 import {
   readExternalId,
   readLengthPrefixedUtf8,
-  writeExternalId,
 } from './binaryWireIo'
 import { readU32LE, readUtf8 } from './binaryBytes'
 import type { BinaryBytes } from './binaryBytes'
@@ -195,59 +194,6 @@ export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): s
   const names = Object.keys(fieldIds)
   names.sort((a, b) => fieldIds[a] - fieldIds[b])
   return names
-}
-
-/** Core with explicit {@link termCountOf} (no dictionary section). */
-export function buildCoreSectionWithTermCount(snap: FrozenSnapshot): Buffer {
-  const out = Buffer.alloc(16)
-  out.writeUInt32LE(snap.documentCount, 0)
-  out.writeUInt32LE(snap.nextId, 4)
-  out.writeUInt32LE(snap.fieldCount, 8)
-  out.writeUInt32LE(termCountOf(snap), 12)
-  return out
-}
-
-export function buildFieldNamesSection(fieldNames: string[]): Buffer {
-  const chunks: Buffer[] = []
-  for (const name of fieldNames) {
-    const body = Buffer.from(name, 'utf8')
-    const header = Buffer.alloc(4)
-    header.writeUInt32LE(body.length, 0)
-    chunks.push(header, body)
-  }
-  return Buffer.concat(chunks)
-}
-
-export function buildExternalIdsSection(externalIds: unknown[], nextId: number): Buffer {
-  const chunks: Buffer[] = []
-  for (let i = 0; i < nextId; i++) {
-    writeExternalId(chunks, externalIds[i])
-  }
-  return Buffer.concat(chunks)
-}
-
-export function buildStoredFieldsSection(
-  storedFields: (Record<string, unknown> | undefined)[],
-  nextId: number,
-): Buffer {
-  const table = Buffer.alloc(nextId * 4)
-  const heapChunks: Buffer[] = []
-  let heapOff = 0
-  for (let i = 0; i < nextId; i++) {
-    const row = storedFields[i]
-    if (row == null) {
-      table.writeUInt32LE(0, i * 4)
-      continue
-    }
-    table.writeUInt32LE(heapOff + 1, i * 4)
-    const json = Buffer.from(JSON.stringify(row), 'utf8')
-    const entry = Buffer.alloc(4 + json.length)
-    entry.writeUInt32LE(json.length, 0)
-    json.copy(entry, 4)
-    heapChunks.push(entry)
-    heapOff += entry.length
-  }
-  return Buffer.concat([table, ...heapChunks])
 }
 
 export function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {

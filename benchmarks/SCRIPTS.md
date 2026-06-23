@@ -128,6 +128,15 @@ The `Makefile` declares native dependencies:
 
 For a guaranteed clean rebuild: `make build` (PHONY, cleans `dist/` first).
 
+## Source vs bundled imports
+
+Most low-level benchmark scripts load the published Node bundle from `dist/es/`
+so they measure the public package surface. The isolated CPU pipeline
+microbenchmarks (`benchmark:finalize` / `benchmark:autosuggest`, via Makefile
+targets `benchmark-finalize` / `benchmark-autosuggest`) are exceptions: they run
+through `tsx` and import `src/` plus `benchmarks/harness/` because they time
+internal query phases that are intentionally not exported.
+
 ## See also
 
 - [`benchmarks/scripts/README.md`](scripts/README.md) — Performance history

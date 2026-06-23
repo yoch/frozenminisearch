@@ -11,7 +11,8 @@
  * Run:
  *   pnpm benchmark:finalize -- --runs=5 --warmup=20 --iterations=50
  */
-import FrozenMiniSearch, { finalizeRawSearchResults } from '../../dist/es/index.js'
+import FrozenMiniSearch from '../../src/FrozenMiniSearch.ts'
+import { executeRaw, finalizeRaw } from '../harness/frozenPipelineHarness.ts'
 import { giantVocabulary, highFrequencyTerms } from '../benchmarkScenarios.js'
 import { intArg, median, timed } from './cpuBenchUtils.mjs'
 
@@ -98,24 +99,16 @@ for (const spec of caseSpecs()) {
   for (let r = 0; r < runs; r++) {
     // Reuse one raw result per run to isolate finalize() without folding
     // executeQuery() cost into the timed section.
-    const raw = index.executeQuery(spec.query, spec.searchOptions)
+    const raw = executeRaw(index, spec.query, spec.searchOptions)
     rawResults = raw.size
     runRows.push({
       executeQuery: timed(
-        () => index.executeQuery(spec.query, spec.searchOptions),
+        () => executeRaw(index, spec.query, spec.searchOptions),
         warmup,
         iterations,
       ),
       finalize: timed(
-        () => finalizeRawSearchResults(
-          raw,
-          spec.query,
-          spec.searchOptions,
-          index._options.searchOptions,
-          docId => index._externalIds[docId],
-          undefined,
-          index._storedFields,
-        ),
+        () => finalizeRaw(index, raw, spec.query, spec.searchOptions),
         warmup,
         iterations,
       ),

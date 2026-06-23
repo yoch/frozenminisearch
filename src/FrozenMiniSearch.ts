@@ -12,33 +12,23 @@ import type { FrozenAssembleParams } from './frozenTypes'
 import type { SaveBinaryOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
   assembleFrozenWithCtor,
-  frozenMemoryBreakdown,
+  frozenFromDocumentsWithCtor,
+  frozenFromIndexBuilderWithCtor,
 } from './FrozenMiniSearchCore'
-import { buildFrozenParamsFromDocuments, type FrozenIndexBuilder } from './frozenBuild'
-
-export {
-  frozenMemoryBreakdown,
-}
-export type { FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
-export type { MiniSearchSnapshot } from './fromMiniSearch'
+import { type FrozenIndexBuilder } from './frozenBuild'
 
 /** Build a read-only Node index in one pass from documents. */
 export function buildFrozenFromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
-  return assembleFrozenWithCtor(
-    buildFrozenParamsFromDocuments(documents, options),
-    true,
-    'trusted-build',
-    FrozenMiniSearch,
-  )
+  return frozenFromDocumentsWithCtor(FrozenMiniSearch, documents, options)
 }
 
 /** Finalize a {@link FrozenIndexBuilder} into a read-only Node index. */
 export function freezeFrozenIndexBuilder<T>(builder: FrozenIndexBuilder<T>): FrozenMiniSearch<T> {
-  return assembleFrozenWithCtor(builder.freezeParams(), true, 'trusted-build', FrozenMiniSearch)
+  return frozenFromIndexBuilderWithCtor(FrozenMiniSearch, builder)
 }
 
-/** Instantiate {@link FrozenMiniSearch} from pre-built flat index parts (full validation). */
-export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
+/** @internal */
+function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearch<T> {
   return assembleFrozenWithCtor(params, false, 'binary-load', FrozenMiniSearch)
 }
 

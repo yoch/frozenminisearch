@@ -68,7 +68,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 | `search` | Paired mutable/frozen `search()` timing (`hrtime`, see `searchBenchBatches.json`) |
 | `search-levels` | L0 lookup / L1 `executeQuery` / L2 `search` decomposition |
 | `save` / `load` | binary snapshot round-trip |
-| `memory` | Retained heap (protocol **v3**: isolated scenario process, in-process trials, median+MAD) + `memoryBreakdown` |
+| `memory` | Retained heap (protocol **v3**: isolated scenario process, in-process trials, median+MAD) + internal memory breakdown |
 | `migrate` | JSON → frozen path |
 | `drift` | Score drift vs reference (`toBeCloseTo` tolerance) |
 

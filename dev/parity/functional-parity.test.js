@@ -1,5 +1,5 @@
 import MiniSearch from 'minisearch'
-import FrozenMiniSearch, { frozenMemoryBreakdown, freezeFrozenIndexBuilder } from '../../src/FrozenMiniSearch'
+import FrozenMiniSearch, { freezeFrozenIndexBuilder } from '../../src/FrozenMiniSearch'
 import { createFrozenIndexBuilder } from '../../src/frozenBuild'
 import { overflowFrequencies } from '../../benchmarks/benchmarkScenarios.js'
 import {
@@ -385,7 +385,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
     const frozen = FrozenMiniSearch.fromMiniSearchSnapshot(snapshot, opts)
     expect(frozen.documentCount).toBe(65536)
     expect(frozen.search('alpha').map(r => r.id)).toEqual(['max'])
-    expect(frozen.memoryBreakdown().postings.docIdWidth).toBe(32)
+    expect(frozen._memoryBreakdown().postings.docIdWidth).toBe(32)
     const buf = frozen.saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe('MSv5')
     expect(buf.readUInt16LE(6) & 1).toBe(0)
@@ -585,8 +585,8 @@ describe('FrozenIndexBuilder', () => {
     expect(fromBuilder.documentCount).toBe(fromDocs.documentCount)
     expectSameResults(fromDocs, fromBuilder, 'zen')
     // Internal arrays must not be padded to the overestimate
-    const breakdown = fromBuilder.memoryBreakdown()
-    const directBreakdown = fromDocs.memoryBreakdown()
+    const breakdown = fromBuilder._memoryBreakdown()
+    const directBreakdown = fromDocs._memoryBreakdown()
     expect(breakdown.documentCount).toBe(directBreakdown.documentCount)
     expect(breakdown.storedFieldsJsonBytes).toBe(directBreakdown.storedFieldsJsonBytes)
   })
@@ -659,8 +659,8 @@ describe('FrozenMiniSearch.fromAsyncIterable', () => {
     })
     expect(fromAsync.documentCount).toBe(fromDocs.documentCount)
     expectSameResults(fromDocs, fromAsync, 'zen')
-    const breakdown = fromAsync.memoryBreakdown()
-    const directBreakdown = fromDocs.memoryBreakdown()
+    const breakdown = fromAsync._memoryBreakdown()
+    const directBreakdown = fromDocs._memoryBreakdown()
     expect(breakdown.documentCount).toBe(directBreakdown.documentCount)
     expect(breakdown.storedFieldsJsonBytes).toBe(directBreakdown.storedFieldsJsonBytes)
   })
@@ -716,12 +716,12 @@ describe('FrozenIndexBuilder.addAll / addAllAsync', () => {
   })
 })
 
-describe('frozenMemoryBreakdown', () => {
+describe('memoryBreakdown', () => {
   test('returns sensible structure sizes', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
-    const b = frozenMemoryBreakdown(frozen)
+    const b = frozen._memoryBreakdown()
     expect(b.termCount).toBeGreaterThan(0)
     expect(b.postings.totalTypedBytes).toBeGreaterThan(0)
     expect(b.radixTree.nodeCount).toBeGreaterThan(0)
@@ -732,7 +732,7 @@ describe('frozenMemoryBreakdown', () => {
 describe('fieldLengthMatrix adaptive width', () => {
   test('uses Uint8 for typical multi-field corpus', () => {
     const frozen = buildFrozenDirect()
-    const params = frozen.memoryBreakdown()
+    const params = frozen._memoryBreakdown()
     // 4 docs × 2 fields × 1 byte
     expect(params.documents.fieldLengthMatrixBytes).toBe(8)
   })
@@ -741,20 +741,20 @@ describe('fieldLengthMatrix adaptive width', () => {
     const corpus = [{ id: 1, text: Array.from({ length: 300 }, (_, i) => `term${i}`).join(' ') }]
     const opts = { fields: ['text'] }
     const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
-    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(2)
+    expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(2)
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), opts)
     expect(loaded.search('term0')).toEqual(frozen.search('term0'))
     // Wire format is always Uint32 per cell; adaptive width is not preserved after load.
-    expect(loaded.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    expect(loaded._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
   })
 
   test('uses Uint32 when a field exceeds 65535 unique terms', () => {
     const corpus = [{ id: 1, text: Array.from({ length: 70000 }, (_, i) => `term${i}`).join(' ') }]
     const opts = { fields: ['text'] }
     const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
-    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), opts)
-    expect(loaded.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    expect(loaded._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
     expect(loaded.search('term0')).toEqual(frozen.search('term0'))
   })
 
@@ -764,7 +764,7 @@ describe('fieldLengthMatrix adaptive width', () => {
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
     const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
-    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
   })
 
   test('saveBinary round-trip preserves search with Uint8 matrix', () => {
@@ -779,7 +779,7 @@ describe('fieldLengthMatrix adaptive width', () => {
     mutable.addAll(docs)
     mutable.discard(3)
     const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
-    expect(frozen.memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(6)
+    expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(6)
     expectSameResults(mutable, frozen, 'zen')
   })
 })
@@ -787,7 +787,7 @@ describe('fieldLengthMatrix adaptive width', () => {
 describe('allFreqs adaptive width', () => {
   test('uses Uint8 for typical corpus', () => {
     const frozen = buildFrozenDirect()
-    const { postings } = frozen.memoryBreakdown()
+    const { postings } = frozen._memoryBreakdown()
     expect(postings.allFreqsBytes).toBe(postings.allDocIdsBytes / 2)
   })
 
@@ -795,7 +795,7 @@ describe('allFreqs adaptive width', () => {
     const corpus = overflowFrequencies(4, 400)
     const opts = { fields: ['txt'] }
     const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
-    const { postings } = frozen.memoryBreakdown()
+    const { postings } = frozen._memoryBreakdown()
     expect(postings.allFreqsBytes).toBe(postings.allDocIdsBytes)
   })
 
@@ -818,9 +818,9 @@ describe('allFreqs adaptive width', () => {
     const corpus = overflowFrequencies(4, 400)
     const opts = { fields: ['txt'] }
     const frozen = FrozenMiniSearch.fromDocuments(corpus, opts)
-    const beforeBytes = frozen.memoryBreakdown().postings.allFreqsBytes
+    const beforeBytes = frozen._memoryBreakdown().postings.allFreqsBytes
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), opts)
-    expect(loaded.memoryBreakdown().postings.allFreqsBytes).toBe(beforeBytes)
+    expect(loaded._memoryBreakdown().postings.allFreqsBytes).toBe(beforeBytes)
     const a = frozen.search('alpha', { combineWith: 'OR' })
     const b = loaded.search('alpha', { combineWith: 'OR' })
     for (let i = 0; i < a.length; i++) {

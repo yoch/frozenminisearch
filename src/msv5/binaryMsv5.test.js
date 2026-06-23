@@ -156,8 +156,8 @@ describe('binaryMsv5', () => {
     const buf = frozen.saveBinarySync()
     expect(buf.readUInt16LE(6) & FLAG_FREQ_U16).toBe(FLAG_FREQ_U16)
     const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields: ['txt'] })
-    expect(loaded.memoryBreakdown().postings.allFreqsBytes)
-      .toBe(frozen.memoryBreakdown().postings.allFreqsBytes)
+    expect(loaded._memoryBreakdown().postings.allFreqsBytes)
+      .toBe(frozen._memoryBreakdown().postings.allFreqsBytes)
   })
 
   test('MSv5 legacy u8 freqs load without FLAG_FREQ_U16', () => {

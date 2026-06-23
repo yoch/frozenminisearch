@@ -208,11 +208,11 @@ benchmark-gate-posting-ratio: $(DIST_MARKER)
 benchmark-targeted: $(DIST_MARKER)
 	$(NODE) $(EXPOSE) benchmarks/scripts/targeted-failures.mjs
 
-benchmark-finalize: $(DIST_MARKER)
-	$(NODE) $(EXPOSE) benchmarks/scripts/finalize-search.mjs
+benchmark-finalize:
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs
 
-benchmark-autosuggest: $(DIST_MARKER)
-	$(NODE) $(EXPOSE) benchmarks/scripts/autosuggest-search.mjs
+benchmark-autosuggest:
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/autosuggest-search.mjs
 
 # History analysis (read-only, no build required)
 .PHONY: benchmark-history-analyze benchmark-history-vs-mutable

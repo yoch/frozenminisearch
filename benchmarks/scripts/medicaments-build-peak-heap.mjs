@@ -14,7 +14,6 @@ import { fileURLToPath } from 'node:url'
 import FrozenMiniSearch, {
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
-  frozenMemoryBreakdown,
 } from '../../dist/es/index.js'
 import { extractCorpusFromMsbinFile } from '../extractCorpusFromMsbin.ts'
 import {
@@ -91,7 +90,7 @@ function measurePhasedBuild (corpus, options) {
   const frozen = freezeFrozenIndexBuilder(builder)
   sampler.sample()
   const finished = sampler.finish(frozen)
-  const breakdown = frozenMemoryBreakdown(frozen)
+  const breakdown = frozen._memoryBreakdown()
 
   const peakHeapMb = finished.peakHeapBytes / 1024 / 1024
 
@@ -138,7 +137,7 @@ async function measurePhasedBuildFromStream (spec, options, estimatedDocumentCou
   const frozen = freezeFrozenIndexBuilder(builder)
   sampler.sample()
   const finished = sampler.finish(frozen)
-  const breakdown = frozenMemoryBreakdown(frozen)
+  const breakdown = frozen._memoryBreakdown()
 
   const peakHeapMb = finished.peakHeapBytes / 1024 / 1024
 
@@ -210,7 +209,7 @@ function measureLoadBinaryRetained (filePath, options) {
   })
   return {
     retainedHeapMb: mbRound(sample.heapBytes, 4),
-    structuredMb: mbRound(frozenMemoryBreakdown(sample.value).estimatedStructuredBytes),
+    structuredMb: mbRound(sample.value._memoryBreakdown().estimatedStructuredBytes),
   }
 }
 

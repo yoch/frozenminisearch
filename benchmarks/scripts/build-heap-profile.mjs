@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url'
 import {
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
-  frozenMemoryBreakdown,
 } from '../../dist/es/index.js'
 import {
   loadAllCorpusExportSpecs,
@@ -63,7 +62,7 @@ async function runBuildProfileFromStream (label, spec, options, stats) {
 
   gc()
   const retainedMb = Number((measureHeap(() => frozen).heapBytes / 1024 / 1024).toFixed(4))
-  const breakdown = frozenMemoryBreakdown(frozen)
+  const breakdown = frozen._memoryBreakdown()
 
   return {
     id: label,
@@ -114,7 +113,7 @@ function runBuildProfile (label, documents, options) {
 
   gc()
   const retainedMb = Number((measureHeap(() => frozen).heapBytes / 1024 / 1024).toFixed(4))
-  const breakdown = frozenMemoryBreakdown(frozen)
+  const breakdown = frozen._memoryBreakdown()
 
   return {
     id: label,

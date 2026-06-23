@@ -189,8 +189,8 @@ describe('IncrementalPostingsAccumulator', () => {
     const fromMiniSearch = FrozenMiniSearch.fromMiniSearch(mutable, options)
     const fromDocuments = FrozenMiniSearch.fromDocuments(documents, options)
 
-    expect(fromMiniSearch.memoryBreakdown().postings.layout).toBe('dense')
-    expect(fromDocuments.memoryBreakdown().postings.layout).toBe('dense')
+    expect(fromMiniSearch._memoryBreakdown().postings.layout).toBe('dense')
+    expect(fromDocuments._memoryBreakdown().postings.layout).toBe('dense')
     expect(searchSnapshot(fromDocuments, 'term2')).toEqual(searchSnapshot(fromMiniSearch, 'term2'))
   })
 

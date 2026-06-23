@@ -337,10 +337,6 @@ starting points:
   3. **`saveBinarySync` / `loadBinarySync` / `loadBinaryAsync`** — persist and restore a frozen index
      to/from disk.
 
-`assembleFrozen` is the low-level entry point shared by all of these; it
-validates the assembled parts (posting bounds, matrix sizes, radix leaf indices)
-before handing back an instance, so custom pipelines fail fast on malformed
-input.
 
 ### On-disk format
 

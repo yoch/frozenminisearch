@@ -35,8 +35,6 @@ import type {
   FrozenMemoryBreakdown,
   OptionsWithDefaults,
 } from './frozenTypes'
-export type { FrozenAssembleParams, FrozenMemoryBreakdown } from './frozenTypes'
-export type { MiniSearchSnapshot } from './fromMiniSearch'
 import { forEachLiveShortId } from './forEachLiveShortId'
 import { miniSearchSnapshotFromFrozen } from './toMiniSearch'
 import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
@@ -48,10 +46,6 @@ import {
 } from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
 import { getFrozenDefault, type FrozenDefaultOptionName } from './searchDefaults'
-
-export function frozenMemoryBreakdown(frozen: FrozenMiniSearchCore): FrozenMemoryBreakdown {
-  return frozen.memoryBreakdown()
-}
 
 const noStoredFields = (): undefined => undefined
 type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (params: FrozenAssembleParams<T>) => I
@@ -101,26 +95,21 @@ export function assembleFrozenWithCtor<T, I extends FrozenMiniSearchCore<T>>(
   return assembleFrozenInternal(params, trustedSource, ownershipMode, Ctor)
 }
 
-/** Trusted build paths only (same package); skips O(postings) layout checks. */
-function assembleFrozenTrusted<T>(
-  params: FrozenAssembleParams<T>,
-  ownershipMode: SnapshotOwnershipMode = 'trusted-build',
-): FrozenMiniSearchCore<T> {
-  return assembleFrozenInternal(params, true, ownershipMode)
+/** @internal Trusted document build for a concrete FrozenMiniSearch subclass. */
+export function frozenFromDocumentsWithCtor<T, I extends FrozenMiniSearchCore<T>>(
+  Ctor: FrozenMiniSearchCtor<T, I>,
+  documents: readonly T[],
+  options: Options<T>,
+): I {
+  return assembleFrozenInternal(buildFrozenParamsFromDocuments(documents, options), true, 'trusted-build', Ctor)
 }
 
-/** Instantiate {@link FrozenMiniSearchCore} from pre-built flat index parts (full validation). */
-export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearchCore<T> {
-  return assembleFrozenInternal(params, false, 'binary-load')
-}
-
-export function buildFrozenFromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearchCore<T> {
-  return assembleFrozenTrusted(buildFrozenParamsFromDocuments(documents, options))
-}
-
-/** Finalize a {@link FrozenIndexBuilder} into a read-only index. */
-export function freezeFrozenIndexBuilder<T>(builder: FrozenIndexBuilder<T>): FrozenMiniSearchCore<T> {
-  return assembleFrozenTrusted(builder.freezeParams())
+/** @internal Trusted builder finalize for a concrete FrozenMiniSearch subclass. */
+export function frozenFromIndexBuilderWithCtor<T, I extends FrozenMiniSearchCore<T>>(
+  Ctor: FrozenMiniSearchCtor<T, I>,
+  builder: FrozenIndexBuilder<T>,
+): I {
+  return assembleFrozenInternal(builder.freezeParams(), true, 'trusted-build', Ctor)
 }
 
 export default class FrozenMiniSearchCore<T = any> {
@@ -197,7 +186,8 @@ export default class FrozenMiniSearchCore<T = any> {
   get documentCount(): number { return this._documentCount }
   get termCount(): number { return this._termCount }
 
-  memoryBreakdown(): FrozenMemoryBreakdown {
+  /** @internal Benchmark-only retained structure estimate. */
+  protected _memoryBreakdown(): FrozenMemoryBreakdown {
     const termCount = this.termCount
     const postingsStats = postingsTypedBytes(this._postings)
 
@@ -289,7 +279,7 @@ export default class FrozenMiniSearchCore<T = any> {
     documents: readonly T[],
     options: Options<T>,
   ): I {
-    return assembleFrozenInternal(buildFrozenParamsFromDocuments(documents, options), true, 'trusted-build', this)
+    return frozenFromDocumentsWithCtor(this, documents, options)
   }
 
   /**

@@ -11,7 +11,12 @@
  * Run:
  *   pnpm benchmark:autosuggest -- --runs=5 --warmup=20 --iterations=50
  */
-import FrozenMiniSearch, { suggestFromRawResults } from '../../dist/es/index.js'
+import FrozenMiniSearch from '../../src/FrozenMiniSearch.ts'
+import {
+  executeRaw,
+  mergedAutoSuggestOptions,
+} from '../harness/frozenPipelineHarness.ts'
+import { suggestFromRawResults } from '../../src/suggestions.ts'
 import { giantVocabulary, highFrequencyTerms } from '../benchmarkScenarios.js'
 import { intArg, median, timed } from './cpuBenchUtils.mjs'
 
@@ -79,16 +84,16 @@ const report = {
 
 for (const spec of caseSpecs()) {
   const index = FrozenMiniSearch.fromDocuments(spec.docs, spec.options)
-  const merged = { ...index._options.autoSuggestOptions, ...spec.autoSuggestOptions }
+  const merged = mergedAutoSuggestOptions(index, spec.autoSuggestOptions)
   const runRows = []
   let rawResults = 0
 
   for (let r = 0; r < runs; r++) {
-    const raw = index.executeQuery(spec.query, merged)
+    const raw = executeRaw(index, spec.query, merged)
     rawResults = raw.size
     runRows.push({
       executeQuery: timed(
-        () => index.executeQuery(spec.query, merged),
+        () => executeRaw(index, spec.query, merged),
         warmup,
         iterations,
       ),

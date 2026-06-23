@@ -8,9 +8,28 @@ import type { FrozenAssembleParams } from './frozenTypes'
 import type { BrowserSaveBinaryAsyncOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
   assembleFrozenWithCtor,
+  frozenFromDocumentsWithCtor,
+  frozenFromIndexBuilderWithCtor,
 } from './FrozenMiniSearchCore'
+import { type FrozenIndexBuilder } from './frozenBuild'
 
-export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearchBrowser<T> {
+/** Build a read-only browser index in one pass from documents. */
+export function buildFrozenFromDocuments<T>(
+  documents: readonly T[],
+  options: Options<T>,
+): FrozenMiniSearchBrowser<T> {
+  return frozenFromDocumentsWithCtor(FrozenMiniSearchBrowser, documents, options)
+}
+
+/** Finalize a {@link FrozenIndexBuilder} into a read-only browser index. */
+export function freezeFrozenIndexBuilder<T>(
+  builder: FrozenIndexBuilder<T>,
+): FrozenMiniSearchBrowser<T> {
+  return frozenFromIndexBuilderWithCtor(FrozenMiniSearchBrowser, builder)
+}
+
+/** @internal */
+function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearchBrowser<T> {
   return assembleFrozenWithCtor(params, false, 'binary-load', FrozenMiniSearchBrowser)
 }
 

@@ -204,7 +204,7 @@ describe('binaryFormat MSv5', () => {
     const mutable = new MiniSearch({ fields, storeFields: [] })
     mutable.addAll(docs)
     const frozen = FrozenMiniSearch.fromMiniSearch(mutable, { fields })
-    expect(frozen.memoryBreakdown().postings.layout).toBe('sparse')
+    expect(frozen._memoryBreakdown().postings.layout).toBe('sparse')
 
     const buf = frozen.saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
@@ -225,14 +225,14 @@ describe('binaryFormat MSv5', () => {
     }))
     const options = { fields, storeFields: [] }
     const frozen = FrozenMiniSearch.fromDocuments(docs, options)
-    expect(frozen.memoryBreakdown().postings.layout).toBe('dense')
+    expect(frozen._memoryBreakdown().postings.layout).toBe('dense')
 
     const buf = frozen.saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.readUInt16LE(6) & FLAG_SPARSE_LAYOUT).toBe(0)
 
     const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
-    expect(loaded.memoryBreakdown().postings.layout).toBe('dense')
+    expect(loaded._memoryBreakdown().postings.layout).toBe('dense')
     expect(loaded.search('term2')).toEqual(frozen.search('term2'))
   })
 

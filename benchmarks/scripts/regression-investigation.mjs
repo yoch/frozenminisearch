@@ -170,7 +170,7 @@ function runCase (id) {
   })
   console.log(`heap delta: mutable=${heapMutable.heapMb} MB frozen=${heapFrozen.heapMb} MB external=${heapFrozen.externalMb} MB`)
 
-  const breakdown = frozen.memoryBreakdown()
+  const breakdown = frozen._memoryBreakdown()
   const rt = breakdown.radixTree
   console.log(`radix: nodes=${rt.nodeCount} edges=${rt.edgeCount} est=${(rt.estimatedBytes / 1024).toFixed(1)} KB structured=${(breakdown.estimatedStructuredBytes / 1024).toFixed(1)} KB`)
 

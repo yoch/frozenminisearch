@@ -10,6 +10,11 @@
 ### Changed
 
 - **Heap benchmark protocol v3** — retained-heap measurement runs in isolated scenario processes with in-process trials (warm-up once per path, median+MAD, GC×3). CPU/search benchmarks are decoupled from the heap phase (`pnpm bench:memory`). See `benchmarks/README.md`.
+- **Public API cleanup** — `assembleFrozen`, `frozenMemoryBreakdown`, `memoryBreakdown()`, and low-level finalize/suggest helpers are no longer part of the public API; use `FrozenMiniSearch.fromDocuments`, `buildFrozenFromDocuments`, `freezeFrozenIndexBuilder`, and the instance `search` / `autoSuggest` methods instead. Retained-heap diagnostics remain available only to internal benchmarks.
+
+### Removed
+
+- **Breaking** — package exports removed: `finalizeRawSearchResults`, `finalizeSearchResults`, `suggestFromRawResults`, `suggestFromSearchResults`, `assembleFrozen`, `frozenMemoryBreakdown`, and related internal types (`SerializedIndexEntry`, `MiniSearchSnapshot`, `FrozenAssembleParams`, `FrozenMemoryBreakdown`).
 
 ## v1.3.0 — `@yoch/frozenminisearch`
 

@@ -21,7 +21,10 @@ import {
 } from './storedFieldsLayout'
 
 export interface FrozenIndexBuilderHints {
-  /** Pre-size per-document arrays when the final document count is known. */
+  /**
+   * Pre-size per-document arrays when the final document count is known upfront.
+   * Passed to {@link FrozenMiniSearch.fromAsyncIterable} or {@link createFrozenIndexBuilder}.
+   */
   estimatedDocumentCount?: number
   /** Hint for initial growable posting column capacity per (term, field) slot. */
   estimatedPostingsPerSlot?: number
@@ -185,8 +188,8 @@ export class FrozenIndexBuilder<T> {
   }
 
   /**
-   * Finalize this builder into assembly params. Call {@link assembleFrozen} or
-   * {@link freezeFrozenIndexBuilder} to obtain a {@link FrozenMiniSearch} instance.
+   * Finalize this builder into assembly params. Call {@link freezeFrozenIndexBuilder}
+   * to obtain a {@link FrozenMiniSearch} instance.
    */
   freezeParams(): FrozenAssembleParams<T> {
     if (this._frozen) {

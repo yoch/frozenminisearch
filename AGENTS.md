@@ -8,14 +8,18 @@ Core TypeScript sources live in `src/`. Public exports start at `src/index.ts` a
 
 Use Node `>=20`. Install with `pnpm install` to match the checked-in `pnpm-lock.yaml`.
 
-- `pnpm test`: runs Jest tests in `src/` plus `dev/parity/`.
-- `pnpm test:fuzzysearch`: runs long fuzzy parity sweeps from `dev/internal/`.
-- `pnpm test:benchmarks`: runs benchmark test files, separate from normal CI tests.
-- `pnpm coverage`: runs Jest coverage for `src/`.
-- `pnpm lint` / `pnpm lintfix`: checks or fixes ESLint style issues in `src/`.
-- `pnpm build`: cleans `dist/`, builds ESM/CJS bundles with Rollup, and patches CJS output.
+All `package.json` scripts are thin aliases to a `Makefile` target (`make <target>`). Run `make help` for a quick overview. The Makefile centralises prerequisites (build, `--expose-gc`, `NODE_ENV=production`) that scripts previously duplicated as `pnpm build &&` prefixes. See [`benchmarks/SCRIPTS.md`](benchmarks/SCRIPTS.md) for the boundary between the profiled `bench:*` interface (via `benchmarks/framework/cli.mjs`) and the low-level `benchmark:*` interface (direct access to `*.js`).
+
+- `pnpm test` (`make test`): runs vitest tests in `src/`, `dev/`, and `benchmarks/`.
+- `pnpm test:fuzzysearch` (`make test-fuzzysearch`): runs long fuzzy parity sweeps from `dev/internal/`.
+- `pnpm test:benchmarks` (`make test-benchmarks`): runs benchmark test files, separate from normal CI tests.
+- `pnpm coverage` (`make coverage`): runs vitest coverage for `src/`.
+- `pnpm lint` / `pnpm lint:fix` (`make lint` / `make lint-fix`): checks or fixes ESLint style issues in `src/`.
+- `pnpm build` (`make build`): cleans `dist/`, builds ESM/CJS bundles with Rollup, and patches CJS output.
+- `make bench`: quick local performance check (`cli.mjs run --profile=dev --quick`).
 - `node scripts/verify-npm-pack.cjs`: validates package contents before publishing.
-- `pnpm bench -- run --profile=dev --quick`: quick local performance check.
+
+Build freshness is tracked by the real file `dist/es/index.js`. Make rebuilds automatically only when that file is absent; after editing `src/*.ts`, run `make build` explicitly to refresh `dist/`.
 
 ## Coding Style & Naming Conventions
 
@@ -23,7 +27,7 @@ This repo uses TypeScript/ES modules with neostandard plus `@stylistic/eslint-pl
 
 ## Testing Guidelines
 
-Add or update colocated Jest tests for behavior changes. For search semantics, include parity coverage in `dev/parity/` when behavior should match MiniSearch 7. For binary formats, test round trips and boundary cases, especially typed-array widths, doc id limits, and stored-field layouts. Run `pnpm test` before PRs; add targeted benchmark runs when changing postings, query execution, or binary encoding.
+Add or update colocated vitest tests for behavior changes. For search semantics, include parity coverage in `dev/parity/` when behavior should match MiniSearch 7. For binary formats, test round trips and boundary cases, especially typed-array widths, doc id limits, and stored-field layouts. Run `pnpm test` before PRs; add targeted benchmark runs when changing postings, query execution, or binary encoding.
 
 ## Commit & Pull Request Guidelines
 

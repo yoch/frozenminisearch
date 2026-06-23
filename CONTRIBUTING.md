@@ -24,7 +24,7 @@ Parity expectations are documented in [`dev/parity/PARITY_CONTRACT.md`](dev/pari
 
 ## Documentation / GitHub Pages
 
-- **Verify** (PR or push `master` touching doc sources): workflow [Docs](https://github.com/yoch/frozenminisearch/actions/workflows/docs.yml) runs `pnpm build-docs` only.
+- **Verify** (PR or push `master` touching doc sources): workflow [Docs](https://github.com/yoch/frozenminisearch/actions/workflows/docs.yml) runs `pnpm docs:build` only.
 - **Publish** (https://yoch.github.io/frozenminisearch/): push a release tag `vX.Y.Z` — the site header shows `@yoch/frozenminisearch vX.Y.Z`.
 - Do not commit generated `docs/` HTML. GitHub Pages is built from the tagged commit.
 

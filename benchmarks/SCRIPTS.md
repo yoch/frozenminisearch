@@ -1,0 +1,136 @@
+# Benchmark scripts — boundaries and environment variables
+
+This document describes the two families of benchmark scripts exposed via
+`package.json` (thin aliases to the root `Makefile`) and the environment
+variables that drive them.
+
+## Two interfaces coexist on purpose
+
+| Family | Interface | Status | Typical usage |
+|---|---|---|---|
+| `bench:*` | `benchmarks/framework/cli.mjs` (profiles `dev` / `regression` / `vs-reference`) | Profiled | CI, regression checks, daily use |
+| `benchmark:*` | direct `*.js` (`captureBaseline.js`, `diffBaseline.js`, `compare.js`) | Low-level expert | Debug, ad-hoc runs, flag access without going through `cli.mjs` |
+| `benchmark:packed-radix*` | `packedRadix*.js` + dedicated rollup build (`PACKED_RADIX_BENCH=true`) | Orthogonal | Isolated PackedRadixTree subsystem |
+| `benchmark:binary-format` | `binaryFormatCompare.ts` | Orthogonal | msv5 binary format vs JS comparison |
+| `benchmark:medicaments-indexes` | `analyzeMedicamentsIndexes.js` | Orthogonal | Dedicated medicaments corpus |
+
+`cli.mjs` is **not** a rewrite of the legacy scripts: it is a profile-based
+orchestration layer that delegates to them systematically:
+
+- `cli.mjs run` → `benchmarks/compare.js`
+- `cli.mjs record` → `benchmarks/captureBaseline.js`
+- `cli.mjs diff` → (optionally `captureBaseline.js --run`) + `diffBaseline.js`
+- `cli.mjs micro` → `benchmarks/micro/run.mjs`
+- `cli.mjs history` → `benchmarks/scripts/record-history.mjs`
+
+## `bench:*` vs `benchmark:*` correspondences
+
+The pairs below run **the same underlying script**; the difference is that
+`bench:*` sets `BENCH_PROFILE` (and the derived env vars `RUNS`,
+`SEARCH_ITERATIONS`, `BENCH_WARMUP` in `dev` profile), while `benchmark:*`
+lets the user provide their own flags.
+
+| `bench:*` (profiled) | `benchmark:*` (expert) | Underlying script | Difference |
+|---|---|---|---|
+| `bench` | `benchmark:compare` | `compare.js` | `bench` forces `RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20` (`dev` profile) |
+| `bench:record` | `benchmark:record` | `captureBaseline.js` | `bench:record` sets `BENCH_PROFILE` |
+| `bench:diff` | `benchmark:diff` | `diffBaseline.js` | `bench:diff` can chain `captureBaseline --run` via `cli.mjs diff --run` |
+| `bench:memory` | `benchmark:record:memory` | `runHeapSuite.mjs` | `benchmark:record:memory` adds `--out=benchmarks/baselines/latest-heap.json` |
+
+## Recommended workflows
+
+### Reference refresh (full workflow)
+
+```bash
+# Recommended: profiled interface
+make bench-reference-update
+# equivalent to:
+#   RUNS=3 cli.mjs record --profile=vs-reference
+#   promote-latest-to-reference.mjs
+#   generate-readme-comparison.mjs
+```
+
+### Legacy (still supported, marked as such in benchmarks/scripts/README.md)
+
+```bash
+make benchmark-baseline-update   # captureBaseline.js --reference
+```
+
+Prefer `bench:reference:update` which also chains promotion and README regen.
+
+### CI regression check
+
+```bash
+make bench-record                # default profile (regression)
+make bench-diff                  # latest.json vs reference.json
+```
+
+### Ad-hoc debug without profile
+
+```bash
+make benchmark-compare           # compare.js with no imposed env vars
+make benchmark-record RUNS=1 SEARCH_ITERATIONS=10
+```
+
+## Environment variables
+
+### Set by the Makefile (do not override unless needed)
+
+| Variable | Value | Affected targets |
+|---|---|---|
+| `NODE_ENV` | `production` | `build`, `build-minified`, `build-packed-radix-bench` |
+| `MINIFY` | `true` | `build-minified` |
+| `PACKED_RADIX_BENCH` | `true` | `build-packed-radix-bench` |
+| `--expose-gc` | node flag | all `bench-*` / `benchmark-*` targets (except read-only analysis) |
+
+### Set by `cli.mjs` (profiled interface)
+
+| Variable | Values | Role |
+|---|---|---|
+| `BENCH_PROFILE` | `dev` \| `regression` \| `vs-reference` | Selected profile |
+| `BENCH_SURFACES` | `search,build,heap` (subset) | Surfaces to run |
+| `BENCH_USE_REFERENCE` | `1` | Set in `vs-reference` profile |
+
+### Passed by the user (legitimate variability)
+
+| Variable | Default | Role |
+|---|---|---|
+| `RUNS` | `3` | Number of capture runs |
+| `SEARCH_ITERATIONS` | (internal default) | Search iterations per run |
+| `BENCH_WARMUP` | (internal default) | Warmup iterations |
+| `BENCH_SEARCH_ONLY` | `1` | Skip non-search scenarios |
+
+Example:
+
+```bash
+make benchmark-record RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20
+# equivalent to the legacy pnpm benchmark:record:quick
+```
+
+### Documentation / demo
+
+| Variable | Role |
+|---|---|
+| `DOCS_PAGES` | `1` = GitHub Pages mode (basePath, hostedBaseUrl) |
+| `DOCS_VERSION` | Semver version for the TypeDoc title (default: `package.json#version`) |
+
+## Build prerequisites
+
+The `Makefile` declares native dependencies:
+
+- **`dist/es/index.js`** (real file, freshness marker) — consumed by any target
+  that reads `dist/browser/index.js` or `dist/es/` (browser tests, benchmarks
+  that load the bundle, docs/demo). Make rebuilds automatically when any
+  `src/**/*.ts`/`src/**/*.js` source or build config (`rollup.config.js`,
+  `tsconfig.json`, `package.json`) changes.
+- **`benchmarks/dist/packedRadixTree.cjs`** (real file marker) — consumed only
+  by `benchmark-packed-*` targets; produces `benchmarks/dist/packedRadix*.cjs`
+  and not `dist/`.
+
+For a guaranteed clean rebuild: `make build` (PHONY, cleans `dist/` first).
+
+## See also
+
+- [`benchmarks/scripts/README.md`](scripts/README.md) — Performance history
+  tracking (`perf-history.jsonl`, `record-history.sh`, `analyze-history.sh`).
+- [`Makefile`](../Makefile) — Available targets (`make help` for a summary).

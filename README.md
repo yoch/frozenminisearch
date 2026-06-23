@@ -92,7 +92,7 @@ const buf = new Uint8Array(await (await fetch('/index.frozen')).arrayBuffer())
 const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
-See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/](examples/plain_js_frozen/) locally (`pnpm demo:prepare` then serve the repo root).
+See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/](examples/plain_js_frozen/) locally (`pnpm docs:demo:frozen` then serve the repo root).
 
 ---
 

@@ -17,7 +17,7 @@ HTML; the versioned site is produced from the tagged commit.
    pnpm test
    pnpm build
    node scripts/verify-npm-pack.cjs
-   pnpm build-docs
+   pnpm docs:build
    ```
 
 3. Commit the release changes.

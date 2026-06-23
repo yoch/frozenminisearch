@@ -3,6 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@yoch/frozenminisearch.svg)](https://www.npmjs.com/package/@yoch/frozenminisearch)
 [![coverage](https://codecov.io/gh/yoch/frozenminisearch/graph/badge.svg)](https://codecov.io/gh/yoch/frozenminisearch)
 [![CI](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml/badge.svg)](https://github.com/yoch/frozenminisearch/actions/workflows/main.yml)
+[![Docs](https://github.com/yoch/frozenminisearch/actions/workflows/docs.yml/badge.svg)](https://github.com/yoch/frozenminisearch/actions/workflows/docs.yml)
 
 [API documentation](https://yoch.github.io/frozenminisearch/) · [Live demo](https://yoch.github.io/frozenminisearch/demo/)
 

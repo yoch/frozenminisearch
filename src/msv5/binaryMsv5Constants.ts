@@ -62,3 +62,20 @@ export const enum Msv5SectionId {
 
 /** Tree column order for columnWidthFlags bit pairs (2 bits each). */
 export const MSV5_TREE_COLUMN_COUNT = 6
+
+// ---------------------------------------------------------------------------
+// Error message constants shared between Node (binaryMsv5Compression.ts) and
+// Browser (binaryMsv5CompressionBrowser.ts) MSv5 code.
+// ---------------------------------------------------------------------------
+export const MSV5_ERR_PAYLOAD_EXCEEDS_1GIB = 'MSv5 payload exceeds 1 GiB limit'
+export const MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER = 'MSv5 buffer too short for header'
+export const MSV5_ERR_SECTION_CRC_MISMATCH = 'MSv5 section CRC mismatch'
+export const MSV5_ERR_PAYLOAD_CRC_MISMATCH = 'MSv5 payload CRC mismatch'
+export const MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED = 'MSv5 section offset not aligned'
+export const MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC = 'MSv5 section offsets not monotonic'
+export const MSV5_ERR_SECTION_OUT_OF_BOUNDS = 'MSv5 section out of uncompressed bounds'
+export const MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH = 'MSv5 uncompressed payload length mismatch'
+export const MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS = 'MSv5 payload out of bounds'
+export const MSV5_ERR_RAW_PAYLOAD_LENGTH = 'MSv5 raw payload length mismatch'
+export const MSV5_ERR_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH = 'MSv5 compressed payload exceeds declared length'
+export const MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH = 'MSv5 decompressed payload length mismatch'

@@ -78,8 +78,7 @@ make benchmark-record RUNS=1 SEARCH_ITERATIONS=10
 
 | Variable | Value | Affected targets |
 |---|---|---|
-| `NODE_ENV` | `production` | `build`, `build-minified`, `build-packed-radix-bench` |
-| `MINIFY` | `true` | `build-minified` |
+| `NODE_ENV` | `production` | `build`, `build-packed-radix-bench` |
 | `PACKED_RADIX_BENCH` | `true` | `build-packed-radix-bench` |
 | `--expose-gc` | node flag | all `bench-*` / `benchmark-*` targets (except read-only analysis) |
 

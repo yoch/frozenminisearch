@@ -45,15 +45,15 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
 export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   /** Serialize this index as a frozen binary snapshot (synchronous). */
   saveBinarySync(saveOptions: SaveBinaryOptions = {}): Buffer {
-    return encodeFrozenSnapshot(this.binarySnapshotInput(), undefined, this._index, saveOptions.compression)
+    return encodeFrozenSnapshot(this._binarySnapshotInput(), undefined, this._index, saveOptions.compression)
   }
 
   /** Non-blocking snapshot serialization with the selected compression codec. */
   async saveBinaryAsync(saveOptions: SaveBinaryOptions = {}): Promise<Buffer> {
-    return encodeFrozenSnapshotAsync(this.binarySnapshotInput(), undefined, this._index, saveOptions.compression)
+    return encodeFrozenSnapshotAsync(this._binarySnapshotInput(), undefined, this._index, saveOptions.compression)
   }
 
-  private binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshot>[0] {
+  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshot>[0] {
     return buildBinarySnapshotInput({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -71,7 +71,7 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   static loadBinarySync<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = decodeFrozenSnapshot(buffer, { storeFields })
-    return FrozenMiniSearch.fromBinarySnapshot(snap, options)
+    return FrozenMiniSearch._fromBinarySnapshot(snap, options)
   }
 
   /** Load a frozen binary snapshot with streaming decompression when needed (bounded memory). */
@@ -81,10 +81,10 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   ): Promise<FrozenMiniSearch<T>> {
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = await decodeFrozenSnapshotAsync(buffer, { storeFields })
-    return FrozenMiniSearch.fromBinarySnapshot(snap, options)
+    return FrozenMiniSearch._fromBinarySnapshot(snap, options)
   }
 
-  private static fromBinarySnapshot<T>(
+  private static _fromBinarySnapshot<T>(
     snap: ReturnType<typeof decodeFrozenSnapshot>,
     options: Options<T>,
   ): FrozenMiniSearch<T> {

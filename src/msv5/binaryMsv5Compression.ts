@@ -9,6 +9,18 @@ import {
   CODEC_RAW,
   CODEC_ZLIB,
   CODEC_ZSTD,
+  MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER,
+  MSV5_ERR_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH,
+  MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH,
+  MSV5_ERR_PAYLOAD_CRC_MISMATCH,
+  MSV5_ERR_PAYLOAD_EXCEEDS_1GIB,
+  MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS,
+  MSV5_ERR_RAW_PAYLOAD_LENGTH,
+  MSV5_ERR_SECTION_CRC_MISMATCH,
+  MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC,
+  MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED,
+  MSV5_ERR_SECTION_OUT_OF_BOUNDS,
+  MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH,
   MSV5_FORMAT_REV_OFFSET,
   MSV5_FORMAT_REV_PAYLOAD,
   MSV5_HEADER_SIZE,
@@ -40,8 +52,6 @@ export interface Msv5AssembledFile {
  *  trusting `uncompressedLength` from that same header. Semantic integrity (length match,
  *  payload CRC, per-section CRC) is enforced after decode. */
 const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
-const MSV5_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH = 'MSv5 compressed payload exceeds declared length'
-const MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH = 'MSv5 decompressed payload length mismatch'
 
 // zstd landed in node:zlib at Node 22.15.0 (22.x line) / 23.8.0, where the whole family
 // (zstdCompress[Sync], zstdDecompressSync, createZstdDecompress) ships together — so probing one
@@ -89,7 +99,7 @@ function readPayloadMeta(fileBuf: Buffer | Uint8Array): {
   const payloadCrc32 = readU32LE(fileBuf, MSV5_PAYLOAD_CRC_OFFSET)
   const payloadCodec = readU8(fileBuf, MSV5_PAYLOAD_CODEC_OFFSET)
   if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error('MSv5 payload exceeds 1 GiB limit')
+    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
   }
   return { payloadOffset, compressedLength, uncompressedLength, payloadCrc32, payloadCodec }
 }
@@ -303,7 +313,7 @@ function concatAndValidateSections(rawSections: Array<Buffer | Uint8Array>): {
   }
   const { uncompressed, entries } = concatRawSections(rawSections)
   if (uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error('MSv5 payload exceeds 1 GiB limit')
+    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
   }
   return { uncompressed, entries, payloadCrc32: crc32Bytes(uncompressed) }
 }
@@ -404,7 +414,7 @@ export async function assembleMsv5FileAsync(
 
 export function readMsv5SectionDirectory(buf: Buffer | Uint8Array): Msv5SectionEntry[] {
   if (buf.length < MSV5_HEADER_SIZE) {
-    throw new Error('MSv5 buffer too short for header')
+    throw new Error(MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER)
   }
   const sectionCount = readU32LE(buf, MSV5_SECTION_COUNT_OFFSET)
   if (sectionCount !== MSV5_SECTION_COUNT) {
@@ -444,7 +454,7 @@ export function readMsv5SnapshotCompressionMeta(buf: Buffer | Uint8Array): Msv5S
 
 function verifySectionCrc(section: Buffer, expected: number): void {
   if (crc32Buffer(section) !== expected) {
-    throw new Error('MSv5 section CRC mismatch')
+    throw new Error(MSV5_ERR_SECTION_CRC_MISMATCH)
   }
 }
 
@@ -455,7 +465,7 @@ function sectionsFromPayload(
   payloadCrc32: number,
 ): Buffer[] {
   if (crc32Buffer(payload) !== payloadCrc32) {
-    throw new Error('MSv5 payload CRC mismatch')
+    throw new Error(MSV5_ERR_PAYLOAD_CRC_MISMATCH)
   }
   return directory.map((entry) => {
     const slice = payload.subarray(entry.fileOffset, entry.fileOffset + entry.uncompressedLength)
@@ -481,7 +491,7 @@ function collectCompressedPayloadSections(
   finish: () => void
 } {
   if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error('MSv5 payload exceeds 1 GiB limit')
+    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
   }
   const sections: Buffer[] = new Array(directory.length)
   let sectionId = 0
@@ -503,7 +513,7 @@ function collectCompressedPayloadSections(
 
   function consume(chunk: Buffer): void {
     if (streamOffset + chunk.length > uncompressedLength) {
-      throw new Error(MSV5_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH)
+      throw new Error(MSV5_ERR_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH)
     }
 
     payloadCrc = crc32Update(payloadCrc, chunk)
@@ -547,10 +557,10 @@ function collectCompressedPayloadSections(
   function finish(): void {
     emitEmptySections()
     if (streamOffset !== uncompressedLength || sectionId !== directory.length) {
-      throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+      throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
     if (payloadCrc !== payloadCrc32) {
-      throw new Error('MSv5 payload CRC mismatch')
+      throw new Error(MSV5_ERR_PAYLOAD_CRC_MISMATCH)
     }
   }
 
@@ -624,18 +634,18 @@ function validatePayloadDirectory(
   let prevEnd = 0
   for (const entry of directory) {
     if ((entry.fileOffset & 3) !== 0) {
-      throw new Error('MSv5 section offset not aligned')
+      throw new Error(MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED)
     }
     if (entry.fileOffset < prevEnd) {
-      throw new Error('MSv5 section offsets not monotonic')
+      throw new Error(MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC)
     }
     if (entry.fileOffset + entry.uncompressedLength > uncompressedLength) {
-      throw new Error('MSv5 section out of uncompressed bounds')
+      throw new Error(MSV5_ERR_SECTION_OUT_OF_BOUNDS)
     }
     prevEnd = entry.fileOffset + entry.uncompressedLength
   }
   if (prevEnd !== uncompressedLength) {
-    throw new Error('MSv5 uncompressed payload length mismatch')
+    throw new Error(MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH)
   }
 }
 
@@ -654,10 +664,10 @@ function preparePayload(fileBuf: Buffer, directory: Msv5SectionEntry[]): Prepare
   validatePayloadDirectory(directory, uncompressedLength)
 
   if (payloadOffset !== MSV5_HEADER_SIZE || payloadOffset + compressedLength > fileBuf.length) {
-    throw new Error('MSv5 payload out of bounds')
+    throw new Error(MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS)
   }
   if (payloadCodec === CODEC_RAW && compressedLength !== uncompressedLength) {
-    throw new Error('MSv5 raw payload length mismatch')
+    throw new Error(MSV5_ERR_RAW_PAYLOAD_LENGTH)
   }
 
   return {
@@ -681,7 +691,7 @@ function decompressPayloadSync(
       maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
     })
     if (decoded.length !== uncompressedLength) {
-      throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+      throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
     return decoded
   }
@@ -690,7 +700,7 @@ function decompressPayloadSync(
       maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
     })
     if (decoded.length !== uncompressedLength) {
-      throw new Error(MSV5_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+      throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
     return decoded
   }

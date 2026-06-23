@@ -81,7 +81,7 @@ export default class SearchableMap<T = any> {
    * Map at the given prefix
    */
   atPrefix(prefix: string): SearchableMap<T> {
-    if (!prefix.startsWith(this._prefix)) { throw new Error('Mismatched prefix') }
+    if (!prefix.startsWith(this._prefix)) { throw new Error('FrozenMiniSearch: mismatched prefix') }
 
     const [node, path] = trackDown(this._tree, prefix.slice(this._prefix.length))
 
@@ -203,7 +203,7 @@ export default class SearchableMap<T = any> {
    * @return The {@link SearchableMap} itself, to allow chaining
    */
   set(key: string, value: T): SearchableMap<T> {
-    if (typeof key !== 'string') { throw new Error('key must be a string') }
+    if (typeof key !== 'string') { throw new Error('FrozenMiniSearch: key must be a string') }
     this._size = undefined
     const node = createPath(this._tree, key)
     node.set(LEAF, value)
@@ -245,7 +245,7 @@ export default class SearchableMap<T = any> {
    * @return The {@link SearchableMap} itself, to allow chaining
    */
   update(key: string, fn: (value: T | undefined) => T): SearchableMap<T> {
-    if (typeof key !== 'string') { throw new Error('key must be a string') }
+    if (typeof key !== 'string') { throw new Error('FrozenMiniSearch: key must be a string') }
     this._size = undefined
     const node = createPath(this._tree, key)
     node.set(LEAF, fn(node.get(LEAF)))
@@ -269,7 +269,7 @@ export default class SearchableMap<T = any> {
    * @return The existing or new value at the given key
    */
   fetch(key: string, initial: () => T): T {
-    if (typeof key !== 'string') { throw new Error('key must be a string') }
+    if (typeof key !== 'string') { throw new Error('FrozenMiniSearch: key must be a string') }
     this._size = undefined
     const node = createPath(this._tree, key)
 

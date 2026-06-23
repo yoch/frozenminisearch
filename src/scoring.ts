@@ -466,7 +466,7 @@ export function combineResults(results: RawResult[], combineWith: CombinationOpe
   const operator = combineWith.toLowerCase() as LowercaseCombinationOperator
   const combinator = combinators[operator]
   if (!combinator) {
-    throw new Error(`Invalid combination operator: ${combineWith}`)
+    throw new Error(`FrozenMiniSearch: invalid combination operator: ${combineWith}`)
   }
   return results.reduce(combinator)
 }

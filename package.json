@@ -88,7 +88,6 @@
     "lint:fix": "make lint-fix",
     "build": "make build",
     "clean-build": "make clean-build",
-    "build-minified": "make build-minified",
     "build-packed-radix-bench": "make build-packed-radix-bench",
     "prepublishOnly": "make prepublish-only",
     "release:beta": "make release-beta",

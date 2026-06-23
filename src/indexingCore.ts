@@ -14,7 +14,7 @@ export type IndexingOptions<T> = OptionsWithDefaults<T>
 
 export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<T> {
   if (options?.fields == null) {
-    throw new Error('MiniSearch: option "fields" must be provided')
+    throw new Error('FrozenMiniSearch: option "fields" must be provided')
   }
   return {
     ...defaultFrozenLoadOptions,

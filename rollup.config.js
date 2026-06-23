@@ -5,15 +5,23 @@ import terser from '@rollup/plugin-terser'
 
 const production = process.env.NODE_ENV === 'production'
 const terserPlugin = terser({
+  compress: {
+    passes: 2,
+    pure_getters: true,
+    unsafe_arrows: true,
+    //dead_code: true,
+  },
   mangle: {
     properties: {
       regex: /^_/
     }
-  }
+  },
+  format: {
+    comments: false,
+  },
 })
 
 const config = ({ format, input, output, dir, extension = 'js', exports = undefined }) => {
-  const shouldMinify = process.env.MINIFY === 'true' && output !== 'dts'
   const outDir = `dist/${dir || format}`
 
   return {
@@ -26,8 +34,7 @@ const config = ({ format, input, output, dir, extension = 'js', exports = undefi
       dir: `dist/${dir || format}`,
       exports,
       format,
-      entryFileNames: shouldMinify ? `[name].min.${extension}` : `[name].${extension}`,
-      plugins: shouldMinify ? [terserPlugin] : []
+      entryFileNames: `[name].${extension}`,
     },
     plugins: [
       output === 'dts'
@@ -108,6 +115,9 @@ function rollupExports () {
   config({ format: 'es', input: 'src/index.ts', output: 'dts', dir: 'es', extension: 'd.ts' }),
   {
     input: 'src/browser.ts',
+    treeshake: {
+      moduleSideEffects: false,
+    },
     output: {
       sourcemap: !production,
       file: 'dist/browser/index.js',
@@ -115,7 +125,9 @@ function rollupExports () {
       plugins: production ? [terserPlugin] : [],
     },
     plugins: [
-      resolve({ browser: true }),
+      resolve({
+        browser: true,
+      }),
       typescript(production
         ? { sourceMap: false, compilerOptions: { outDir: 'dist/browser', sourceMap: false } }
         : { sourceMap: true, compilerOptions: { outDir: 'dist/browser', sourceMap: true } }),

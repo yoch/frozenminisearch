@@ -538,7 +538,7 @@ function collectCombinedDocIds<T>(
     return docIds
   }
 
-  throw new Error(`Invalid combination operator: ${operator}`)
+  throw new Error(`FrozenMiniSearch: invalid combination operator: ${operator}`)
 }
 
 /**
@@ -635,7 +635,7 @@ function executeCombinedBranches<T>(
     return result
   }
 
-  throw new Error(`Invalid combination operator: ${operator}`)
+  throw new Error(`FrozenMiniSearch: invalid combination operator: ${operator}`)
 }
 
 /** Query adapter for packed frozen term indexes. */

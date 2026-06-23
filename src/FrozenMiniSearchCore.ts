@@ -163,7 +163,7 @@ export default class FrozenMiniSearchCore<T = any> {
       documentCount: this._documentCount,
       avgFieldLength: this._avgFieldLength,
       fieldIds: this._fieldIds,
-      getFieldLength: (docId, fieldId) => this.getFieldLength(docId, fieldId),
+      getFieldLength: (docId, fieldId) => this._getFieldLength(docId, fieldId),
       getExternalId: docId => this._externalIds[docId],
       getStoredFields: this._hasStoredFields
         ? docId => readStoredFields(this._storedFields, docId)
@@ -257,7 +257,7 @@ export default class FrozenMiniSearchCore<T = any> {
 
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     return finalizeRawSearchResults(
-      this.executeQuery(query, searchOptions),
+      this._executeQuery(query, searchOptions),
       query,
       searchOptions,
       this._options.searchOptions,
@@ -274,7 +274,7 @@ export default class FrozenMiniSearchCore<T = any> {
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
     const merged = { ...this._options.autoSuggestOptions, ...options }
     if (merged.filter == null) {
-      return suggestFromRawResults(this.executeQuery(queryString, merged))
+      return suggestFromRawResults(this._executeQuery(queryString, merged))
     }
     return suggestFromSearchResults(this.search(queryString, merged))
   }
@@ -382,11 +382,11 @@ export default class FrozenMiniSearchCore<T = any> {
     return assembleFrozenInternal(builder.freezeParams(), true, 'trusted-build', this)
   }
 
-  private getFieldLength(docId: number, fieldId: number): number {
+  private _getFieldLength(docId: number, fieldId: number): number {
     return this._fieldLengthMatrix[docId * this._fieldCount + fieldId] ?? 0
   }
 
-  private executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
+  private _executeQuery(query: Query, searchOptions: SearchOptions = {}): RawResult {
     return runQuery(query, searchOptions, this._queryEngineParams)
   }
 }

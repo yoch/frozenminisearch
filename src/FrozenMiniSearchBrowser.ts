@@ -17,14 +17,14 @@ export function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSe
 export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCore<T> {
   async saveBinaryAsync(saveOptions: BrowserSaveBinaryAsyncOptions = {}): Promise<Uint8Array> {
     return encodeFrozenSnapshotMsv5Browser(
-      this.binarySnapshotInput(),
+      this._binarySnapshotInput(),
       undefined,
       this._index,
       saveOptions.compression,
     )
   }
 
-  private binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotMsv5Browser>[0] {
+  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotMsv5Browser>[0] {
     return buildBinarySnapshotInput({
       documentCount: this._documentCount,
       nextId: this._nextId,
@@ -44,10 +44,10 @@ export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCo
   ): Promise<FrozenMiniSearchBrowser<T>> {
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = await decodeFrozenSnapshotMsv5Browser(buffer, { storeFields })
-    return FrozenMiniSearchBrowser.fromBinarySnapshot(snap, options)
+    return FrozenMiniSearchBrowser._fromBinarySnapshot(snap, options)
   }
 
-  private static fromBinarySnapshot<T>(
+  private static _fromBinarySnapshot<T>(
     snap: Awaited<ReturnType<typeof decodeFrozenSnapshotMsv5Browser>>,
     options: Options<T>,
   ): FrozenMiniSearchBrowser<T> {

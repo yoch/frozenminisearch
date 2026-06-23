@@ -89,6 +89,6 @@ export function readUtf8(buf: BinaryBytes, start: number, end: number): string {
 
 export function assertBytesLength(buf: BinaryBytes, min: number, detail = 'buffer too short'): void {
   if (buf.length < min) {
-    throw new Error(`Invalid frozen index: ${detail} (${buf.length} < ${min})`)
+    throw new Error(`FrozenMiniSearch: invalid frozen index: ${detail} (${buf.length} < ${min})`)
   }
 }

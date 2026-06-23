@@ -39,16 +39,12 @@ PACKED_SOURCES := $(wildcard benchmarks/packedRadix*.js) $(wildcard src/*.ts src
 # Build
 # ----------------------------------------------------------------------------
 
-.PHONY: clean-build build build-minified build-packed-radix-bench
+.PHONY: clean-build build build-packed-radix-bench
 clean-build:
 	rm -rf dist
 
 build: clean-build
 	NODE_ENV=production $(RUN) rollup -c
-	node scripts/postbuild-cjs.cjs
-
-build-minified: clean-build
-	MINIFY=true NODE_ENV=production $(RUN) rollup -c
 	node scripts/postbuild-cjs.cjs
 
 # Specialised build for PackedRadixTree benchmarks (rollup in bench mode).
@@ -322,7 +318,6 @@ help:
 	@echo ""
 	@echo "Build:"
 	@echo "  make build                  full build (clean + rollup + postbuild)"
-	@echo "  make build-minified         build with minification"
 	@echo "  make build-packed-radix-bench  PackedRadixTree specialised build"
 	@echo ""
 	@echo "Tests:"

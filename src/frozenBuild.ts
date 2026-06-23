@@ -98,10 +98,10 @@ export class FrozenIndexBuilder<T> {
     const { extractField, stringifyField, tokenize, processTerm, fields, idField, storeFields } = this._options
     const id = extractField(document, idField)
     if (id == null) {
-      throw new Error(`MiniSearch: document does not have ID field "${idField}"`)
+      throw new Error(`FrozenMiniSearch: document does not have ID field "${idField}"`)
     }
     if (this._seenIds.has(id)) {
-      throw new Error(`MiniSearch: duplicate ID ${id}`)
+      throw new Error(`FrozenMiniSearch: duplicate ID ${id}`)
     }
     this._seenIds.add(id)
 
@@ -163,7 +163,7 @@ export class FrozenIndexBuilder<T> {
   addAllAsync(documents: readonly T[], options: { chunkSize?: number } = {}): Promise<void> {
     const { chunkSize = 10 } = options
     if (!Number.isInteger(chunkSize) || chunkSize < 1) {
-      throw new Error('MiniSearch: chunkSize must be a positive integer')
+      throw new Error('FrozenMiniSearch: chunkSize must be a positive integer')
     }
     const acc: { chunk: T[], promise: Promise<void> } = { chunk: [], promise: Promise.resolve() }
 

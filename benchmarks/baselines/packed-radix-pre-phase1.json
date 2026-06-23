@@ -1,7 +1,7 @@
 {
   "metadata": {
     "capturedAt": "2026-05-31T19:00:00.000Z",
-    "note": "Baseline Phase 0 avant suppression edgeFirstChar (Uint16, 2 B/arête). small/dense-prefix/scale : mesures du premier run ; corpus 5k/10k : même arbre qu’aujourd’hui + edgeFirstChar extrapolé.",
+    "note": "Baseline Phase 0 before edgeFirstChar removal (Uint16, 2 B/edge). small/dense-prefix/scale: first run measurements; corpus 5k/10k: same tree as today + extrapolated edgeFirstChar.",
     "packageVersion": "8.2.1"
   },
   "corpora": {

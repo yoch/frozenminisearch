@@ -1,32 +1,32 @@
-# Récapitulatif — fréquences postings adaptatives (u8 / u16)
+# Recap — adaptive posting frequencies (u8 / u16)
 
-Document de relecture pour le changement « freq adaptive » sur `FrozenMiniSearch`.  
-Package : `@yoch/frozenminisearch` 1.x.
-
----
-
-## 1. Contexte et objectif
-
-**Avant** : la colonne globale `allFreqs` était toujours un `Uint8Array`, avec `clampFreq` plafonné à **255**. Conséquence : parité BM25 cassée dès qu’un terme dépasse 255 occurrences dans un champ-document (`scoreDrift` ~**0,2 %** sur le scénario `extreme-overflowFrequency`).
-
-**Après** : largeur **adaptative** `Uint8Array` | `Uint16Array`, plafond de type **u16** (pas de u32), clamp à **65535** sur tous les chemins frozen (`clampFrequencies: true`).
-
-Objectif : corriger la limite artificielle à 255 **sans** doubler la colonne freqs sur les corpus typiques (Divina, vocabulaire large, etc.).
+Review document for the "freq adaptive" change on `FrozenMiniSearch`.  
+Package: `@yoch/frozenminisearch` 1.x.
 
 ---
 
-## 2. Paramètres retenus (invariants)
+## 1. Context and objective
 
-| Paramètre | Valeur |
+**Before**: the global `allFreqs` column was always a `Uint8Array`, with `clampFreq` capped at **255**. Consequence: BM25 parity was broken whenever a term exceeds 255 occurrences in a field-document (`scoreDrift` ~**0.2 %** on the `extreme-overflowFrequency` scenario).
+
+**After**: **adaptive** width `Uint8Array` | `Uint16Array`, cap type **u16** (no u32), clamp at **65535** on all frozen paths (`clampFrequencies: true`).
+
+Goal: fix the artificial 255 limit **without** doubling the freqs column on typical corpora (Divina, large vocabulary, etc.).
+
+---
+
+## 2. Chosen parameters (invariants)
+
+| Parameter | Value |
 |-----------|--------|
 | `MAX_FREQ` | `65535` — [`src/compactPostings.ts`](../../src/compactPostings.ts) |
-| Type `allFreqs` | `FreqArray = Uint8Array \| Uint16Array` |
-| Seuil allocation u8 | `maxAfterClamp ≤ 255` → `Uint8Array`, sinon `Uint16Array` |
-| Plafond type | **jamais** `Uint32` pour les fréquences de postings |
+| `allFreqs` type | `FreqArray = Uint8Array \| Uint16Array` |
+| u8 allocation threshold | `maxAfterClamp ≤ 255` → `Uint8Array`, otherwise `Uint16Array` |
+| Cap type | **never** `Uint32` for posting frequencies |
 | Clamp frozen | `clampFrequencies: true` — [`src/FrozenMiniSearch.ts`](../../src/FrozenMiniSearch.ts), [`src/frozenBuild.ts`](../../src/frozenBuild.ts) |
-| Flag wire | `FLAG_FREQ_U16 = 32` — [`src/msv5/binaryMsv5Constants.ts`](../../src/msv5/binaryMsv5Constants.ts) |
-| Rétrocompat | flag absent → section `AllFreqs` lue en u8 (snapshots existants) |
-| Anciens binaires | rejetés ; re-sauvegarder avec `saveBinarySync()` |
+| Wire flag | `FLAG_FREQ_U16 = 32` — [`src/msv5/binaryMsv5Constants.ts`](../../src/msv5/binaryMsv5Constants.ts) |
+| Backward compat | flag absent → `AllFreqs` section read as u8 (existing snapshots) |
+| Old binaries | rejected; re-save with `saveBinarySync()` |
 
 ```typescript
 // src/compactPostings.ts
@@ -44,39 +44,39 @@ export function allocateFreqs(length: number, maxValue: number): FreqArray {
 
 ---
 
-## 3. Flux build
+## 3. Build flow
 
 ```mermaid
 flowchart TD
-  emit["Pour chaque posting: v = clampFreq tf si frozen"]
+  emit["For each posting: v = clampFreq tf if frozen"]
   scan["scanMaxPostingFreq / maxFreq"]
   alloc["allocateFreqs totalPostings, max"]
   u8["Uint8Array"]
   u16["Uint16Array"]
-  wire["FLAG_FREQ_U16 sur disque si u16"]
+  wire["FLAG_FREQ_U16 on disk if u16"]
   emit --> scan --> alloc
   alloc -->|max le 255| u8
   alloc -->|max gt 255| u16 --> wire
 ```
 
-- **Dense** : [`src/flatPostings.ts`](../../src/flatPostings.ts) — 2 passes (count+max, write).
-- **Sparse** : [`src/frozenPostings.ts`](../../src/frozenPostings.ts) — 2 passes (metadata sparse + count+max, write).
-- **Recherche** : [`SegmentPostingList`](../../src/compactPostings.ts) lit `freqs[i]` sans branche de largeur dans la boucle BM25 ([`src/scoring.ts`](../../src/scoring.ts)).
+- **Dense**: [`src/flatPostings.ts`](../../src/flatPostings.ts) — 2 passes (count+max, write).
+- **Sparse**: [`src/frozenPostings.ts`](../../src/frozenPostings.ts) — 2 passes (metadata sparse + count+max, write).
+- **Search**: [`SegmentPostingList`](../../src/compactPostings.ts) reads `freqs[i]` without a width branch in the BM25 loop ([`src/scoring.ts`](../../src/scoring.ts)).
 
 ---
 
-## 4. Fichiers modifiés / ajoutés
+## 4. Modified / added files
 
-### Nouveaux
+### New
 
-| Fichier | Rôle |
+| File | Role |
 |---------|------|
 | [`src/freqPostings.ts`](../../src/freqPostings.ts) | `freqWireFlags`, `readFreqsSection` |
-| [`benchmarks/scripts/freq-adaptive-validate.mjs`](../../benchmarks/scripts/freq-adaptive-validate.mjs) | Validation smoke ~20 s (3 scénarios) |
+| [`benchmarks/scripts/freq-adaptive-validate.mjs`](../../benchmarks/scripts/freq-adaptive-validate.mjs) | Smoke validation ~20 s (3 scenarios) |
 
-### Code runtime
+### Runtime code
 
-| Fichier | Changements |
+| File | Changes |
 |---------|-------------|
 | [`src/compactPostings.ts`](../../src/compactPostings.ts) | `MAX_FREQ`, `FreqArray`, `allocateFreqs`, `clampFreq(65535)`, `SegmentPostingList.freqs: FreqArray` |
 | [`src/flatPostings.ts`](../../src/flatPostings.ts) | `postingFreqValue`, pass 1 count+max, pass 2 write ; `allFreqs: FreqArray` |
@@ -85,143 +85,143 @@ flowchart TD
 | [`src/msv5/binaryMsv5Encode.ts`](../../src/msv5/binaryMsv5Encode.ts) | `globalFlags \|= freqWireFlags(snap.postings.allFreqs)` (sync + async) |
 | [`src/msv5/binaryMsv5Postings.ts`](../../src/msv5/binaryMsv5Postings.ts) | `readFreqsSection(freqs, flags, allDocIds.length)` |
 
-### Non modifié (volontairement)
+### Unchanged (intentionally)
 
-| Fichier | Raison |
+| File | Reason |
 |---------|--------|
-| [`src/binaryDecode.ts`](../../src/binaryDecode.ts) | format binaire courant uniquement |
-| [`src/scoring.ts`](../../src/scoring.ts) | Formule BM25+ inchangée |
+| [`src/binaryDecode.ts`](../../src/binaryDecode.ts) | current binary format only |
+| [`src/scoring.ts`](../../src/scoring.ts) | BM25+ formula unchanged |
 
 ### Tests
 
-| Fichier | Couverture |
+| File | Coverage |
 |---------|------------|
-| [`src/FrozenMiniSearch.test.js`](../../src/FrozenMiniSearch.test.js) | Bloc `allFreqs adaptive width` : u8 typique, u16 overflow, parité mutable, round-trip binaire |
-| [`src/msv5/binaryMsv5.test.js`](../../src/msv5/binaryMsv5.test.js) | `FLAG_FREQ_U16` présent (overflow) / absent (corpus standard) |
+| [`src/FrozenMiniSearch.test.js`](../../src/FrozenMiniSearch.test.js) | `allFreqs adaptive width` block: typical u8, u16 overflow, mutable parity, binary round-trip |
+| [`src/msv5/binaryMsv5.test.js`](../../src/msv5/binaryMsv5.test.js) | `FLAG_FREQ_U16` present (overflow) / absent (standard corpus) |
 
-### Documentation mise à jour
+### Documentation updated
 
 - [`README.md`](../../README.md)
 - [`DESIGN_DOCUMENT.md`](../../DESIGN_DOCUMENT.md)
-- [`CHANGELOG.md`](../../CHANGELOG.md) (section Unreleased)
+- [`CHANGELOG.md`](../../CHANGELOG.md) (Unreleased section)
 - [`ANALYSE_STRATEGIE_PACKAGE.md`](../../ANALYSE_STRATEGIE_PACKAGE.md)
 - [`benchmarks/README.md`](../../benchmarks/README.md)
 
 ### Baseline (`reference.json`)
 
-Scénario **`extreme-overflowFrequency`** uniquement (patch manuel, pas de re-record full suite) :
+**`extreme-overflowFrequency`** scenario only (manual patch, no full suite re-record):
 
-| Champ | Avant | Après |
+| Field | Before | After |
 |-------|-------|-------|
 | `postings.allFreqsBytes` | 6 000 | **12 000** |
 | `postings.totalTypedBytes` | 18 032 | **24 032** |
 | `estimatedStructuredBytes` | 20 102 | **26 102** |
-| `scoreDrift[0].maxRelScoreDeltaPct` | 0,2 | **0** |
-| `scoreDrift[0].maxAbsScoreDelta` | 0,000001 | **0** |
+| `scoreDrift[0].maxRelScoreDeltaPct` | 0.2 | **0** |
+| `scoreDrift[0].maxAbsScoreDelta` | 0.000001 | **0** |
 
 ---
 
-## 5. Wire (snapshot binaire)
+## 5. Wire (binary snapshot)
 
-- Section inchangée : `Msv5SectionId.AllFreqs` (index 11).
-- **Encode** : `bufferFromView(postings.allFreqs)` ; bit global `FLAG_FREQ_U16` si `Uint16Array`.
-- **Decode** : `readFreqsSection` — validation `buf.length === postingCount` (u8) ou `=== postingCount × 2` (u16).
-- **Flags globaux coexistants** (16 bits, offset 6 du header) :
+- Section unchanged: `Msv5SectionId.AllFreqs` (index 11).
+- **Encode**: `bufferFromView(postings.allFreqs)`; global bit `FLAG_FREQ_U16` if `Uint16Array`.
+- **Decode**: `readFreqsSection` — validation `buf.length === postingCount` (u8) or `=== postingCount × 2` (u16).
+- **Coexisting global flags** (16 bits, header offset 6):
 
-| Bit | Constante | Usage |
+| Bit | Constant | Usage |
 |-----|-----------|--------|
 | 1 | `FLAG_DOC_ID_16` | doc ids u16 |
-| 2 | `FLAG_SPARSE_LAYOUT` | postings sparse |
+| 2 | `FLAG_SPARSE_LAYOUT` | sparse postings |
 | 4 | `FLAG_FIELD_ID_16` | sparse field ids u16 |
 | 8 | `FLAG_FL_U8` | fieldLengthMatrix u8 |
 | 16 | `FLAG_FL_U16` | fieldLengthMatrix u16 |
 | **32** | **`FLAG_FREQ_U16`** | **allFreqs u16** |
 
-Absence de `FLAG_FREQ_U16` = section freqs u8 (rétrocompat snapshots existants).
+Absence of `FLAG_FREQ_U16` = freqs section u8 (backward compat with existing snapshots).
 
 ---
 
-## 6. Scripts benchmark — paramètres et durées
+## 6. Benchmark scripts — parameters and durations
 
-### 6.1 Nouveaux scripts (ajoutés pour ce changement)
+### 6.1 New scripts (added for this change)
 
-| Script npm | Commande | Paramètres par défaut | Scénarios | Durée observée* |
+| npm script | Command | Default parameters | Scenarios | Observed duration* |
 |------------|----------|----------------------|-----------|-----------------|
-| `pnpm benchmark:validate:freq-adaptive` | `node --expose-gc benchmarks/scripts/freq-adaptive-validate.mjs` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=15` (env dans `package.json`) ; préfixe `pnpm build` | 3 : `divina-storeFields`, `extreme-overflowFrequency`, `extreme-giantVocabulary` | **~35–40 s** mesure ; **~50 s** avec build |
-| `pnpm benchmark:record:quick` | `captureBaseline.js` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=20` | 13 (suite complète) | Plusieurs minutes (vs `benchmark:record` standard **très long**) |
+| `pnpm benchmark:validate:freq-adaptive` | `node --expose-gc benchmarks/scripts/freq-adaptive-validate.mjs` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=15` (env in `package.json`); prefix `pnpm build` | 3: `divina-storeFields`, `extreme-overflowFrequency`, `extreme-giantVocabulary` | **~35–40 s** measurement; **~50 s** with build |
+| `pnpm benchmark:record:quick` | `captureBaseline.js` | `RUNS=1`, `SEARCH_ITERATIONS=10`, `BENCH_WARMUP=20` | 13 (full suite) | Several minutes (vs standard `benchmark:record` **very long**) |
 
-\* Machine de dev lors de l’implémentation (Node 24, `--expose-gc`). Les timings structurels du smoke **ne font pas échouer** le script.
+\* Dev machine at implementation time (Node 24, `--expose-gc`). Structural smoke timings **do not fail** the script.
 
-#### Détail timings `validate:freq-adaptive` (run observé)
+#### Timing details `validate:freq-adaptive` (observed run)
 
-| Scénario | Durée wall | Résultat fonctionnel |
+| Scenario | Wall duration | Functional result |
 |----------|------------|----------------------|
-| `divina-storeFields` | **2,8–2,9 s** | `allFreqsBytes` 98 836 (= ref) ; heap frozen ~1,68 MB (ref 1,65) |
-| `extreme-overflowFrequency` | **2,7 s** | `allFreqsBytes` 12 000 ; `scoreDrift` **0 %** |
-| `extreme-giantVocabulary` | **13–14 s** | `allFreqsBytes` 200 000 (= ref) ; heap ~2,29 MB |
+| `divina-storeFields` | **2.8–2.9 s** | `allFreqsBytes` 98 836 (= ref); heap frozen ~1.68 MB (ref 1.65) |
+| `extreme-overflowFrequency` | **2.7 s** | `allFreqsBytes` 12 000; `scoreDrift` **0 %** |
+| `extreme-giantVocabulary` | **13–14 s** | `allFreqsBytes` 200 000 (= ref); heap ~2.29 MB |
 | **Total** | **~20 s** | exit 0 — `freq-adaptive validation OK` |
 
-#### Critères gating (`freq-adaptive-validate.mjs`)
+#### Gating criteria (`freq-adaptive-validate.mjs`)
 
-**FAIL (exit 1)** :
+**FAIL (exit 1)**:
 
-- heap frozen +10 % par rapport à la ref (hors règles floor)
-- `allFreqsBytes` +2 % sur corpus standard (divina, giant vocab)
-- overflow sans croissance u16 attendue
-- `scoreDrift.maxRelScoreDeltaPct` > **0,05 %**
+- heap frozen +10 % compared to ref (outside floor rules)
+- `allFreqsBytes` +2 % on standard corpus (divina, giant vocab)
+- overflow without expected u16 growth
+- `scoreDrift.maxRelScoreDeltaPct` > **0.05 %**
 
-**Log only (non bloquant)** :
+**Log only (non-blocking)**:
 
 - `freezeMs`, `saveBinaryMs`, `loadBinaryMs`
-- search frozen p50 par requête (1 run vs référence médiane 3 runs)
+- search frozen p50 per query (1 run vs reference median 3 runs)
 
-**Seuils heap floor** ([`benchmarks/regressionPolicy.js`](../../benchmarks/regressionPolicy.js)) :
+**Heap floor thresholds** ([`benchmarks/regressionPolicy.js`](../../benchmarks/regressionPolicy.js)):
 
-- `HEAP_MB_FLOOR` = 0,05 MB
-- +256 KB absolu → fail ; +128 KB → warn
+- `HEAP_MB_FLOOR` = 0.05 MB
+- +256 KB absolute → fail; +128 KB → warn
 
-**Overrides** : `RUNS=2 SEARCH_ITERATIONS=10 pnpm benchmark:validate:freq-adaptive`
+**Overrides**: `RUNS=2 SEARCH_ITERATIONS=10 pnpm benchmark:validate:freq-adaptive`
 
 ---
 
-### 6.2 Suite standard (existante)
+### 6.2 Standard suite (existing)
 
-| Script | Paramètres défaut | Agrégation | Profil |
+| Script | Default parameters | Aggregation | Profile |
 |--------|-------------------|------------|--------|
-| `pnpm benchmark:record` | `RUNS=3`, `SEARCH_ITERATIONS=15`, `BENCH_WARMUP=100` | médiane sur 3 runs | `full` |
-| `pnpm benchmark:record:search` | idem + `BENCH_SEARCH_ONLY=1` | médiane | `search` (sans timing index/heap/save/load) |
-| `pnpm benchmark:diff` | lit `latest.json` vs `reference.json` | — | pas de re-run |
+| `pnpm benchmark:record` | `RUNS=3`, `SEARCH_ITERATIONS=15`, `BENCH_WARMUP=100` | median over 3 runs | `full` |
+| `pnpm benchmark:record:search` | same + `BENCH_SEARCH_ONLY=1` | median | `search` (no index/heap/save/load timing) |
+| `pnpm benchmark:diff` | reads `latest.json` vs `reference.json` | — | no re-run |
 | `pnpm benchmark:diff:run` | record + diff | — | |
-| `pnpm benchmark:baseline:update` | record → `reference.json` (git propre) | — | |
-| `pnpm benchmark:targeted` | défauts `benchmarkUtils` ; `--runs` CLI | médiane si runs>1 | 7 scénarios |
-| `pnpm benchmark:compare` | 3×15 via `compare.js` | — | rapport lisible |
+| `pnpm benchmark:baseline:update` | record → `reference.json` (clean git) | — | |
+| `pnpm benchmark:targeted` | defaults `benchmarkUtils`; `--runs` CLI | median if runs>1 | 7 scenarios |
+| `pnpm benchmark:compare` | 3×15 via `compare.js` | — | readable report |
 
-**Protocole search** ([`benchmarks/baselines/reference.json`](../../benchmarks/baselines/reference.json)) :
+**Search protocol** ([`benchmarks/baselines/reference.json`](../../benchmarks/baselines/reference.json)):
 
-- `searchBenchProtocol` v1 : `batchTargetMs` 0,3 ; `maxBatch` 32
-- Batches fixes : [`benchmarks/searchBenchBatches.json`](../../benchmarks/searchBenchBatches.json)
-- Référence capturée : **2026-06-03**, commit `6278ba1`, Node **v22.22.0**, `runs=3`, `searchIterations=25`
+- `searchBenchProtocol` v1: `batchTargetMs` 0.3; `maxBatch` 32
+- Fixed batches: [`benchmarks/searchBenchBatches.json`](../../benchmarks/searchBenchBatches.json)
+- Reference captured: **2026-06-03**, commit `6278ba1`, Node **v22.22.0**, `runs=3`, `searchIterations=25`
 
-**Seuils `benchmark:diff`** :
+**`benchmark:diff` thresholds**:
 
-| Métrique | Fail | Warn |
+| Metric | Fail | Warn |
 |----------|------|------|
 | heap frozen | +10 % | +5 % |
 | heap saving vs mutable | −10 pts | −5 pts |
 | loadBinary | +20 % | +10 % |
 | freezeMs | +40 % | +20 % |
 | saveBinaryMs | +30 % | +15 % |
-| search p50 | +50 % (sauf `--strict`) | +20 % |
+| search p50 | +50 % (except `--strict`) | +20 % |
 
-Règles floor (&lt; 10 ms structurel, &lt; 0,1 ms search) : voir [`regressionPolicy.js`](../../benchmarks/regressionPolicy.js).
+Floor rules (< 10 ms structural, < 0.1 ms search): see [`regressionPolicy.js`](../../benchmarks/regressionPolicy.js).
 
 ---
 
-### 6.3 `benchmark:targeted` (7 scénarios)
+### 6.3 `benchmark:targeted` (7 scenarios)
 
-IDs : `extreme-giantVocabulary`, `extreme-overflowFrequency`, `denseNumericIds-100k`, `genericStringIds-100k`, `docIdUint16Boundary-65535`, `docIdUint16Boundary-65536`, `saveBinaryAfterNoTerms`.
+IDs: `extreme-giantVocabulary`, `extreme-overflowFrequency`, `denseNumericIds-100k`, `genericStringIds-100k`, `docIdUint16Boundary-65535`, `docIdUint16Boundary-65536`, `saveBinaryAfterNoTerms`.
 
-Comparaison before/after :
+Before/after comparison:
 
 ```bash
 pnpm benchmark:targeted --label before --out /tmp/before.json
@@ -229,77 +229,77 @@ pnpm benchmark:targeted --label after --out /tmp/after.json
 pnpm benchmark:targeted:compare --compare=/tmp/before.json,/tmp/after.json
 ```
 
-Exit 1 si **after** régresse vs **before** sur freeze / saveBinary / loadBinary.
+Exit 1 if **after** regresses vs **before** on freeze / saveBinary / loadBinary.
 
 ---
 
-## 7. Analyse complète baseline actuelle (`reference.json`)
+## 7. Full current baseline analysis (`reference.json`)
 
-13 scénarios, profil **full**, médiane **3×25** (référence golden capturée ainsi) ; défaut routine `benchmark:record` = **3×15** depuis ce changement. Synthèse post-changement fréquences (seul **overflow** modifié dans la golden).
+13 scenarios, **full** profile, median **3×25** (golden reference captured that way); default `benchmark:record` routine = **3×15** since this change. Post-change frequency synthesis (only **overflow** modified in the golden).
 
-| Scénario | Docs | heap frozen (MB) | saving % | allFreqsBytes | search gain p50 avg | scoreDrift | Impact freq adaptive |
+| Scenario | Docs | heap frozen (MB) | saving % | allFreqsBytes | search gain p50 avg | scoreDrift | Freq adaptive impact |
 |----------|------|------------------|----------|---------------|---------------------|------------|----------------------|
-| `divina-storeFields` | 14 097 | 1,65 | 89,8 | 98 836 | +26,6 % | — | u8 inchangé |
-| `divina-indexOnly` | 14 097 | 0,925 | 93,8 | 98 836 | +15,7 % | — | u8 inchangé |
-| `extreme-giantVocabulary` | 50 000 | 2,294 | 95,1 | 200 000 | +27,2 % | — | u8 inchangé |
-| `extreme-largeDocuments` | 5 000 | 0,501 | 92,4 | 45 000 | +31,7 % | — | u8 |
-| `extreme-manyFields` | 2 000 | 0,097 | 98,6 | 80 000 | +57,0 % | — | u8 |
-| `extreme-highFrequency` | 10 000 | 0,165 | 97,8 | 100 000 | +42,5 % | — | u8 (tf élevé mais ≤255) |
-| **`extreme-overflowFrequency`** | 2 000 | 0,201 | 63,4 | **12 000** (↑) | +40,9 % | **0 %** (était 0,2 %) | **u16** ; parité mutable |
-| `denseNumericIds-100k` | 100 000 | 4,612 | 94,9 | 300 000 | +48,1 % | — | u8 |
-| `genericStringIds-100k` | 100 000 | 4,613 | 94,9 | 300 000 | +54,6 % | — | u8 |
-| `sparseFields-50kTerms-20Fields` | 5 000 | 0,239 | 95,4 | 15 000 | +45,6 % | — | u8 |
-| `docIdUint16Boundary-65535` | 65 535 | 3,004 | 94,9 | 262 140 | +40,7 % | — | u8 |
-| `docIdUint16Boundary-65536` | 65 536 | 3,004 | 94,9 | 262 144 | +41,0 % | — | u8 |
-| `saveBinaryAfterNoTerms` | 50 000 | 2,293 | 95,1 | 200 000 | +12,1 % | — | u8 |
+| `divina-storeFields` | 14 097 | 1.65 | 89.8 | 98 836 | +26.6 % | — | u8 unchanged |
+| `divina-indexOnly` | 14 097 | 0.925 | 93.8 | 98 836 | +15.7 % | — | u8 unchanged |
+| `extreme-giantVocabulary` | 50 000 | 2.294 | 95.1 | 200 000 | +27.2 % | — | u8 unchanged |
+| `extreme-largeDocuments` | 5 000 | 0.501 | 92.4 | 45 000 | +31.7 % | — | u8 |
+| `extreme-manyFields` | 2 000 | 0.097 | 98.6 | 80 000 | +57.0 % | — | u8 |
+| `extreme-highFrequency` | 10 000 | 0.165 | 97.8 | 100 000 | +42.5 % | — | u8 (high tf but ≤255) |
+| **`extreme-overflowFrequency`** | 2 000 | 0.201 | 63.4 | **12 000** (↑) | +40.9 % | **0 %** (was 0.2 %) | **u16**; mutable parity |
+| `denseNumericIds-100k` | 100 000 | 4.612 | 94.9 | 300 000 | +48.1 % | — | u8 |
+| `genericStringIds-100k` | 100 000 | 4.613 | 94.9 | 300 000 | +54.6 % | — | u8 |
+| `sparseFields-50kTerms-20Fields` | 5 000 | 0.239 | 95.4 | 15 000 | +45.6 % | — | u8 |
+| `docIdUint16Boundary-65535` | 65 535 | 3.004 | 94.9 | 262 140 | +40.7 % | — | u8 |
+| `docIdUint16Boundary-65536` | 65 536 | 3.004 | 94.9 | 262 144 | +41.0 % | — | u8 |
+| `saveBinaryAfterNoTerms` | 50 000 | 2.293 | 95.1 | 200 000 | +12.1 % | — | u8 |
 
-### Lecture globale
+### Global reading
 
-- **12/13 scénarios** : `allFreqsBytes` **identique** à avant le changement (max tf ≤ 255).
-- **1/13** (`overflow`) : colonne freqs **×2** (6 000 → 12 000 octets) ; `estimatedStructuredBytes` +6 Ko ; **parité BM25** rétablie.
-- **Divina** : freqs ≈ **24 %** de `totalTypedBytes` postings (~99 Ko / ~404 Ko) ; ~**6 %** du heap frozen (hors storedFields JSON) — justification du mode adaptatif vs u16 fixe partout.
-- **Référence non re-recordée** en full suite : seul overflow patché ; timings index/search restent ceux du commit `6278ba1`.
+- **12/13 scenarios**: `allFreqsBytes` **identical** to before the change (max tf ≤ 255).
+- **1/13** (`overflow`): freqs column **×2** (6 000 → 12 000 bytes); `estimatedStructuredBytes` +6 KB; **BM25 parity** restored.
+- **Divina**: freqs ≈ **24 %** of `totalTypedBytes` postings (~99 KB / ~404 KB); ~**6 %** of heap frozen (excluding storedFields JSON) — justification of adaptive mode vs fixed u16 everywhere.
+- **Reference not re-recorded** as full suite: only overflow patched; index/search timings remain from commit `6278ba1`.
 
-### Validation smoke vs ref (run observé)
+### Smoke validation vs ref (observed run)
 
-- Métriques fonctionnelles : **OK**
-- Timings structurels : souvent marqués FAIL en log en 1 run (bruit) — **non bloquant** par design
-- **Recommandation** : `pnpm benchmark:validate:freq-adaptive` pour valider ce feature ; `pnpm benchmark:record` (3×15) pour releases / `baseline:update` intentionnel
-
----
-
-## 8. Hors scope (non fait)
-
-- Uint16 fixe pour tous les index
-- `Uint32` pour les fréquences de postings
-- Nouvelle révision wire dédiée (extension par flags suffit)
-- Encodage vbyte / delta
-- Re-sauvegarde requise pour les snapshots binaires obsolètes
+- Functional metrics: **OK**
+- Structural timings: often marked FAIL in log on 1 run (noise) — **non-blocking** by design
+- **Recommendation**: `pnpm benchmark:validate:freq-adaptive` to validate this feature; `pnpm benchmark:record` (3×15) for releases / intentional `baseline:update`
 
 ---
 
-## 9. Points de relecture suggérés
+## 8. Out of scope (not done)
 
-1. **Double passe** build postings (dense et sparse) : count+max puis write — acceptable vs tokenisation ?
-2. **Invariant sparse** : field ids triés par terme (boucle `f` ascendante) — inchangé par fusion count+max.
-3. **Clamp 65535** : non benchmarké sur `repeat > 65535` (optionnel futur).
-4. **Baseline** : seul overflow patché ; pas de re-record full suite après le changement.
+- Fixed Uint16 for all indexes
+- `Uint32` for posting frequencies
+- Dedicated new wire revision (extension via flags suffices)
+- Vbyte / delta encoding
+- Re-save required for obsolete binary snapshots
 
 ---
 
-## Commandes utiles
+## 9. Suggested review points
+
+1. **Double pass** build postings (dense and sparse): count+max then write — acceptable vs tokenization?
+2. **Sparse invariant**: field ids sorted per term (ascending `f` loop) — unchanged by count+max merge.
+3. **Clamp 65535**: not benchmarked on `repeat > 65535` (optional future).
+4. **Baseline**: only overflow patched; no full suite re-record after the change.
+
+---
+
+## Useful commands
 
 ```bash
-# Validation rapide de ce changement (~20 s après build)
+# Quick validation of this change (~20 s after build)
 pnpm benchmark:validate:freq-adaptive
 
-# Suite complète accélérée (plusieurs minutes)
+# Accelerated full suite (several minutes)
 pnpm benchmark:record:quick
 
-# Suite golden complète (long — releases uniquement)
+# Full golden suite (long — releases only)
 pnpm benchmark:record
 pnpm benchmark:diff
 
-# Tests unitaires
+# Unit tests
 pnpm test
 ```

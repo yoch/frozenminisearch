@@ -1,10 +1,10 @@
-# Notes de conception (développeurs)
+# Design Notes (developers)
 
-Documents de référence pour des mécanismes internes — **non** inclus dans l’API publique npm.
+Reference documents for internal mechanisms — **not** included in the public npm API.
 
-| Document | Sujet |
+| Document | Topic |
 |----------|--------|
-| [FREQ_ADAPTIVE_RECAP.md](./FREQ_ADAPTIVE_RECAP.md) | Largeur adaptative u8/u16 sur `allFreqs`, parité BM25, flags wire |
-| [AND_GATE_PARAMETERS.md](./AND_GATE_PARAMETERS.md) | Heuristiques de gating AND / AND_NOT (`queryEngineGateLimits.ts`) |
+| [FREQ_ADAPTIVE_RECAP.md](./FREQ_ADAPTIVE_RECAP.md) | Adaptive u8/u16 width for `allFreqs`, BM25 parity, wire flags |
+| [AND_GATE_PARAMETERS.md](./AND_GATE_PARAMETERS.md) | AND / AND_NOT gating heuristics (`queryEngineGateLimits.ts`) |
 
-Ces fichiers sont la **source versionnée**. `pnpm docs:build` copie aussi leur contenu dans `docs/media/` pour le site TypeDoc (généré localement, gitignored).
+These files are the **versioned source**. `pnpm docs:build` also copies their content into `docs/media/` for the TypeDoc site (generated locally, gitignored).

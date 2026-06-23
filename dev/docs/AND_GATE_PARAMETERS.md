@@ -1,88 +1,88 @@
-# Paramètres du gating AND / AND_NOT
+# AND / AND_NOT gating parameters
 
-Document interne (non exposé dans l’API publique). Les constantes vivent dans `src/queryEngineGateLimits.ts` et sont consommées par `src/queryEngine.ts`.
+Internal document (not exposed in the public API). Constants live in `src/queryEngineGateLimits.ts` and are consumed by `src/queryEngine.ts`.
 
-## Comportement
+## Behavior
 
-Pour une requête combinée `AND` (ou `AND_NOT` sur la branche négative), le moteur évalue les branches dans l’ordre. Après la branche *i − 1*, l’ensemble des `docId` matchants forme la **gate** passée à la branche *i* :
+For a combined `AND` query (or `AND_NOT` on the negative branch), the engine evaluates branches in order. After branch *i − 1*, the set of matching `docId`s forms the **gate** passed to branch *i*:
 
-- **Gate sélective** : on ne score la branche *i* que sur les documents de la gate (`allowedDocs`). Même sémantique de scores que le chemin naïf (score puis intersection), mais moins de travail.
-- **Gate non sélective** : on retombe sur le score complet de la branche *i*, puis `combineResults` — équivalent au chemin sans gating (validé par `dev/parity/queryEngine.gate.test.js`).
+- **Selective gate**: only documents in the gate (`allowedDocs`) are scored for branch *i*. Same score semantics as the naive path (score then intersect), but less work.
+- **Non-selective gate**: falls back to full scoring of branch *i*, then `combineResults` — equivalent to the no-gating path (validated by `dev/parity/queryEngine.gate.test.js`).
 
-La gate vide est toujours traitée comme sélective (court-circuit utile pour AND+prefix sans match sur la première branche).
+The empty gate is always treated as selective (useful short-circuit for AND+prefix with no match on the first branch).
 
-## Formule
+## Formula
 
-Pour un index de `N` documents :
+For an index of `N` documents:
 
 ```text
 maxGateSize = min(maxAbsolute, max(100, floor(N × maxFraction)))
 ```
 
-La gate de taille `G` est **sélective** si `G === 0`, si `G ≤ maxGateSize`, ou si le [ratio posting](#ratio-posting) passe pour la branche suivante.
+A gate of size `G` is **selective** if `G === 0`, if `G ≤ maxGateSize`, or if the [posting ratio](#posting-ratio) passes for the next branch.
 
-Quand `G > maxGateSize`, la longueur posting max (exact + prefix + fuzzy) est estimée pour le ratio. Sur le chemin absolu (`G ≤ maxGateSize`), cette estimation **n’est pas** refaite : la sélectivité est déjà fixée par `G ≤ maxGateSize` (évite un walk fuzzy/prefix coûteux avant chaque branche AND, ex. Divina AND+fuzzy).
+When `G > maxGateSize`, the max posting length (exact + prefix + fuzzy) is estimated for the ratio. On the absolute path (`G ≤ maxGateSize`), this estimation is **not** repeated: selectivity is already determined by `G ≤ maxGateSize` (avoids an expensive fuzzy/prefix walk before each AND branch, e.g. Divina AND+fuzzy).
 
-La gate sélective est **toujours** passée en `allowedDocs` à la branche suivante. Ne pas conditionner ce passage à `postingListLength > G` : sur un AND exact courant (ex. `inferno paradiso`, 0 résultat), le filtre `allowedDocs.has` évite de scorer des docs hors gate — retirer la gate dans ce cas coûte plus cher qu’il ne rapporte.
+The selective gate is **always** passed as `allowedDocs` to the next branch. Do not condition this pass on `postingListLength > G`: on a common exact AND (e.g. `inferno paradiso`, 0 results), the `allowedDocs.has` filter avoids scoring docs outside the gate — removing the gate in this case costs more than it saves.
 
-| Paramètre | Valeur actuelle | Rôle |
+| Parameter | Current value | Role |
 |-----------|-----------------|------|
-| `maxAbsolute` | `5000` | Plafond absolu : au-delà, le filtrage par gate ne vaut pas le coût de gestion d’un gros `Set` + scoring partiel. |
-| `maxFraction` | `0.1` | Plafond relatif : sur un gros corpus, une gate qui couvre plus de 10 % des docs est traitée comme « trop large ». |
-| Plancher `100` | fixe dans le code | Sur les petits index, évite un `maxGateSize` ridiculement bas (ex. 30 docs → gate max 100). |
+| `maxAbsolute` | `5000` | Absolute cap: beyond this, gate filtering is not worth the cost of managing a large `Set` + partial scoring. |
+| `maxFraction` | `0.1` | Relative cap: on a large corpus, a gate covering more than 10 % of docs is treated as "too wide." |
+| Floor `100` | hardcoded | On small indexes, prevents a ridiculously low `maxGateSize` (e.g. 30 docs → gate max 100). |
 
-**Défauts** : `maxAbsolute = 5000`, `maxFraction = 0.1` (`DEFAULT_AND_GATE_LIMITS`).
+**Defaults**: `maxAbsolute = 5000`, `maxFraction = 0.1` (`DEFAULT_AND_GATE_LIMITS`).
 
-## Ratio posting
+## Posting ratio
 
-Quand la gate dépasse `maxGateSize` mais reste **petite par rapport au posting** de la branche suivante, le gating reste actif (`allowedDocs` passé à la branche). Calibration empirique (script `benchmark:gate-posting-ratio`, non CI) :
+When the gate exceeds `maxGateSize` but remains **small relative to the posting** of the next branch, gating stays active (`allowedDocs` passed to the branch). Empirical calibration (script `benchmark:gate-posting-ratio`, not CI):
 
-| Paramètre | Valeur | Rôle |
+| Parameter | Value | Role |
 |-----------|--------|------|
-| `minLength` | `2048` | Posting trop court → pas de ratio (évite bruit sur petites listes) |
-| `ratioShift` | `2` | Gate OK si `G ≤ postingLength >>> 2` (max **25 %** du posting) |
+| `minLength` | `2048` | Posting too short → no ratio (avoids noise on small lists) |
+| `ratioShift` | `2` | Gate OK if `G ≤ postingLength >>> 2` (max **25 %** of the posting) |
 
-Helper : `passGateByPostingRatio` dans `queryEngineGateLimits.ts`, intégrée à `gateIsSelectiveEnough` quand `estimateMaxPostingLengthForQuery` fournit la longueur max du posting de la branche (chemin ratio uniquement).
+Helper: `passGateByPostingRatio` in `queryEngineGateLimits.ts`, integrated into `gateIsSelectiveEnough` when `estimateMaxPostingLengthForQuery` provides the max posting length of the branch (ratio path only).
 
-**Exemples** :
+**Examples**:
 
-| Cas | gate | posting | Ratio | Abs OK ? | Ratio OK ? |
+| Case | gate | posting | Ratio | Abs OK ? | Ratio OK ? |
 |-----|------|---------|-------|----------|------------|
-| giant AND+prefix branche 2 | 11 111 | 50 000 | 22 % | non | **oui** → seek + scan filtré |
-| highFrequency AND | 10 000 | 10 000 | 100 % | non | non |
-| parity 6000-doc alpha∧beta | ~6000 | ~6000 | ~100 % | non | non |
+| giant AND+prefix branch 2 | 11 111 | 50 000 | 22 % | no | **yes** → seek + filtered scan |
+| highFrequency AND | 10 000 | 10 000 | 100 % | no | no |
+| parity 6000-doc alpha∧beta | ~6000 | ~6000 | ~100 % | no | no |
 
-**Seek scoring** (`shouldSeekAllowedDocs` dans `compactPostings.ts`) réutilise les **mêmes seuils numériques** une fois `allowedDocs` actif : décision distincte (scan séquentiel vs binary search), pas la même fonction métier.
+**Seek scoring** (`shouldSeekAllowedDocs` in `compactPostings.ts`) reuses the **same numeric thresholds** once `allowedDocs` is active: distinct decision (sequential scan vs binary search), not the same business function.
 
-**Estimation posting** : `forEachQuerySpecTermRef` / `estimateMaxPostingLengthForQuery` — uniquement quand `G > maxGateSize` (chemin ratio). Ne pas estimer sur le chemin absolu (`G ≤ maxGateSize`). Le broad-first utilise un estimateur séparé, `estimateCheapTwoPhasePostingLength*`, qui refuse les specs prefix/fuzzy pour éviter un walk upfront coûteux.
+**Posting estimation**: `forEachQuerySpecTermRef` / `estimateMaxPostingLengthForQuery` — only when `G > maxGateSize` (ratio path). Do not estimate on the absolute path (`G ≤ maxGateSize`). The broad-first uses a separate estimator, `estimateCheapTwoPhasePostingLength*`, which rejects prefix/fuzzy specs to avoid an expensive upfront walk.
 
 ## Broad-first (exact-only, v1.2.3)
 
-Quand toutes les specs d’une requête string normalisée ont une estimation upfront bon marché (aujourd’hui : exact-only, pas de `prefix` ni `fuzzy`), le moteur peut prendre un chemin **two-phase** avant le gating séquentiel :
+When all specs of a normalized query string have a cheap upfront estimate (currently: exact-only, no `prefix` or `fuzzy`), the engine can take a **two-phase** path before sequential gating:
 
-- **AND** — si la 1ʳᵉ branche a un posting ≥ `minLength` (2048) et une branche ultérieure a un posting ≤ `firstPosting >>> ratioShift`, collecter les doc ids par longueur posting croissante, puis scorer dans l’ordre de la requête avec la gate finale.
-- **AND_NOT** — si la branche positive est « large » (≥ max(2048, 50 % de N)) et une branche négative l’est aussi, collecter d’abord les exclusions, puis scorer la positive sur les survivants.
+- **AND** — if the 1st branch has a posting ≥ `minLength` (2048) and a later branch has a posting ≤ `firstPosting >>> ratioShift`, collect doc ids by increasing posting length, then score in query order with the final gate.
+- **AND_NOT** — if the positive branch is "wide" (≥ max(2048, 50 % of N)) and a negative branch is too, first collect exclusions, then score the positive branch on survivors.
 
-L’estimateur two-phase renvoie `undefined` pour prefix/fuzzy (pas d’estimation upfront coûteuse). Parité : `dev/parity/queryEngine.gate.test.js` (cas `common unique1`, prefix/fuzzy broad-first probe, nested AND, AND_NOT vide).
+The two-phase estimator returns `undefined` for prefix/fuzzy (no expensive upfront estimate). Parity: `dev/parity/queryEngine.gate.test.js` (cases `common unique1`, prefix/fuzzy broad-first probe, nested AND, empty AND_NOT).
 
-## Pourquoi ces valeurs
+## Why these values
 
-1. **Petites gates (synthétique + Divina)** — Ex. AND `bucket5` puis `shared` sur 2 000 docs : gate ≈ 200, `maxGate` ≈ 200 → gating actif, gain net vs naïf (moins de postings scorés sur la 2ᵉ branche).
-2. **Grosses gates** — Ex. AND `alpha` puis `beta` sur 3 000 docs : gate = 3 000, `maxGate` = 300 → gating désactivé ; le chemin naïf est déjà acceptable et évite le surcoût d’un filtre inefficace.
-3. **Corpus réels type Divina** — AND `inferno paradiso` : gate très petite (~quelques docs) → toujours sélectif avec les défauts.
-4. **Plafond absolu 5000** — Protège les index à très fort `N` : une gate de 8 000 docs ne doit pas déclencher un parcours « sélectif » qui reste massif.
+1. **Small gates (synthetic + Divina)** — e.g. AND `bucket5` then `shared` on 2 000 docs: gate ≈ 200, `maxGate` ≈ 200 → gating active, net gain vs naive (fewer postings scored on the 2nd branch).
+2. **Large gates** — e.g. AND `alpha` then `beta` on 3 000 docs: gate = 3 000, `maxGate` = 300 → gating disabled; the naive path is already acceptable and avoids the overhead of an ineffective filter.
+3. **Real corpora like Divina** — AND `inferno paradiso`: gate very small (~a few docs) → always selective with defaults.
+4. **Absolute cap 5000** — Protects indexes with very large `N`: an 8 000 doc gate should not trigger a "selective" traversal that remains massive.
 
-Les seuils n’ont pas été exposés dans l’API : ce sont des heuristiques perf, pas des garanties sémantiques (la sémantique reste celle du combine naïf quand le gating est off).
+The thresholds are not exposed in the API: they are performance heuristics, not semantic guarantees (semantics remain those of naive combine when gating is off).
 
-## Ordre des branches AND
+## AND branch order
 
-La gate après la branche 0 est `|résultat branche 0|`. **Le terme le plus sélectif doit être en première position** dans la requête (ex. `bucket5 shared`, pas `shared bucket5`). Sinon la gate est grosse et le gating ne s’active pas — comportement correct mais perf dégradée.
+The gate after branch 0 is `|branch 0 result|`. **The most selective term should be first** in the query (e.g. `bucket5 shared`, not `shared bucket5`). Otherwise the gate is large and gating does not activate — correct behavior but degraded performance.
 
-## Réglage et validation
+## Tuning and validation
 
-- Script calibration ratio : `pnpm benchmark:gate-posting-ratio` (`benchmarks/scripts/calibrate-gate-posting-ratio.mjs`).
-- Script optionnel : `benchmarks/and-gate-tuning.mjs` (`pnpm benchmark:and-gate-tuning`).
-- Tests oracle : `dev/parity/queryEngine.gate.test.js` (comparaison gated vs chemin naïf via `dev/parity/queryEngineHarness.js`).
-- Suite de régression perf : `pnpm benchmark:record` puis `benchmark:diff` vs `benchmarks/baselines/reference.json` (mesure **warm**).
+- Ratio calibration script: `pnpm benchmark:gate-posting-ratio` (`benchmarks/scripts/calibrate-gate-posting-ratio.mjs`).
+- Optional script: `benchmarks/and-gate-tuning.mjs` (`pnpm benchmark:and-gate-tuning`).
+- Oracle tests: `dev/parity/queryEngine.gate.test.js` (gated vs naive path comparison via `dev/parity/queryEngineHarness.js`).
+- Perf regression suite: `pnpm benchmark:record` then `benchmark:diff` vs `benchmarks/baselines/reference.json` (**warm** measurement).
 
-Ne pas changer les défauts sans refaire le tuning et, si les gains sont intentionnels, mettre à jour `reference.json`.
+Do not change defaults without re-running the tuning and, if gains are intentional, updating `reference.json`.

@@ -29,9 +29,9 @@ pnpm bench:medicaments-build-peak       # rebuild peak from corpus extracted out
 
 `bench:medicaments-build-peak` measures `FrozenIndexBuilder` peak on real post-parse JSONL when available (`/home/yoch/fr.gouv.medicaments.rest/data/corpus-export`, override with `CORPUS_EXPORT_DIR`). Documents contain **indexed fields + `id` only** (`buildIndexDocument`). Fallback: invert `.msbin` fixtures (`SOURCE=msbin`). Output: `medicaments-build-peak-heap.json` (jsonl) or `medicaments-build-peak-heap-msbin.json`. Filter: `ONLY=bdpm-presentations`.
 
-**Dev** : préférer `pnpm test` + `ONLY=bdpm-presentations pnpm run bench:medicaments-build-peak`. Réserver `benchmark:diff:run` (suite complète, long) à la CI / pré-merge.
+**Dev**: prefer `pnpm test` + `ONLY=bdpm-presentations pnpm run bench:medicaments-build-peak`. Reserve `benchmark:diff:run` (full suite, slow) for CI / pre-merge.
 
-`bench:build-heap-profile` — profil rapide add vs freeze (réel vs synthétique few-terms / 1-field) → `benchmarks/baselines/build-heap-profile.json`.
+`bench:build-heap-profile` — quick add vs freeze profile (real vs synthetic few-terms / 1-field) → `benchmarks/baselines/build-heap-profile.json`.
 
 ## Micro-benchmarks (`benchmarks/micro/`)
 

@@ -1,4 +1,4 @@
-// shared.js — code commun aux deux démos (MiniSearch et FrozenMiniSearch)
+// shared.js — common code for both demos (MiniSearch and FrozenMiniSearch)
 
 let miniSearch = null
 let songsById = {}

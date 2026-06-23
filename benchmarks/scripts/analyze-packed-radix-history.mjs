@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Analyse benchmarks/packed-radix-history.jsonl et comparaison pré-Phase 1.
+ * Analyze benchmarks/packed-radix-history.jsonl and pre-Phase 1 comparison.
  *
  *   pnpm benchmark:packed-radix:history
  *   node benchmarks/scripts/analyze-packed-radix-history.mjs --compare pre-phase1 HEAD
@@ -80,7 +80,7 @@ function printStructuredTable (a, b, title) {
 }
 
 function printTimeline (entries) {
-  console.log('\n## Historique (bytes structurés)\n')
+  console.log('\n## History (structured bytes)\n')
   const ids = corpusIds(entries)
   const header = `${pad('commit / kind', 16)} ${pad('date', 11)} ${ids.map((id) => pad(id.slice(0, 10), 11)).join(' ')}`
   console.log(header)
@@ -99,7 +99,7 @@ function printTimeline (entries) {
 function main () {
   let entries = loadLines(HISTORY)
   if (entries.length === 0) {
-    console.log('Historique vide — lancez: node benchmarks/scripts/seed-packed-radix-history.mjs\n')
+    console.log('Empty history — run: node benchmarks/scripts/seed-packed-radix-history.mjs\n')
   }
 
   const compareA = argv.includes('--compare')
@@ -130,7 +130,7 @@ function main () {
     entries = [preEntry, goldEntry]
   }
 
-  console.log('=== PackedRadixTree — évolution mémoire structurée ===')
+  console.log('=== PackedRadixTree — structured memory evolution ===')
   printTimeline(entries)
 
   const a = findEntry(entries, compareA) ?? findEntry(entries, 'synthetic-pre-phase1')
@@ -150,7 +150,7 @@ function main () {
     printStructuredTable(
       a,
       b,
-      `Comparaison ${label(a)} → ${label(b)} (négatif = moins de bytes, souhaité après optim)`,
+      `Comparison ${label(a)} → ${label(b)} (negative = fewer bytes, desired after optimization)`,
     )
   }
 
@@ -160,15 +160,15 @@ function main () {
     const edges = 2651
     const expectedEdgeFirstChar = edges * 2
     const actual = scaleA - scaleB
-    console.log('\n## Synthèse Phase 1 (edgeFirstChar)\n')
+    console.log('\n## Phase 1 summary (edgeFirstChar)\n')
     console.log(`- corpus \`scale\` : ${scaleA} → ${scaleB} B (${pct(scaleA, scaleB)} %)`)
-    console.log(`- économie attendue edgeFirstChar (2×${edges} arêtes) : ${expectedEdgeFirstChar} B`)
-    console.log(`- écart observé sur scale : ${actual} B${actual === expectedEdgeFirstChar ? ' (cohérent)' : ''}`)
+    console.log(`- expected edgeFirstChar saving (2×${edges} edges): ${expectedEdgeFirstChar} B`)
+    console.log(`- observed delta on scale: ${actual} B${actual === expectedEdgeFirstChar ? ' (consistent)' : ''}`)
   }
 
-  console.log('\n## Enregistrement baseline\n')
-  console.log('- `pnpm benchmark:packed-radix:record` exige un arbre git propre (fichiers suivis).')
-  console.log('- Commit enregistré dans `metadata.baselineCommit` + ligne dans packed-radix-history.jsonl.')
+  console.log('\n## Baseline recording\n')
+  console.log('- `pnpm benchmark:packed-radix:record` requires a clean git tree (tracked files).')
+  console.log('- Commit recorded in `metadata.baselineCommit` + line in packed-radix-history.jsonl.')
 }
 
 main()

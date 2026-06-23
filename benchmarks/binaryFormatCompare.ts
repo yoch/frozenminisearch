@@ -174,16 +174,16 @@ function printSaveSyncVsAsync (rows: SaveResult[]): void {
   )
 
   const maxDelta = Math.max(...rows.map((r) => r.byteDelta))
-  console.log(`\n  Écart taille max sync/async : ${maxDelta} o (zstd peut varier légèrement ; payload décompressé identique).`)
+  console.log(`\n  Max sync/async size delta: ${maxDelta} B (zstd may vary slightly; decompressed payload identical).`)
 }
 
 function printNotes (): void {
   console.log(`
 Notes
 ─────
-• saveBinarySync  — zstdCompressSync sur le payload concaténé.
-• saveBinaryAsync — zstd via callback async (même sémantique ; taille compressée ± quelques octets).
-• Format courant uniquement (dense/sparse postings, radix columnar, field lengths adaptatifs).
+• saveBinarySync  — zstdCompressSync on the concatenated payload.
+• saveBinaryAsync — zstd via async callback (same semantics; compressed size ± few bytes).
+• Current format only (dense/sparse postings, radix columnar, adaptive field lengths).
 `)
 }
 

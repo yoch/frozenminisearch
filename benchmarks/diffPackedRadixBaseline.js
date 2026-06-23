@@ -22,7 +22,7 @@ const forceRun = argv.includes('--run')
 
 function loadJson (path, hint) {
   if (!existsSync(path)) {
-    console.error(`Fichier manquant : ${path}`)
+    console.error(`Missing file: ${path}`)
     if (hint) console.error(hint)
     process.exit(1)
   }
@@ -39,7 +39,7 @@ function compareCorpus (id, ref, cur) {
   const refBytes = ref?.bytes?.totalStructuredBytes
   const curBytes = cur?.bytes?.totalStructuredBytes
   if (refBytes == null || curBytes == null) {
-    return { id, skip: true, reason: 'métrique absente' }
+    return { id, skip: true, reason: 'missing metric' }
   }
   const delta = curBytes - refBytes
   const pct = pctDeltaRound(refBytes, curBytes)
@@ -47,7 +47,7 @@ function compareCorpus (id, ref, cur) {
 }
 
 function printTable (rows, { refLabel, curLabel }) {
-  console.log(`\n${refLabel} → ${curLabel} (bytes structurés ; plus bas = mieux)\n`)
+  console.log(`\n${refLabel} → ${curLabel} (structured bytes; lower is better)\n`)
   console.log('corpus                  ref        cur        Δ B      Δ %')
   for (const r of rows) {
     if (r.skip) {
@@ -68,29 +68,29 @@ function main () {
   const currentPath = forceRun ? LATEST : (argValue('--current', argv) ?? LATEST)
 
   if (forceRun) {
-    console.log('Exécution benchmark:packed-radix → packed-radix-latest.json, puis comparaison au golden\n')
+    console.log('Running benchmark:packed-radix → packed-radix-latest.json, then comparing to golden\n')
     execSync(
       'pnpm build-packed-radix-bench && node --expose-gc benchmarks/dist/packedRadixTree.cjs --record',
       { cwd: join(__dirname, '..'), stdio: 'inherit' },
     )
   } else {
-    console.log(`Comparaison ${currentPath} → ${referencePath} (sans relance ; --run pour mesurer à nouveau)\n`)
+    console.log(`Comparison ${currentPath} → ${referencePath} (no re-run; --run to measure again)\n`)
   }
 
   const reference = loadJson(referencePath)
   const current = loadJson(
     currentPath,
-    'Lancez : pnpm benchmark:packed-radix:diff:run (mesure puis compare).',
+    'Run: pnpm benchmark:packed-radix:diff:run (measure then compare).',
   )
 
   const refMeta = reference.metadata
   const curMeta = current.metadata
   if (refMeta?.capturedAt) {
-    console.log(`Référence : ${referencePath} (${refMeta.capturedAt})`)
-    if (refMeta.baselineCommit) console.log(`  commit référence : ${refMeta.baselineCommit.slice(0, 12)}…`)
+    console.log(`Reference: ${referencePath} (${refMeta.capturedAt})`)
+    if (refMeta.baselineCommit) console.log(`  reference commit: ${refMeta.baselineCommit.slice(0, 12)}…`)
   }
   if (curMeta?.capturedAt) {
-    console.log(`Actuel    : ${currentPath} (${curMeta.capturedAt})${curMeta.git?.dirty ? ' (dirty)' : ''}`)
+    console.log(`Current   : ${currentPath} (${curMeta.capturedAt})${curMeta.git?.dirty ? ' (dirty)' : ''}`)
   }
 
   const ids = [...new Set([
@@ -103,7 +103,7 @@ function main () {
     reference.corpora[id],
     current.corpora[id],
   ))
-  printTable(rows, { refLabel: 'référence (golden)', curLabel: 'mesure' })
+  printTable(rows, { refLabel: 'reference (golden)', curLabel: 'measurement' })
 }
 
 main()

@@ -38,7 +38,7 @@ function syntheticPrePhase1 () {
     git: {
       commit: null,
       commitShort: 'pre-phase1',
-      subject: 'Avant suppression edgeFirstChar (mesures + extrapolation)',
+      subject: 'Before edgeFirstChar removal (measurements + extrapolation)',
       dirty: false,
     },
     baselineCommit: 'synthetic:pre-phase1',
@@ -53,16 +53,16 @@ function fromGolden (ref) {
   entry.recordKind = ref.metadata?.recordKind ?? 'golden-import'
   entry.baselineCommit = ref.metadata?.baselineCommit ?? ref.metadata?.git?.commit ?? entry.baselineCommit
   if (ref.metadata?.git?.dirty) {
-    entry.note = 'Importé depuis référence ; mesure initiale sur worktree dirty (re-enregistrer proprement après commit).'
+    entry.note = 'Imported from reference; initial measurement on dirty worktree (re-record cleanly after commit).'
   }
   return entry
 }
 
 if (existsSync(HISTORY) && readFileSync(HISTORY, 'utf8').trim()) {
-  console.log(`Historique déjà présent : ${HISTORY}`)
+  console.log(`History already present: ${HISTORY}`)
   process.exit(0)
 }
 
 const lines = [syntheticPrePhase1(), fromGolden(load('packed-radix-reference.json'))]
 writeFileSync(HISTORY, lines.map((e) => JSON.stringify(e)).join('\n') + '\n')
-console.log(`Écrit ${lines.length} entrées → ${HISTORY}`)
+console.log(`Written ${lines.length} entries → ${HISTORY}`)

@@ -391,17 +391,17 @@ export function assertCleanTrackedTree (options = {}) {
   if (force) return
   const dirty = trackedTreePorcelain()
   if (!dirty) return
-  console.error(`Refus : l’arborescence suivie n’est pas propre (${context}).`)
-  console.error('Modifications sur fichiers suivis :')
+  console.error(`Rejected: tracked tree is not clean (${context}).`)
+  console.error('Modifications on tracked files:')
   for (const line of dirty.split('\n')) {
     if (line) console.error(`  ${line}`)
   }
-  console.error('\nCommitez ou restaurez ces fichiers, puis relancez.')
-  console.error('Pour forcer malgré tout : ajoutez --force (baseline non reproductible au commit HEAD).')
+  console.error('\nCommit or restore these files, then retry.')
+  console.error('To force anyway: add --force (baseline not reproducible at HEAD commit).')
   process.exit(1)
 }
 
-/** Git fields stored with a golden baseline (commit = état du code mesuré). */
+/** Git fields stored with a golden baseline (commit = measured code state). */
 export function enrichGitForBaseline (git) {
   const commit = git?.commit ?? gitCommand('rev-parse HEAD')
   return {
@@ -458,7 +458,7 @@ export function appendPackedRadixHistory (payload, options = {}) {
   const entry = packedRadixHistoryEntry(payload)
   const headSha = entry.baselineCommit
   if (!headSha) {
-    console.warn('appendPackedRadixHistory: pas de commit, historique non écrit')
+    console.warn('appendPackedRadixHistory: no commit, history not written')
     return 'skipped-duplicate'
   }
 
@@ -468,7 +468,7 @@ export function appendPackedRadixHistory (payload, options = {}) {
       try {
         const e = JSON.parse(line)
         if (e.baselineCommit === headSha || e.git?.commit === headSha) {
-          console.log(`Historique : déjà enregistré pour ${e.git?.commitShort ?? headSha.slice(0, 7)}`)
+          console.log(`History: already recorded for ${e.git?.commitShort ?? headSha.slice(0, 7)}`)
           return 'skipped-duplicate'
         }
       } catch { /* ignore */ }

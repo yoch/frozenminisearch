@@ -203,7 +203,7 @@ function buildFrozen(docs, searchOptions = {}) {
   const options = { fields: ['txt'], storeFields: [], searchOptions }
   const ms = new MiniSearch(options)
   ms.addAll(docs)
-  return FrozenMiniSearch.fromMiniSearch(ms, options)
+  return FrozenMiniSearch._fromMiniSearch(ms, options)
 }
 
 function collectRealCases() {

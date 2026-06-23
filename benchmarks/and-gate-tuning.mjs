@@ -63,7 +63,7 @@ function buildFrozen (docs, searchOptions = { prefix: true, fuzzy: 0.2 }) {
   const options = { fields: ['txt'], storeFields: [], searchOptions }
   const ms = new MiniSearch(options)
   ms.addAll(docs)
-  return FrozenMiniSearch.fromMiniSearch(ms, options)
+  return FrozenMiniSearch._fromMiniSearch(ms, options)
 }
 
 function median (arr) {

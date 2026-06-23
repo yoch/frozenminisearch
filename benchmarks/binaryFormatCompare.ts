@@ -99,7 +99,7 @@ async function runScenario (scenario: Scenario): Promise<SaveResult> {
 
   const ms = new MiniSearch(options)
   ms.addAll(corpus)
-  const frozen = FrozenMiniSearch.fromMiniSearch(ms, options)
+  const frozen = FrozenMiniSearch._fromMiniSearch(ms, options)
 
   const bufSync = frozen.saveBinarySync() as Buffer
   const saveSyncMs = benchSync(() => {

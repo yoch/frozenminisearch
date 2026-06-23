@@ -24,7 +24,7 @@ const options = {
 function buildEngines() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+  const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
   return { mutable, frozen }
 }
 
@@ -128,7 +128,7 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     const extendedOpts = { ...options, searchOptions: { prefix: true, fuzzy: 0.2 } }
     const extendedMutable = new MiniSearch(extendedOpts)
     extendedMutable.addAll(extendedDocs)
-    const extendedFrozen = FrozenMiniSearch.fromMiniSearch(extendedMutable, extendedOpts)
+    const extendedFrozen = FrozenMiniSearch._fromMiniSearch(extendedMutable, extendedOpts)
     const query = {
       combineWith: 'AND_NOT',
       queries: ['ocean', { queries: ['matrix', 'whale'] }],
@@ -173,7 +173,7 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     const opts = { fields: ['text'] }
     const ms = new MiniSearch(opts)
     ms.addAll(corpus)
-    const fr = FrozenMiniSearch.fromMiniSearch(ms, opts)
+    const fr = FrozenMiniSearch._fromMiniSearch(ms, opts)
     expectSameResults(ms, fr, 'combo', {
       processTerm: term => term === 'combo' ? ['alpha', 'beta'] : term,
       combineWith: 'AND',
@@ -188,7 +188,7 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     const opts = { fields: ['text'] }
     const ms = new MiniSearch(opts)
     ms.addAll(corpus)
-    const fr = FrozenMiniSearch.fromMiniSearch(ms, opts)
+    const fr = FrozenMiniSearch._fromMiniSearch(ms, opts)
     const processTerm = term => {
       if (term === 'false') return false
       if (term === 'null') return null
@@ -257,7 +257,7 @@ describe('FrozenMiniSearch custom indexing options', () => {
     }
     const mutable = new MiniSearch(customOpts)
     mutable.addAll(customDocs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, customOpts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, customOpts)
     const direct = FrozenMiniSearch.fromDocuments(customDocs, customOpts)
     expectSameResults(frozen, direct, 'hello')
     expect(frozen.has('a')).toBe(true)
@@ -275,7 +275,7 @@ describe('FrozenMiniSearch custom indexing options', () => {
     }
     const mutable = new MiniSearch(customOpts)
     mutable.addAll(customDocs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, customOpts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, customOpts)
     const direct = FrozenMiniSearch.fromDocuments(customDocs, customOpts)
     expectSameResults(frozen, direct, 'alpha')
   })
@@ -286,7 +286,7 @@ describe('FrozenMiniSearch freeze after discard', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     mutable.discard(3)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     expectSameResults(mutable, frozen, 'zen')
     expectSameResults(mutable, frozen, 'zen art', { combineWith: 'AND' })
     expectSameWildcardResults(mutable, frozen)
@@ -296,7 +296,7 @@ describe('FrozenMiniSearch freeze after discard', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     mutable.discard(3)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
     expect(loaded.search(FrozenMiniSearch.wildcard)).toEqual(frozen.search(FrozenMiniSearch.wildcard))
@@ -307,7 +307,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
   test('search results match after saveBinary/loadBinary', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const buf = frozen.saveBinarySync()
     const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
 
@@ -320,7 +320,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
   test('autoSuggest keeps defaults and ordering after saveBinary/loadBinary', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
 
     expect(loaded.autoSuggest('zen ar')).toEqual(frozen.autoSuggest('zen ar'))
@@ -329,7 +329,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
   test('loadBinary rejects fields not in snapshot', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, options).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync()
     expect(() => FrozenMiniSearch.loadBinarySync(buf, { fields: ['title', 'missing'] }))
       .toThrow(/must match the indexed fields exactly/)
   })
@@ -337,7 +337,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
   test('loadBinary rejects field subset', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, options).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync()
     expect(() => FrozenMiniSearch.loadBinarySync(buf, { fields: ['title'] }))
       .toThrow(/must match the indexed fields exactly/)
   })
@@ -359,7 +359,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
   test('saveBinary writes MSv5 for multi-field index', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, options).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe('MSv5')
     expect(buf.readUInt16LE(4)).toBe(5)
   })
@@ -382,7 +382,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
       serializationVersion: 2,
     }
     const opts = { fields: ['txt'] }
-    const frozen = FrozenMiniSearch.fromMiniSearchSnapshot(snapshot, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, opts)
     expect(frozen.documentCount).toBe(65536)
     expect(frozen.search('alpha').map(r => r.id)).toEqual(['max'])
     expect(frozen._memoryBreakdown().postings.docIdWidth).toBe(32)
@@ -401,7 +401,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
     }))
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(docsBig)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, { fields: ['text'] }).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, { fields: ['text'] }).saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe('MSv5')
     expect(buf.readUInt16LE(4)).toBe(5)
     expect(buf.readUInt16LE(6) & 1).toBe(1)
@@ -410,7 +410,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
   test('loadBinary without fields option', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), {})
     expectSameResults(frozen, loaded, 'zen')
   })
@@ -419,7 +419,7 @@ describe('FrozenMiniSearch binary round-trip', () => {
 function buildFrozenViaFreeze() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  return FrozenMiniSearch.fromMiniSearch(mutable, options)
+  return FrozenMiniSearch._fromMiniSearch(mutable, options)
 }
 
 function buildFrozenDirect() {
@@ -448,7 +448,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const sparseOpts = { fields: ['title', 'text'] }
     const mutable = new MiniSearch(sparseOpts)
     mutable.addAll(sparseDocs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, sparseOpts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, sparseOpts)
     const direct = FrozenMiniSearch.fromDocuments(sparseDocs, sparseOpts)
     expectSameResults(frozen, direct, 'three')
     expectSameResults(frozen, direct, 'alpha gamma', { combineWith: 'OR' })
@@ -470,7 +470,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, opts)
     const direct = FrozenMiniSearch.fromDocuments(corpus, opts)
     expect(mutable.search('the')).toEqual([])
     expect(frozen.search('the')).toEqual([])
@@ -488,7 +488,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, opts)
     const direct = FrozenMiniSearch.fromDocuments(corpus, opts)
     expectSameResults(frozen, direct, 'foo')
     expectSameResults(frozen, direct, 'BAR')
@@ -502,7 +502,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, opts)
     const direct = FrozenMiniSearch.fromDocuments(corpus, opts)
     expect(direct.termCount).toBe(frozen.termCount)
     expect(direct.search('foo')).toEqual(frozen.search('foo'))
@@ -513,7 +513,7 @@ describe('FrozenMiniSearch.fromDocuments', () => {
     const opts = { fields: ['txt'] }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, opts)
     const direct = FrozenMiniSearch.fromDocuments(corpus, opts)
     const a = frozen.search('alpha', { combineWith: 'OR' })
     const b = direct.search('alpha', { combineWith: 'OR' })
@@ -720,7 +720,7 @@ describe('memoryBreakdown', () => {
   test('returns sensible structure sizes', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const b = frozen._memoryBreakdown()
     expect(b.termCount).toBeGreaterThan(0)
     expect(b.postings.totalTypedBytes).toBeGreaterThan(0)
@@ -763,7 +763,7 @@ describe('fieldLengthMatrix adaptive width', () => {
     const opts = { fields: ['text'] }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, opts)
     expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
   })
 
@@ -778,7 +778,7 @@ describe('fieldLengthMatrix adaptive width', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     mutable.discard(3)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(6)
     expectSameResults(mutable, frozen, 'zen')
   })
@@ -804,7 +804,7 @@ describe('allFreqs adaptive width', () => {
     const opts = { fields: ['txt'] }
     const mutable = new MiniSearch(opts)
     mutable.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, opts)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, opts)
     const ms = mutable.search('alpha', { combineWith: 'OR' })
     const fr = frozen.search('alpha', { combineWith: 'OR' })
     expect(fr.length).toBe(ms.length)
@@ -833,7 +833,7 @@ describe('owned snapshot independence', () => {
   test('freeze keeps fieldIds independent of mutable source', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const before = frozen.search('zen')
     mutable._fieldIds.title = 99
     expect(frozen.search('zen')).toEqual(before)
@@ -842,7 +842,7 @@ describe('owned snapshot independence', () => {
   test('loadBinary survives wire buffer mutation after owned copy', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, options).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync()
     const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
     const before = loaded.search('zen')
     buf.fill(0)

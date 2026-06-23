@@ -27,7 +27,7 @@ describe('fromMiniSearch loaders', () => {
   test('fromMiniSearch instance uses toJSON()', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(reference, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(reference, options)
     expect(frozen.documentCount).toBe(reference.documentCount)
     expect(frozen.search('zen art', { combineWith: 'AND' }).length).toBeGreaterThan(0)
   })

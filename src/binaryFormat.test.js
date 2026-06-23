@@ -50,7 +50,7 @@ const options = { fields: ['title', 'text'] }
 function buildSnapshotFromFrozen() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {})
+  const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {})
   const buf = frozen.saveBinarySync()
   return decodeFrozenSnapshot(buf)
 }
@@ -153,7 +153,7 @@ describe('binaryFormat MSv5', () => {
   test('rejects section CRC mismatch', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = Buffer.from(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
+    const buf = Buffer.from(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
     const coreDir = msv5SectionDirOffset(Msv5SectionId.Core)
     buf.writeUInt32LE(0, coreDir + 8)
     expect(() => decodeFrozenSnapshot(buf)).toThrow(/CRC mismatch/)
@@ -163,7 +163,7 @@ describe('binaryFormat MSv5', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: 'alpha', text: 'one' })
     mutable.add({ id: 42, text: 'two' })
-    const snap = decodeFrozenSnapshot(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
+    const snap = decodeFrozenSnapshot(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toBe('alpha')
     expect(snap.externalIds[1]).toBe(42)
   })
@@ -203,7 +203,7 @@ describe('binaryFormat MSv5', () => {
     }
     const mutable = new MiniSearch({ fields, storeFields: [] })
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, { fields })
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, { fields })
     expect(frozen._memoryBreakdown().postings.layout).toBe('sparse')
 
     const buf = frozen.saveBinarySync()
@@ -239,7 +239,7 @@ describe('binaryFormat MSv5', () => {
   test('external id JSON blob round-trip', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: { k: 'complex' }, text: 'data' })
-    const snap = decodeFrozenSnapshot(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
+    const snap = decodeFrozenSnapshot(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toEqual({ k: 'complex' })
   })
 })
@@ -250,7 +250,7 @@ describe('binaryFormat corruption guards', () => {
   beforeEach(() => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    validBuf = FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync()
+    validBuf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
   })
 
   test('rejects buffer shorter than header', () => {
@@ -337,7 +337,7 @@ describe('FrozenMiniSearch loadBinary fields', () => {
   test('load without fields uses snapshot field names', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const buf = frozen.saveBinarySync()
     const loaded = FrozenMiniSearch.loadBinarySync(buf, {})
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))

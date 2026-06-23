@@ -121,7 +121,7 @@ function probeAndGate(corpus, query, searchOptions) {
   const ms = new MiniSearch({ ...baseOpts, searchOptions: searchOptions.prefix ? { prefix: true } : {} })
   ms.addAll(corpus)
   const [firstToken, secondToken] = query.trim().split(/\s+/)
-  const frozen = FrozenMiniSearch.fromMiniSearch(ms, baseOpts)
+  const frozen = FrozenMiniSearch._fromMiniSearch(ms, baseOpts)
   const gateSize = frozen.executeQuery(firstToken, searchOptions).size
   const maxGate = resolveGateMaxSize(corpus.length, DEFAULT_AND_GATE_LIMITS)
   const branchPostingLength = secondToken == null

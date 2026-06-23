@@ -23,7 +23,7 @@ export function heapFactoryForKind (kind, scenario, artifacts = {}) {
       return () => {
         const ms = new MiniSearch(options)
         ms.addAll(corpus)
-        return FrozenMiniSearch.fromMiniSearch(ms, options)
+        return FrozenMiniSearch._fromMiniSearch(ms, options)
       }
     case 'loadJSON':
       if (artifacts.json == null) throw new Error('loadJSON heap path requires json artifact')
@@ -72,6 +72,6 @@ export function buildLoadArtifacts (scenario) {
   const ms = new MiniSearch(scenario.options)
   ms.addAll(scenario.corpus)
   const json = JSON.stringify(ms.toJSON())
-  const frozen = FrozenMiniSearch.fromMiniSearch(ms, scenario.options)
+  const frozen = FrozenMiniSearch._fromMiniSearch(ms, scenario.options)
   return { json, binaryBuf: frozen.saveBinarySync() }
 }

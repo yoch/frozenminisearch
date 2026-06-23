@@ -88,7 +88,7 @@ function bigCompressibleIndex() {
     id: i,
     text: `payload ${'z'.repeat(120)} ${i}`,
   })))
-  return FrozenMiniSearch.fromMiniSearch(mutable, {})
+  return FrozenMiniSearch._fromMiniSearch(mutable, {})
 }
 
 function compressedSnapshotBuffer(compression) {
@@ -135,7 +135,7 @@ describe('binaryMsv5', () => {
   test('encodeFrozenSnapshot uses MSv5 by default', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.length).toBeGreaterThan(MSV5_HEADER_SIZE)
   })
@@ -143,7 +143,7 @@ describe('binaryMsv5', () => {
   test('MSv5 round-trip preserves search', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {})
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {})
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
   })
@@ -163,14 +163,14 @@ describe('binaryMsv5', () => {
   test('MSv5 legacy u8 freqs load without FLAG_FREQ_U16', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
     expect(buf.readUInt16LE(6) & FLAG_FREQ_U16).toBe(0)
   })
 
   test('MSv5 async stream load preserves search', async () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {})
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {})
     const loaded = await FrozenMiniSearch.loadBinaryAsync(frozen.saveBinarySync(), options)
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))
   })
@@ -178,7 +178,7 @@ describe('binaryMsv5', () => {
   test('MSv5 async save uses same format and preserves search', async () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {})
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {})
     const buf = await frozen.saveBinaryAsync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
@@ -188,7 +188,7 @@ describe('binaryMsv5', () => {
   test('saveBinarySync and saveBinaryAsync agree on payload CRC and header metadata', async () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {})
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {})
     const syncBuf = frozen.saveBinarySync()
     const asyncBuf = await frozen.saveBinaryAsync()
     const syncMeta = msv5ComparableHeaderMeta(syncBuf)
@@ -212,7 +212,7 @@ describe('binaryMsv5', () => {
   test('single payload stream with per-section catalogue offsets', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
     const meta = readMsv5SnapshotCompressionMeta(buf)
     expect(meta.formatRev).toBe(MSV5_FORMAT_REV_PAYLOAD)
     expect(meta.sections.length).toBe(12)
@@ -312,7 +312,7 @@ describe('binaryMsv5', () => {
   test('rejects payload sizes above 1 GiB', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(docs)
-    const buf = Buffer.from(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
+    const buf = Buffer.from(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
     buf.writeUInt32LE(1024 * 1024 * 1024 + 1, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
     expect(() => FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }))
       .toThrow(/1 GiB/)
@@ -321,7 +321,7 @@ describe('binaryMsv5', () => {
   test('encodeFrozenSnapshotMsv5 round-trips programmatic snapshot', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.addAll(Array.from({ length: 50 }, (_, i) => ({ id: i, text: `doc ${i}` })))
-    const snap = decodeFrozenSnapshot(FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync())
+    const snap = decodeFrozenSnapshot(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
     const buf = encodeFrozenSnapshotMsv5(snap)
     const dir = readMsv5SectionDirectory(buf)
     expect(dir[Msv5SectionId.Core].uncompressedLength).toBe(16)
@@ -461,7 +461,7 @@ describe('binaryMsv5 load memory', () => {
       text: `term${i % 200} repeated content ${i}`,
     }))
     mutable.addAll(big)
-    const buf = FrozenMiniSearch.fromMiniSearch(mutable, {}).saveBinarySync()
+    const buf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
     const fileBytes = buf.length
 
     global.gc()

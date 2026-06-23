@@ -77,7 +77,7 @@ describe('toJSON MiniSearch wire export', () => {
       serializationVersion: 2,
     }
 
-    const frozen = FrozenMiniSearch.fromMiniSearchSnapshot(snapshot, options)
+    const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options)
     const reloaded = FrozenMiniSearch.fromJson(JSON.stringify(frozen.toJSON()), options)
 
     expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])

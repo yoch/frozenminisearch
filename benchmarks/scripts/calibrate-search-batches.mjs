@@ -62,7 +62,7 @@ for (const scenario of scenarios) {
   mutableIndex.addAll(scenario.corpus)
   const frozenBuild = new MiniSearch(scenario.options)
   frozenBuild.addAll(scenario.corpus)
-  const frozenIndex = FrozenMiniSearch.fromMiniSearch(frozenBuild, scenario.options)
+  const frozenIndex = FrozenMiniSearch._fromMiniSearch(frozenBuild, scenario.options)
 
   console.log(scenario.id)
   for (const { label, q, opts } of scenario.queries) {

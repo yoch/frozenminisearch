@@ -12,7 +12,7 @@ describe('packed binary round-trip', () => {
   test('saveBinary/loadBinary preserves term lookup', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
     expect(frozen.search('zen').length).toBeGreaterThan(0)
 
     const buf = frozen.saveBinarySync()

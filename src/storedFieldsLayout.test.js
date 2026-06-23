@@ -60,7 +60,7 @@ describe('storedFieldsLayout', () => {
       storeFields: ['title', 'category'],
     })
     mutable.add({ id: 1, title: 'Zen Motorcycle', text: 'zen art', category: 'fiction' })
-    const frozen = FrozenMiniSearch.fromMiniSearch(mutable, {
+    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {
       fields: ['title', 'text'],
       storeFields: ['title', 'category'],
     })

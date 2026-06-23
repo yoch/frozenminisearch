@@ -321,11 +321,11 @@ export default class FrozenMiniSearchCore<T = any> {
   }
 
   /**
-   * Same as {@link fromJson} with a pre-parsed snapshot object.
+   * @internal Benchmark/test helper — same as {@link fromJson} with a pre-parsed snapshot object.
    * `storedFields` are shallow-copied; callers must not mutate nested values
    * after load if they intend to keep the index immutable.
    */
-  static fromMiniSearchSnapshot<T, I extends FrozenMiniSearchCore<T>>(
+  protected static _fromMiniSearchSnapshot<T, I extends FrozenMiniSearchCore<T>>(
     this: FrozenMiniSearchCtor<T, I>,
     snapshot: MiniSearchSnapshot,
     options: Options<T> = {} as Options<T>,
@@ -338,8 +338,8 @@ export default class FrozenMiniSearchCore<T = any> {
     )
   }
 
-  /** Accepts any object exposing `toJSON()` in MiniSearch snapshot shape. */
-  static fromMiniSearch<T, I extends FrozenMiniSearchCore<T>>(
+  /** @internal Benchmark/test helper — object exposing MiniSearch `toJSON()`. */
+  protected static _fromMiniSearch<T, I extends FrozenMiniSearchCore<T>>(
     this: FrozenMiniSearchCtor<T, I>,
     source: { toJSON(): MiniSearchSnapshot },
     options: Options<T> = {} as Options<T>,

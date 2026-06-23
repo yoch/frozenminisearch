@@ -33,7 +33,7 @@ function prepareScenarioSearchIndexes (corpus, options) {
   gc()
   const frozenBuild = new MiniSearch(options)
   frozenBuild.addAll(corpus)
-  const frozenSearchIndex = FrozenMiniSearch.fromMiniSearch(frozenBuild, options)
+  const frozenSearchIndex = FrozenMiniSearch._fromMiniSearch(frozenBuild, options)
   gc()
   return { mutableSearchIndex, frozenSearchIndex }
 }
@@ -508,7 +508,7 @@ export function runScenario (scenario, benchOptions = {}) {
     const ser = timedMs(() => JSON.stringify(ms.result))
     json = ser.result
     jsonSerializeMs = ser.ms
-    const fr = timedMs(() => FrozenMiniSearch.fromMiniSearch(ms.result, options))
+    const fr = timedMs(() => FrozenMiniSearch._fromMiniSearch(ms.result, options))
     freezeMs = fr.ms
     const bin = timedMs(() => fr.result.saveBinarySync())
     binaryBuf = bin.result
@@ -535,7 +535,7 @@ export function runScenario (scenario, benchOptions = {}) {
   if (need.drift && driftQueries && driftQueries.length > 0) {
     const ms = new MiniSearch(options)
     ms.addAll(corpus)
-    const frozen = FrozenMiniSearch.fromMiniSearch(ms, options)
+    const frozen = FrozenMiniSearch._fromMiniSearch(ms, options)
     scoreDrift = driftQueries.map((query) => computeScoreDrift(ms, frozen, query))
   }
 

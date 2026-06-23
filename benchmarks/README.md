@@ -64,7 +64,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 
 | Surface | Measures |
 |---------|----------|
-| `build` | `fromDocuments` / `fromMiniSearch` vs mutable `addAll` |
+| `build` | `fromDocuments` / MiniSearch snapshot conversion vs mutable `addAll` |
 | `search` | Paired mutable/frozen `search()` timing (`hrtime`, see `searchBenchBatches.json`) |
 | `search-levels` | L0 lookup / L1 `executeQuery` / L2 `search` decomposition |
 | `save` / `load` | binary snapshot round-trip |

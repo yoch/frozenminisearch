@@ -58,7 +58,7 @@ describe('FrozenMiniSearchBrowser', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const snap = await decodeFrozenSnapshotMsv5Browser(
-      new Uint8Array(FrozenMiniSearch.fromMiniSearch(mutable, options).saveBinarySync({ compression: 'raw' })),
+      new Uint8Array(FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync({ compression: 'raw' })),
     )
     const encoded = await encodeFrozenSnapshotMsv5Browser(snap, undefined, undefined, 'zlib')
     const roundTripped = await decodeFrozenSnapshotMsv5Browser(encoded)

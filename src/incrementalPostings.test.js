@@ -186,7 +186,7 @@ describe('IncrementalPostingsAccumulator', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(documents)
 
-    const fromMiniSearch = FrozenMiniSearch.fromMiniSearch(mutable, options)
+    const fromMiniSearch = FrozenMiniSearch._fromMiniSearch(mutable, options)
     const fromDocuments = FrozenMiniSearch.fromDocuments(documents, options)
 
     expect(fromMiniSearch._memoryBreakdown().postings.layout).toBe('dense')

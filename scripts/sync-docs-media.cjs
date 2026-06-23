@@ -15,8 +15,6 @@ const COPIES = [
   ['CHANGELOG.md', 'CHANGELOG.md'],
   ['benchmarks/README.md', 'README.md'],
   ['benchmarks/baselines/reference.json', 'reference.json'],
-  ['dev/docs/FREQ_ADAPTIVE_RECAP.md', 'FREQ_ADAPTIVE_RECAP.md'],
-  ['dev/docs/AND_GATE_PARAMETERS.md', 'AND_GATE_PARAMETERS.md'],
 ]
 
 mkdirSync(mediaDir, { recursive: true })

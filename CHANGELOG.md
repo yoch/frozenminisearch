@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.4.0 — `@yoch/frozenminisearch`
+
+Minor release: trimmed public API, hosted browser demo, `getDefault`, and production browser bundle minification.
+
 ### Added
 
 - **Hosted browser demo** — `examples/plain_js_frozen/` is published to GitHub Pages at `/demo/` (`pnpm build-demo`).
@@ -11,6 +15,11 @@
 
 - **Heap benchmark protocol v3** — retained-heap measurement runs in isolated scenario processes with in-process trials (warm-up once per path, median+MAD, GC×3). CPU/search benchmarks are decoupled from the heap phase (`pnpm bench:memory`). See `benchmarks/README.md`.
 - **Public API cleanup** — `assembleFrozen`, `frozenMemoryBreakdown`, `memoryBreakdown()`, `fromMiniSearch`, `fromMiniSearchSnapshot`, and low-level finalize/suggest helpers are no longer part of the public API; use `FrozenMiniSearch.fromDocuments`, `fromJson`, `buildFrozenFromDocuments`, `freezeFrozenIndexBuilder`, and the instance `search` / `autoSuggest` methods instead. Retained-heap diagnostics and MiniSearch snapshot conversion helpers remain available only to internal benchmarks/tests.
+- **Documentation** — French documentation, comments, and console messages translated to English.
+
+### Improved
+
+- **Browser bundle** — production `dist/browser/index.js` is minified via Rollup/Terser property mangling; redundant `build-minified` Make target removed.
 
 ### Removed
 

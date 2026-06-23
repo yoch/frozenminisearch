@@ -253,7 +253,7 @@ v1.2.3, **exact-only** combined queries may use a **broad-first** path: collect
 the final gate from selective branches (by estimated posting length) before
 scoring, and large AND_NOT exclusions may be collected before scoring the
 positive branch. Prefix/fuzzy AND keeps the sequential gate path. Details:
-[`dev/docs/AND_GATE_PARAMETERS.md`](dev/docs/AND_GATE_PARAMETERS.md) (internal, not public API).
+[`dev/docs/AND_GATE_PARAMETERS.md`](https://github.com/yoch/frozenminisearch/blob/master/dev/docs/AND_GATE_PARAMETERS.md) (internal, not public API).
 
 ### Index data structure: flat arrays instead of nested maps
 

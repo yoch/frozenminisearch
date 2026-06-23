@@ -7,12 +7,30 @@ const { join } = require('node:path')
 const root = join(__dirname, '..')
 const forbidden = [/^benchmarks\//, /^testSupport\//, /^src\//, /^examples\//, /^dev\//, /^vendor\//]
 
+function parsePackPaths (out) {
+  const npmNotice = [...out.matchAll(/^npm notice [\d.]+(?:kB|B) (.+)$/gm)].map((m) => m[1])
+  if (npmNotice.length > 0) return npmNotice
+
+  const marker = 'Tarball Contents'
+  const contentsIdx = out.indexOf(marker)
+  if (contentsIdx === -1) return []
+
+  const afterContents = out.slice(contentsIdx + marker.length)
+  const detailsIdx = afterContents.indexOf('Tarball Details')
+  const block = detailsIdx === -1 ? afterContents : afterContents.slice(0, detailsIdx)
+
+  return block
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
 const out = execSync('pnpm pack --dry-run 2>&1', {
   cwd: root,
   encoding: 'utf8',
   shell: true,
 })
-const paths = [...out.matchAll(/^npm notice [\d.]+(?:kB|B) (.+)$/gm)].map((m) => m[1])
+const paths = parsePackPaths(out)
 
 if (paths.length === 0) {
   console.error(`verify-npm-pack: could not parse pnpm pack file list`)

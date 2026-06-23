@@ -93,7 +93,7 @@ const buf = new Uint8Array(await (await fetch('/index.frozen')).arrayBuffer())
 const loaded = await FrozenMiniSearch.loadBinaryAsync(buf, options)
 ```
 
-See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/](examples/plain_js_frozen/) locally (`pnpm docs:demo:frozen` then serve the repo root).
+See the [hosted demo](https://yoch.github.io/frozenminisearch/demo/) or [examples/plain_js_frozen/README.md](examples/plain_js_frozen/README.md) locally (`pnpm docs:demo:frozen` then serve the repo root).
 
 ---
 
@@ -306,7 +306,7 @@ pnpm build
 node scripts/verify-npm-pack.cjs
 ```
 
-Parity tests compare against MiniSearch 7. Longer notes and performance work live under [dev/docs/README.md](dev/docs/README.md) and [benchmarks/README.md](benchmarks/README.md).
+Parity tests compare against MiniSearch 7. Longer notes and performance work live under [dev/docs/](https://github.com/yoch/frozenminisearch/tree/master/dev/docs) (repository only) and [benchmarks/README.md](benchmarks/README.md).
 
 ---
 

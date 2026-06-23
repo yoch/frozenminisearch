@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Heap benchmark protocol v4** — primary RAM comparison uses `totalResidentApprox` (heapUsed + external on both mutable and frozen sides). Heap-only savings remain as `frozenVsMutableHeapOnlySavingPct` for diagnostics. Memory warmup reduced to 2 passes (was up to 100 for small corpora). Heap allowlist expanded to 12 scenarios. See `benchmarks/README.md`.
+
 ## v1.4.0 — `@yoch/frozenminisearch`
 
 Minor release: trimmed public API, hosted browser demo, `getDefault`, and production browser bundle minification.

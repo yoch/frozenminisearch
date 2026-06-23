@@ -22,7 +22,7 @@ console.log(
   pad('COMMIT', 8) +
   pad('DATE', 22) +
   pad('SCEN', 5) +
-  pad('HEAP', 7) +
+  pad('HEAP_T', 7) +
   pad('LOAD', 8) +
   pad('FREEZE', 8) +
   pad('MAGIC', 7) +
@@ -36,7 +36,7 @@ for (const line of lines) {
     pad(e.git?.commitShort, 8) +
     pad((e.git?.commitDate ?? '').slice(0, 19), 22) +
     pad(e.scenarios?.length, 5) +
-    pad(s?.heapMb?.frozen, 7) +
+    pad(s?.heapMb?.frozenTotalResident ?? s?.memoryMb?.frozen?.totalResidentApprox, 7) +
     pad(s?.loadMs?.binary, 8) +
     pad(s?.indexing?.freezeMs, 8) +
     pad(s?.indexing?.binaryMagic, 7) +

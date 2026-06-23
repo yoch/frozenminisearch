@@ -113,7 +113,7 @@ function printScenarioSummary(scenario, defaultSurfaces) {
   }
 
   if (scenario.heapMb?.frozen != null) {
-    console.log(`  - ${scenario.id}: frozen heap ${scenario.heapMb.frozen} MB (${scenario.heapMb.frozenVsMutableSavingPct}% vs mutable)`)
+    console.log(`  - ${scenario.id}: frozen total ${scenario.heapMb.frozenTotalResident ?? scenario.memoryMb?.frozen?.totalResidentApprox} MB (${scenario.heapMb.frozenVsMutableSavingPct}% vs mutable)`)
     return
   }
 

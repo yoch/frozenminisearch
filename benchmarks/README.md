@@ -21,7 +21,7 @@ pnpm bench:micro                        # Benchmark.js micro suites (Divina corp
 pnpm bench -- micro --only=fuzzy,ranking
 pnpm bench:micro -- --list
 pnpm bench:build-peak                   # transient heap peak during FrozenIndexBuilder
-pnpm bench:memory                       # isolated heap phase only (protocol v3)
+pnpm bench:memory                       # isolated heap phase only (protocol v4)
 pnpm bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
 ```
 
@@ -68,7 +68,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 | `search` | Paired mutable/frozen `search()` timing (`hrtime`, see `searchBenchBatches.json`) |
 | `search-levels` | L0 lookup / L1 `executeQuery` / L2 `search` decomposition |
 | `save` / `load` | binary snapshot round-trip |
-| `memory` | Retained heap (protocol **v3**: isolated scenario process, in-process trials, median+MAD) + internal memory breakdown |
+| `memory` | Retained RAM (protocol **v4**: `totalResidentApprox` = heapUsed + external on both sides; isolated scenario process, in-process trials, median+MAD) + internal memory breakdown |
 | `migrate` | JSON → frozen path |
 | `drift` | Score drift vs reference (`toBeCloseTo` tolerance) |
 
@@ -82,13 +82,15 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 
 Legacy `benchmarks/index.js` orchestrator was replaced by `pnpm bench:micro`.
 
-## Heap protocol v3
+## Heap protocol v4
 
-CPU/search benchmarks and retained-heap measurement run in **separate processes**:
+CPU/search benchmarks and retained-RAM measurement run in **separate processes**:
 
 1. `captureBaseline.js` runs the CPU suite (`memory` / `breakdown` surfaces stripped).
 2. `runHeapSuite.mjs` spawns one Node process per allowlisted scenario (`benchmarks/framework/heapScenarios.mjs`).
-3. Each scenario process warms up once per path, then runs in-process trials: GC×3 → allocate one index → GC×3 → delta (median+MAD).
+3. Each scenario process warms up twice per path (memory-only; not search JIT warmup), then runs in-process trials: GC×3 → allocate one index → GC×3 → delta on **heapUsed + external** (`totalResidentApprox`, median+MAD).
+
+Primary comparison metric: `frozenVsMutableSavingPct` on **totalResident** (both sides). `heapMb.mutable` / `heapMb.frozen` remain as heap-only detail; `frozenVsMutableHeapOnlySavingPct` is diagnostic.
 
 Env overrides: `BENCH_HEAP_TRIALS`, `BENCH_HEAP_SCENARIOS`, `BENCH_HEAP_PATHS`, `BENCH_HEAP_GC_PASSES`, `BENCH_HEAP_WARMUP`.
 
@@ -96,7 +98,7 @@ Optional Chrome validation: `node --expose-gc benchmarks/scripts/heap-snapshot-p
 
 ## Baselines
 
-Committed reference: `benchmarks/baselines/reference.json` (search protocol **v2**, heap protocol **v3**).
+Committed reference: `benchmarks/baselines/reference.json` (search protocol **v2**, heap protocol **v4**).
 
 ```bash
 pnpm run bench:reference:update   # RUNS=3 vs-reference → reference.json + README table

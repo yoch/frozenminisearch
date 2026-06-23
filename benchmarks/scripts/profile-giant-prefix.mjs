@@ -15,6 +15,7 @@ import {
   resolveGateMaxSize,
 } from '../../src/queryEngineGateLimits.ts'
 import { giantVocabulary } from '../benchmarkScenarios.js'
+import { executeRaw } from '../harness/frozenPipelineHarness.ts'
 
 function argValue(name) {
   for (let i = 0; i < process.argv.length; i++) {
@@ -163,8 +164,8 @@ const uniqueStats = countPrefixTerms(frozen._index, 'unique1')
 const commonStats = countPrefixTerms(frozen._index, 'common')
 const commonPostingLen = postingLengthForTerm(frozen, 'common')
 
-const gateAfterUnique1 = frozen.executeQuery('unique1', andPrefix)
-const gateAfterFull = frozen.executeQuery(query, andPrefix)
+const gateAfterUnique1 = executeRaw(frozen, 'unique1', andPrefix)
+const gateAfterFull = executeRaw(frozen, query, andPrefix)
 const maxGate = resolveGateMaxSize(docCount, DEFAULT_AND_GATE_LIMITS)
 const absoluteGatePass = gateAfterUnique1.size <= maxGate
 const postingRatioGatePass = commonPostingLen != null && passGateByPostingRatio(
@@ -204,12 +205,12 @@ const staticProfile = {
 }
 
 const scenarios = {
-  l1_andPrefix_full: () => frozen.executeQuery(query, andPrefix),
+  l1_andPrefix_full: () => executeRaw(frozen, query, andPrefix),
   l2_search_full: () => frozen.search(query, andPrefix),
-  l1_branch0_unique1_prefix: () => frozen.executeQuery('unique1', { prefix: true }),
-  l1_branch1_common_exact: () => frozen.executeQuery('common', {}),
-  l1_branch1_common_prefix: () => frozen.executeQuery('common', { prefix: true }),
-  l1_andExact_noPrefix: () => frozen.executeQuery('unique1 common', { combineWith: 'AND' }),
+  l1_branch0_unique1_prefix: () => executeRaw(frozen, 'unique1', { prefix: true }),
+  l1_branch1_common_exact: () => executeRaw(frozen, 'common', {}),
+  l1_branch1_common_prefix: () => executeRaw(frozen, 'common', { prefix: true }),
+  l1_andExact_noPrefix: () => executeRaw(frozen, 'unique1 common', { combineWith: 'AND' }),
 }
 
 const timings = {}
@@ -221,9 +222,9 @@ for (const [name, fn] of Object.entries(scenarios)) {
   timings[name] = { p50Ms: median(runSamples), runP50s: runSamples }
 }
 
-const materializedBranch0 = frozen.executeQuery('unique1', { prefix: true })
-const materializedBranch2Full = frozen.executeQuery('common', {})
-const materializedFullRaw = frozen.executeQuery(query, andPrefix)
+const materializedBranch0 = executeRaw(frozen, 'unique1', { prefix: true })
+const materializedBranch2Full = executeRaw(frozen, 'common', {})
+const materializedFullRaw = executeRaw(frozen, query, andPrefix)
 const combineAndMaterializedMs = timePrepared(
   () => cloneRawResult(materializedBranch0),
   branch0Clone => combineAnd(branch0Clone, materializedBranch2Full),

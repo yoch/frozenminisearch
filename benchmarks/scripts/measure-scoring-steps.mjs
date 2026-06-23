@@ -22,6 +22,7 @@ import {
   passGateByPostingRatio,
   resolveGateMaxSize,
 } from '../../src/queryEngineGateLimits.ts'
+import { executeRaw } from '../harness/frozenPipelineHarness.ts'
 
 function argValue(name) {
   for (let i = 0; i < process.argv.length; i++) {
@@ -122,7 +123,7 @@ function probeAndGate(corpus, query, searchOptions) {
   ms.addAll(corpus)
   const [firstToken, secondToken] = query.trim().split(/\s+/)
   const frozen = FrozenMiniSearch._fromMiniSearch(ms, baseOpts)
-  const gateSize = frozen.executeQuery(firstToken, searchOptions).size
+  const gateSize = executeRaw(frozen, firstToken, searchOptions).size
   const maxGate = resolveGateMaxSize(corpus.length, DEFAULT_AND_GATE_LIMITS)
   const branchPostingLength = secondToken == null
     ? 0
@@ -154,7 +155,7 @@ function probeAndGate(corpus, query, searchOptions) {
 }
 
 function runExecuteQuery(frozen, query, searchOptions, warmup, iterations) {
-  const fn = () => frozen.executeQuery(query, searchOptions)
+  const fn = () => executeRaw(frozen, query, searchOptions)
   let sink = 0
   for (let i = 0; i < warmup; i++) {
     sink += fn().size

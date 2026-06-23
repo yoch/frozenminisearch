@@ -2,12 +2,10 @@
  * Compare benchmark results against benchmarks/baselines/reference.json.
  *
  *   pnpm benchmark:diff              → latest.json vs reference (no re-run)
- *   pnpm benchmark:diff --run          → run suite, write latest.json, then diff
  *   pnpm benchmark:diff --current=a.json --reference=b.json
  *
  * Exit code 1 if regressions exceed thresholds (for CI).
  */
-import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,6 +21,7 @@ import {
 import {
   STRUCTURAL_TIMING_THRESHOLDS,
   compareHeapFrozenMb,
+  compareHeapFrozenTotalResidentMb,
   compareHeapSavingPct,
   compareSearchMetric,
   compareTimingMetric,
@@ -113,6 +112,10 @@ function compareMetric (label, refVal, curVal, metricKey, higherIsBetter = false
   return status
 }
 
+function frozenTotalResidentMb (scenario) {
+  return scenario.heapMb?.frozenTotalResident ?? scenario.memoryMb?.frozen?.totalResidentApprox
+}
+
 function compareScenario (ref, cur, { structural = true } = {}) {
   console.log(`\n${'─'.repeat(72)}`)
   console.log(`${cur.name} (${cur.id})`)
@@ -126,19 +129,16 @@ function compareScenario (ref, cur, { structural = true } = {}) {
   }
 
   if (structural) {
-    if (ref.heapMb?.frozen != null && cur.heapMb?.frozen != null) {
-      const skipHeapSaving = compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump)
+    const refTotal = frozenTotalResidentMb(ref)
+    const curTotal = frozenTotalResidentMb(cur)
+    if (refTotal != null && curTotal != null) {
+      const skipHeapSaving = compareHeapFrozenTotalResidentMb(refTotal, curTotal, compareMetric, bump)
       compareHeapSavingPct(ref, cur, skipHeapSaving, compareMetric, bump)
-      if (ref.memoryMb?.frozen?.totalResidentApprox != null && cur.memoryMb?.frozen?.totalResidentApprox != null) {
-        bump(compareMetric(
-          'frozen totalResident (MB)',
-          ref.memoryMb.frozen.totalResidentApprox,
-          cur.memoryMb.frozen.totalResidentApprox,
-          'heapFrozenMb',
-        ))
-      }
     } else {
       console.log('  (heap metrics unavailable for one side; skipped)')
+    }
+    if (ref.heapMb?.frozen != null && cur.heapMb?.frozen != null) {
+      compareHeapFrozenMb(ref.heapMb.frozen, cur.heapMb.frozen, compareMetric, bump, { informative: true })
     }
     if (ref.loadMs?.binary != null && cur.loadMs?.binary != null) {
       compareTimingMetric('loadBinary (ms)', ref.loadMs.binary, cur.loadMs.binary, 'loadBinaryMs', bump)
@@ -189,30 +189,20 @@ function mb (bytes) {
 }
 
 function main () {
+  if (forceRun) {
+    console.error('diffBaseline.js compares existing JSON files. Use `make benchmark-diff-run` or `node benchmarks/framework/cli.mjs diff --run` to capture first.')
+    process.exit(1)
+  }
+
   const referencePath = argValue('--reference', argv) ?? REFERENCE_PATH
   const currentPath = argValue('--current', argv) ?? LATEST_PATH
   const reference = loadJson(referencePath)
 
-  let current
-  if (forceRun) {
-    console.log('Running benchmark suite → latest.json, then comparing to reference\n')
-    if (!global.gc) {
-      console.warn('Tip: use node --expose-gc for stable heap numbers.\n')
-    }
-    const r = spawnSync(process.execPath, ['--expose-gc', join(__dirname, 'captureBaseline.js')], {
-      stdio: 'inherit',
-      env: process.env,
-    })
-    if (r.status !== 0) process.exit(r.status ?? 1)
-    current = loadJson(LATEST_PATH)
-    console.log('')
-  } else {
-    console.log(`Comparing ${currentPath} → ${referencePath} (no re-run; use --run to measure again)\n`)
-    if (runs !== DEFAULT_BENCHMARK_RUNS || searchIterations !== DEFAULT_SEARCH_ITERATIONS) {
-      console.log('Note: --runs / --iterations apply only with --run.\n')
-    }
-    current = loadJson(currentPath)
+  console.log(`Comparing ${currentPath} → ${referencePath} (no re-run; use make benchmark-diff-run to measure again)\n`)
+  if (runs !== DEFAULT_BENCHMARK_RUNS || searchIterations !== DEFAULT_SEARCH_ITERATIONS) {
+    console.log('Note: --runs / --iterations apply only when capturing a new latest.json.\n')
   }
+  const current = loadJson(currentPath)
 
   console.log(`Reference: ${reference.capturedAt} @ ${reference.git?.commitShort}`)
   console.log(`Current:   ${current.capturedAt} @ ${current.git?.commitShort}${current.git?.dirty ? ' (dirty)' : ''}`)
@@ -281,7 +271,7 @@ function main () {
   }
   console.log('='.repeat(72))
   if (!diffSearchOnly) {
-    console.log('\nThresholds (fail): heap frozen +10%; loadBinary +20%; heap saving −10 pts.')
+    console.log('\nThresholds (fail): frozen totalResident +10%; loadBinary +20%; total resident saving −10 pts.')
     console.log(`Search p50: abs floor below ${SEARCH_MS_FLOOR} ms; informational unless --strict.`)
   } else {
     console.log(`\nSearch-only thresholds (fail): +${SEARCH_PCT_FAIL}% or floor rules below ${SEARCH_MS_FLOOR} ms baseline.`)

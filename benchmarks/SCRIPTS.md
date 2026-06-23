@@ -19,7 +19,7 @@ orchestration layer that delegates to them systematically:
 
 - `cli.mjs run` → `benchmarks/compare.js`
 - `cli.mjs record` → `benchmarks/captureBaseline.js`
-- `cli.mjs diff` → (optionally `captureBaseline.js --run`) + `diffBaseline.js`
+- `cli.mjs diff` → optionally runs `captureBaseline.js`, then `diffBaseline.js`
 - `cli.mjs micro` → `benchmarks/micro/run.mjs`
 - `cli.mjs history` → `benchmarks/scripts/record-history.mjs`
 
@@ -34,7 +34,7 @@ lets the user provide their own flags.
 |---|---|---|---|
 | `bench` | `benchmark:compare` | `compare.js` | `bench` forces `RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20` (`dev` profile) |
 | `bench:record` | `benchmark:record` | `captureBaseline.js` | `bench:record` sets `BENCH_PROFILE` |
-| `bench:diff` | `benchmark:diff` | `diffBaseline.js` | `bench:diff` can chain `captureBaseline --run` via `cli.mjs diff --run` |
+| `bench:diff` | `benchmark:diff` | `diffBaseline.js` | `cli.mjs diff --run` captures a fresh `latest.json` before comparing |
 | `bench:memory` | `benchmark:record:memory` | `runHeapSuite.mjs` | `benchmark:record:memory` adds `--out=benchmarks/baselines/latest-heap.json` |
 
 ## Recommended workflows

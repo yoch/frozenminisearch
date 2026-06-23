@@ -63,20 +63,20 @@ function compareScenario (ref, cur) {
   let status = 'ok'
   const bump = (st) => { status = worstStatus(status, st) }
 
-  const heapRef = ref.heapMb?.frozen
-  const heapCur = cur.heapMb?.frozen
+  const heapRef = ref.heapMb?.frozenTotalResident ?? ref.memoryMb?.frozen?.totalResidentApprox
+  const heapCur = cur.heapMb?.frozenTotalResident ?? cur.memoryMb?.frozen?.totalResidentApprox
   if (heapRef != null && heapCur != null) {
     if (refBelowHeapFloor(heapRef)) {
       const absDeltaKb = (heapCur - heapRef) * 1024
       const st = absDeltaKb > HEAP_ABS_FAIL_KB ? 'fail' : absDeltaKb > HEAP_ABS_WARN_KB ? 'warn' : 'ok'
       const icon = st === 'fail' ? 'FAIL' : st === 'warn' ? 'warn' : 'ok  '
-      console.log(`    ${icon} heap frozen ref=${heapRef} cur=${heapCur} Δ +${absDeltaKb.toFixed(0)} KB (floor < ${HEAP_MB_FLOOR} MB)`)
+      console.log(`    ${icon} frozen totalResident ref=${heapRef} cur=${heapCur} Δ +${absDeltaKb.toFixed(0)} KB (floor < ${HEAP_MB_FLOOR} MB)`)
       bump(st)
     } else if (heapCur > heapRef * 1.1) {
-      console.log(`    FAIL heap frozen ref=${heapRef} cur=${heapCur}`)
+      console.log(`    FAIL frozen totalResident ref=${heapRef} cur=${heapCur}`)
       bump('fail')
     } else {
-      console.log(`    ok   heap frozen ref=${heapRef} cur=${heapCur}`)
+      console.log(`    ok   frozen totalResident ref=${heapRef} cur=${heapCur}`)
     }
   }
 

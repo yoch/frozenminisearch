@@ -69,12 +69,13 @@ function printScenario (data) {
   }
 
   if (data.heapMb && data.diskMb) {
-    const baseHeap = data.heapMb.mutable
+    const baseTotal = data.heapMb.mutableTotalResident ?? data.memoryMb?.mutable?.totalResidentApprox ?? data.heapMb.mutable
+    const frozenTotal = data.heapMb.frozenTotalResident ?? data.memoryMb?.frozen?.totalResidentApprox ?? data.heapMb.frozen
     printTable([
-      { label: 'Mutable MiniSearch', heapMb: data.heapMb.mutable.toFixed(2), diskMb: data.diskMb.json?.toFixed(2), loadMs: data.loadMs?.json, vsMutable: 'baseline' },
-      { label: 'FrozenMiniSearch', heapMb: data.heapMb.frozen.toFixed(2), diskMb: data.diskMb.binary?.toFixed(2), loadMs: null, vsMutable: pct(baseHeap, data.heapMb.frozen) },
-      { label: 'loadJSON → MiniSearch', heapMb: data.heapMb.loadJson?.toFixed(2), diskMb: data.diskMb.json?.toFixed(2), loadMs: data.loadMs?.json, vsMutable: data.heapMb.loadJson != null ? pct(baseHeap, data.heapMb.loadJson) : '—' },
-      { label: 'loadBinary → Frozen', heapMb: data.heapMb.loadBinary?.toFixed(2), diskMb: data.diskMb.binary?.toFixed(2), loadMs: data.loadMs?.binary, vsMutable: data.heapMb.loadBinary != null ? pct(baseHeap, data.heapMb.loadBinary) : '—' }
+      { label: 'Mutable MiniSearch', heapMb: baseTotal.toFixed(2), diskMb: data.diskMb.json?.toFixed(2), loadMs: data.loadMs?.json, vsMutable: 'baseline' },
+      { label: 'FrozenMiniSearch', heapMb: frozenTotal.toFixed(2), diskMb: data.diskMb.binary?.toFixed(2), loadMs: null, vsMutable: pct(baseTotal, frozenTotal) },
+      { label: 'loadJSON → MiniSearch', heapMb: data.heapMb.loadJson?.toFixed(2), diskMb: data.diskMb.json?.toFixed(2), loadMs: data.loadMs?.json, vsMutable: data.heapMb.loadJson != null ? pct(baseTotal, data.heapMb.loadJson) : '—' },
+      { label: 'loadBinary → Frozen', heapMb: data.heapMb.loadBinary?.toFixed(2), diskMb: data.diskMb.binary?.toFixed(2), loadMs: data.loadMs?.binary, vsMutable: data.heapMb.loadBinary != null ? pct(baseTotal, data.heapMb.loadBinary) : '—' }
     ])
   }
 
@@ -89,7 +90,7 @@ function printScenario (data) {
   if (data.summary && Object.keys(data.summary).length > 0) {
     console.log('\nProfile summary:')
     if (data.summary.heapFrozenVsMutableSavingPct != null) {
-      console.log(`  RAM frozen vs mutable (isolated):  ${data.summary.heapFrozenVsMutableSavingPct.toFixed(1)}% smaller`)
+      console.log(`  RAM frozen vs mutable (isolated totalResident):  ${data.summary.heapFrozenVsMutableSavingPct.toFixed(1)}% smaller`)
     }
     if (data.summary.diskBinaryVsJsonSavingPct != null) {
       console.log(`  Disk binary vs JSON:               ${data.summary.diskBinaryVsJsonSavingPct.toFixed(1)}% smaller`)

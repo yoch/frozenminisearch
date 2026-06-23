@@ -85,7 +85,10 @@ function extract (entry, scenarioId = REF_SCENARIO) {
     scenarioId,
     heapMutableMb: s.heapMb?.mutable,
     heapFrozenMb: s.heapMb?.frozen,
+    heapMutableTotalMb: s.heapMb?.mutableTotalResident ?? s.memoryMb?.mutable?.totalResidentApprox,
+    heapFrozenTotalMb: s.heapMb?.frozenTotalResident ?? s.memoryMb?.frozen?.totalResidentApprox,
     heapSavingPct: s.heapMb?.frozenVsMutableSavingPct,
+    heapOnlySavingPct: s.heapMb?.frozenVsMutableHeapOnlySavingPct,
     loadJsonMs: s.loadMs?.json,
     loadBinaryMs: s.loadMs?.binary,
     diskJsonMb: s.diskMb?.json,
@@ -104,8 +107,8 @@ function extract (entry, scenarioId = REF_SCENARIO) {
 function compareMetrics (before, after) {
   if (!before || !after) return []
   const rows = [
-    ['heap frozen (MB)', before.heapFrozenMb, after.heapFrozenMb, pctDelta(before.heapFrozenMb, after.heapFrozenMb), '%', THRESHOLDS.heapFrozenMb, true],
-    ['heap saving vs mutable (pts)', before.heapSavingPct, after.heapSavingPct, ptsDelta(before.heapSavingPct, after.heapSavingPct), ' pts', THRESHOLDS.heapSavingPts, false],
+    ['frozen totalResident (MB)', before.heapFrozenTotalMb, after.heapFrozenTotalMb, pctDelta(before.heapFrozenTotalMb, after.heapFrozenTotalMb), '%', THRESHOLDS.heapFrozenMb, true],
+    ['total resident saving vs mutable (pts)', before.heapSavingPct, after.heapSavingPct, ptsDelta(before.heapSavingPct, after.heapSavingPct), ' pts', THRESHOLDS.heapSavingPts, false],
     ['loadBinary (ms)', before.loadBinaryMs, after.loadBinaryMs, pctDelta(before.loadBinaryMs, after.loadBinaryMs), '%', THRESHOLDS.loadBinaryMs, true],
     ['freeze (ms)', before.freezeMs, after.freezeMs, pctDelta(before.freezeMs, after.freezeMs), '%', THRESHOLDS.freezeMs, true],
     ['search frozen p50 avg (ms)', before.searchFrozenP50, after.searchFrozenP50, pctDelta(before.searchFrozenP50, after.searchFrozenP50), '%', THRESHOLDS.searchFrozenVsMutablePts, true],
@@ -134,8 +137,8 @@ function printTimeline (entries) {
     pad('COMMIT', 8) +
     pad('DATE', 11) +
     pad('SCEN', 5) +
-    pad('HEAP_M', 7) +
-    pad('HEAP_F', 7) +
+    pad('TOT_M', 7) +
+    pad('TOT_F', 7) +
     pad('SAVE%', 6) +
     pad('LOAD_F', 8) +
     pad('SRCH_F', 8) +
@@ -150,8 +153,8 @@ function printTimeline (entries) {
       pad(e.git?.commitShort, 8) +
       pad((e.git?.commitDate ?? '').slice(0, 10), 11) +
       pad(e.scenarios?.length, 5) +
-      pad(m.heapMutableMb, 7) +
-      pad(m.heapFrozenMb, 7) +
+      pad(m.heapMutableTotalMb, 7) +
+      pad(m.heapFrozenTotalMb, 7) +
       pad(m.heapSavingPct, 6) +
       pad(m.loadBinaryMs, 8) +
       pad(m.searchFrozenP50, 8) +
@@ -173,7 +176,7 @@ function printVsMutable (entries) {
       continue
     }
     console.log(`  ${id}`)
-    console.log(`    heap:  mutable ${m.heapMutableMb} MB → frozen ${m.heapFrozenMb} MB (${m.heapSavingPct}% smaller)`)
+    console.log(`    RAM total:  mutable ${m.heapMutableTotalMb} MB → frozen ${m.heapFrozenTotalMb} MB (${m.heapSavingPct}% smaller; heap-only ${m.heapOnlySavingPct ?? '—'}%)`)
     console.log(`    load:  JSON ${m.loadJsonMs} ms → binary ${m.loadBinaryMs} ms`)
     console.log(`    search p50 avg: mutable ${m.searchMutableP50} ms, frozen ${m.searchFrozenP50} ms (${m.searchFrozenVsMutablePct}% vs mutable)`)
     if (m.scoreDriftMaxRel != null) {
@@ -218,17 +221,17 @@ function changelogBullets (entries, curRef, prevRef = null) {
   const pm = prev ? extract(prev, REF_SCENARIO) : null
 
   if (pm && m) {
-    const heapD = pctDelta(pm.heapFrozenMb, m.heapFrozenMb)
+    const heapD = pctDelta(pm.heapFrozenTotalMb, m.heapFrozenTotalMb)
     if (heapD != null && Math.abs(heapD) >= THRESHOLDS.heapFrozenMb) {
       const dir = heapD < 0 ? 'lower' : 'higher'
       bullets.push(
-        `Benchmark (${REF_SCENARIO}): frozen heap ${dir} ${Math.abs(heapD)}% vs ${prev.git.commitShort} (${pm.heapFrozenMb} → ${m.heapFrozenMb} MB isolated heap)`
+        `Benchmark (${REF_SCENARIO}): frozen totalResident ${dir} ${Math.abs(heapD)}% vs ${prev.git.commitShort} (${pm.heapFrozenTotalMb} → ${m.heapFrozenTotalMb} MB isolated heap)`
       )
     }
     const saveD = ptsDelta(pm.heapSavingPct, m.heapSavingPct)
     if (saveD != null && Math.abs(saveD) >= THRESHOLDS.heapSavingPts) {
       bullets.push(
-        `Benchmark: frozen index uses ${m.heapSavingPct}% less heap than mutable MiniSearch on same corpus (was ${pm.heapSavingPct}% at ${prev.git.commitShort})`
+        `Benchmark: frozen index uses ${m.heapSavingPct}% less total RAM than mutable MiniSearch on same corpus (was ${pm.heapSavingPct}% at ${prev.git.commitShort})`
       )
     }
     if (pm.binaryMagic !== m.binaryMagic) {
@@ -288,7 +291,7 @@ function printRetroChangelog (entries) {
     console.log(`### ${e.git.commitShort} — ${label}`)
     console.log(`  ${e.git.subject}`)
     if (m) {
-      console.log(`  - divina-indexOnly: frozen heap ${m.heapFrozenMb} MB (${m.heapSavingPct}% vs mutable), loadBinary ${m.loadBinaryMs} ms, ${m.binaryMagic}`)
+      console.log(`  - divina-indexOnly: frozen total ${m.heapFrozenTotalMb} MB (${m.heapSavingPct}% vs mutable), loadBinary ${m.loadBinaryMs} ms, ${m.binaryMagic}`)
       console.log(`  - search p50: frozen ${m.searchFrozenP50} ms vs mutable ${m.searchMutableP50} ms (${m.searchFrozenVsMutablePct}%)`)
     }
     console.log('')
@@ -297,8 +300,8 @@ function printRetroChangelog (entries) {
   const last = extract(entries[entries.length - 1], REF_SCENARIO)
   if (first && last) {
     console.log('### Overall (first → last recorded commit)')
-    console.log(`  - frozen heap: ${first.heapFrozenMb} → ${last.heapFrozenMb} MB (${pctDelta(first.heapFrozenMb, last.heapFrozenMb)}%)`)
-    console.log(`  - heap saving vs mutable: ${first.heapSavingPct}% → ${last.heapSavingPct}%`)
+    console.log(`  - frozen totalResident: ${first.heapFrozenTotalMb} → ${last.heapFrozenTotalMb} MB (${pctDelta(first.heapFrozenTotalMb, last.heapFrozenTotalMb)}%)`)
+    console.log(`  - total resident saving vs mutable: ${first.heapSavingPct}% → ${last.heapSavingPct}%`)
     console.log(`  - loadBinary: ${first.loadBinaryMs} → ${last.loadBinaryMs} ms`)
     console.log(`  - format: ${first.binaryMagic} → ${last.binaryMagic}`)
     console.log('')

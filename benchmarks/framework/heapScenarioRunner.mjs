@@ -49,8 +49,11 @@ export function runHeapScenario (scenarioId, opts = {}) {
   const frozenIndex = FrozenMiniSearch.fromDocuments(scenario.corpus, scenario.options)
   const breakdown = frozenIndex._memoryBreakdown()
 
-  const savingPct = mutable.heapMb > 0
+  const heapOnlySavingPct = mutable.heapMb > 0
     ? Number((100 * (1 - frozen.heapMb / mutable.heapMb)).toFixed(1))
+    : 0
+  const savingPct = mutable.totalResidentApproxMb > 0
+    ? Number((100 * (1 - frozen.totalResidentApproxMb / mutable.totalResidentApproxMb)).toFixed(1))
     : 0
 
   return {
@@ -59,7 +62,10 @@ export function runHeapScenario (scenarioId, opts = {}) {
     heapMb: {
       mutable: mutable.heapMb,
       frozen: frozen.heapMb,
+      mutableTotalResident: mutable.totalResidentApproxMb,
+      frozenTotalResident: frozen.totalResidentApproxMb,
       frozenVsMutableSavingPct: savingPct,
+      frozenVsMutableHeapOnlySavingPct: heapOnlySavingPct,
       protocol: {
         version: HEAP_BENCH_PROTOCOL_VERSION,
         trials,

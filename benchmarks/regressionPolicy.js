@@ -170,34 +170,65 @@ export function refBelowHeapFloor (heapRefMb) {
 }
 
 /**
- * Compare frozen heap MB; uses absolute KB deltas when reference is below {@link HEAP_MB_FLOOR}.
+ * Compare frozen totalResident MB (heapUsed + external); primary heap regression metric.
  * @returns whether reference was below the floor (skip saving-% comparison when true)
  */
-export function compareHeapFrozenMb (heapRef, heapCur, compareMetric, bump) {
-  const belowFloor = refBelowHeapFloor(heapRef)
-  if (heapRef != null && heapCur != null && belowFloor) {
-    const absDeltaKb = (heapCur - heapRef) * 1024
+export function compareHeapFrozenTotalResidentMb (totalRef, totalCur, compareMetric, bump) {
+  const belowFloor = refBelowHeapFloor(totalRef)
+  if (totalRef != null && totalCur != null && belowFloor) {
+    const absDeltaKb = (totalCur - totalRef) * 1024
     const icon = absDeltaKb > HEAP_ABS_FAIL_KB ? 'FAIL' : absDeltaKb > HEAP_ABS_WARN_KB ? 'warn' : 'ok  '
     console.log(
-      `  ${icon} heap frozen (MB)                 ref=${String(heapRef).padEnd(10)} cur=${String(heapCur).padEnd(10)} Δ +${absDeltaKb.toFixed(0)} KB (floor; ref < ${HEAP_MB_FLOOR} MB)`,
+      `  ${icon} frozen totalResident (MB)       ref=${String(totalRef).padEnd(10)} cur=${String(totalCur).padEnd(10)} Δ +${absDeltaKb.toFixed(0)} KB (floor; ref < ${HEAP_MB_FLOOR} MB)`,
     )
     if (absDeltaKb > HEAP_ABS_FAIL_KB) bump('fail')
     else if (absDeltaKb > HEAP_ABS_WARN_KB) bump('warn')
     return true
   }
-  bump(compareMetric('heap frozen (MB)', heapRef, heapCur, 'heapFrozenMb'))
+  bump(compareMetric('frozen totalResident (MB)', totalRef, totalCur, 'heapFrozenMb'))
+  return belowFloor
+}
+
+/**
+ * Compare frozen heapUsed MB; informative secondary metric (TypedArray backing stores excluded).
+ * @returns whether reference was below the floor
+ */
+export function compareHeapFrozenMb (heapRef, heapCur, compareMetric, bump, { informative = false } = {}) {
+  const belowFloor = refBelowHeapFloor(heapRef)
+  if (heapRef != null && heapCur != null && belowFloor) {
+    const absDeltaKb = (heapCur - heapRef) * 1024
+    const icon = informative ? 'info' : absDeltaKb > HEAP_ABS_FAIL_KB ? 'FAIL' : absDeltaKb > HEAP_ABS_WARN_KB ? 'warn' : 'ok  '
+    console.log(
+      `  ${icon} heap frozen heap-only (MB)       ref=${String(heapRef).padEnd(10)} cur=${String(heapCur).padEnd(10)} Δ +${absDeltaKb.toFixed(0)} KB (floor; ref < ${HEAP_MB_FLOOR} MB)`,
+    )
+    if (!informative) {
+      if (absDeltaKb > HEAP_ABS_FAIL_KB) bump('fail')
+      else if (absDeltaKb > HEAP_ABS_WARN_KB) bump('warn')
+    }
+    return true
+  }
+  if (informative) {
+    const deltaPct = heapRef !== 0 ? ((heapCur - heapRef) / heapRef) * 100 : null
+    const sign = deltaPct != null && deltaPct > 0 ? '+' : ''
+    const deltaStr = deltaPct != null ? `${sign}${deltaPct.toFixed(1)}%` : '—'
+    console.log(
+      `  info heap frozen heap-only (MB)       ref=${String(heapRef).padEnd(10)} cur=${String(heapCur).padEnd(10)} Δ ${deltaStr}`,
+    )
+    return belowFloor
+  }
+  bump(compareMetric('heap frozen heap-only (MB)', heapRef, heapCur, 'heapFrozenMb'))
   return belowFloor
 }
 
 export function compareHeapSavingPct (ref, cur, skip, compareMetric, bump) {
   if (skip) {
     console.log(
-      `  ok   heap saving vs mutable (%)       ref=${ref.heapMb.frozenVsMutableSavingPct}       cur=${cur.heapMb.frozenVsMutableSavingPct}       (skipped; ref heap below floor)`,
+      `  ok   total resident saving vs mutable (%) ref=${ref.heapMb.frozenVsMutableSavingPct}       cur=${cur.heapMb.frozenVsMutableSavingPct}       (skipped; ref below floor)`,
     )
     return
   }
   bump(compareMetric(
-    'heap saving vs mutable (%)',
+    'total resident saving vs mutable (%)',
     ref.heapMb.frozenVsMutableSavingPct,
     cur.heapMb.frozenVsMutableSavingPct,
     'heapFrozenSavingPct',

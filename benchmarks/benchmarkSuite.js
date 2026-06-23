@@ -224,6 +224,12 @@ function aggregateScenarioRuns (runs) {
   const heapFrozen = base.heapMb
     ? medianRound(runs.map((r) => r.heapMb?.frozen).filter((v) => v != null), 3)
     : undefined
+  const heapMutableTotal = base.heapMb?.mutableTotalResident != null
+    ? medianRound(runs.map((r) => r.heapMb?.mutableTotalResident).filter((v) => v != null), 3)
+    : undefined
+  const heapFrozenTotal = base.heapMb?.frozenTotalResident != null
+    ? medianRound(runs.map((r) => r.heapMb?.frozenTotalResident).filter((v) => v != null), 3)
+    : undefined
   const heapBuildMutableFreeze = base.heapMb?.buildMutableFreeze != null
     ? medianRound(runs.map((r) => r.heapMb?.buildMutableFreeze).filter((v) => v != null), 3)
     : undefined
@@ -236,7 +242,10 @@ function aggregateScenarioRuns (runs) {
   const heapLoadBinary = base.heapMb?.loadBinary != null
     ? medianRound(runs.map((r) => r.heapMb?.loadBinary).filter((v) => v != null), 3)
     : undefined
-  const heapSavingPct = heapMutable != null && heapFrozen != null && heapMutable > 0
+  const heapSavingPct = heapMutableTotal != null && heapFrozenTotal != null && heapMutableTotal > 0
+    ? Number((100 * (1 - heapFrozenTotal / heapMutableTotal)).toFixed(1))
+    : undefined
+  const heapOnlySavingPct = heapMutable != null && heapFrozen != null && heapMutable > 0
     ? Number((100 * (1 - heapFrozen / heapMutable)).toFixed(1))
     : undefined
   const buildHeapSavingPct = heapBuildMutableFreeze != null && heapBuildFromDocuments != null && heapBuildMutableFreeze > 0
@@ -301,6 +310,10 @@ function aggregateScenarioRuns (runs) {
       heapMb: {
         mutable: heapMutable,
         frozen: heapFrozen,
+        ...(heapMutableTotal != null && heapFrozenTotal != null ? {
+          mutableTotalResident: heapMutableTotal,
+          frozenTotalResident: heapFrozenTotal,
+        } : {}),
         ...(heapBuildMutableFreeze != null && heapBuildFromDocuments != null ? {
           buildMutableFreeze: heapBuildMutableFreeze,
           buildFromDocuments: heapBuildFromDocuments,
@@ -310,7 +323,8 @@ function aggregateScenarioRuns (runs) {
           loadJson: heapLoadJson,
           loadBinary: heapLoadBinary,
         } : {}),
-        frozenVsMutableSavingPct: heapSavingPct,
+        ...(heapSavingPct != null ? { frozenVsMutableSavingPct: heapSavingPct } : {}),
+        ...(heapOnlySavingPct != null ? { frozenVsMutableHeapOnlySavingPct: heapOnlySavingPct } : {}),
       },
     } : {}),
     diskMb: {

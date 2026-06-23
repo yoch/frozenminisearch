@@ -21,6 +21,7 @@ PNPM := pnpm
 # devDeps live in node_modules/.bin/ and are reached via pnpm exec (make does
 # not inherit pnpm's augmented PATH).
 RUN := $(PNPM) exec
+BENCH_TSX := $(PNPM) exec tsx --expose-gc
 
 # Build freshness marker. Targets that consume dist/ depend on this real file.
 # The dependency list below makes make rebuild whenever any source or build
@@ -163,10 +164,10 @@ bench-reference-update: $(DIST_MARKER)
 
 .PHONY: benchmark-compare benchmark-record benchmark-diff
 benchmark-compare: $(DIST_MARKER)
-	$(NODE) $(EXPOSE) benchmarks/compare.js
+	$(BENCH_TSX) benchmarks/compare.js
 
 benchmark-record: $(DIST_MARKER)
-	$(NODE) $(EXPOSE) benchmarks/captureBaseline.js
+	$(BENCH_TSX) benchmarks/captureBaseline.js
 
 benchmark-diff:
 	$(NODE) $(EXPOSE) benchmarks/diffBaseline.js
@@ -174,21 +175,23 @@ benchmark-diff:
 # Specialised variants of captureBaseline.js
 .PHONY: benchmark-record-quick benchmark-record-search benchmark-baseline-update
 benchmark-record-quick: $(DIST_MARKER)
-	RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20 $(NODE) $(EXPOSE) benchmarks/captureBaseline.js
+	RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20 $(BENCH_TSX) benchmarks/captureBaseline.js
 
 benchmark-record-search: $(DIST_MARKER)
-	BENCH_SEARCH_ONLY=1 $(NODE) $(EXPOSE) benchmarks/captureBaseline.js
+	BENCH_SEARCH_ONLY=1 $(BENCH_TSX) benchmarks/captureBaseline.js
 
 benchmark-baseline-update: $(DIST_MARKER)
-	$(NODE) $(EXPOSE) benchmarks/captureBaseline.js --reference
+	$(BENCH_TSX) benchmarks/captureBaseline.js --reference
 
 # Variants of diffBaseline.js
 .PHONY: benchmark-diff-run benchmark-diff-search-run
 benchmark-diff-run: $(DIST_MARKER)
-	$(NODE) $(EXPOSE) benchmarks/diffBaseline.js --run
+	$(BENCH_TSX) benchmarks/captureBaseline.js
+	$(NODE) $(EXPOSE) benchmarks/diffBaseline.js
 
 benchmark-diff-search-run: $(DIST_MARKER)
-	BENCH_SEARCH_ONLY=1 $(NODE) $(EXPOSE) benchmarks/diffBaseline.js --run
+	BENCH_SEARCH_ONLY=1 $(BENCH_TSX) benchmarks/captureBaseline.js
+	BENCH_SEARCH_ONLY=1 $(NODE) $(EXPOSE) benchmarks/diffBaseline.js
 
 # Tuning / calibration workflows
 .PHONY: benchmark-calibrate-batches benchmark-validate-freq-adaptive benchmark-and-gate-tuning

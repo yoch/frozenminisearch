@@ -38,16 +38,24 @@
     "batchMode": "fixed-per-query"
   },
   "heapBenchProtocol": {
-    "version": 3,
-    "trials": 3,
+    "version": 4,
+    "trials": 7,
     "gcPasses": 3,
     "isolated": "per-scenario",
     "inProcessTrials": true,
     "scenarioAllowlist": [
       "divina-storeFields",
       "divina-indexOnly",
+      "extreme-giantVocabulary",
       "extreme-largeDocuments",
-      "sparseFields-50kTerms-20Fields"
+      "extreme-manyFields",
+      "extreme-highFrequency",
+      "extreme-overflowFrequency",
+      "denseNumericIds-100k",
+      "genericStringIds-100k",
+      "sparseFields-50kTerms-20Fields",
+      "docIdUint16Boundary-65535",
+      "docIdUint16Boundary-65536"
     ],
     "paths": [
       "mutable-addAll",
@@ -442,19 +450,22 @@
         "diskBinaryVsJsonSavingPct": 71,
         "loadBinaryVsJsonSavingPct": 53.8,
         "searchFrozenP50AvgGainPct": 19.4,
-        "heapFrozenVsMutableSavingPct": 98.2
+        "heapFrozenVsMutableSavingPct": 94.9
       },
       "heapMb": {
-        "mutable": 16.126,
-        "frozen": 0.284,
-        "frozenVsMutableSavingPct": 98.2,
+        "mutable": 16.12,
+        "frozen": 0.262,
+        "mutableTotalResident": 16.12,
+        "frozenTotalResident": 0.827,
+        "frozenVsMutableSavingPct": 94.9,
+        "frozenVsMutableHeapOnlySavingPct": 98.4,
         "protocol": {
-          "version": 3,
-          "trials": 3,
+          "version": 4,
+          "trials": 7,
           "gcPasses": 3,
           "isolated": "per-scenario",
           "inProcessTrials": true,
-          "warmup": 20,
+          "warmup": 2,
           "paths": [
             "mutable-addAll",
             "frozen-fromDocuments"
@@ -463,25 +474,25 @@
       },
       "heapSkipped": null,
       "heapStability": {
-        "mutableMadMb": 0.006,
-        "frozenMadMb": 0.003,
-        "mutableTotalResidentMadMb": 0.006,
-        "frozenTotalResidentMadMb": 0.003
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.009,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.009
       },
       "memoryMb": {
         "mutable": {
-          "heapUsed": 16.126,
+          "heapUsed": 16.12,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 1.996,
-          "totalResidentApprox": 16.126
+          "rss": 16.051,
+          "totalResidentApprox": 16.12
         },
         "frozen": {
-          "heapUsed": 0.284,
+          "heapUsed": 0.262,
           "external": 0.565,
           "arrayBuffers": 0.565,
-          "rss": 0.758,
-          "totalResidentApprox": 0.849
+          "rss": 0.641,
+          "totalResidentApprox": 0.827
         }
       }
     },
@@ -636,19 +647,22 @@
         "diskBinaryVsJsonSavingPct": 74.4,
         "loadBinaryVsJsonSavingPct": 82,
         "searchFrozenP50AvgGainPct": 16.5,
-        "heapFrozenVsMutableSavingPct": 98.8
+        "heapFrozenVsMutableSavingPct": 95.2
       },
       "heapMb": {
         "mutable": 14.93,
-        "frozen": 0.172,
-        "frozenVsMutableSavingPct": 98.8,
+        "frozen": 0.155,
+        "mutableTotalResident": 14.93,
+        "frozenTotalResident": 0.72,
+        "frozenVsMutableSavingPct": 95.2,
+        "frozenVsMutableHeapOnlySavingPct": 99,
         "protocol": {
-          "version": 3,
-          "trials": 3,
+          "version": 4,
+          "trials": 7,
           "gcPasses": 3,
           "isolated": "per-scenario",
           "inProcessTrials": true,
-          "warmup": 20,
+          "warmup": 2,
           "paths": [
             "mutable-addAll",
             "frozen-fromDocuments"
@@ -657,25 +671,25 @@
       },
       "heapSkipped": null,
       "heapStability": {
-        "mutableMadMb": 0,
-        "frozenMadMb": 0.001,
-        "mutableTotalResidentMadMb": 0,
-        "frozenTotalResidentMadMb": 0.001
+        "mutableMadMb": 0.001,
+        "frozenMadMb": 0.011,
+        "mutableTotalResidentMadMb": 0.001,
+        "frozenTotalResidentMadMb": 0.011
       },
       "memoryMb": {
         "mutable": {
           "heapUsed": 14.93,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 1.398,
+          "rss": 14.512,
           "totalResidentApprox": 14.93
         },
         "frozen": {
-          "heapUsed": 0.172,
+          "heapUsed": 0.155,
           "external": 0.565,
           "arrayBuffers": 0.565,
-          "rss": 0.523,
-          "totalResidentApprox": 0.737
+          "rss": 0.762,
+          "totalResidentApprox": 0.72
         }
       }
     },
@@ -699,7 +713,8 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 81,
         "loadBinaryVsJsonSavingPct": 85.6,
-        "searchFrozenP50AvgGainPct": 35
+        "searchFrozenP50AvgGainPct": 35,
+        "heapFrozenVsMutableSavingPct": 95.9
       },
       "indexing": {
         "addAllMs": 218.97,
@@ -884,7 +899,79 @@
         "effective": 1,
         "reason": "very expensive calibrated search (105.9 ms >= 50 ms)"
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 47.201,
+        "frozen": 0.443,
+        "mutableTotalResident": 47.201,
+        "frozenTotalResident": 1.921,
+        "frozenVsMutableSavingPct": 95.9,
+        "frozenVsMutableHeapOnlySavingPct": 99.1,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.006,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.006
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 47.201,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 47.516,
+          "totalResidentApprox": 47.201
+        },
+        "frozen": {
+          "heapUsed": 0.443,
+          "external": 1.478,
+          "arrayBuffers": 1.478,
+          "rss": 1.852,
+          "totalResidentApprox": 1.921
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 50003,
+        "documentCount": 50000,
+        "nextId": 50000,
+        "postings": {
+          "slotCount": 50003,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 400000,
+          "allFreqsBytes": 200000,
+          "offsetsBytes": 200012,
+          "lengthsBytes": 200012,
+          "totalTypedBytes": 1000024
+        },
+        "radixTree": {
+          "nodeCount": 50005,
+          "edgeCount": 50004,
+          "estimatedBytes": 600089
+        },
+        "documents": {
+          "externalIdsSlots": 50000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 50000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 1650117
+      }
     },
     {
       "id": "extreme-largeDocuments",
@@ -1039,19 +1126,22 @@
         "diskBinaryVsJsonSavingPct": 99.4,
         "loadBinaryVsJsonSavingPct": -88.9,
         "searchFrozenP50AvgGainPct": 47.3,
-        "heapFrozenVsMutableSavingPct": 98.5
+        "heapFrozenVsMutableSavingPct": 95.1
       },
       "heapMb": {
         "mutable": 6.568,
-        "frozen": 0.097,
-        "frozenVsMutableSavingPct": 98.5,
+        "frozen": 0.102,
+        "mutableTotalResident": 6.568,
+        "frozenTotalResident": 0.321,
+        "frozenVsMutableSavingPct": 95.1,
+        "frozenVsMutableHeapOnlySavingPct": 98.4,
         "protocol": {
-          "version": 3,
-          "trials": 3,
+          "version": 4,
+          "trials": 7,
           "gcPasses": 3,
           "isolated": "per-scenario",
           "inProcessTrials": true,
-          "warmup": 100,
+          "warmup": 2,
           "paths": [
             "mutable-addAll",
             "frozen-fromDocuments"
@@ -1061,24 +1151,24 @@
       "heapSkipped": null,
       "heapStability": {
         "mutableMadMb": 0,
-        "frozenMadMb": 0.007,
+        "frozenMadMb": 0.01,
         "mutableTotalResidentMadMb": 0,
-        "frozenTotalResidentMadMb": 0.007
+        "frozenTotalResidentMadMb": 0.01
       },
       "memoryMb": {
         "mutable": {
           "heapUsed": 6.568,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 2.75,
+          "rss": 6.25,
           "totalResidentApprox": 6.568
         },
         "frozen": {
-          "heapUsed": 0.097,
+          "heapUsed": 0.102,
           "external": 0.22,
           "arrayBuffers": 0.22,
-          "rss": 0.109,
-          "totalResidentApprox": 0.317
+          "rss": 0.191,
+          "totalResidentApprox": 0.321
         }
       }
     },
@@ -1211,9 +1301,82 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 92.2,
         "loadBinaryVsJsonSavingPct": 88,
-        "searchFrozenP50AvgGainPct": 48.4
+        "searchFrozenP50AvgGainPct": 48.4,
+        "heapFrozenVsMutableSavingPct": 93.7
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 7.082,
+        "frozen": 0.024,
+        "mutableTotalResident": 7.082,
+        "frozenTotalResident": 0.445,
+        "frozenVsMutableSavingPct": 93.7,
+        "frozenVsMutableHeapOnlySavingPct": 99.7,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.01,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.01
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 7.082,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 5.25,
+          "totalResidentApprox": 7.082
+        },
+        "frozen": {
+          "heapUsed": 0.024,
+          "external": 0.421,
+          "arrayBuffers": 0.421,
+          "rss": 0.82,
+          "totalResidentApprox": 0.445
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 2012,
+        "documentCount": 2000,
+        "nextId": 2000,
+        "postings": {
+          "slotCount": 20120,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 160000,
+          "allFreqsBytes": 80000,
+          "offsetsBytes": 80480,
+          "lengthsBytes": 80480,
+          "totalTypedBytes": 400960
+        },
+        "radixTree": {
+          "nodeCount": 2014,
+          "edgeCount": 2013,
+          "estimatedBytes": 24189
+        },
+        "documents": {
+          "externalIdsSlots": 2000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 20000,
+          "avgFieldLengthBytes": 40,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 445189
+      }
     },
     {
       "id": "extreme-highFrequency",
@@ -1235,7 +1398,8 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 91.8,
         "loadBinaryVsJsonSavingPct": 82.6,
-        "searchFrozenP50AvgGainPct": 42.9
+        "searchFrozenP50AvgGainPct": 42.9,
+        "heapFrozenVsMutableSavingPct": 94.3
       },
       "indexing": {
         "addAllMs": 81.88,
@@ -1342,7 +1506,79 @@
         "effective": 1,
         "reason": "expensive search-levels scenario (23.1 ms >= 20 ms)"
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 7.371,
+        "frozen": 0.118,
+        "mutableTotalResident": 7.371,
+        "frozenTotalResident": 0.418,
+        "frozenVsMutableSavingPct": 94.3,
+        "frozenVsMutableHeapOnlySavingPct": 98.4,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0.001,
+        "frozenMadMb": 0.011,
+        "mutableTotalResidentMadMb": 0.001,
+        "frozenTotalResidentMadMb": 0.011
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 7.371,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 6.887,
+          "totalResidentApprox": 7.371
+        },
+        "frozen": {
+          "heapUsed": 0.118,
+          "external": 0.3,
+          "arrayBuffers": 0.3,
+          "rss": 0.605,
+          "totalResidentApprox": 0.418
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 258,
+        "documentCount": 10000,
+        "nextId": 10000,
+        "postings": {
+          "slotCount": 258,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 200000,
+          "allFreqsBytes": 100000,
+          "offsetsBytes": 1032,
+          "lengthsBytes": 1032,
+          "totalTypedBytes": 302064
+        },
+        "radixTree": {
+          "nodeCount": 262,
+          "edgeCount": 261,
+          "estimatedBytes": 3217
+        },
+        "documents": {
+          "externalIdsSlots": 10000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 10000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 315285
+      }
     },
     {
       "id": "extreme-overflowFrequency",
@@ -1435,9 +1671,82 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 90.1,
         "loadBinaryVsJsonSavingPct": 43.3,
-        "searchFrozenP50AvgGainPct": 25.9
+        "searchFrozenP50AvgGainPct": 25.9,
+        "heapFrozenVsMutableSavingPct": 90.8
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 0.684,
+        "frozen": 0.039,
+        "mutableTotalResident": 0.684,
+        "frozenTotalResident": 0.063,
+        "frozenVsMutableSavingPct": 90.8,
+        "frozenVsMutableHeapOnlySavingPct": 94.3,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0.001,
+        "frozenMadMb": 0.005,
+        "mutableTotalResidentMadMb": 0.001,
+        "frozenTotalResidentMadMb": 0.005
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 0.684,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 0.75,
+          "totalResidentApprox": 0.684
+        },
+        "frozen": {
+          "heapUsed": 0.039,
+          "external": 0.025,
+          "arrayBuffers": 0.025,
+          "rss": 0,
+          "totalResidentApprox": 0.063
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 4,
+        "documentCount": 2000,
+        "nextId": 2000,
+        "postings": {
+          "slotCount": 4,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 12000,
+          "allFreqsBytes": 12000,
+          "offsetsBytes": 16,
+          "lengthsBytes": 16,
+          "totalTypedBytes": 24032
+        },
+        "radixTree": {
+          "nodeCount": 5,
+          "edgeCount": 4,
+          "estimatedBytes": 66
+        },
+        "documents": {
+          "externalIdsSlots": 2000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 2000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 26102
+      }
     },
     {
       "id": "denseNumericIds-100k",
@@ -1520,9 +1829,82 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 73.3,
         "loadBinaryVsJsonSavingPct": 87.9,
-        "searchFrozenP50AvgGainPct": 28.1
+        "searchFrozenP50AvgGainPct": 28.1,
+        "heapFrozenVsMutableSavingPct": 94.6
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 91.267,
+        "frozen": 0.873,
+        "mutableTotalResident": 91.267,
+        "frozenTotalResident": 4.904,
+        "frozenVsMutableSavingPct": 94.6,
+        "frozenVsMutableHeapOnlySavingPct": 99,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.005,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.005
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 91.267,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 91.848,
+          "totalResidentApprox": 91.267
+        },
+        "frozen": {
+          "heapUsed": 0.873,
+          "external": 4.03,
+          "arrayBuffers": 4.03,
+          "rss": 4.73,
+          "totalResidentApprox": 4.904
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 101001,
+        "documentCount": 100000,
+        "nextId": 100000,
+        "postings": {
+          "slotCount": 101001,
+          "layout": "dense",
+          "docIdWidth": 32,
+          "allDocIdsBytes": 1200000,
+          "allFreqsBytes": 300000,
+          "offsetsBytes": 404004,
+          "lengthsBytes": 404004,
+          "totalTypedBytes": 2308008
+        },
+        "radixTree": {
+          "nodeCount": 101003,
+          "edgeCount": 101002,
+          "estimatedBytes": 2020065
+        },
+        "documents": {
+          "externalIdsSlots": 100000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 100000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 4428077
+      }
     },
     {
       "id": "genericStringIds-100k",
@@ -1605,9 +1987,82 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 73.9,
         "loadBinaryVsJsonSavingPct": 85,
-        "searchFrozenP50AvgGainPct": 16.8
+        "searchFrozenP50AvgGainPct": 16.8,
+        "heapFrozenVsMutableSavingPct": 94.6
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 91.267,
+        "frozen": 0.872,
+        "mutableTotalResident": 91.267,
+        "frozenTotalResident": 4.903,
+        "frozenVsMutableSavingPct": 94.6,
+        "frozenVsMutableHeapOnlySavingPct": 99,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.006,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.006
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 91.267,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 92.199,
+          "totalResidentApprox": 91.267
+        },
+        "frozen": {
+          "heapUsed": 0.872,
+          "external": 4.03,
+          "arrayBuffers": 4.03,
+          "rss": 4.852,
+          "totalResidentApprox": 4.903
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 101001,
+        "documentCount": 100000,
+        "nextId": 100000,
+        "postings": {
+          "slotCount": 101001,
+          "layout": "dense",
+          "docIdWidth": 32,
+          "allDocIdsBytes": 1200000,
+          "allFreqsBytes": 300000,
+          "offsetsBytes": 404004,
+          "lengthsBytes": 404004,
+          "totalTypedBytes": 2308008
+        },
+        "radixTree": {
+          "nodeCount": 101003,
+          "edgeCount": 101002,
+          "estimatedBytes": 2020065
+        },
+        "documents": {
+          "externalIdsSlots": 100000,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "lazy-map",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 100000,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 4428077
+      }
     },
     {
       "id": "sparseFields-50kTerms-20Fields",
@@ -1710,20 +2165,23 @@
         "diskBinaryVsJsonSavingPct": 90.2,
         "loadBinaryVsJsonSavingPct": 84.7,
         "searchFrozenP50AvgGainPct": 41.1,
-        "heapFrozenVsMutableSavingPct": 98.8
+        "heapFrozenVsMutableSavingPct": 93.9
       },
       "heapSkipped": null,
       "heapMb": {
         "mutable": 5.161,
-        "frozen": 0.064,
-        "frozenVsMutableSavingPct": 98.8,
+        "frozen": 0.067,
+        "mutableTotalResident": 5.161,
+        "frozenTotalResident": 0.316,
+        "frozenVsMutableSavingPct": 93.9,
+        "frozenVsMutableHeapOnlySavingPct": 98.7,
         "protocol": {
-          "version": 3,
-          "trials": 3,
+          "version": 4,
+          "trials": 7,
           "gcPasses": 3,
           "isolated": "per-scenario",
           "inProcessTrials": true,
-          "warmup": 100,
+          "warmup": 2,
           "paths": [
             "mutable-addAll",
             "frozen-fromDocuments"
@@ -1732,24 +2190,24 @@
       },
       "heapStability": {
         "mutableMadMb": 0,
-        "frozenMadMb": 0.013,
+        "frozenMadMb": 0.006,
         "mutableTotalResidentMadMb": 0,
-        "frozenTotalResidentMadMb": 0.013
+        "frozenTotalResidentMadMb": 0.006
       },
       "memoryMb": {
         "mutable": {
           "heapUsed": 5.161,
           "external": 0,
           "arrayBuffers": 0,
-          "rss": 0.75,
+          "rss": 4.625,
           "totalResidentApprox": 5.161
         },
         "frozen": {
-          "heapUsed": 0.064,
+          "heapUsed": 0.067,
           "external": 0.248,
           "arrayBuffers": 0.248,
-          "rss": 0.484,
-          "totalResidentApprox": 0.312
+          "rss": 0.313,
+          "totalResidentApprox": 0.316
         }
       },
       "memoryBreakdown": {
@@ -1803,7 +2261,8 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 77.2,
         "loadBinaryVsJsonSavingPct": 90.7,
-        "searchFrozenP50AvgGainPct": 45
+        "searchFrozenP50AvgGainPct": 45,
+        "heapFrozenVsMutableSavingPct": 94.9
       },
       "indexing": {
         "addAllMs": 283.46,
@@ -1871,7 +2330,79 @@
         "effective": 1,
         "reason": "very expensive calibrated search (95.3 ms >= 50 ms)"
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 58.603,
+        "frozen": 0.578,
+        "mutableTotalResident": 58.603,
+        "frozenTotalResident": 3.016,
+        "frozenVsMutableSavingPct": 94.9,
+        "frozenVsMutableHeapOnlySavingPct": 99,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.009,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.009
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 58.603,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 59.105,
+          "totalResidentApprox": 58.603
+        },
+        "frozen": {
+          "heapUsed": 0.578,
+          "external": 2.438,
+          "arrayBuffers": 2.438,
+          "rss": 2.977,
+          "totalResidentApprox": 3.016
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 65538,
+        "documentCount": 65535,
+        "nextId": 65535,
+        "postings": {
+          "slotCount": 65538,
+          "layout": "dense",
+          "docIdWidth": 16,
+          "allDocIdsBytes": 524280,
+          "allFreqsBytes": 262140,
+          "offsetsBytes": 262152,
+          "lengthsBytes": 262152,
+          "totalTypedBytes": 1310724
+        },
+        "radixTree": {
+          "nodeCount": 65540,
+          "edgeCount": 65539,
+          "estimatedBytes": 1310817
+        },
+        "documents": {
+          "externalIdsSlots": 65535,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 65535,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 2687080
+      }
     },
     {
       "id": "docIdUint16Boundary-65536",
@@ -1893,7 +2424,8 @@
       "summary": {
         "diskBinaryVsJsonSavingPct": 73.9,
         "loadBinaryVsJsonSavingPct": 89.8,
-        "searchFrozenP50AvgGainPct": 54.8
+        "searchFrozenP50AvgGainPct": 54.8,
+        "heapFrozenVsMutableSavingPct": 94
       },
       "indexing": {
         "addAllMs": 277.87,
@@ -1961,7 +2493,79 @@
         "effective": 1,
         "reason": "very expensive calibrated search (95.6 ms >= 50 ms)"
       },
-      "heapSkipped": "not-in-allowlist"
+      "heapSkipped": null,
+      "heapMb": {
+        "mutable": 58.604,
+        "frozen": 0.578,
+        "mutableTotalResident": 58.604,
+        "frozenTotalResident": 3.516,
+        "frozenVsMutableSavingPct": 94,
+        "frozenVsMutableHeapOnlySavingPct": 99,
+        "protocol": {
+          "version": 4,
+          "trials": 7,
+          "gcPasses": 3,
+          "isolated": "per-scenario",
+          "inProcessTrials": true,
+          "warmup": 2,
+          "paths": [
+            "mutable-addAll",
+            "frozen-fromDocuments"
+          ]
+        }
+      },
+      "heapStability": {
+        "mutableMadMb": 0,
+        "frozenMadMb": 0.008,
+        "mutableTotalResidentMadMb": 0,
+        "frozenTotalResidentMadMb": 0.008
+      },
+      "memoryMb": {
+        "mutable": {
+          "heapUsed": 58.604,
+          "external": 0,
+          "arrayBuffers": 0,
+          "rss": 58.941,
+          "totalResidentApprox": 58.604
+        },
+        "frozen": {
+          "heapUsed": 0.578,
+          "external": 2.938,
+          "arrayBuffers": 2.938,
+          "rss": 3.395,
+          "totalResidentApprox": 3.516
+        }
+      },
+      "memoryBreakdown": {
+        "termCount": 65539,
+        "documentCount": 65536,
+        "nextId": 65536,
+        "postings": {
+          "slotCount": 65539,
+          "layout": "dense",
+          "docIdWidth": 32,
+          "allDocIdsBytes": 1048576,
+          "allFreqsBytes": 262144,
+          "offsetsBytes": 262156,
+          "lengthsBytes": 262156,
+          "totalTypedBytes": 1835032
+        },
+        "radixTree": {
+          "nodeCount": 65541,
+          "edgeCount": 65540,
+          "estimatedBytes": 1310837
+        },
+        "documents": {
+          "externalIdsSlots": 65536,
+          "storedFieldsSlots": 0,
+          "idLookupMode": "identity",
+          "idToShortIdEntries": 0,
+          "fieldLengthMatrixBytes": 65536,
+          "avgFieldLengthBytes": 4,
+          "storedFieldsJsonBytes": 0
+        },
+        "estimatedStructuredBytes": 3211409
+      }
     },
     {
       "id": "saveBinaryAfterNoTerms",

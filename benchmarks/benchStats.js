@@ -14,7 +14,11 @@ export const DEFAULT_HEAP_GC_PASSES = 3
 /** Reduced warm-up for very large corpora (>10k docs). */
 export const HEAP_WARMUP_CAP = 20
 
-export const HEAP_BENCH_PROTOCOL_VERSION = 3
+/** Heap retained metric: totalResidentApprox (heapUsed + external) for both sides. */
+export const HEAP_BENCH_PROTOCOL_VERSION = 4
+
+/** Default in-process warmup for retained-heap measurement (not search JIT warmup). */
+export const DEFAULT_HEAP_WARMUP = 2
 
 /** Median of numeric samples; 0 when empty (timing aggregates). */
 export function median (values) {

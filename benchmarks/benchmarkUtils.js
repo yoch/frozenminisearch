@@ -8,6 +8,7 @@ import {
   DEFAULT_HEAP_GC_PASSES,
   DEFAULT_HEAP_TRIALS,
   DEFAULT_HEAP_TRIALS_FAST,
+  DEFAULT_HEAP_WARMUP,
   HEAP_WARMUP_CAP,
   madMbRound,
   madOf,
@@ -158,6 +159,7 @@ export {
   DEFAULT_HEAP_GC_PASSES,
   DEFAULT_HEAP_TRIALS,
   DEFAULT_HEAP_TRIALS_FAST,
+  DEFAULT_HEAP_WARMUP,
   HEAP_WARMUP_CAP,
   madMbRound,
   madOf,
@@ -244,11 +246,10 @@ export function defaultHeapGcPasses () {
   return DEFAULT_HEAP_GC_PASSES
 }
 
-export function defaultHeapWarmup (documentCount = 0) {
+export function defaultHeapWarmup (_documentCount = 0) {
   const fromEnv = Number(process.env.BENCH_HEAP_WARMUP)
   if (Number.isFinite(fromEnv) && fromEnv >= 0) return Math.floor(fromEnv)
-  if (documentCount > 10_000) return HEAP_WARMUP_CAP
-  return DEFAULT_BENCH_WARMUP
+  return DEFAULT_HEAP_WARMUP
 }
 
 export function parseHeapPathsArg (args = process.argv) {

@@ -72,7 +72,7 @@ The hook **does not** fail the commit if the benchmark fails; it only logs.
 
 Each scenario already measures both indexes on the same corpus:
 
-- **Heap**: `heapMb.mutable` vs `heapMb.frozen` (+ `frozenVsMutableSavingPct`)
+- **Heap**: `totalResident` (`heapMb.mutableTotalResident` vs `heapMb.frozenTotalResident`, + `frozenVsMutableSavingPct`; heap-only detail in `heapMb.mutable` / `heapMb.frozen`)
 - **Search**: `search[].mutableP50` vs `search[].frozenP50` (+ `frozenP50VsMutablePct`)
 - **Score**: `scoreDrift` on `extreme-overflowFrequency` (tf > 255) — **0%** expected with adaptive freqs; legacy u8 may still drift
 
@@ -82,8 +82,8 @@ Each scenario already measures both indexes on the same corpus:
 
 | Metric | Threshold |
 |----------|--------|
-| Heap frozen | ±5% |
-| Heap saving vs mutable | ±3 points |
+| Frozen totalResident | ±5% |
+| Total resident saving vs mutable | ±3 points |
 | loadBinary | ±10% |
 | freeze | ±15% |
 | Search frozen vs mutable p50 | ±5 points |

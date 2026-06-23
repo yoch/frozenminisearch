@@ -23,6 +23,7 @@ import {
   resolveGateMaxSize,
 } from '../../src/queryEngineGateLimits.ts'
 import { executeQueryWithRunOptions } from '../../src/queryEngine.ts'
+import { executeRaw } from '../harness/frozenPipelineHarness.ts'
 import {
   docIdUint16Boundary,
   giantVocabulary,
@@ -213,7 +214,7 @@ function collectRealCases() {
   {
     const frozen = buildFrozen(giantVocabulary(50000), { prefix: true })
     const andPrefix = { combineWith: 'AND', prefix: true }
-    const gate = frozen.executeQuery('unique1', andPrefix).size
+    const gate = executeRaw(frozen, 'unique1', andPrefix).size
     cases.push({
       id: 'giantPrefix',
       label: 'giant AND+prefix unique1 common',
@@ -267,7 +268,7 @@ function collectRealCases() {
   {
     const docs = corpusSharedBucket(10000, 100, 7)
     const frozen = buildFrozen(docs, {})
-    const gate = frozen.executeQuery('bucket7', { combineWith: 'AND' }).size
+    const gate = executeRaw(frozen, 'bucket7', { combineWith: 'AND' }).size
     cases.push({
       id: 'selectiveAndBucket',
       label: 'bucket7 shared AND',

@@ -54,11 +54,11 @@ function fmtMs (n, digits = 2) {
 }
 
 function fmtHeapPair (scenario) {
-  const mut = scenario.heapMb?.mutable
-  const frz = scenario.heapMb?.frozen
+  const mut = scenario.heapMb?.mutableTotalResident ?? scenario.memoryMb?.mutable?.totalResidentApprox
+  const frz = scenario.heapMb?.frozenTotalResident ?? scenario.memoryMb?.frozen?.totalResidentApprox
   const save = scenario.heapMb?.frozenVsMutableSavingPct
   if (mut == null || frz == null) return '—'
-  return `${frz.toFixed(1)} vs ${mut.toFixed(1)} MB (${fmtSaving(save)})`
+  return `${frz.toFixed(2)} vs ${mut.toFixed(1)} MB total (${fmtSaving(save)})`
 }
 
 function scenarioById (id) {
@@ -120,7 +120,7 @@ function buildBlock () {
 
   const heapProto = payload.heapBenchProtocol?.version
   const heapNote = heapProto != null
-    ? `Heap protocol v${heapProto} (isolated scenario processes, in-process trials, median+MAD on allowlisted scenarios) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.`
+    ? `Heap protocol v${heapProto} (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.`
     : 'Heap is measured with one index alive and should be read as a trend, not exact accounting.'
 
   return `${START} — pnpm bench:readme -->

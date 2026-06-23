@@ -78,7 +78,7 @@ export function runHeapSuite (opts = {}) {
     results[id] = spawnHeapScenario(id, { reference, paths, trials, gcPasses })
     console.log(
       `[heap] ${id} done in ${((performance.now() - t0) / 1000).toFixed(1)}s `
-      + `(frozen ${results[id].heapMb.frozen} MB, ${results[id].heapMb.frozenVsMutableSavingPct}% vs mutable)`,
+      + `(frozen total ${results[id].heapMb.frozenTotalResident} MB, ${results[id].heapMb.frozenVsMutableSavingPct}% vs mutable)`,
     )
   }
 

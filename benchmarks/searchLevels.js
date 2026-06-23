@@ -3,10 +3,11 @@ import {
   benchTimedSamples,
   frozenVsMutablePct,
 } from './searchBenchTiming.js'
+import { executeRaw } from './harness/frozenPipelineHarness.ts'
 
 /**
  * Decompose search cost: L0 term lookup, L1 executeQuery (frozen), L2 full search (paired).
- * Bench-only: uses `_index` and `executeQuery` (private TS, callable at runtime).
+ * Bench-only: uses `_index` and executeRaw (not part of the public API).
  * @param {import('minisearch').default} mutableIndex
  * @param {import('../dist/es/index.js').default} frozenIndex
  * @param {string} term — processed lookup term (first query token)
@@ -30,7 +31,7 @@ export function benchSearchLevels (
   )
 
   const L1 = benchTimedSamples(
-    () => frozenIndex.executeQuery(query, searchOptions),
+    () => executeRaw(frozenIndex, query, searchOptions),
     iterations,
     batchSize,
   )

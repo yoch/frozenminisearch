@@ -3,5 +3,4 @@ allowBuilds:
   esbuild: true
   unrs-resolver: true
 minimumReleaseAge: 0
-legacyPeerDeps: true
 shamefullyHoist: false

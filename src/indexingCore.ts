@@ -77,8 +77,6 @@ function forEachDefaultToken(text: string, onToken: (token: string) => void): vo
   }
   if (start < text.length) {
     onToken(text.slice(start))
-  } else if (start === 0) {
-    onToken(text)
   } else if (start === text.length) {
     onToken('')
   }

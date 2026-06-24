@@ -65,9 +65,9 @@ describe('browser bundle smoke', () => {
     }
   })
 
-  test('fromJson round-trip search', () => {
+  test('fromJSON round-trip search', () => {
     const built = FrozenMiniSearch.fromDocuments(documents, options)
-    const loaded = FrozenMiniSearch.fromJson(JSON.stringify(built), options)
+    const loaded = FrozenMiniSearch.fromJSON(JSON.stringify(built), options)
     const hits = loaded.search('quixote', { prefix: true })
     expect(hits.map(h => h.id)).toEqual(['3'])
   })

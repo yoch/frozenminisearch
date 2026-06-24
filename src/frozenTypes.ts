@@ -41,7 +41,7 @@ export interface FrozenMemoryBreakdown {
 
 /**
  * Low-level parameters for internal frozen index assembly (custom frozen index pipelines).
- * Typical apps use {@link buildFrozenFromDocuments}, {@link FrozenMiniSearch.fromJson},
+ * Typical apps use {@link buildFrozenFromDocuments}, {@link FrozenMiniSearch.fromJSON},
  * or binary load instead.
  */
 export interface FrozenAssembleParams<T = any> {

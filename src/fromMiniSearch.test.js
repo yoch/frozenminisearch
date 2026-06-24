@@ -13,11 +13,11 @@ const options = {
 }
 
 describe('fromMiniSearch loaders', () => {
-  test('fromJson matches reference search', () => {
+  test('fromJSON matches reference search', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
     const json = JSON.stringify(reference)
-    const frozen = FrozenMiniSearch.fromJson(json, options)
+    const frozen = FrozenMiniSearch.fromJSON(json, options)
     expect(frozen.search('zen')).toEqual(reference.search('zen'))
     expect(frozen.search('ishmael', { prefix: true }).map(r => r.id)).toEqual(
       reference.search('ishmael', { prefix: true }).map(r => r.id),

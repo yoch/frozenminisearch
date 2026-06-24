@@ -30,7 +30,7 @@ export function heapFactoryForKind (kind, scenario, artifacts = {}) {
       return () => MiniSearch.loadJSON(artifacts.json, options)
     case 'fromJson':
       if (artifacts.json == null) throw new Error('fromJson heap path requires json artifact')
-      return () => FrozenMiniSearch.fromJson(artifacts.json, options)
+      return () => FrozenMiniSearch.fromJSON(artifacts.json, options)
     case 'loadBinary':
       if (artifacts.binaryBuf == null) throw new Error('loadBinary heap path requires binaryBuf artifact')
       return () => FrozenMiniSearch.loadBinarySync(artifacts.binaryBuf, options)

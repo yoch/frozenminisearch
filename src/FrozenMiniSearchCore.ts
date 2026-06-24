@@ -330,7 +330,7 @@ export default class FrozenMiniSearchCore<T = any> {
    * Accepts the wire format produced by MiniSearch `toJSON` or by {@link toJSON} on this class.
    * No runtime dependency on the `minisearch` package.
    */
-  static fromJson<T, I extends FrozenMiniSearchCore<T>>(
+  static fromJSON<T, I extends FrozenMiniSearchCore<T>>(
     this: FrozenMiniSearchCtor<T, I>,
     json: string,
     options: Options<T> = {} as Options<T>,
@@ -344,7 +344,22 @@ export default class FrozenMiniSearchCore<T = any> {
   }
 
   /**
-   * @internal Benchmark/test helper — same as {@link fromJson} with a pre-parsed snapshot object.
+   * @deprecated Use {@link fromJSON} instead.
+   */
+  static fromJson<T, I extends FrozenMiniSearchCore<T>>(
+    this: FrozenMiniSearchCtor<T, I>,
+    json: string,
+    options: Options<T> = {} as Options<T>,
+  ): I {
+    return FrozenMiniSearchCore.fromJSON.call(
+      this as FrozenMiniSearchCtor<any, any>,
+      json,
+      options as Options<any>,
+    ) as I
+  }
+
+  /**
+   * @internal Benchmark/test helper — same as {@link fromJSON} with a pre-parsed snapshot object.
    * `storedFields` are shallow-copied; callers must not mutate nested values
    * after load if they intend to keep the index immutable.
    */

@@ -24,7 +24,7 @@ describe('toJSON MiniSearch wire export', () => {
   test('round-trip preserves search results', () => {
     const frozen = FrozenMiniSearch.fromDocuments(docs, options)
     const snapshot = frozen.toJSON()
-    const reloaded = FrozenMiniSearch.fromJson(JSON.stringify(snapshot), options)
+    const reloaded = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), options)
 
     expect(reloaded.search('zen')).toEqual(frozen.search('zen'))
     expect(searchIds(reloaded, 'ishmael', { prefix: true })).toEqual(
@@ -78,7 +78,7 @@ describe('toJSON MiniSearch wire export', () => {
     }
 
     const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options)
-    const reloaded = FrozenMiniSearch.fromJson(JSON.stringify(frozen.toJSON()), options)
+    const reloaded = FrozenMiniSearch.fromJSON(JSON.stringify(frozen.toJSON()), options)
 
     expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])
     expect(frozen.search('gamma').map(r => r.id)).toEqual(['c'])

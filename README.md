@@ -241,7 +241,7 @@ import FrozenMiniSearch from '@yoch/frozenminisearch'
 const mutable = new MiniSearch(options)
 mutable.addAll(documents)
 
-const frozen = FrozenMiniSearch.fromJson(JSON.stringify(mutable), options)
+const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(mutable), options)
 ```
 
 MiniSearch is only needed if you still build mutable indexes. Frozen instances do not support live `add`, `remove`, or `discard`.

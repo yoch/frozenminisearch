@@ -61,10 +61,10 @@ describe('indexing parity — MiniSearch.addAll vs FrozenMiniSearch.fromDocument
   )
 
   test.each(indexingProfiles.map((p) => [p.name, p]))(
-    'profile %s: fromJson upstream snapshot matches upstream',
+    'profile %s: fromJSON upstream snapshot matches upstream',
     (_name, profile) => {
       const ms = buildMutable(profile.docs, profile.options)
-      const loaded = FrozenMiniSearch.fromJson(JSON.stringify(ms.toJSON()), profile.options)
+      const loaded = FrozenMiniSearch.fromJSON(JSON.stringify(ms.toJSON()), profile.options)
       expectUpstreamIndexingParity(ms, loaded, profile.options, profile.queries, {
         scorePrecision: scorePrecisionForProfile(profile),
       })

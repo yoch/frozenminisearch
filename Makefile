@@ -94,9 +94,12 @@ coverage:
 # Lint
 # ----------------------------------------------------------------------------
 
-.PHONY: lint lint-fix
-lint:
+.PHONY: lint lint-fix typecheck
+lint: typecheck
 	$(RUN) eslint 'src/**/*.{js,ts}'
+
+typecheck:
+	$(RUN) tsc --noEmit
 
 lint-fix:
 	$(RUN) eslint --fix 'src/**/*.{js,ts}'
@@ -340,7 +343,9 @@ help:
 	@echo "  make benchmark-record       captureBaseline.js"
 	@echo "  make benchmark-diff         diffBaseline.js"
 	@echo ""
-	@echo "Docs:"
+	@echo "Lint:"
+	@echo "  make lint                   eslint + tsc --noEmit (src/)"
+	@echo "  make typecheck              tsc --noEmit only"
 	@echo "  make docs-build             typedoc + demo"
 	@echo "  make docs-build-pages       typedoc GitHub Pages mode"
 	@echo ""

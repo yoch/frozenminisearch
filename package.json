@@ -86,6 +86,7 @@
     "coverage": "make coverage",
     "lint": "make lint",
     "lint:fix": "make lint-fix",
+    "typecheck": "make typecheck",
     "build": "make build",
     "clean-build": "make clean-build",
     "build-packed-radix-bench": "make build-packed-radix-bench",

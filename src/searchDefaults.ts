@@ -15,7 +15,7 @@ export const defaultSearchOptions = {
 
 export const defaultAutoSuggestOptions = {
   combineWith: AND,
-  prefix: (term: string, i: number, terms: string[]): boolean =>
+  prefix: (_term: string, i: number, terms: string[]): boolean =>
     i === terms.length - 1,
 }
 

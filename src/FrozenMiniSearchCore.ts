@@ -236,15 +236,30 @@ export default class FrozenMiniSearchCore<T = any> {
     }
   }
 
+  /** Whether a document with the given external id is in the index. */
   has(id: unknown): boolean {
     return this._idLookup.has(id)
   }
 
+  /**
+   * Stored fields for a document id, when configured via {@link Options.storeFields}.
+   * Returns `undefined` if the id is missing or no fields were stored.
+   */
   getStoredFields(id: unknown): Record<string, unknown> | undefined {
     const shortId = this._idLookup.get(id)
     return shortId == null ? undefined : readStoredFields(this._storedFields, shortId)
   }
 
+  /**
+   * Search the index. API and scoring match MiniSearch 7 for the same options.
+   *
+   * `query` may be a string, {@link FrozenMiniSearchCore.wildcard}, or a nested
+   * {@link QueryCombination}. Per-query options override index defaults from
+   * {@link Options.searchOptions}; see {@link SearchOptions} for boosts, prefix,
+   * fuzzy, filters, and `combineWith`.
+   *
+   * @returns Matches sorted by descending score.
+   */
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     return finalizeRawSearchResults(
       this._executeQuery(query, searchOptions),
@@ -274,6 +289,14 @@ export default class FrozenMiniSearchCore<T = any> {
     return getFrozenDefault(optionName)
   }
 
+  /**
+   * Build a read-only index in one pass from an in-memory document array.
+   * Indexing semantics match MiniSearch `addAll` for the same {@link Options}.
+   *
+   * For custom ingestion (streaming, per-document transforms), use
+   * {@link createFrozenIndexBuilder} and {@link freezeFrozenIndexBuilder} instead.
+   * The named export {@link buildFrozenFromDocuments} is equivalent on the Node/browser entry.
+   */
   static fromDocuments<T, I extends FrozenMiniSearchCore<T>>(
     this: FrozenMiniSearchCtor<T, I>,
     documents: readonly T[],

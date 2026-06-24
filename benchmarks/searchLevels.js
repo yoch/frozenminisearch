@@ -21,8 +21,6 @@ export function benchSearchLevels (
   iterations,
   batchSize,
 ) {
-  const benchOpts = { batchSize }
-
   const L0 = benchPairedSearchSamples(
     () => { mutableIndex._index.get(term) },
     () => { frozenIndex._index.get(term) },

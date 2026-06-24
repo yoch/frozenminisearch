@@ -457,7 +457,6 @@ export function runScenario (scenario, benchOptions = {}) {
       'Surfaces memory/breakdown require the isolated heap phase (captureBaseline or pnpm bench:memory), not runScenario.',
     )
   }
-  const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')
   const levelOpts = { searchLevels: need.searchLevels }
 
   if (need.searchOnly) {
@@ -622,7 +621,6 @@ export function runBenchmarkSuite (
   const total = scenarios.length
   const surfaces = benchOptions.surfaces ?? [...ALL_SURFACES]
   const need = computeSurfaceNeeds(surfaces)
-  const benchProfile = need.searchOnly ? 'search' : (benchOptions.benchProfile ?? 'full')
   const profileLabel = need.searchOnly ? 'search-only' : `surfaces=[${surfaces.join(',')}]`
   if (need.searchOnly) {
     console.log('Benchmark profile: search-only (skip indexing / heap / save / load timing)\n')

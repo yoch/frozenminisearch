@@ -6,7 +6,7 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../dist/es/index.js'
 import { CODEC_RAW, CODEC_ZSTD, MSV5_PAYLOAD_CODEC_OFFSET } from '../src/msv5/binaryMsv5Constants.ts'
-import { gc, timedMs } from './benchmarkUtils.js'
+import { gc } from './benchmarkUtils.js'
 import { loadDivinaLines } from './loadDivinaLines.js'
 import {
   denseNumericIds,

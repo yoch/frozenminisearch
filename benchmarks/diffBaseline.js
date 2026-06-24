@@ -6,7 +6,7 @@
  *
  * Exit code 1 if regressions exceed thresholds (for CI).
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -39,7 +39,7 @@ const argv = process.argv.slice(2)
 const strictSearch = argv.includes('--strict')
 const forceRun = argv.includes('--run')
 
-const { runs, searchIterations, benchProfile, surfaces } = parseBenchmarkArgs()
+const { runs, searchIterations, surfaces } = parseBenchmarkArgs()
 
 /** Lower is better unless noted. */
 const THRESHOLDS = {
@@ -219,8 +219,6 @@ function main () {
   const curIters = current.searchIterations ?? '(legacy)'
   const curProfile = current.benchProfile ?? current.scenarios[0]?.benchProfile ?? 'full'
   const refProfile = reference.benchProfile ?? reference.scenarios[0]?.benchProfile ?? 'full'
-  const currentSurfaces = current.benchSurfaces ?? current.scenarios[0]?.benchSurfaces ?? []
-  const referenceSurfaces = reference.benchSurfaces ?? reference.scenarios[0]?.benchSurfaces ?? []
   const diffSearchOnly = !payloadHasStructuralData(current)
     || !payloadHasStructuralData(reference)
     || isCpuOnlySurfaces(surfaces)

@@ -192,13 +192,11 @@ function summarizeTrends (cases, gridResults) {
   console.log('\n--- Sweep: where selective flips (maxAbsolute × maxFraction) ---')
   for (const c of cases) {
     const rows = gridResults.filter(r => r.caseId === c.id && !r.disableGating)
-    const flips = rows.filter(r => {
-      const sel = r.probe[0]?.selective
-      return sel !== rows[0]?.probe[0]?.selective
-    })
     if (rows.length === 0) continue
+    const baselineSelective = rows[0]?.probe[0]?.selective
+    const flips = rows.filter(r => r.probe[0]?.selective !== baselineSelective)
     const selectiveCount = rows.filter(r => r.probe[0]?.selective).length
-    console.log(`  ${c.id}: selective in ${selectiveCount}/${rows.length} grid points`)
+    console.log(`  ${c.id}: ${flips.length} flip(s) vs first grid point (baseline selective=${baselineSelective}), selective in ${selectiveCount}/${rows.length} grid points`)
   }
 
   console.log('\n--- Heuristic pick (match expectSelectiveAtDefault on synthetic cases) ---')

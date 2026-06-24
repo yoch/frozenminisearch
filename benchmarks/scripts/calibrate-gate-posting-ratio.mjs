@@ -208,7 +208,6 @@ function buildFrozen(docs, searchOptions = {}) {
 }
 
 function collectRealCases() {
-  const opts = { fields: ['txt'], storeFields: [] }
   const cases = []
 
   {
@@ -325,12 +324,6 @@ function collectRealCases() {
 
 const MIN_LENGTH_GRID = [512, 1024, 2048, 4096, 8192]
 const RATIO_SHIFT_GRID = [1, 2, 3, 4] // max ratio 50%, 25%, 12.5%, 6.25%
-
-function policyWouldPass(policy, gateSize, postingLength, docCount) {
-  const absSelective = gateSize <= resolveGateMaxSize(docCount, DEFAULT_AND_GATE_LIMITS)
-  const ratioSelective = passGateByPostingRatio(gateSize, postingLength, policy)
-  return absSelective || ratioSelective
-}
 
 function evaluatePolicyGrid(syntheticMicro, realCases) {
   const policies = []

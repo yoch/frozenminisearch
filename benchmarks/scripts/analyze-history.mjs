@@ -262,8 +262,6 @@ function printChangelog (entries, commitRef) {
   const cur = commitRef
     ? findEntry(entries, commitRef)
     : entries[entries.length - 1]
-  const idx = entries.indexOf(cur)
-  const prev = idx > 0 ? entries[idx - 1] : null
   console.log(`\n## Changelog snippet (${cur.git.commitShort})\n`)
   console.log(`  ${cur.git.subject}\n`)
   const bullets = changelogBullets(entries, cur.git.commitShort)

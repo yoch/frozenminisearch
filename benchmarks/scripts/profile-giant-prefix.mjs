@@ -72,7 +72,7 @@ function countPrefixTerms(index, term) {
   let exact = 0
   let prefix = 0
   const postingLengths = new Map()
-  for (const { termIndex, length } of index.prefixRefs(term)) {
+  for (const { length } of index.prefixRefs(term)) {
     const distance = length - term.length
     if (distance === 0) exact++
     else prefix++

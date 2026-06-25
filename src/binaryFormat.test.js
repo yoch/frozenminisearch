@@ -17,6 +17,7 @@ import {
   FLAG_SPARSE_LAYOUT,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
+  MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET,
   MSV5_SECTION_DIR_OFFSET,
   Msv5SectionId,
 } from './msv5/binaryMsv5Constants'
@@ -324,6 +325,21 @@ describe('binaryFormat corruption guards', () => {
     corrupt.writeUInt32LE(postOff, flDir)
     corrupt.writeUInt32LE(flOff, postDir)
     expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/not monotonic/)
+  })
+
+  test('rejects misaligned section offsets', () => {
+    const corrupt = Buffer.from(validBuf)
+    const coreDir = msv5SectionDirOffset(Msv5SectionId.Core)
+    const coreOff = corrupt.readUInt32LE(coreDir)
+    corrupt.writeUInt32LE(coreOff | 1, coreDir)
+    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/offset not aligned/)
+  })
+
+  test('rejects uncompressed payload length mismatch', () => {
+    const corrupt = Buffer.from(validBuf)
+    const declared = corrupt.readUInt32LE(MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
+    corrupt.writeUInt32LE(declared + 4, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
+    expect(() => decodeFrozenSnapshot(corrupt)).toThrow(/uncompressed payload length mismatch/)
   })
 
   test('rejects corrupted external id payloads', () => {

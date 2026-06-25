@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { createFrozenIndexBuilder } from './frozenBuild'
@@ -253,16 +254,83 @@ function searchSnapshot(index, query) {
   return index.search(query).map(r => ({ id: r.id, score: r.score }))
 }
 
-describe('IncrementalPostingsAccumulator medicaments golden (incremental build only)', () => {
-  const corpusDir = process.env.CORPUS_EXPORT_DIR
-    ?? '/home/yoch/fr.gouv.medicaments.rest/data/corpus-export'
+const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), '../testSupport/fixtures')
+const DEFAULT_MEDICAMENTS_CORPUS_DIR = '/home/yoch/fr.gouv.medicaments.rest/data/corpus-export'
 
-  function loadJsonl(file) {
-    return readFileSync(join(corpusDir, file), 'utf8')
-      .split('\n')
-      .filter(line => line.trim().length > 0)
-      .map(line => JSON.parse(line))
+function parseJsonl(content) {
+  return content
+    .split('\n')
+    .filter(line => line.trim().length > 0)
+    .map(line => JSON.parse(line))
+}
+
+function loadJsonlFile(dir, file) {
+  return parseJsonl(readFileSync(join(dir, file), 'utf8'))
+}
+
+function registerGoldenDatasetTests({ id, documents, options, query }) {
+  test(`${id} doc-by-doc add matches hinted incremental build`, () => {
+    const hinted = buildIncrementally(documents, options)
+    const docByDoc = buildDocByDoc(documents, options)
+
+    expect(docByDoc.termCount).toBe(hinted.termCount)
+    expect(docByDoc.documentCount).toBe(hinted.documentCount)
+    expect(searchSnapshot(docByDoc, query)).toEqual(searchSnapshot(hinted, query))
+
+    const builder = createFrozenIndexBuilder(options)
+    for (const doc of documents) builder.add(doc)
+    const params = builder.freezeParams()
+    validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
+    assertSegmentsPartitionBuffers(params.postings)
+  })
+
+  test(`${id} incremental build round-trips through binary`, () => {
+    const built = buildDocByDoc(documents, options)
+    const loaded = FrozenMiniSearch.loadBinarySync(built.saveBinarySync(), options)
+
+    expect(loaded.termCount).toBe(built.termCount)
+    expect(searchSnapshot(loaded, query)).toEqual(searchSnapshot(built, query))
+  })
+}
+
+describe('IncrementalPostingsAccumulator golden (CI fixture)', () => {
+  const fixtureDataset = {
+    id: 'incremental-golden',
+    file: 'incremental-golden.jsonl',
+    options: {
+      fields: ['cis', 'denomination', 'forme_pharma', 'titulaire'],
+      storeFields: ['id'],
+    },
+    query: 'doliprane',
   }
+  const documents = loadJsonlFile(FIXTURES_DIR, fixtureDataset.file)
+  registerGoldenDatasetTests({ ...fixtureDataset, documents })
+
+  test('fromAsyncIterable matches doc-by-doc incremental build', async () => {
+    const { default: FrozenMiniSearch } = await import('./FrozenMiniSearch')
+    const options = { fields: ['txt'], storeFields: [] }
+    const streamDocs = [
+      { id: 'a', txt: 'alpha beta gamma' },
+      { id: 'b', txt: 'beta delta' },
+      { id: 'c', txt: 'gamma epsilon' },
+    ]
+
+    async function* stream() {
+      for (const doc of streamDocs) yield doc
+    }
+
+    const fromStream = await FrozenMiniSearch.fromAsyncIterable(stream(), options, {
+      estimatedDocumentCount: streamDocs.length,
+    })
+    const fromAdds = buildDocByDoc(streamDocs, options)
+
+    expect(fromStream.termCount).toBe(fromAdds.termCount)
+    expect(searchSnapshot(fromStream, 'beta')).toEqual(searchSnapshot(fromAdds, 'beta'))
+  })
+})
+
+describe('IncrementalPostingsAccumulator medicaments golden (optional local)', () => {
+  const corpusDir = process.env.CORPUS_EXPORT_DIR ?? DEFAULT_MEDICAMENTS_CORPUS_DIR
 
   const datasets = [
     {
@@ -298,63 +366,13 @@ describe('IncrementalPostingsAccumulator medicaments golden (incremental build o
   ]
 
   for (const { id, file, options, query } of datasets) {
-    test(`${id} doc-by-doc add matches hinted incremental build`, () => {
-      let documents
-      try {
-        documents = loadJsonl(file)
-      } catch {
-        return // skip when corpus not present (CI)
-      }
-
-      const hinted = buildIncrementally(documents, options)
-      const docByDoc = buildDocByDoc(documents, options)
-
-      expect(docByDoc.termCount).toBe(hinted.termCount)
-      expect(docByDoc.documentCount).toBe(hinted.documentCount)
-      expect(searchSnapshot(docByDoc, query)).toEqual(searchSnapshot(hinted, query))
-
-      const builder = createFrozenIndexBuilder(options)
-      for (const doc of documents) builder.add(doc)
-      const params = builder.freezeParams()
-      validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
-      assertSegmentsPartitionBuffers(params.postings)
-    })
-
-    test(`${id} incremental build round-trips through binary`, () => {
-      let documents
-      try {
-        documents = loadJsonl(file)
-      } catch {
-        return
-      }
-
-      const built = buildDocByDoc(documents, options)
-      const loaded = FrozenMiniSearch.loadBinarySync(built.saveBinarySync(), options)
-
-      expect(loaded.termCount).toBe(built.termCount)
-      expect(searchSnapshot(loaded, query)).toEqual(searchSnapshot(built, query))
-    })
-  }
-
-  test('fromAsyncIterable matches doc-by-doc incremental build', async () => {
-    const { default: FrozenMiniSearch } = await import('./FrozenMiniSearch')
-    const options = { fields: ['txt'], storeFields: [] }
-    const documents = [
-      { id: 'a', txt: 'alpha beta gamma' },
-      { id: 'b', txt: 'beta delta' },
-      { id: 'c', txt: 'gamma epsilon' },
-    ]
-
-    async function* stream() {
-      for (const doc of documents) yield doc
+    const corpusPath = join(corpusDir, file)
+    if (!existsSync(corpusPath)) {
+      test.skip(`${id} doc-by-doc add matches hinted incremental build`, () => {})
+      test.skip(`${id} incremental build round-trips through binary`, () => {})
+      continue
     }
-
-    const fromStream = await FrozenMiniSearch.fromAsyncIterable(stream(), options, {
-      estimatedDocumentCount: documents.length,
-    })
-    const fromAdds = buildDocByDoc(documents, options)
-
-    expect(fromStream.termCount).toBe(fromAdds.termCount)
-    expect(searchSnapshot(fromStream, 'beta')).toEqual(searchSnapshot(fromAdds, 'beta'))
-  })
+    const documents = loadJsonlFile(corpusDir, file)
+    registerGoldenDatasetTests({ id, documents, options, query })
+  }
 })

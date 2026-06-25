@@ -1,0 +1,80 @@
+{"id":"doc-000","cis":"60000000","denomination":"DOLIPRANE 100 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-001","cis":"60000001","denomination":"EFFERALGAN 200 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-002","cis":"60000002","denomination":"ASPEGIC 300 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-003","cis":"60000003","denomination":"SPASFON 400 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-004","cis":"60000004","denomination":"IXPRIM 500 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-005","cis":"60000005","denomination":"NURAVAN 100 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-006","cis":"60000006","denomination":"ZALDIAR 200 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-007","cis":"60000007","denomination":"DAFALGAN 300 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-008","cis":"60000008","denomination":"DOLIPRANE 400 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-009","cis":"60000009","denomination":"EFFERALGAN 500 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-010","cis":"60000010","denomination":"ASPEGIC 100 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-011","cis":"60000011","denomination":"SPASFON 200 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-012","cis":"60000012","denomination":"IXPRIM 300 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-013","cis":"60000013","denomination":"NURAVAN 400 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-014","cis":"60000014","denomination":"ZALDIAR 500 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-015","cis":"60000015","denomination":"DAFALGAN 100 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-016","cis":"60000016","denomination":"DOLIPRANE 200 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-017","cis":"60000017","denomination":"EFFERALGAN 300 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-018","cis":"60000018","denomination":"ASPEGIC 400 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-019","cis":"60000019","denomination":"SPASFON 500 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-020","cis":"60000020","denomination":"IXPRIM 100 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-021","cis":"60000021","denomination":"NURAVAN 200 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-022","cis":"60000022","denomination":"ZALDIAR 300 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-023","cis":"60000023","denomination":"DAFALGAN 400 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-024","cis":"60000024","denomination":"DOLIPRANE 500 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-025","cis":"60000025","denomination":"EFFERALGAN 100 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-026","cis":"60000026","denomination":"ASPEGIC 200 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-027","cis":"60000027","denomination":"SPASFON 300 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-028","cis":"60000028","denomination":"IXPRIM 400 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-029","cis":"60000029","denomination":"NURAVAN 500 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-030","cis":"60000030","denomination":"ZALDIAR 100 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-031","cis":"60000031","denomination":"DAFALGAN 200 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-032","cis":"60000032","denomination":"DOLIPRANE 300 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-033","cis":"60000033","denomination":"EFFERALGAN 400 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-034","cis":"60000034","denomination":"ASPEGIC 500 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-035","cis":"60000035","denomination":"SPASFON 100 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-036","cis":"60000036","denomination":"IXPRIM 200 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-037","cis":"60000037","denomination":"NURAVAN 300 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-038","cis":"60000038","denomination":"ZALDIAR 400 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-039","cis":"60000039","denomination":"DAFALGAN 500 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-040","cis":"60000040","denomination":"DOLIPRANE 100 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-041","cis":"60000041","denomination":"EFFERALGAN 200 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-042","cis":"60000042","denomination":"ASPEGIC 300 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-043","cis":"60000043","denomination":"SPASFON 400 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-044","cis":"60000044","denomination":"IXPRIM 500 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-045","cis":"60000045","denomination":"NURAVAN 100 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-046","cis":"60000046","denomination":"ZALDIAR 200 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-047","cis":"60000047","denomination":"DAFALGAN 300 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-048","cis":"60000048","denomination":"DOLIPRANE 400 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-049","cis":"60000049","denomination":"EFFERALGAN 500 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-050","cis":"60000050","denomination":"ASPEGIC 100 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-051","cis":"60000051","denomination":"SPASFON 200 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-052","cis":"60000052","denomination":"IXPRIM 300 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-053","cis":"60000053","denomination":"NURAVAN 400 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-054","cis":"60000054","denomination":"ZALDIAR 500 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-055","cis":"60000055","denomination":"DAFALGAN 100 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-056","cis":"60000056","denomination":"DOLIPRANE 200 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-057","cis":"60000057","denomination":"EFFERALGAN 300 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-058","cis":"60000058","denomination":"ASPEGIC 400 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-059","cis":"60000059","denomination":"SPASFON 500 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-060","cis":"60000060","denomination":"IXPRIM 100 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-061","cis":"60000061","denomination":"NURAVAN 200 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-062","cis":"60000062","denomination":"ZALDIAR 300 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-063","cis":"60000063","denomination":"DAFALGAN 400 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-064","cis":"60000064","denomination":"DOLIPRANE 500 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-065","cis":"60000065","denomination":"EFFERALGAN 100 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-066","cis":"60000066","denomination":"ASPEGIC 200 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-067","cis":"60000067","denomination":"SPASFON 300 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-068","cis":"60000068","denomination":"IXPRIM 400 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-069","cis":"60000069","denomination":"NURAVAN 500 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-070","cis":"60000070","denomination":"ZALDIAR 100 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-071","cis":"60000071","denomination":"DAFALGAN 200 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-072","cis":"60000072","denomination":"DOLIPRANE 300 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-073","cis":"60000073","denomination":"EFFERALGAN 400 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-074","cis":"60000074","denomination":"ASPEGIC 500 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-075","cis":"60000075","denomination":"SPASFON 100 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-076","cis":"60000076","denomination":"IXPRIM 200 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}
+{"id":"doc-077","cis":"60000077","denomination":"NURAVAN 300 mg","forme_pharma":"solution buvable","titulaire":"BIOPHARMA"}
+{"id":"doc-078","cis":"60000078","denomination":"ZALDIAR 400 mg","forme_pharma":"comprime","titulaire":"SANOFI"}
+{"id":"doc-079","cis":"60000079","denomination":"DAFALGAN 500 mg","forme_pharma":"solution buvable","titulaire":"UPSA"}

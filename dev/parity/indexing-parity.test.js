@@ -1,10 +1,12 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from '../../src/FrozenMiniSearch'
 import { createFrozenIndexBuilder } from '../../src/frozenBuild'
-import { expectSameResults } from './parityHarness.js'
+import { expectSameResults, expectSameWildcardResults } from './parityHarness.js'
 import { expectSameIndexFingerprint } from '../../testSupport/indexFingerprint.js'
 import {
   camelCaseOptions,
+  defaultDocs,
+  defaultOptions,
   indexingProfiles,
 } from '../../testSupport/indexingProfiles.js'
 
@@ -37,6 +39,17 @@ function expectUpstreamIndexingParity (ms, fr, options, queries, { scorePrecisio
   for (const query of queries) {
     expectSameResults(ms, fr, query, searchOptions, { scorePrecision })
   }
+}
+
+function expectNativeCombinedQueries (ms, fr, options) {
+  const searchOptions = options.searchOptions ?? {}
+  expectSameWildcardResults(ms, fr, searchOptions)
+  expectSameResults(ms, fr, 'zen art', { ...searchOptions, combineWith: 'AND' })
+  expectSameResults(ms, fr, 'matrix zen', { ...searchOptions, combineWith: 'AND_NOT' })
+  expectSameResults(ms, fr, {
+    combineWith: 'AND',
+    queries: ['zen', { combineWith: 'OR', queries: ['motorcycle', 'archery'] }],
+  }, searchOptions)
 }
 
 describe('indexing parity — MiniSearch.addAll vs FrozenMiniSearch.fromDocuments', () => {
@@ -98,5 +111,30 @@ describe('indexing parity — MiniSearch.addAll vs FrozenMiniSearch.fromDocument
     const frHits = fr.search('create', searchOptions)
     expect(frHits.map((h) => h.id)).toEqual(msHits.map((h) => h.id))
     expect(frHits.length).toBeGreaterThan(0)
+  })
+})
+
+describe('indexing parity — native build combined queries', () => {
+  test('fromDocuments matches upstream', () => {
+    const { ms, fr } = buildIndexingPair(defaultDocs, defaultOptions)
+    expectNativeCombinedQueries(ms, fr, defaultOptions)
+  })
+
+  test('builder addAll matches upstream', () => {
+    const ms = buildMutable(defaultDocs, defaultOptions)
+    const fr = buildFrozenWithBuilder(defaultDocs, defaultOptions)
+    expectNativeCombinedQueries(ms, fr, defaultOptions)
+  })
+
+  test('fromJSON matches upstream', () => {
+    const ms = buildMutable(defaultDocs, defaultOptions)
+    const loaded = FrozenMiniSearch.fromJSON(JSON.stringify(ms.toJSON()), defaultOptions)
+    expectNativeCombinedQueries(ms, loaded, defaultOptions)
+  })
+
+  test('binary round-trip matches upstream', () => {
+    const { ms, fr } = buildIndexingPair(defaultDocs, defaultOptions)
+    const loaded = FrozenMiniSearch.loadBinarySync(fr.saveBinarySync(), defaultOptions)
+    expectNativeCombinedQueries(ms, loaded, defaultOptions)
   })
 })

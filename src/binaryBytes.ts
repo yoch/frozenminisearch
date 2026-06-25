@@ -86,9 +86,3 @@ export function readAscii(buf: BinaryBytes, offset: number, length: number): str
 export function readUtf8(buf: BinaryBytes, start: number, end: number): string {
   return new TextDecoder().decode(buf.subarray(start, end))
 }
-
-export function assertBytesLength(buf: BinaryBytes, min: number, detail = 'buffer too short'): void {
-  if (buf.length < min) {
-    throw new Error(`FrozenMiniSearch: invalid frozen index: ${detail} (${buf.length} < ${min})`)
-  }
-}

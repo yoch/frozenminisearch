@@ -10,7 +10,8 @@ const DEFAULT_WIDE_TARGET = 1000
 /** @param {import('../src/PackedRadixTree/PackedRadixTree.ts').default} tree */
 export function countPrefixEntries (tree, prefix) {
   let n = 0
-  for (const _ of tree.prefixEntries(prefix)) n++
+  // eslint-disable-next-line no-unused-vars -- count-only; no materialized match array
+  for (const _ of tree.prefixRefs(prefix)) n++
   return n
 }
 

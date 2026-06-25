@@ -13,6 +13,12 @@ const styleConfig = stylistic.configs.customize({
 })
 
 export default [
+  {
+    ignores: [
+      'benchmarks/fuzzyPrefixVariant.ts',
+      'benchmarks/packedRadixFuzzyAlgoCompare.js',
+    ],
+  },
   ...neostandard({ ts: true, noStyle: true }),
   styleConfig,
   {
@@ -36,7 +42,7 @@ export default [
     }
   },
   {
-    files: ['src/**/*.test.{js,ts}'],
+    files: ['src/**/*.test.{js,ts}', 'benchmarks/**/*.test.{js,ts}'],
     languageOptions: {
       globals: globals.vitest
     }

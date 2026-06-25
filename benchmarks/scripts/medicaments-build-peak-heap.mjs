@@ -169,6 +169,8 @@ async function measureRetainedBuildFromStream (spec, options, estimatedDocumentC
   const frozen = freezeFrozenIndexBuilder(builder)
   gc()
   const after = memorySnapshot()
+  // Garder `frozen` vivant jusqu'au snapshot : mesure de heap « retained » après gc().
+  // eslint-disable-next-line no-void -- référence volontaire pour que V8 ne l'élague pas avant le snapshot
   void frozen
   return mbRound(Math.max(0, after.heapUsed - before.heapUsed), 4)
 }

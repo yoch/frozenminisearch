@@ -2,9 +2,9 @@
 
 In-memory packed radix tree for string keys with numeric payloads.
 
-- `prefixRefs()` / `fuzzyRefs()`: ref-first internal primitives for query execution (`termIndex`, `length`, and fuzzy `distance`).
-- `entries()`: string iterator used for full materialization/parity.
-- `prefixEntries()` / `fuzzyEntries()`: deprecated internal benchmark/compat wrappers; prefer refs plus `termByIndex()`.
+- `prefixRefs()` / `fuzzyRefs()`: ref-first primitives for query execution (`termIndex`, `length`, and fuzzy `distance`).
+- `entries()`: string iterator used for full materialization and parity checks.
+- `termByIndex()` / `termLengthByIndex()`: resolve a ref to its UTF-16 term (or length only).
 
 ## Term resolution (frozen search)
 

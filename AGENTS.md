@@ -31,4 +31,4 @@ Add or update colocated vitest tests for behavior changes. For search semantics,
 
 ## Commit & Pull Request Guidelines
 
-Recent commits use concise imperative subjects, for example `Fix lint failures blocking CI.` and `Add toJSON export and rename fromMiniSearchJson to fromJson.` Keep commits focused and mention user-visible changes in `CHANGELOG.md`. PRs should describe the change, list tests or benchmarks run, link related issues, and call out compatibility, binary format, or parity impacts. Do not commit generated `docs/` HTML; published docs are produced by the release/docs workflows.
+Recent commits use concise imperative subjects, for example `Fix lint failures blocking CI.` and `Add toJSON export and deprecate fromJson alias.` Keep commits focused and mention user-visible changes in `CHANGELOG.md`. PRs should describe the change, list tests or benchmarks run, link related issues, and call out compatibility, binary format, or parity impacts. Do not commit generated `docs/` HTML; published docs are produced by the release/docs workflows.

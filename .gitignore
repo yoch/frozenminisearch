@@ -14,6 +14,7 @@ isolate-*.log
 FORK_NOTES.md
 # Rapport d'analyse stratégie package (local, non versionné)
 ANALYSE_STRATEGIE_PACKAGE.md
+FINDINGS_AUDIT.md
 /benchmarks/tmp/
 benchmarks/baselines/latest.json
 benchmarks/baselines/latest-heap.json
@@ -34,4 +35,5 @@ dev/minisearch*
 scripts/poc-mcp*
 scripts/minisearch*
 examples/plain_js_frozen/frozenminisearch.js
+FrozenMiniSearch-v2.png
 FrozenMiniSearch-v2 (1).png

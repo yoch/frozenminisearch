@@ -16,7 +16,7 @@ Validated in [`indexing-parity.test.js`](indexing-parity.test.js) — **MiniSear
 - Field length counts **unique raw tokens** before `processTerm` filtering (MiniSearch semantics).
 - Search parity on representative queries per profile (default, camelCase, processTerm, Vocs integration).
 
-`functional-parity.test.js` alone is **not sufficient**: it mostly builds Frozen via `_fromMiniSearch(snapshot)` and compares Frozen-vs-Frozen on `fromDocuments`. Native indexing must be checked against upstream.
+`functional-parity.test.js` alone is **not sufficient**: it mostly builds Frozen via `_fromMiniSearch(mutable)` or `_fromMiniSearchSnapshot(snapshot)` and compares Frozen-vs-Frozen on `fromDocuments`. Native indexing must be checked against upstream.
 
 `isDefaultTokenize` fast path: only the library default tokenizer **reference** (`defaultFrozenLoadOptions.tokenize`). Custom tokenizers always use the two-phase path.
 

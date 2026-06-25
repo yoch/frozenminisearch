@@ -4,10 +4,10 @@ import { median } from '../benchStats.js'
 
 export { argValue, median }
 
-export function intArg(name, fallback) {
+export function intArg(name, fallback, { min = 1 } = {}) {
   const raw = argValue(`--${name}`)
   const value = raw == null ? NaN : Number(raw)
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
+  return Number.isFinite(value) && value >= min ? Math.floor(value) : fallback
 }
 
 export function p95(nums) {

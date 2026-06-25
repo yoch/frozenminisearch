@@ -22,6 +22,7 @@ PNPM := pnpm
 # not inherit pnpm's augmented PATH).
 RUN := $(PNPM) exec
 BENCH_TSX := $(PNPM) exec tsx --expose-gc
+BENCH_TIMING_ARGS := $(if $(RUNS),--runs=$(RUNS)) $(if $(BENCH_WARMUP),--warmup=$(BENCH_WARMUP)) $(if $(SEARCH_ITERATIONS),--iterations=$(SEARCH_ITERATIONS))
 
 # Build freshness marker. Targets that consume dist/ depend on this real file.
 # The dependency list below makes make rebuild whenever any source or build
@@ -222,10 +223,10 @@ benchmark-measure-scoring-steps: $(DIST_MARKER)
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/measure-scoring-steps.mjs
 
 benchmark-finalize:
-	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs $(BENCH_TIMING_ARGS)
 
 benchmark-autosuggest:
-	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/autosuggest-search.mjs
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/autosuggest-search.mjs $(BENCH_TIMING_ARGS)
 
 # History analysis (read-only, no build required)
 .PHONY: benchmark-history-analyze benchmark-history-vs-mutable

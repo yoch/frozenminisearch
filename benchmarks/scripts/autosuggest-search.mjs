@@ -9,7 +9,7 @@
  * This is CPU-only instrumentation. It does not sample heap or process memory.
  *
  * Run:
- *   pnpm benchmark:autosuggest -- --runs=5 --warmup=20 --iterations=50
+ *   pnpm benchmark:autosuggest RUNS=5 BENCH_WARMUP=20 SEARCH_ITERATIONS=50
  */
 import FrozenMiniSearch from '../../src/FrozenMiniSearch.ts'
 import {
@@ -72,7 +72,7 @@ function caseSpecs() {
 }
 
 const runs = intArg('runs', 5)
-const warmup = intArg('warmup', 20)
+const warmup = intArg('warmup', 20, { min: 0 })
 const iterations = intArg('iterations', 50)
 const report = {
   capturedAt: new Date().toISOString(),

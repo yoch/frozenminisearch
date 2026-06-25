@@ -73,6 +73,14 @@ make benchmark-compare           # compare.js with no imposed env vars
 make benchmark-record RUNS=1 SEARCH_ITERATIONS=10
 ```
 
+The internal CPU pipeline microbenchmarks exposed through Makefile targets use
+the same timing variables:
+
+```bash
+make benchmark-finalize RUNS=5 BENCH_WARMUP=20 SEARCH_ITERATIONS=50
+make benchmark-autosuggest RUNS=5 BENCH_WARMUP=20 SEARCH_ITERATIONS=50
+```
+
 ## Environment variables
 
 ### Set by the Makefile (do not override unless needed)

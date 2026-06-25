@@ -3,7 +3,7 @@
  * Local dev only — not committed to CI.
  *
  *   pnpm build
- *   node --expose-gc benchmarks/scripts/profile-giant-prefix.mjs [--runs=5] [--warmup=4] [--iterations=12]
+ *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-giant-prefix.mjs [--runs=5] [--warmup=4] [--iterations=12]
  */
 import { performance } from 'node:perf_hooks'
 import FrozenMiniSearch from '../../dist/es/index.js'

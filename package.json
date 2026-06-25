@@ -125,6 +125,8 @@
     "benchmark:gate-posting-ratio": "make benchmark-gate-posting-ratio",
     "benchmark:targeted": "make benchmark-targeted",
     "benchmark:targeted:compare": "make benchmark-targeted-compare",
+    "benchmark:profile-giant-prefix": "make benchmark-profile-giant-prefix",
+    "benchmark:measure-scoring-steps": "make benchmark-measure-scoring-steps",
     "benchmark:finalize": "make benchmark-finalize",
     "benchmark:autosuggest": "make benchmark-autosuggest",
     "benchmark:history:analyze": "make benchmark-history-analyze",

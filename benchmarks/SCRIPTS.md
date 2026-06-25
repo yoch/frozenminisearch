@@ -13,6 +13,7 @@ variables that drive them.
 | `benchmark:packed-radix*` | `packedRadix*.js` + dedicated rollup build (`PACKED_RADIX_BENCH=true`) | Orthogonal | Isolated PackedRadixTree subsystem |
 | `benchmark:binary-format` | `binaryFormatCompare.ts` | Orthogonal | msv5 binary format vs JS comparison |
 | `benchmark:medicaments-indexes` | `analyzeMedicamentsIndexes.js` | Orthogonal | Dedicated medicaments corpus |
+| `benchmark:profile-giant-prefix` / `benchmark:measure-scoring-steps` | `benchmarks/scripts/*.mjs` via `tsx` | Internal pipeline | Ad-hoc AND/prefix scoring probes that import `src/*.ts` helpers |
 
 `cli.mjs` is **not** a rewrite of the legacy scripts: it is a profile-based
 orchestration layer that delegates to them systematically:
@@ -132,10 +133,17 @@ For a guaranteed clean rebuild: `make build` (PHONY, cleans `dist/` first).
 
 Most low-level benchmark scripts load the published Node bundle from `dist/es/`
 so they measure the public package surface. The isolated CPU pipeline
-microbenchmarks (`benchmark:finalize` / `benchmark:autosuggest`, via Makefile
-targets `benchmark-finalize` / `benchmark-autosuggest`) are exceptions: they run
-through `tsx` and import `src/` plus `benchmarks/harness/` because they time
-internal query phases that are intentionally not exported.
+microbenchmarks (`benchmark:finalize`, `benchmark:autosuggest`,
+`benchmark:profile-giant-prefix`, and `benchmark:measure-scoring-steps`, via
+their Makefile targets) are exceptions: they run through `tsx` and import `src/`
+plus `benchmarks/harness/` because they time internal query phases that are
+intentionally not exported. For direct invocation, use the same contract:
+
+```bash
+pnpm build
+NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-giant-prefix.mjs
+NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/measure-scoring-steps.mjs
+```
 
 ## See also
 

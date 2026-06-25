@@ -72,10 +72,10 @@ benchmarks/dist/packedRadixTree.cjs: $(PACKED_SOURCES)
 
 .PHONY: test test-watch test-browser test-fuzzysearch test-benchmarks coverage
 test:
-	$(RUN) vitest run
+	$(RUN) vitest run src/ dev/parity/
 
 test-watch:
-	$(RUN) vitest
+	$(RUN) vitest src/ dev/parity/
 
 test-browser: $(DIST_MARKER)
 	node scripts/assert-browser-bundle.cjs
@@ -88,7 +88,7 @@ test-benchmarks:
 	$(RUN) vitest run benchmarks/
 
 coverage:
-	$(RUN) vitest run --coverage
+	$(RUN) vitest run --coverage src/ dev/parity/
 
 # ----------------------------------------------------------------------------
 # Lint
@@ -198,7 +198,8 @@ benchmark-diff-search-run: $(DIST_MARKER)
 
 # Tuning / calibration workflows
 .PHONY: benchmark-calibrate-batches benchmark-validate-freq-adaptive benchmark-and-gate-tuning
-.PHONY: benchmark-gate-posting-ratio benchmark-targeted benchmark-finalize benchmark-autosuggest
+.PHONY: benchmark-gate-posting-ratio benchmark-targeted benchmark-profile-giant-prefix
+.PHONY: benchmark-measure-scoring-steps benchmark-finalize benchmark-autosuggest
 benchmark-calibrate-batches: $(DIST_MARKER)
 	$(NODE) $(EXPOSE) benchmarks/scripts/calibrate-search-batches.mjs
 
@@ -213,6 +214,12 @@ benchmark-gate-posting-ratio: $(DIST_MARKER)
 
 benchmark-targeted: $(DIST_MARKER)
 	$(NODE) $(EXPOSE) benchmarks/scripts/targeted-failures.mjs
+
+benchmark-profile-giant-prefix: $(DIST_MARKER)
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/profile-giant-prefix.mjs
+
+benchmark-measure-scoring-steps: $(DIST_MARKER)
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/measure-scoring-steps.mjs
 
 benchmark-finalize:
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs

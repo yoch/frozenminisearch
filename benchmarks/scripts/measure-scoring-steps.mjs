@@ -5,7 +5,7 @@
  * (gate <= maxGate). Optimizations on allowedDocs (seek) only apply when selective=true.
  *
  *   pnpm build
- *   node --expose-gc benchmarks/scripts/measure-scoring-steps.mjs [--step=baseline] [--runs=5]
+ *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/measure-scoring-steps.mjs [--step=baseline] [--runs=5]
  */
 import { performance } from 'node:perf_hooks'
 import MiniSearch from 'minisearch'

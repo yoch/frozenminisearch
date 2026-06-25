@@ -126,10 +126,54 @@ function corruptStreamingLength(buf) {
   return buf
 }
 
-const compressedCodecCases = [
-  ['zstd', 'zstd', CODEC_ZSTD, () => !hasZstd],
-  ['zlib', 'zlib', CODEC_ZLIB, () => false],
+const alwaysCodecCases = [
+  ['zlib', 'zlib', CODEC_ZLIB],
 ]
+const zstdCodecCases = [
+  ['zstd', 'zstd', CODEC_ZSTD],
+]
+
+function defineCorruptionCodecTests(codecCases) {
+  test.each(codecCases)(
+    'rejects %s payload CRC mismatch on sync load',
+    (_label, compression, codec) => {
+      const buf = corruptPayloadCrc(compressedSnapshotBuffer(compression))
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
+      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
+        .toThrow(/payload CRC mismatch/)
+    },
+  )
+
+  test.each(codecCases)(
+    'rejects %s section CRC mismatch on sync load',
+    (_label, compression, codec) => {
+      const buf = corruptCoreSectionCrc(compressedSnapshotBuffer(compression))
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
+      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
+        .toThrow(/section CRC mismatch/)
+    },
+  )
+
+  test.each(codecCases)(
+    'rejects %s decompressed length mismatch on sync load',
+    (_label, compression, codec) => {
+      const buf = corruptDecompressedLength(compressedSnapshotBuffer(compression))
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
+      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
+        .toThrow(/decompressed payload length mismatch/)
+    },
+  )
+
+  test.each(codecCases)(
+    'streaming load rejects %s output past declared uncompressed length',
+    async (_label, compression, codec) => {
+      const buf = corruptStreamingLength(compressedSnapshotBuffer(compression))
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
+      await expect(loadMsv5SectionsAsync(buf, readMsv5SectionDirectory(buf)))
+        .rejects.toThrow(/compressed payload exceeds declared length/)
+    },
+  )
+}
 
 describe('binaryMsv5', () => {
   test('encodeFrozenSnapshot uses MSv5 by default', () => {
@@ -196,10 +240,7 @@ describe('binaryMsv5', () => {
     expect(asyncMeta).toEqual(syncMeta)
   })
 
-  test('saveBinarySync vs async: same CRC/metadata on zstd-sized index', async () => {
-    if (!hasZstd) {
-      return
-    }
+  test.skipIf(!hasZstd)('saveBinarySync vs async: same CRC/metadata on zstd-sized index', async () => {
     const frozen = bigCompressibleIndex()
     const syncBuf = frozen.saveBinarySync({ compression: 'zstd' })
     const asyncBuf = await frozen.saveBinaryAsync({ compression: 'zstd' })
@@ -257,57 +298,11 @@ describe('binaryMsv5', () => {
     expect(loaded.search('payload').length).toBeGreaterThan(0)
   })
 
-  test.each(compressedCodecCases)(
-    'rejects %s payload CRC mismatch on sync load',
-    (_label, compression, codec, skip) => {
-      if (skip()) {
-        return
-      }
-      const buf = corruptPayloadCrc(compressedSnapshotBuffer(compression))
-      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
-      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
-        .toThrow(/payload CRC mismatch/)
-    },
-  )
+  defineCorruptionCodecTests(alwaysCodecCases)
 
-  test.each(compressedCodecCases)(
-    'rejects %s section CRC mismatch on sync load',
-    (_label, compression, codec, skip) => {
-      if (skip()) {
-        return
-      }
-      const buf = corruptCoreSectionCrc(compressedSnapshotBuffer(compression))
-      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
-      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
-        .toThrow(/section CRC mismatch/)
-    },
-  )
-
-  test.each(compressedCodecCases)(
-    'rejects %s decompressed length mismatch on sync load',
-    (_label, compression, codec, skip) => {
-      if (skip()) {
-        return
-      }
-      const buf = corruptDecompressedLength(compressedSnapshotBuffer(compression))
-      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
-      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
-        .toThrow(/decompressed payload length mismatch/)
-    },
-  )
-
-  test.each(compressedCodecCases)(
-    'streaming load rejects %s output past declared uncompressed length',
-    async (_label, compression, codec, skip) => {
-      if (skip()) {
-        return
-      }
-      const buf = corruptStreamingLength(compressedSnapshotBuffer(compression))
-      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
-      await expect(loadMsv5SectionsAsync(buf, readMsv5SectionDirectory(buf)))
-        .rejects.toThrow(/compressed payload exceeds declared length/)
-    },
-  )
+  describe.skipIf(!hasZstd)('MSv5 zstd corruption (requires node:zlib zstd)', () => {
+    defineCorruptionCodecTests(zstdCodecCases)
+  })
 
   test('rejects payload sizes above 1 GiB', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
@@ -419,10 +414,7 @@ describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
     }
   })
 
-  test('loadBinarySync throws a clear error on a zstd snapshot', () => {
-    if (!hasZstd) {
-      return
-    }
+  test.skipIf(!hasZstd)('loadBinarySync throws a clear error on a zstd snapshot', () => {
     const buf = bigCompressibleIndex().saveBinarySync({ compression: 'zstd' })
     expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_ZSTD)
     const restore = stubMissingZstd()
@@ -434,10 +426,7 @@ describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
     }
   })
 
-  test('loadBinaryAsync throws a clear error on a zstd snapshot', async () => {
-    if (!hasZstd) {
-      return
-    }
+  test.skipIf(!hasZstd)('loadBinaryAsync throws a clear error on a zstd snapshot', async () => {
     const buf = bigCompressibleIndex().saveBinarySync({ compression: 'zstd' })
     expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(CODEC_ZSTD)
     const restore = stubMissingZstd()

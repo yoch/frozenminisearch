@@ -10,7 +10,7 @@
 | Freq clamp 65535 | Low | overflow tests in functional-parity | Documented acceptable drift |
 | AND-gate internals | Low | [`queryEngine.gate.test.js`](queryEngine.gate.test.js) | Frozen gated vs naive only |
 | HMR `discard`/`add` incremental | Out of scope | — | Vocs dev friction; no upstream oracle |
-| Browser dist smoke | Low | manual / outreach only | optional `dev/poc-vocs/` PoC, not part of `pnpm test` |
+| Browser dist smoke | Low | [`FrozenMiniSearchBrowser.test.js`](../../src/FrozenMiniSearchBrowser.test.js), [`dev/browser/browser.smoke.test.js`](../browser/browser.smoke.test.js) | CI runs `pnpm test:browser` after build (`.github/workflows/main.yml`); optional local PoC in `dev/poc-vocs/` |
 
 ## Coverage audit (manual)
 

@@ -74,9 +74,13 @@ The two-phase estimator returns `undefined` for prefix/fuzzy (no expensive upfro
 
 The thresholds are not exposed in the API: they are performance heuristics, not semantic guarantees (semantics remain those of naive combine when gating is off).
 
-## AND branch order
+## AND branch order (performance)
 
-The gate after branch 0 is `|branch 0 result|`. **The most selective term should be first** in the query (e.g. `bucket5 shared`, not `shared bucket5`). Otherwise the gate is large and gating does not activate — correct behavior but degraded performance.
+The gate after branch 0 is `|branch 0 result|`. **Put the most selective term first** in the query (e.g. `bucket5 shared`, not `shared bucket5`). Wrong order is semantically correct but the gate stays large and gating does not activate — more postings scored on later branches.
+
+**Iterative AND** (default when prefix/fuzzy is present, or when broad-first does not apply): branch 0 is always scored in full before the gate narrows branch 1. There is no automatic reordering by posting length on this path.
+
+**Two-phase AND** (exact-only specs, see [Broad-first](#broad-first-exact-only-v123)): branches are collected by increasing posting length before scoring. This path does not apply to prefix/fuzzy queries.
 
 ## Tuning and validation
 

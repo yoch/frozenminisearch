@@ -352,7 +352,15 @@ function findSparseSlotByFieldId(
   return -1
 }
 
-/** Reusable scratch for {@link resolvePostingSlice} (scoring is synchronous). */
+/**
+ * Module-level scratch for {@link resolvePostingSlice} (zero allocation on hot paths).
+ *
+ * **Threading / reentrancy:** query execution is synchronous and single-threaded today.
+ * Safe while `search()` does not yield and callers do not re-enter the engine from
+ * callbacks (`filter`, `boostDocument`, `isDocActive`) on the same index instance.
+ * If the engine becomes async, concurrent, or shared across Workers without copying
+ * the index, pass a per-query scratch (or move scratch onto the flyweight instance).
+ */
 const postingSliceScratch = { offset: 0, length: 0 }
 
 /**

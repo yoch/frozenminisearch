@@ -1,8 +1,5 @@
 import type { PostingListLike } from './scoring'
-import {
-  DEFAULT_POSTING_GATE_MIN_LENGTH,
-  passGateByPostingRatio,
-} from './queryEngineGateLimits'
+import { passGateByPostingRatio } from './queryEngineGateLimits'
 
 export const MAX_FREQ = 65535
 
@@ -14,9 +11,6 @@ export type FreqArray = Uint8Array | Uint16Array
 export function readDocId(docIds: DocIdArray, index: number): number {
   return docIds[index] as number
 }
-
-/** @deprecated Use {@link DEFAULT_POSTING_GATE_MIN_LENGTH} — seek shares numeric thresholds with AND gate ratio policy. */
-export const SEEK_ALLOWED_MIN_LIST_LENGTH = DEFAULT_POSTING_GATE_MIN_LENGTH
 
 /** Binary search for docId in a sorted segment; returns global index or -1. */
 export function findDocIndexInSortedSegment(

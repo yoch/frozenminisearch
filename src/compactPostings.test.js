@@ -1,8 +1,8 @@
 import {
-  SEEK_ALLOWED_MIN_LIST_LENGTH,
   findDocIndexInSortedSegment,
   shouldSeekAllowedDocs,
 } from './compactPostings'
+import { DEFAULT_POSTING_GATE_MIN_LENGTH } from './queryEngineGateLimits'
 
 describe('sorted segment seek helpers', () => {
   test('findDocIndexInSortedSegment locates doc ids', () => {
@@ -19,6 +19,6 @@ describe('sorted segment seek helpers', () => {
     expect(shouldSeekAllowedDocs(1, 100)).toBe(false)
     expect(shouldSeekAllowedDocs(1, 2048)).toBe(true)
     expect(shouldSeekAllowedDocs(1, 1024)).toBe(false)
-    expect(SEEK_ALLOWED_MIN_LIST_LENGTH).toBe(2048)
+    expect(DEFAULT_POSTING_GATE_MIN_LENGTH).toBe(2048)
   })
 })

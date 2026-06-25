@@ -55,7 +55,9 @@ function layoutsEqual(a, b) {
   expect(a.nextId).toBe(b.nextId)
   expect(a.layout).toBe(b.layout)
   expect(a.docIdWidth).toBe(b.docIdWidth)
-  expect(a.sparseFieldIdWidth).toBe(b.sparseFieldIdWidth)
+  if (a.layout === 'sparse') {
+    expect(a.sparseFieldIdWidth).toBe(b.sparseFieldIdWidth)
+  }
   expect(a.allDocIds.length).toBe(b.allDocIds.length)
   expect(a.allFreqs.length).toBe(b.allFreqs.length)
   for (let i = 0; i < a.allDocIds.length; i++) {

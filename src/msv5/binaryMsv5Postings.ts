@@ -24,17 +24,16 @@ export interface Msv5PostingsWire {
 
 export function msv5PostingsFlags(postings: FrozenPostingsLayout): number {
   let flags = 0
-  if (postings.layout === 'sparse') flags |= FLAG_SPARSE_LAYOUT
+  if (postings.layout === 'sparse') {
+    flags |= FLAG_SPARSE_LAYOUT
+    if (postings.sparseFieldIdWidth === 16) flags |= FLAG_FIELD_ID_16
+  }
   if (postings.docIdWidth === 16) flags |= FLAG_DOC_ID_16
-  if (postings.sparseFieldIdWidth === 16) flags |= FLAG_FIELD_ID_16
   return flags
 }
 
 export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5PostingsWire {
   if (postings.layout === 'dense') {
-    if (postings.denseOffsets == null || postings.denseLengths == null) {
-      throw invalidFrozenIndex('dense postings missing offset tables')
-    }
     return {
       flags: msv5PostingsFlags(postings),
       meta: bytesFromView(postings.denseOffsets),
@@ -43,15 +42,6 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
       docIds: bytesFromView(postings.allDocIds),
       freqs: bytesFromView(postings.allFreqs),
     }
-  }
-
-  if (
-    postings.sparseTermStarts == null
-    || postings.sparseFieldIds == null
-    || postings.sparseOffsets == null
-    || postings.sparseLengths == null
-  ) {
-    throw invalidFrozenIndex('sparse postings missing tables')
   }
 
   const offBuf = bytesFromView(postings.sparseOffsets)
@@ -115,8 +105,6 @@ export function decodeMsv5PostingsSections(
       sparseFieldIdWidth,
       allDocIds,
       allFreqs,
-      denseOffsets: null,
-      denseLengths: null,
       sparseTermStarts,
       sparseFieldIds,
       sparseOffsets,
@@ -132,14 +120,9 @@ export function decodeMsv5PostingsSections(
     nextId,
     layout: 'dense',
     docIdWidth: docId16 ? 16 : 32,
-    sparseFieldIdWidth: null,
     allDocIds,
     allFreqs,
     denseOffsets,
     denseLengths,
-    sparseTermStarts: null,
-    sparseFieldIds: null,
-    sparseOffsets: null,
-    sparseLengths: null,
   }
 }

@@ -46,23 +46,23 @@ function ownedPostingsLayout(postings: FrozenPostingsLayout): FrozenPostingsLayo
       ...postings,
       allDocIds,
       allFreqs,
-      denseOffsets: new Uint32Array(postings.denseOffsets!),
-      denseLengths: new Uint32Array(postings.denseLengths!),
+      denseOffsets: new Uint32Array(postings.denseOffsets),
+      denseLengths: new Uint32Array(postings.denseLengths),
     }
   }
 
   const sparseFieldIds = postings.sparseFieldIdWidth === 16
-    ? new Uint16Array(postings.sparseFieldIds!)
-    : new Uint8Array(postings.sparseFieldIds!)
+    ? new Uint16Array(postings.sparseFieldIds)
+    : new Uint8Array(postings.sparseFieldIds)
 
   return {
     ...postings,
     allDocIds,
     allFreqs,
-    sparseTermStarts: new Uint32Array(postings.sparseTermStarts!),
+    sparseTermStarts: new Uint32Array(postings.sparseTermStarts),
     sparseFieldIds,
-    sparseOffsets: new Uint32Array(postings.sparseOffsets!),
-    sparseLengths: new Uint32Array(postings.sparseLengths!),
+    sparseOffsets: new Uint32Array(postings.sparseOffsets),
+    sparseLengths: new Uint32Array(postings.sparseLengths),
   }
 }
 

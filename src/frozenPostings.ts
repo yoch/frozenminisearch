@@ -24,23 +24,31 @@ export function readFieldId(fieldIds: FieldIdArray, index: number): number {
 
 export type PostingsLayoutKind = 'dense' | 'sparse'
 
-export interface FrozenPostingsLayout {
+export interface FrozenPostingsLayoutBase {
   fieldCount: number
   termCount: number
   nextId: number
-  layout: PostingsLayoutKind
   docIdWidth: 16 | 32
-  /** Width of sparse field id column; null when layout is dense. */
-  sparseFieldIdWidth: 8 | 16 | null
   allDocIds: DocIdArray
   allFreqs: FreqArray
-  denseOffsets: Uint32Array | null
-  denseLengths: Uint32Array | null
-  sparseTermStarts: Uint32Array | null
-  sparseFieldIds: FieldIdArray | null
-  sparseOffsets: Uint32Array | null
-  sparseLengths: Uint32Array | null
 }
+
+export interface DensePostingsLayout extends FrozenPostingsLayoutBase {
+  layout: 'dense'
+  denseOffsets: Uint32Array
+  denseLengths: Uint32Array
+}
+
+export interface SparsePostingsLayout extends FrozenPostingsLayoutBase {
+  layout: 'sparse'
+  sparseFieldIdWidth: 8 | 16
+  sparseTermStarts: Uint32Array
+  sparseFieldIds: FieldIdArray
+  sparseOffsets: Uint32Array
+  sparseLengths: Uint32Array
+}
+
+export type FrozenPostingsLayout = DensePostingsLayout | SparsePostingsLayout
 
 export function chooseSparseFieldIdWidth(fieldCount: number): 8 | 16 {
   return fieldCount > 255 ? 16 : 8
@@ -113,17 +121,12 @@ export function buildFrozenPostingsLayout(
       fieldCount,
       termCount,
       nextId,
-      layout,
+      layout: 'dense',
       docIdWidth,
-      sparseFieldIdWidth: null,
       allDocIds,
       allFreqs,
       denseOffsets,
       denseLengths,
-      sparseTermStarts: null,
-      sparseFieldIds: null,
-      sparseOffsets: null,
-      sparseLengths: null,
     }
   }
 
@@ -155,13 +158,11 @@ export function buildFrozenPostingsLayout(
     fieldCount,
     termCount,
     nextId,
-    layout,
+    layout: 'sparse',
     docIdWidth,
     sparseFieldIdWidth,
     allDocIds,
     allFreqs,
-    denseOffsets: null,
-    denseLengths: null,
     sparseTermStarts: new Uint32Array(termStarts),
     sparseFieldIds,
     sparseOffsets: new Uint32Array(sparseOffsets),
@@ -239,8 +240,8 @@ export function postingsTypedBytes(layout: FrozenPostingsLayout): {
   const allDocIdsBytes = layout.allDocIds.byteLength
   const allFreqsBytes = layout.allFreqs.byteLength
   if (layout.layout === 'dense') {
-    const offsetsBytes = layout.denseOffsets!.byteLength
-    const lengthsBytes = layout.denseLengths!.byteLength
+    const offsetsBytes = layout.denseOffsets.byteLength
+    const lengthsBytes = layout.denseLengths.byteLength
     return {
       allDocIdsBytes,
       allFreqsBytes,
@@ -250,9 +251,10 @@ export function postingsTypedBytes(layout: FrozenPostingsLayout): {
       slotCount: layout.termCount * layout.fieldCount,
     }
   }
-  const offsetsBytes = layout.sparseOffsets!.byteLength + layout.sparseTermStarts!.byteLength
-  const lengthsBytes = layout.sparseLengths!.byteLength + layout.sparseFieldIds!.byteLength
-  const slotCount = layout.sparseFieldIds!.length
+
+  const offsetsBytes = layout.sparseOffsets.byteLength + layout.sparseTermStarts.byteLength
+  const lengthsBytes = layout.sparseLengths.byteLength + layout.sparseFieldIds.byteLength
+  const slotCount = layout.sparseFieldIds.length
   return {
     allDocIdsBytes,
     allFreqsBytes,
@@ -276,16 +278,13 @@ export function validateFrozenPostingsLayout(
     fail('allDocIds and allFreqs length mismatch')
   }
   if (layout.layout === 'dense') {
-    if (layout.sparseFieldIdWidth != null) {
-      fail('dense layout must not have sparseFieldIdWidth')
-    }
     const slotCount = layout.termCount * layout.fieldCount
-    if (layout.denseOffsets!.length !== slotCount || layout.denseLengths!.length !== slotCount) {
+    if (layout.denseOffsets.length !== slotCount || layout.denseLengths.length !== slotCount) {
       fail('dense postings slot count mismatch')
     }
     for (let slot = 0; slot < slotCount; slot++) {
-      const off = layout.denseOffsets![slot]
-      const len = layout.denseLengths![slot]
+      const off = layout.denseOffsets[slot]
+      const len = layout.denseLengths[slot]
       if (off + len > layout.allDocIds.length) {
         fail(`posting slot ${slot} exceeds allDocIds bounds`)
       }
@@ -294,25 +293,25 @@ export function validateFrozenPostingsLayout(
         if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
       }
     }
-  } else {
+  } else if (layout.layout === 'sparse') {
     const expectedFieldIdWidth = chooseSparseFieldIdWidth(layout.fieldCount)
     if (layout.sparseFieldIdWidth !== expectedFieldIdWidth) {
       fail('sparseFieldIdWidth mismatch with fieldCount')
     }
 
-    const starts = layout.sparseTermStarts!
+    const starts = layout.sparseTermStarts
     if (starts.length !== layout.termCount + 1) fail('sparseTermStarts length mismatch')
-    const slotCount = layout.sparseFieldIds!.length
-    if (layout.sparseOffsets!.length !== slotCount || layout.sparseLengths!.length !== slotCount) {
+    const slotCount = layout.sparseFieldIds.length
+    if (layout.sparseOffsets.length !== slotCount || layout.sparseLengths.length !== slotCount) {
       fail('sparse slot count mismatch')
     }
     for (let slot = 0; slot < slotCount; slot++) {
-      const fieldId = readFieldId(layout.sparseFieldIds!, slot)
+      const fieldId = readFieldId(layout.sparseFieldIds, slot)
       if (fieldId >= layout.fieldCount) {
         fail(`sparse fieldId ${fieldId} >= fieldCount ${layout.fieldCount}`)
       }
-      const off = layout.sparseOffsets![slot]
-      const len = layout.sparseLengths![slot]
+      const off = layout.sparseOffsets[slot]
+      const len = layout.sparseLengths[slot]
       if (off + len > layout.allDocIds.length) {
         fail(`sparse slot ${slot} exceeds allDocIds bounds`)
       }
@@ -321,6 +320,9 @@ export function validateFrozenPostingsLayout(
         if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
       }
     }
+  } else {
+    const _exhaustive: never = layout
+    fail(`unknown postings layout: ${(_exhaustive as FrozenPostingsLayout).layout}`)
   }
 
   if (documentCount < 0 || documentCount > nextId) {
@@ -365,22 +367,27 @@ function resolvePostingSlice(
 ): boolean {
   if (layout.layout === 'dense') {
     const base = termIndex * layout.fieldCount + fieldId
-    const len = layout.denseLengths![base]
+    const len = layout.denseLengths[base]
     if (len === 0) return false
-    out.offset = layout.denseOffsets![base]
+    out.offset = layout.denseOffsets[base]
     out.length = len
     return true
   }
 
-  const start = layout.sparseTermStarts![termIndex]
-  const end = layout.sparseTermStarts![termIndex + 1]
-  const slot = findSparseSlotByFieldId(layout.sparseFieldIds!, start, end, fieldId)
-  if (slot < 0) return false
-  const len = layout.sparseLengths![slot]
-  if (len === 0) return false
-  out.offset = layout.sparseOffsets![slot]
-  out.length = len
-  return true
+  if (layout.layout === 'sparse') {
+    const start = layout.sparseTermStarts[termIndex]
+    const end = layout.sparseTermStarts[termIndex + 1]
+    const slot = findSparseSlotByFieldId(layout.sparseFieldIds, start, end, fieldId)
+    if (slot < 0) return false
+    const len = layout.sparseLengths[slot]
+    if (len === 0) return false
+    out.offset = layout.sparseOffsets[slot]
+    out.length = len
+    return true
+  }
+
+  const _exhaustive: never = layout
+  return _exhaustive
 }
 
 /** Single rebindable {@link FieldTermDataLike} per frozen index (O(1) RAM). */

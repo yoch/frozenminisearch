@@ -31,15 +31,10 @@ function densePostings(fieldCount, termCount, nextId, offsets, lengths, docIds, 
     nextId,
     layout: 'dense',
     docIdWidth: 32,
-    sparseFieldIdWidth: null,
     allDocIds: docIds,
     allFreqs: freqs,
     denseOffsets: offsets,
     denseLengths: lengths,
-    sparseTermStarts: null,
-    sparseFieldIds: null,
-    sparseOffsets: null,
-    sparseLengths: null,
   }
 }
 

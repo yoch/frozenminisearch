@@ -180,16 +180,6 @@ describe('binaryFormat MSv5', () => {
     expect(() => validateFrozenSnapshot(snap)).toThrow(/leaf count/)
   })
 
-  test('rejects legacy MSv1 through MSv4', () => {
-    const versions = { MSv1: 1, MSv2: 2, MSv3: 3, MSv4: 4 }
-    for (const magic of Object.keys(versions)) {
-      const buf = Buffer.alloc(64)
-      buf.write(magic, 0, 4, 'ascii')
-      buf.writeUInt16LE(versions[magic], 4)
-      expect(() => decodeFrozenSnapshot(buf)).toThrow(/Unsupported frozen binary snapshot/)
-    }
-  })
-
   test('rejects unknown binary magic', () => {
     const buf = Buffer.alloc(64)
     buf.write('XXXX', 0, 4, 'ascii')

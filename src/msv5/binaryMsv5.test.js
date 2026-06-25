@@ -12,6 +12,7 @@ import {
   CODEC_ZSTD,
   FLAG_FREQ_U16,
   MSV5_FORMAT_REV_PAYLOAD,
+  MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER,
   MSV5_HEADER_SIZE,
   MSV5_PAYLOAD_CRC_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
@@ -126,6 +127,14 @@ function corruptStreamingLength(buf) {
   return buf
 }
 
+/** Physically truncate the file while header still claims the full compressed length. */
+function truncatePhysicalBuffer(buf, keepPayloadFraction = 0.5) {
+  const meta = readMsv5SnapshotCompressionMeta(buf)
+  expect(meta.compressedLength).toBeGreaterThan(0)
+  const payloadBytes = Math.max(1, Math.floor(meta.compressedLength * keepPayloadFraction))
+  return Buffer.from(buf.subarray(0, MSV5_HEADER_SIZE + payloadBytes))
+}
+
 const alwaysCodecCases = [
   ['zlib', 'zlib', CODEC_ZLIB],
 ]
@@ -173,6 +182,27 @@ function defineCorruptionCodecTests(codecCases) {
         .rejects.toThrow(/compressed payload exceeds declared length/)
     },
   )
+
+  test.each(codecCases)(
+    'rejects physically truncated %s snapshot on sync load',
+    (_label, compression, codec) => {
+      const buf = truncatePhysicalBuffer(compressedSnapshotBuffer(compression))
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
+      expect(buf.length).toBeLessThan(MSV5_HEADER_SIZE + readMsv5SnapshotCompressionMeta(buf).compressedLength)
+      expect(() => FrozenMiniSearch.loadBinarySync(buf, loadOpts))
+        .toThrow(/payload out of bounds/)
+    },
+  )
+
+  test.each(codecCases)(
+    'rejects physically truncated %s snapshot on async load',
+    async (_label, compression, codec) => {
+      const buf = truncatePhysicalBuffer(compressedSnapshotBuffer(compression))
+      expect(readMsv5SnapshotCompressionMeta(buf).payloadCodec).toBe(codec)
+      await expect(FrozenMiniSearch.loadBinaryAsync(buf, loadOpts))
+        .rejects.toThrow(/payload out of bounds/)
+    },
+  )
 }
 
 describe('binaryMsv5', () => {
@@ -204,7 +234,7 @@ describe('binaryMsv5', () => {
       .toBe(frozen._memoryBreakdown().postings.allFreqsBytes)
   })
 
-  test('MSv5 legacy u8 freqs load without FLAG_FREQ_U16', () => {
+  test('MSv5 u8 freqs load without FLAG_FREQ_U16', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const buf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
@@ -324,17 +354,16 @@ describe('binaryMsv5', () => {
       .toBeGreaterThan(0)
   })
 
-  test('loadBinarySync rejects legacy MSv4 buffers', () => {
-    const mutable = new MiniSearch(options)
-    mutable.addAll(docs)
-    const legacy = Buffer.alloc(64)
-    legacy.write('MSv4', 0, 4, 'ascii')
-    legacy.writeUInt16LE(4, 4)
-    expect(() => FrozenMiniSearch.loadBinarySync(legacy, options)).toThrow(/Unsupported frozen binary snapshot/)
+  test('rejects buffer shorter than MSv5 header', () => {
+    const buf = compressedSnapshotBuffer('zlib')
+    expect(() => readMsv5SectionDirectory(buf.subarray(0, MSV5_HEADER_SIZE - 1)))
+      .toThrow(MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER)
+    expect(() => FrozenMiniSearch.loadBinarySync(buf.subarray(0, MSV5_HEADER_SIZE - 1), loadOpts))
+      .toThrow(MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER)
   })
 })
 
-describe('binaryMsv5 zstd unavailable (legacy Node)', () => {
+describe('binaryMsv5 zstd unavailable (Node without zstd)', () => {
   test('saveBinarySync auto uses a zlib payload', () => {
     const frozen = bigCompressibleIndex()
     const restore = stubMissingZstd()

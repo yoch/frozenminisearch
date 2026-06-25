@@ -31,7 +31,7 @@ export interface FrozenSnapshot {
   storedFieldsLayout?: StoredFieldsLayout
   fieldLengthMatrix: FieldLengthArray
   treeShape: TreeShape
-  /** Populated on decode; legacy path when {@link packedTermIndex} is absent. */
+  /** Radix tree from JSON snapshot wire; absent when {@link packedTermIndex} is set (MSv5 binary). */
   termTree?: RadixTree<number>
   /** Preferred runtime term index after binary decode. */
   packedTermIndex?: FrozenTermIndex

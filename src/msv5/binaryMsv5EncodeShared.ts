@@ -1,4 +1,3 @@
-import type { RadixTree } from '../SearchableMap/types'
 import { bytesFromView, type BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import {
@@ -23,6 +22,7 @@ import type { FrozenTermIndex } from '../frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { freqWireFlags } from '../freqPostings'
 import { fromRadixTree } from '../PackedRadixTree'
+import type { RadixTree } from '../radixTree'
 import { buildStoredFieldsWireSection } from '../storedFieldsWire'
 import { buildMsv5PostingsSections } from './binaryMsv5Postings'
 import { buildTermTreeSectionColumnar } from './packedRadixBinaryMsv5'

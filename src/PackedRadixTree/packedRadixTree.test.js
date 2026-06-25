@@ -4,6 +4,7 @@ import {
   readPackedTermTreeSectionColumnar,
 } from '../msv5/packedRadixBinaryMsv5'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
+import { setRadixLeaf } from '../radixTree'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
 import PackedRadixTree, { fromRadixTree } from './index'
 
@@ -12,13 +13,20 @@ const keyValues = terms.map((key, i) => [key, i])
 const map = SearchableMap.from(keyValues)
 const packed = fromRadixTree(map.radixTree, map.size)
 
-test('fromRadixTree with mapLeaf options matches termCount form', () => {
-  const m = SearchableMap.from(keyValues)
-  const viaOptions = fromRadixTree(m.radixTree, {
-    termCount: m.size,
-    mapLeaf: leaf => leaf,
-  })
-  expect(Array.from(viaOptions.entries())).toEqual(Array.from(packed.entries()))
+function fromNeutralRadix(entries) {
+  const tree = new Map()
+  for (const [term, termIndex] of entries) {
+    setRadixLeaf(tree, term, termIndex)
+  }
+  return fromRadixTree(tree, entries.length)
+}
+
+test('neutral radix builder matches SearchableMap packing', () => {
+  const viaRadix = fromNeutralRadix(keyValues)
+  expect(Array.from(viaRadix.entries())).toEqual(Array.from(packed.entries()))
+  expect(Array.from(viaRadix.prefixRefs('a')).map(({ termIndex }) => [viaRadix.termByIndex(termIndex), termIndex]))
+    .toEqual(Array.from(map.atPrefix('a').entries()))
+  expectFuzzyMultiset(viaRadix, map, 'acqua', 2)
 })
 
 function expectFuzzyMultiset(packed, map, query, maxDistance) {
@@ -38,26 +46,33 @@ function expectPackedParity(entries, probes = {}) {
 
   const m = SearchableMap.from(entries)
   const p = fromRadixTree(m.radixTree, m.size)
+  const built = fromNeutralRadix(entries)
   const packedBuf = buildTermTreeSectionColumnar(p)
 
   // entries() must match Map iteration order exactly (not just as a set).
   expect(Array.from(p.entries())).toEqual(Array.from(m.entries()))
+  expect(Array.from(built.entries())).toEqual(Array.from(m.entries()))
   // Order must survive MSv5 columnar wire round-trip.
   expect(Array.from(readPackedTermTreeSectionColumnar(packedBuf, m.size).entries()))
     .toEqual(Array.from(m.entries()))
 
   for (const term of gets) {
     expect(p.get(term)).toBe(m.get(term))
+    expect(built.get(term)).toBe(m.get(term))
   }
   for (const prefix of prefixes) {
     const fromRefs = Array.from(p.prefixRefs(prefix))
       .map(({ termIndex }) => [p.termByIndex(termIndex), termIndex])
+    const fromBuiltRefs = Array.from(built.prefixRefs(prefix))
+      .map(({ termIndex }) => [built.termByIndex(termIndex), termIndex])
     expect(fromRefs).toEqual(Array.from(m.atPrefix(prefix).entries()))
+    expect(fromBuiltRefs).toEqual(Array.from(m.atPrefix(prefix).entries()))
   }
   // fuzzyRefs: same match set as fuzzyGet; iteration order is not compared.
   for (const query of fuzzyQueries) {
     for (const distance of fuzzyDistances) {
       expectFuzzyMultiset(p, m, query, distance)
+      expectFuzzyMultiset(built, m, query, distance)
     }
   }
 }
@@ -271,10 +286,19 @@ describe('PackedRadixTree module', () => {
     expect(() => validateFrozenTermIndexLeaves(malformed, 0)).toThrow(/child out of bounds/)
   })
 
+  test('fromRadixTree rejects inconsistent leaf indices', () => {
+    expect(() => fromNeutralRadix([['a', 0], ['b', 0]])).toThrow(/duplicate leaf index/)
+
+    const tree = new Map()
+    setRadixLeaf(tree, 'a', 0)
+    expect(() => fromRadixTree(tree, 2)).toThrow(/leaf count 1 !== termCount 2/)
+  })
+
   test('rejects edge labels that cannot fit the packed length array', () => {
     const longLabel = 'x'.repeat(0x10000)
     const m = SearchableMap.from([[longLabel, 0]])
     expect(() => fromRadixTree(m.radixTree, m.size)).toThrow(/edge label too long/)
+    expect(() => fromNeutralRadix([[longLabel, 0]])).toThrow(/edge label too long/)
   })
 
   test('term tree section round-trips through MSv5 columnar wire', () => {

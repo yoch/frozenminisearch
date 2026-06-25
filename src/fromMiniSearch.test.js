@@ -141,6 +141,25 @@ describe('fromMiniSearch loaders', () => {
       .toThrow(/invalid MiniSearch snapshot: index term "hello" field 0 shortId 99 must be < nextId 1/)
   })
 
+  test('fromJSON rejects malformed index entries', () => {
+    const snapshot = validSnapshot({
+      index: ['hello'],
+    })
+    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
+      .toThrow(/invalid MiniSearch snapshot: index entry 0 must be a \[term, data\] pair/)
+  })
+
+  test('fromJSON rejects duplicate index terms', () => {
+    const snapshot = validSnapshot({
+      index: [
+        ['hello', { 0: { 0: 1 } }],
+        ['hello', { 0: { 0: 1 } }],
+      ],
+    })
+    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
+      .toThrow(/invalid MiniSearch snapshot: index term "hello" is duplicated/)
+  })
+
   test('fromJSON rejects malformed documentIds keys', () => {
     const snapshot = validSnapshot({
       documentIds: { oops: 'a' },

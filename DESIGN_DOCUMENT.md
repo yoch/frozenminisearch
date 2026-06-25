@@ -387,8 +387,8 @@ follows:
 
   - **`PackedRadixTree`** — in-memory structure and query traversal (exact,
     prefix, fuzzy, `entries`).
-  - **`adapters/searchableMap.ts`** — build from a mutable `RadixTree` via
-    `fromRadixTree` (numeric leaves or custom `mapLeaf`).
+  - **`fromRadixTree.ts`** — pack a mutable numeric `RadixTree<number>` built by
+    `radixTree.ts` helpers into the runtime term index.
   - **`src/msv5/packedRadixBinaryMsv5.ts`** — columnar term-tree section (on-disk wire).
   - **`frozenTermIndex.ts`** — `FrozenTermIndex` type alias and
     `validateFrozenTermIndexLeaves` (frozen-only invariants: leaf count, term-index

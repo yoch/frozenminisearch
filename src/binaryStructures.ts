@@ -1,5 +1,10 @@
-import { LEAF } from './SearchableMap/TreeIterator'
-import type { RadixTree } from './SearchableMap/types'
+import {
+  LEAF,
+  deserializeRadixTreeShape,
+  validateRadixLeaves,
+  type RadixTree,
+  type RadixTreeShape,
+} from './radixTree'
 import type { FieldLengthArray } from './fieldLengthMatrix'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import { validateFrozenPostingsLayout } from './frozenPostings'
@@ -14,7 +19,7 @@ import { readU32LE, readUtf8 } from './binaryBytes'
 import type { BinaryBytes } from './binaryBytes'
 import type { StoredFieldsLayout } from './storedFieldsLayout'
 
-export type TreeShape = Array<[string, number | TreeShape]>
+export type TreeShape = RadixTreeShape
 
 /** Flat frozen snapshot (runtime; on disk use {@link encodeFrozenSnapshot}). */
 export interface FrozenSnapshot {
@@ -39,22 +44,35 @@ export interface FrozenSnapshot {
 }
 
 function validateTreeShape(shape: TreeShape, termCount: number): void {
-  if (!Array.isArray(shape)) {
-    throw invalidFrozenIndex('treeShape node must be an array')
-  }
-  for (const entry of shape) {
-    if (!Array.isArray(entry) || entry.length !== 2) {
-      throw invalidFrozenIndex('treeShape entry must be a [key, value] pair')
+  const seen = new Set<number>()
+
+  function visit(node: TreeShape): void {
+    if (!Array.isArray(node)) {
+      throw invalidFrozenIndex('treeShape node must be an array')
     }
-    const [key, value] = entry
-    if (key === LEAF) {
-      const idx = value as number
-      if (!Number.isInteger(idx) || idx < 0 || idx >= termCount) {
-        throw invalidFrozenIndex(`treeShape leaf term index out of range: ${idx}`)
+    for (const entry of node) {
+      if (!Array.isArray(entry) || entry.length !== 2) {
+        throw invalidFrozenIndex('treeShape entry must be a [key, value] pair')
       }
-    } else {
-      validateTreeShape(value as TreeShape, termCount)
+      const [key, value] = entry
+      if (key === LEAF) {
+        const idx = value as number
+        if (!Number.isInteger(idx) || idx < 0 || idx >= termCount) {
+          throw invalidFrozenIndex(`treeShape leaf term index out of range: ${idx}`)
+        }
+        if (seen.has(idx)) {
+          throw invalidFrozenIndex(`treeShape duplicate leaf index: ${idx}`)
+        }
+        seen.add(idx)
+      } else {
+        visit(value as TreeShape)
+      }
     }
+  }
+
+  visit(shape)
+  if (seen.size !== termCount) {
+    throw invalidFrozenIndex(`treeShape leaf count ${seen.size} !== termCount ${termCount}`)
   }
 }
 
@@ -197,26 +215,9 @@ export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): s
 }
 
 export function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {
-  for (const [key, val] of tree) {
-    if (key === LEAF) {
-      const idx = val as number
-      if (!Number.isInteger(idx) || idx < 0 || idx >= termCount) {
-        throw invalidFrozenIndex(`term tree leaf index out of range: ${idx}`)
-      }
-    } else {
-      validateTermTreeLeaves(val as RadixTree<number>, termCount)
-    }
-  }
+  validateRadixLeaves(tree, termCount, (detail) => { throw invalidFrozenIndex(detail) })
 }
 
 export function deserializeTermIndexTree(shape: TreeShape): RadixTree<number> {
-  const tree = new Map() as RadixTree<number>
-  for (const [key, value] of shape) {
-    if (key === LEAF) {
-      tree.set(LEAF, value as number)
-    } else {
-      tree.set(key, deserializeTermIndexTree(value as TreeShape))
-    }
-  }
-  return tree
+  return deserializeRadixTreeShape(shape)
 }

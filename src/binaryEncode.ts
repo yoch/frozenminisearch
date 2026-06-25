@@ -1,7 +1,7 @@
-import type { RadixTree } from './SearchableMap/types'
 import { encodeFrozenSnapshotMsv5, encodeFrozenSnapshotMsv5Async } from './msv5/binaryMsv5Encode'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import type { FrozenSnapshot } from './binaryStructures'
+import type { RadixTree } from './radixTree'
 import type { BinaryCompression } from './searchTypes'
 
 /** Encode a frozen snapshot as a binary buffer. */

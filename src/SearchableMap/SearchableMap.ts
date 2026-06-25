@@ -1,5 +1,5 @@
-/* eslint-disable no-labels */
-import { TreeIterator, ENTRIES, KEYS, VALUES, LEAF } from './TreeIterator'
+import { TreeIterator, ENTRIES, KEYS, VALUES } from './TreeIterator'
+import { LEAF, createRadixPath, lookupRadixNode } from '../radixTree'
 import fuzzySearch, { type FuzzyResults } from './fuzzySearch'
 import type { RadixTree, Entry, Path } from './types'
 
@@ -174,7 +174,7 @@ export default class SearchableMap<T = any> {
    * found.
    */
   get(key: string): T | undefined {
-    const node = lookup<T>(this._tree, key)
+    const node = lookupRadixNode<T>(this._tree, key)
     return node !== undefined ? node.get(LEAF) : undefined
   }
 
@@ -184,7 +184,7 @@ export default class SearchableMap<T = any> {
    * @return True if the key is in the map, false otherwise
    */
   has(key: string): boolean {
-    const node = lookup(this._tree, key)
+    const node = lookupRadixNode(this._tree, key)
     return node !== undefined && node.has(LEAF)
   }
 
@@ -205,7 +205,7 @@ export default class SearchableMap<T = any> {
   set(key: string, value: T): SearchableMap<T> {
     if (typeof key !== 'string') { throw new Error('FrozenMiniSearch: key must be a string') }
     this._size = undefined
-    const node = createPath(this._tree, key)
+    const node = createRadixPath(this._tree, key)
     node.set(LEAF, value)
     return this
   }
@@ -247,7 +247,7 @@ export default class SearchableMap<T = any> {
   update(key: string, fn: (value: T | undefined) => T): SearchableMap<T> {
     if (typeof key !== 'string') { throw new Error('FrozenMiniSearch: key must be a string') }
     this._size = undefined
-    const node = createPath(this._tree, key)
+    const node = createRadixPath(this._tree, key)
     node.set(LEAF, fn(node.get(LEAF)))
     return this
   }
@@ -271,7 +271,7 @@ export default class SearchableMap<T = any> {
   fetch(key: string, initial: () => T): T {
     if (typeof key !== 'string') { throw new Error('FrozenMiniSearch: key must be a string') }
     this._size = undefined
-    const node = createPath(this._tree, key)
+    const node = createRadixPath(this._tree, key)
 
     let value = node.get(LEAF)
     if (value === undefined) {
@@ -333,60 +333,6 @@ const trackDown = <T = any>(tree: RadixTree<T> | undefined, key: string, path: P
 
   path.push([tree, key]) // performance: update in place
   return trackDown(undefined, '', path)
-}
-
-const lookup = <T = any>(tree: RadixTree<T>, key: string): RadixTree<T> | undefined => {
-  if (key.length === 0 || tree == null) { return tree }
-
-  for (const k of tree.keys()) {
-    if (k !== LEAF && key.startsWith(k)) {
-      return lookup(tree.get(k)!, key.slice(k.length))
-    }
-  }
-}
-
-// Create a path in the radix tree for the given key, and returns the deepest
-// node. This function is in the hot path for indexing. It avoids unnecessary
-// string operations and recursion for performance.
-const createPath = <T = any>(node: RadixTree<T>, key: string): RadixTree<T> => {
-  const keyLength = key.length
-
-  outer: for (let pos = 0; node && pos < keyLength;) {
-    for (const k of node.keys()) {
-      // Check whether this key is a candidate: the first characters must match.
-      if (k !== LEAF && key[pos] === k[0]) {
-        const len = Math.min(keyLength - pos, k.length)
-
-        // Advance offset to the point where key and k no longer match.
-        let offset = 1
-        while (offset < len && key[pos + offset] === k[offset]) ++offset
-
-        const child = node.get(k)!
-        if (offset === k.length) {
-          // The existing key is shorter than the key we need to create.
-          node = child
-        } else {
-          // Partial match: we need to insert an intermediate node to contain
-          // both the existing subtree and the new node.
-          const intermediate = new Map()
-          intermediate.set(k.slice(offset), child)
-          node.set(key.slice(pos, pos + offset), intermediate)
-          node.delete(k)
-          node = intermediate
-        }
-
-        pos += offset
-        continue outer
-      }
-    }
-
-    // Create a final child node to contain the final suffix of the key.
-    const child = new Map()
-    node.set(key.slice(pos), child)
-    return child
-  }
-
-  return node
 }
 
 const remove = <T = any>(tree: RadixTree<T>, key: string): void => {

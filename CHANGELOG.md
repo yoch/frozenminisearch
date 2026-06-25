@@ -12,11 +12,12 @@
 
 ### Changed
 
+- **Term index build path** — frozen index construction (`fromJSON`, `FrozenIndexBuilder`) builds a numeric `RadixTree` via `radixTree.ts` helpers instead of routing through `SearchableMap`; packing lives in `PackedRadixTree/fromRadixTree.ts` with `validateRadixLeaves` at finalize.
 - **Heap benchmark protocol v4** — primary RAM comparison uses `totalResidentApprox` (heapUsed + external on both mutable and frozen sides). Heap-only savings remain as `frozenVsMutableHeapOnlySavingPct` for diagnostics. Memory warmup reduced to 2 passes (was up to 100 for small corpora). Heap allowlist expanded to 12 scenarios. See `benchmarks/README.md`.
 
 ### Fixed
 
-- **`fromJSON` snapshot validation** — reject malformed MiniSearch JSON snapshots with non-integer or out-of-range field/doc ids instead of silently producing corrupt hits.
+- **`fromJSON` snapshot validation** — reject malformed MiniSearch JSON snapshots with non-integer or out-of-range field/doc ids, malformed index entries, or duplicate terms instead of silently producing corrupt hits.
 
 ## v1.4.0 — `@yoch/frozenminisearch`
 

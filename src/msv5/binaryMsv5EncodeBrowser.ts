@@ -1,6 +1,6 @@
-import type { RadixTree } from '../SearchableMap/types'
 import type { FrozenSnapshot } from '../binaryStructures'
 import type { FrozenTermIndex } from '../frozenTermIndex'
+import type { RadixTree } from '../radixTree'
 import type { BrowserBinaryCompression } from '../searchTypes'
 import { assembleMsv5FileBrowser } from './binaryMsv5CompressionBrowser'
 import { prepareEncodeFrozenSnapshotMsv5 } from './binaryMsv5EncodeShared'

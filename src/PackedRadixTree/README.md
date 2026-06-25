@@ -18,24 +18,26 @@ Frozen search uses `prefixRefs` / `fuzzyRefs` plus lazy `termByIndex` only when 
 
 ```typescript
 import PackedRadixTree, { fromRadixTree } from './PackedRadixTree'
-import SearchableMap from './SearchableMap/SearchableMap'
+import { setRadixLeaf, type RadixTree } from '../radixTree'
 
-const map = SearchableMap.from([['foo', 0], ['bar', 1]])
-const tree = fromRadixTree(map.radixTree, map.size)
+const radixTree = new Map() as RadixTree<number>
+setRadixLeaf(radixTree, 'foo', 0)
+setRadixLeaf(radixTree, 'bar', 1)
+
+const tree = fromRadixTree(radixTree, 2)
 
 tree.get('foo') // 0
 Array.from(tree.prefixRefs('f'))
 Array.from(tree.fuzzyRefs('fxo', 1))
 ```
 
-Custom leaf mapping (e.g. frozen index build):
+During frozen index build, term indexes are assigned before insertion and stored
+as numeric radix leaves:
 
 ```typescript
-fromRadixTree(radixTree, {
-  termCount: 0,
-  mapLeaf: leaf => assignTermIndex(leaf),
-  inferTermCountFromLeaves: true,
-})
+import { getOrCreateRadixLeaf, type RadixTree } from '../radixTree'
+
+const termIndex = getOrCreateRadixLeaf(radixTree, term, () => nextIndex++)
 ```
 
-Binary encode/decode for frozen MiniSearch indices: columnar wire in `src/msv5/packedRadixBinaryMsv5.ts`. Leaf validation is in `frozenTermIndex.ts`.
+Binary encode/decode for frozen MiniSearch indices: columnar wire in `src/msv5/packedRadixBinaryMsv5.ts`. Leaf invariants are checked by `validateRadixLeaves` in `radixTree.ts` at pack time (`fromRadixTree`) and by `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts` on the packed runtime index.

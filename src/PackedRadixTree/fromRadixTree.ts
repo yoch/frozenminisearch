@@ -1,47 +1,24 @@
-import { LEAF } from '../../SearchableMap/TreeIterator'
-import type { RadixTree } from '../../SearchableMap/types'
-import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from '../constants'
-import { packedIndexArray } from '../layout'
-import PackedRadixTree from '../PackedRadixTree'
+import { LEAF, validateRadixLeaves, type RadixTree } from '../radixTree'
+import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './constants'
+import { packedIndexArray } from './layout'
+import PackedRadixTree from './PackedRadixTree'
 
-export type PackRadixLeavesOptions<Leaf> = {
-  termCount: number
-  mapLeaf: (leaf: Leaf) => number
-  inferTermCountFromLeaves?: boolean
+export function fromRadixTree(tree: RadixTree<number>, termCount: number): PackedRadixTree {
+  validateRadixLeaves(tree, termCount, (detail) => {
+    throw new Error(`PackedRadixTree: ${detail}`)
+  })
+  return packRadixTree(tree, termCount)
 }
 
-export function fromRadixTree(tree: RadixTree<number>, termCount?: number): PackedRadixTree
-export function fromRadixTree<Leaf>(
-  tree: RadixTree<Leaf>,
-  options: PackRadixLeavesOptions<Leaf>,
-): PackedRadixTree
-export function fromRadixTree<Leaf>(
-  tree: RadixTree<Leaf>,
-  termCountOrOptions?: number | PackRadixLeavesOptions<Leaf>,
-): PackedRadixTree {
-  if (termCountOrOptions != null && typeof termCountOrOptions === 'object') {
-    const { termCount, mapLeaf, inferTermCountFromLeaves = false } = termCountOrOptions
-    return packRadixTreeFromRadix(tree, termCount, mapLeaf, inferTermCountFromLeaves)
-  }
-  const termCount = termCountOrOptions
-  if (termCount == null) {
-    return packRadixTreeFromRadix(tree, 0, leaf => leaf as unknown as number, true)
-  }
-  return packRadixTreeFromRadix(tree, termCount, leaf => leaf as unknown as number, false)
-}
-
-function packRadixTreeFromRadix<Leaf>(
-  tree: RadixTree<Leaf>,
+function packRadixTree(
+  tree: RadixTree<number>,
   termCount: number,
-  mapLeaf: (leaf: Leaf) => number,
-  inferTermCountFromLeaves: boolean,
 ): PackedRadixTree {
   type EdgeScratch = { label: string, child: number }
   type NodeScratch = { value: number, leafOrder: number, edges: EdgeScratch[] }
   const nodes: NodeScratch[] = []
-  let leafCount = 0
 
-  function packNode(node: RadixTree<Leaf>): number {
+  function packNode(node: RadixTree<number>): number {
     const nodeId = nodes.length
     const scratch: NodeScratch = { value: PACKED_NO_VALUE, leafOrder: PACKED_NO_VALUE, edges: [] }
     nodes.push(scratch)
@@ -49,11 +26,10 @@ function packRadixTreeFromRadix<Leaf>(
 
     for (const [key, val] of node) {
       if (key === LEAF) {
-        scratch.value = mapLeaf(val as Leaf)
+        scratch.value = val as number
         scratch.leafOrder = childOrder
-        leafCount++
       } else {
-        scratch.edges.push({ label: key, child: packNode(val as RadixTree<Leaf>) })
+        scratch.edges.push({ label: key, child: packNode(val as RadixTree<number>) })
       }
       childOrder++
     }
@@ -62,7 +38,6 @@ function packRadixTreeFromRadix<Leaf>(
   }
 
   packNode(tree)
-  const size = inferTermCountFromLeaves ? leafCount : termCount
 
   const nodeCount = nodes.length
   let edgeCount = 0
@@ -94,7 +69,6 @@ function packRadixTreeFromRadix<Leaf>(
 
   for (let nodeId = 0; nodeId < nodeCount; nodeId++) {
     const node = nodes[nodeId]
-    // nodeLeafOrder: 0 = no leaf, slot + 1 otherwise; nodeValue unused when no leaf.
     if (node.value !== PACKED_NO_VALUE) {
       nodeValue[nodeId] = node.value
       nodeLeafOrder[nodeId] = node.leafOrder + 1
@@ -117,7 +91,7 @@ function packRadixTreeFromRadix<Leaf>(
   const labelHeap = labelParts.join('')
 
   return PackedRadixTree.fromData({
-    size,
+    size: termCount,
     nodeCount,
     edgeCount,
     labelHeap,

@@ -9,6 +9,7 @@ const forbiddenBundlePatterns = [
   { name: 'Node builtin imports', pattern: /\b(?:from\s*|import\s*\(|require\s*\()\s*['"]node:/ },
   { name: 'Buffer runtime usage', pattern: /\bBuffer\b/ },
   { name: 'Node binary I/O module', pattern: /binaryFormat|binaryIo|binaryMsv5Compression\.ts/ },
+  { name: 'SearchableMap runtime', pattern: /SearchableMap|SearchableMap\/|TreeIterator|fuzzySearch/ },
 ]
 const forbiddenSyncBinaryApis = ['saveBinarySync', 'loadBinarySync']
 const requiredAsyncBinaryApis = ['saveBinaryAsync', 'loadBinaryAsync']

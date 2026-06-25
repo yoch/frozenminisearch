@@ -1,6 +1,6 @@
 /* eslint-disable no-labels */
 import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
-import { LEAF } from './TreeIterator'
+import { LEAF } from '../radixTree'
 import type { RadixTree } from './types'
 
 export type FuzzyResult<T> = [T, number]

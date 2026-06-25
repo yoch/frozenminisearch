@@ -1,4 +1,3 @@
-import SearchableMap from './SearchableMap/SearchableMap'
 import { fromRadixTree } from './PackedRadixTree'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
@@ -6,6 +5,8 @@ import { materializeFrozenPostings } from './frozenPostings'
 import { resolveIndexingOptions } from './indexingCore'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 import { DISCARDED_DOC_ID } from './flatPostings'
+import { setRadixLeaf, type RadixTree } from './radixTree'
+import type PackedRadixTree from './PackedRadixTree'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { Options } from './searchTypes'
 
@@ -28,6 +29,11 @@ export type MiniSearchSnapshot = {
 const SUPPORTED_SERIALIZATION_VERSIONS = new Set([1, 2])
 
 type MutableFieldTermData = Map<number, Map<number, number>>
+
+type ParsedSnapshotIndex = {
+  tree: RadixTree<number>
+  termDataByIndex: MutableFieldTermData[]
+}
 
 function snapshotError(detail: string): Error {
   return new Error(`FrozenMiniSearch: invalid MiniSearch snapshot: ${detail}`)
@@ -68,13 +74,14 @@ function assertFrequency(value: unknown, context: string): number {
 }
 
 function parseIndexEntry(
-  entry: SerializedIndexEntry | { ds: SerializedIndexEntry },
+  entry: unknown,
   serializationVersion: number,
-): SerializedIndexEntry {
+  context: string,
+): Record<string, unknown> {
   if (serializationVersion === 1 && entry != null && typeof entry === 'object' && 'ds' in entry) {
-    return entry.ds as SerializedIndexEntry
+    return assertRecord((entry as { ds: unknown }).ds, context)
   }
-  return entry as SerializedIndexEntry
+  return assertRecord(entry, context)
 }
 
 function assertFieldsMatchSnapshot(
@@ -90,37 +97,51 @@ function assertFieldsMatchSnapshot(
   }
 }
 
-function buildSearchableMapFromSnapshot(
+function parseSnapshotIndex(
   snapshot: MiniSearchSnapshot,
   fieldCount: number,
   nextId: number,
-): SearchableMap<MutableFieldTermData> {
-  const index = new SearchableMap<MutableFieldTermData>()
+): ParsedSnapshotIndex {
+  const tree = new Map() as RadixTree<number>
+  const termDataByIndex: MutableFieldTermData[] = new Array(snapshot.index.length)
+  const seenTerms = new Set<string>()
   const { index: entries, serializationVersion } = snapshot
 
-  for (const [term, data] of entries) {
-    assertRecord(data, `index term "${term}"`)
+  for (let termIndex = 0; termIndex < entries.length; termIndex++) {
+    const entry = entries[termIndex]
+    if (!Array.isArray(entry) || entry.length !== 2) {
+      throw snapshotError(`index entry ${termIndex} must be a [term, data] pair`)
+    }
+    const [term, data] = entry as [unknown, unknown]
+    if (typeof term !== 'string') {
+      throw snapshotError(`index entry ${termIndex} term must be a string`)
+    }
+    if (seenTerms.has(term)) {
+      throw snapshotError(`index term "${term}" is duplicated`)
+    }
+    seenTerms.add(term)
+    const dataRecord = assertRecord(data, `index term "${term}"`)
     const dataMap = new Map<number, Map<number, number>>() as MutableFieldTermData
-    for (const fieldId of Object.keys(data)) {
+    for (const fieldId of Object.keys(dataRecord)) {
       const parsedFieldId = parseIntegerKey(fieldId, `index term "${term}" fieldId`)
       if (parsedFieldId >= fieldCount) {
         throw snapshotError(`index term "${term}" fieldId ${parsedFieldId} must be < field count ${fieldCount}`)
       }
-      const raw = data[fieldId]
-      const indexEntry = parseIndexEntry(raw, serializationVersion)
-      assertRecord(indexEntry, `index term "${term}" field ${fieldId}`)
+      const raw = dataRecord[fieldId]
+      const indexEntryRecord = parseIndexEntry(raw, serializationVersion, `index term "${term}" field ${fieldId}`)
       const freqs = new Map<number, number>()
-      for (const [docId, freq] of Object.entries(indexEntry)) {
+      for (const [docId, freq] of Object.entries(indexEntryRecord)) {
         const shortId = parseIntegerKey(docId, `index term "${term}" field ${fieldId} docId`)
         assertShortIdInRange(shortId, nextId, `index term "${term}" field ${fieldId}`)
         freqs.set(shortId, assertFrequency(freq, `index term "${term}" field ${fieldId} docId ${docId}`))
       }
       dataMap.set(parsedFieldId, freqs)
     }
-    index.set(term, dataMap)
+    termDataByIndex[termIndex] = dataMap
+    setRadixLeaf(tree, term, termIndex)
   }
 
-  return index
+  return { tree, termDataByIndex }
 }
 
 function validateFieldIds(fieldIds: Record<string, unknown>, fieldCount: number): { [fieldName: string]: number } {
@@ -157,27 +178,18 @@ function validateActiveShortIds(
   return shortIds
 }
 
-function buildFlatPostingsFromSearchableMap(
-  searchableMap: SearchableMap<MutableFieldTermData>,
+function buildFlatPostingsFromParsedIndex(
+  parsedIndex: ParsedSnapshotIndex,
   fieldCount: number,
   nextId: number,
   shortIdRemap: Uint32Array | null,
 ): {
   termCount: number
-  index: ReturnType<typeof fromRadixTree>
+  index: PackedRadixTree
   postings: ReturnType<typeof materializeFrozenPostings>
 } {
-  const fieldIndexByTermIndex: MutableFieldTermData[] = []
-  const packedIndex = fromRadixTree(searchableMap.radixTree, {
-    termCount: 0,
-    mapLeaf: (leaf) => {
-      const ti = fieldIndexByTermIndex.length
-      fieldIndexByTermIndex[ti] = leaf
-      return ti
-    },
-    inferTermCountFromLeaves: true,
-  })
-  const termCount = packedIndex.size
+  const termCount = parsedIndex.termDataByIndex.length
+  const packedIndex = fromRadixTree(parsedIndex.tree, termCount)
 
   const remapDocId = shortIdRemap != null
     ? (docId: number) => shortIdRemap[docId]
@@ -190,7 +202,7 @@ function buildFlatPostingsFromSearchableMap(
     clampFrequencies: true,
     remapDocId,
     forEachPosting(ti, f, emit) {
-      const freqs = fieldIndexByTermIndex[ti]?.get(f)
+      const freqs = parsedIndex.termDataByIndex[ti]?.get(f)
       if (freqs == null) return
       for (const [shortId, freq] of freqs) {
         emit(shortId, freq)
@@ -328,9 +340,9 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     avgFieldLength[i] = snapshot.averageFieldLength[i]
   }
 
-  const searchableMap = buildSearchableMapFromSnapshot(snapshot, fieldCount, nextId)
-  const flat = buildFlatPostingsFromSearchableMap(
-    searchableMap,
+  const parsedIndex = parseSnapshotIndex(snapshot, fieldCount, nextId)
+  const flat = buildFlatPostingsFromParsedIndex(
+    parsedIndex,
     fieldCount,
     resolvedNextId,
     shortIdRemap,

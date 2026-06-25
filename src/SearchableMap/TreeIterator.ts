@@ -1,4 +1,5 @@
-import type { RadixTree, Entry, LeafType } from './types'
+import { LEAF } from '../radixTree'
+import type { RadixTree, Entry } from './types'
 
 /** @ignore */
 const ENTRIES = 'ENTRIES'
@@ -8,9 +9,6 @@ const KEYS = 'KEYS'
 
 /** @ignore */
 const VALUES = 'VALUES'
-
-/** @ignore */
-const LEAF = '' as LeafType
 
 interface Iterators<T> {
   ENTRIES: Entry<T>

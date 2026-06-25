@@ -1,4 +1,3 @@
-import SearchableMap from './SearchableMap/SearchableMap'
 import { fromRadixTree } from './PackedRadixTree'
 import type { Options } from './searchTypes'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
@@ -6,6 +5,7 @@ import type { FrozenAssembleParams } from './frozenTypes'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { getFrozenDefault } from './searchDefaults'
+import { getOrCreateRadixLeaf, type RadixTree } from './radixTree'
 import {
   buildFieldIds,
   collectFieldTermFreqsFromFieldInto,
@@ -30,25 +30,12 @@ export interface FrozenIndexBuilderHints {
   estimatedPostingsPerSlot?: number
 }
 
-function getOrCreateTermIndex(
-  termCount: { value: number },
-  index: SearchableMap<number>,
-  term: string,
-): number {
-  const existing = index.get(term)
-  if (existing != null) return existing
-  const ti = termCount.value
-  termCount.value++
-  index.set(term, ti)
-  return ti
-}
-
 /** Incremental builder for {@link FrozenMiniSearch} without materializing a full `documents[]` array. */
 export class FrozenIndexBuilder<T> {
   private readonly _options: IndexingOptions<T>
   private readonly _fieldIds: { [key: string]: number }
   private readonly _fieldCount: number
-  private _index: SearchableMap<number> | null
+  private _termTree: RadixTree<number> | null
   private readonly _postings: IncrementalPostingsAccumulator
   private readonly _termCount = { value: 0 }
   private readonly _externalIds: unknown[]
@@ -66,7 +53,7 @@ export class FrozenIndexBuilder<T> {
     this._options = resolveIndexingOptions(options)
     this._fieldIds = buildFieldIds(this._options.fields)
     this._fieldCount = this._options.fields.length
-    this._index = new SearchableMap<number>()
+    this._termTree = new Map() as RadixTree<number>
     const estimatedDocs = hints?.estimatedDocumentCount ?? 0
     const perSlot = hints?.estimatedPostingsPerSlot ?? 4
     this._postings = new IncrementalPostingsAccumulator(this._fieldCount, {
@@ -136,7 +123,7 @@ export class FrozenIndexBuilder<T> {
       updateAvgFieldLength(this._avgFieldLength, fieldId, documentCount - 1, fieldLength)
 
       this._fieldTermFreqScratch.forEach((freq, term) => {
-        const ti = getOrCreateTermIndex(this._termCount, this._index!, term)
+        const ti = getOrCreateRadixLeaf(this._termTree!, term, () => this._termCount.value++)
         this._postings.append(ti, fieldId, shortId, freq)
       })
     }
@@ -201,9 +188,8 @@ export class FrozenIndexBuilder<T> {
     const termCount = this._termCount.value
     const postings = this._postings.finalize(termCount, documentCount)
 
-    const radixTree = this._index!.radixTree
-    this._index = null
-    const index = fromRadixTree(radixTree, termCount)
+    const index = fromRadixTree(this._termTree!, termCount)
+    this._termTree = null
 
     const avgFieldLength = new Float32Array(this._fieldCount)
     for (let f = 0; f < this._fieldCount; f++) {

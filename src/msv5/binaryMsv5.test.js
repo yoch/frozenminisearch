@@ -312,6 +312,14 @@ describe('binaryMsv5', () => {
       .toBeGreaterThan(0)
   })
 
+  test('loaded raw snapshot copies caller wire buffer', () => {
+    const buf = bigCompressibleIndex().saveBinarySync({ compression: 'raw' })
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] })
+    const before = loaded.search('payload').length
+    buf.fill(0)
+    expect(loaded.search('payload').length).toBe(before)
+  })
+
   test('explicit zlib compression writes a zlib payload', () => {
     const buf = bigCompressibleIndex().saveBinarySync({ compression: 'zlib' })
     const meta = readMsv5SnapshotCompressionMeta(buf)
@@ -319,6 +327,14 @@ describe('binaryMsv5', () => {
     expect(meta.zstdLevel).toBe(0)
     expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('payload').length)
       .toBeGreaterThan(0)
+  })
+
+  test('loaded zlib snapshot owns decoded payload after caller buffer mutation', () => {
+    const buf = bigCompressibleIndex().saveBinarySync({ compression: 'zlib' })
+    const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] })
+    const before = loaded.search('payload').length
+    buf.fill(0)
+    expect(loaded.search('payload').length).toBe(before)
   })
 
   test('explicit zlib compression round-trips in async save/load', async () => {

@@ -3,7 +3,6 @@ import type { BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import PackedRadixTree from '../PackedRadixTree'
 import type { PackedIndexArray, PackedRadixTreeData } from '../PackedRadixTree/types'
-import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { MSV5_TREE_COLUMN_COUNT } from './binaryMsv5Constants'
 
 const TREE_SECTION_HEADER_BYTES = 16
@@ -106,6 +105,15 @@ function readColumn(
   return { arr, next: offset + padded }
 }
 
+/**
+ * Decode the columnar packed term-tree section into a {@link PackedRadixTree}.
+ *
+ * This reads structural offsets/lengths but does NOT validate leaf ordering or
+ * term coverage. Callers that load untrusted snapshots must run
+ * {@link validateFrozenTermIndexLeaves} (or {@link validateFrozenSnapshot}, which
+ * covers it) before treating the tree as trusted. The binary load path validates
+ * via `validateFrozenSnapshot` during decode.
+ */
 export function readPackedTermTreeSectionColumnar(
   buf: BinaryBytes,
   termCount: number,
@@ -155,6 +163,5 @@ export function readPackedTermTreeSectionColumnar(
     edgeChild: eChild.arr,
   }
   const tree = PackedRadixTree.fromData(data)
-  validateFrozenTermIndexLeaves(tree, termCount)
   return tree
 }

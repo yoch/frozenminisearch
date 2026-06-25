@@ -37,7 +37,15 @@ import type {
 } from './frozenTypes'
 import { forEachLiveShortId } from './forEachLiveShortId'
 import { miniSearchSnapshotFromFrozen } from './toMiniSearch'
-import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from './frozenOwnedSnapshot'
+import {
+  binaryLoadOwnershipModeFromCodec,
+  materializeOwnedSnapshot,
+  type SnapshotOwnershipMode,
+} from './frozenOwnedSnapshot'
+import { assembleParamsFromBinarySnapshot } from './frozenBinaryShared'
+import type { FrozenSnapshot } from './binaryStructures'
+import { readU8 } from './binaryBytes'
+import { MSV5_PAYLOAD_CODEC_OFFSET } from './msv5/binaryMsv5Constants'
 import {
   readStoredFields,
   storedFieldsJsonBytes,
@@ -93,6 +101,23 @@ export function assembleFrozenWithCtor<T, I extends FrozenMiniSearchCore<T>>(
   Ctor: FrozenMiniSearchCtor<T, I>,
 ): I {
   return assembleFrozenInternal(params, trustedSource, ownershipMode, Ctor)
+}
+
+/**
+ * @internal Assemble a frozen index from a decoded binary snapshot, shared by the
+ * Node and browser entry points. The decode step already ran
+ * {@link validateFrozenSnapshot}, so assembly trusts the snapshot. Ownership is
+ * derived from the wire codec: raw payloads alias `wireBuffer` and must be copied,
+ * compressed payloads are decoded into an owned allocation and can be kept as-is.
+ */
+export function assembleFrozenFromBinarySnapshot<T, I extends FrozenMiniSearchCore<T>>(
+  snap: FrozenSnapshot,
+  options: Options<T>,
+  wireBuffer: Uint8Array,
+  Ctor: FrozenMiniSearchCtor<T, I>,
+): I {
+  const ownershipMode = binaryLoadOwnershipModeFromCodec(readU8(wireBuffer, MSV5_PAYLOAD_CODEC_OFFSET))
+  return assembleFrozenInternal(assembleParamsFromBinarySnapshot(snap, options), true, ownershipMode, Ctor)
 }
 
 /** @internal Trusted document build for a concrete FrozenMiniSearch subclass. */

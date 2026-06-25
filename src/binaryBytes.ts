@@ -1,6 +1,9 @@
 /** Portable wire bytes (browser + Node). Node `Buffer` is accepted wherever `BinaryBytes` is expected. */
 export type BinaryBytes = Uint8Array
 
+const textEncoder = new TextEncoder()
+const textDecoder = new TextDecoder()
+
 export function allocBytes(length: number): Uint8Array {
   return new Uint8Array(length)
 }
@@ -10,7 +13,7 @@ export function bytesFromView(view: ArrayBufferView): Uint8Array {
 }
 
 export function utf8Bytes(str: string): Uint8Array {
-  return new TextEncoder().encode(str)
+  return textEncoder.encode(str)
 }
 
 /** Concatenate byte chunks. Accepts an array to avoid spread stack limits on large corpora. */
@@ -43,12 +46,32 @@ export function readU32LE(buf: BinaryBytes, offset: number): number {
   ) >>> 0
 }
 
+// Decode floats through a fixed 8-byte scratch DataView. Hot loops (external id
+// decode) would otherwise allocate a DataView per element, which dominates load
+// time. A small fixed scratch avoids both per-call allocation and pinning the
+// caller's backing ArrayBuffer, while keeping explicit little-endian semantics.
+const floatScratch = new ArrayBuffer(8)
+const floatScratchView = new DataView(floatScratch)
+const floatScratchBytes = new Uint8Array(floatScratch)
+
 export function readFloatLE(buf: BinaryBytes, offset: number): number {
-  return new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getFloat32(offset, true)
+  floatScratchBytes[0] = buf[offset]
+  floatScratchBytes[1] = buf[offset + 1]
+  floatScratchBytes[2] = buf[offset + 2]
+  floatScratchBytes[3] = buf[offset + 3]
+  return floatScratchView.getFloat32(0, true)
 }
 
 export function readDoubleLE(buf: BinaryBytes, offset: number): number {
-  return new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getFloat64(offset, true)
+  floatScratchBytes[0] = buf[offset]
+  floatScratchBytes[1] = buf[offset + 1]
+  floatScratchBytes[2] = buf[offset + 2]
+  floatScratchBytes[3] = buf[offset + 3]
+  floatScratchBytes[4] = buf[offset + 4]
+  floatScratchBytes[5] = buf[offset + 5]
+  floatScratchBytes[6] = buf[offset + 6]
+  floatScratchBytes[7] = buf[offset + 7]
+  return floatScratchView.getFloat64(0, true)
 }
 
 export function writeU8(buf: BinaryBytes, offset: number, value: number): void {
@@ -68,7 +91,23 @@ export function writeU32LE(buf: BinaryBytes, offset: number, value: number): voi
 }
 
 export function writeFloatLE(buf: BinaryBytes, offset: number, value: number): void {
-  new DataView(buf.buffer, buf.byteOffset, buf.byteLength).setFloat32(offset, value, true)
+  floatScratchView.setFloat32(0, value, true)
+  buf[offset] = floatScratchBytes[0]
+  buf[offset + 1] = floatScratchBytes[1]
+  buf[offset + 2] = floatScratchBytes[2]
+  buf[offset + 3] = floatScratchBytes[3]
+}
+
+export function writeDoubleLE(buf: BinaryBytes, offset: number, value: number): void {
+  floatScratchView.setFloat64(0, value, true)
+  buf[offset] = floatScratchBytes[0]
+  buf[offset + 1] = floatScratchBytes[1]
+  buf[offset + 2] = floatScratchBytes[2]
+  buf[offset + 3] = floatScratchBytes[3]
+  buf[offset + 4] = floatScratchBytes[4]
+  buf[offset + 5] = floatScratchBytes[5]
+  buf[offset + 6] = floatScratchBytes[6]
+  buf[offset + 7] = floatScratchBytes[7]
 }
 
 export function writeAscii(buf: BinaryBytes, offset: number, str: string): void {
@@ -84,5 +123,5 @@ export function readAscii(buf: BinaryBytes, offset: number, length: number): str
 }
 
 export function readUtf8(buf: BinaryBytes, start: number, end: number): string {
-  return new TextDecoder().decode(buf.subarray(start, end))
+  return textDecoder.decode(buf.subarray(start, end))
 }

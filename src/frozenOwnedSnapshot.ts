@@ -5,8 +5,13 @@ import type { FrozenPostingsLayout } from './frozenPostings'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { OptionsWithDefaults } from './searchTypes'
 import { cloneStoredFields } from './storedFieldsLayout'
+import { CODEC_RAW } from './msv5/binaryMsv5Constants'
 
-export type SnapshotOwnershipMode = 'trusted-build' | 'minisearch-json' | 'binary-load'
+export type SnapshotOwnershipMode = 'trusted-build' | 'minisearch-json' | 'binary-load' | 'binary-load-wire'
+
+export function binaryLoadOwnershipModeFromCodec(codec: number): SnapshotOwnershipMode {
+  return codec === CODEC_RAW ? 'binary-load-wire' : 'binary-load'
+}
 
 function ownedIndexArray(arr: PackedIndexArray): PackedIndexArray {
   if (arr instanceof Uint8Array) return new Uint8Array(arr)
@@ -93,19 +98,32 @@ export function materializeOwnedSnapshot<T>(
   params: FrozenAssembleParams<T>,
   mode: SnapshotOwnershipMode,
 ): FrozenAssembleParams<T> {
-  if (mode === 'trusted-build') {
-    return params
-  }
+  switch (mode) {
+    case 'trusted-build':
+      return params
 
-  if (mode === 'minisearch-json') {
-    return { ...params, ...shallowCopyJsSnapshotFields(params) }
-  }
+    case 'minisearch-json':
+      return { ...params, ...shallowCopyJsSnapshotFields(params) }
 
-  return {
-    ...params,
-    index: ownedPackedRadixTree(params.index),
-    postings: ownedPostingsLayout(params.postings),
-    fieldLengthMatrix: ownedFieldLengthMatrix(params.fieldLengthMatrix),
-    avgFieldLength: new Float32Array(params.avgFieldLength),
+    case 'binary-load':
+      // Compressed MSv5 sections are views on an owned decoded allocation, not
+      // the caller's wire buffer.
+      return params
+
+    case 'binary-load-wire':
+      // Raw MSv5 sections alias the caller's wire buffer, so the loaded index
+      // must copy typed arrays before returning.
+      return {
+        ...params,
+        index: ownedPackedRadixTree(params.index),
+        postings: ownedPostingsLayout(params.postings),
+        fieldLengthMatrix: ownedFieldLengthMatrix(params.fieldLengthMatrix),
+        avgFieldLength: new Float32Array(params.avgFieldLength),
+      }
+
+    default: {
+      const exhaustive: never = mode
+      return exhaustive
+    }
   }
 }

@@ -1,13 +1,12 @@
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
 import { encodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5EncodeBrowser'
-import { assembleParamsFromBinarySnapshot, buildBinarySnapshotInput } from './frozenBinaryShared'
+import { buildBinarySnapshotInput } from './frozenBinaryShared'
 import {
   defaultFrozenLoadOptions,
 } from './searchDefaults'
-import type { FrozenAssembleParams } from './frozenTypes'
 import type { BrowserSaveBinaryAsyncOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
-  assembleFrozenWithCtor,
+  assembleFrozenFromBinarySnapshot,
   frozenFromDocumentsWithCtor,
   frozenFromIndexBuilderWithCtor,
 } from './FrozenMiniSearchCore'
@@ -26,11 +25,6 @@ export function freezeFrozenIndexBuilder<T>(
   builder: FrozenIndexBuilder<T>,
 ): FrozenMiniSearchBrowser<T> {
   return frozenFromIndexBuilderWithCtor(FrozenMiniSearchBrowser, builder)
-}
-
-/** @internal */
-function assembleFrozen<T>(params: FrozenAssembleParams<T>): FrozenMiniSearchBrowser<T> {
-  return assembleFrozenWithCtor(params, false, 'binary-load', FrozenMiniSearchBrowser)
 }
 
 export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCore<T> {
@@ -63,13 +57,14 @@ export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCo
   ): Promise<FrozenMiniSearchBrowser<T>> {
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = await decodeFrozenSnapshotMsv5Browser(buffer, { storeFields })
-    return FrozenMiniSearchBrowser._fromBinarySnapshot(snap, options)
+    return FrozenMiniSearchBrowser._fromBinarySnapshot(snap, options, buffer)
   }
 
   private static _fromBinarySnapshot<T>(
     snap: Awaited<ReturnType<typeof decodeFrozenSnapshotMsv5Browser>>,
     options: Options<T>,
+    buffer: Uint8Array,
   ): FrozenMiniSearchBrowser<T> {
-    return assembleFrozen(assembleParamsFromBinarySnapshot(snap, options))
+    return assembleFrozenFromBinarySnapshot(snap, options, buffer, FrozenMiniSearchBrowser)
   }
 }

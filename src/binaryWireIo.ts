@@ -14,6 +14,7 @@ import {
   readU32LE,
   readUtf8,
   utf8Bytes,
+  writeDoubleLE,
   writeU32LE,
   type BinaryBytes,
 } from './binaryBytes'
@@ -47,7 +48,7 @@ export function writeExternalId(chunks: BinaryBytes[], id: unknown): void {
   if (typeof id === 'number' && Number.isFinite(id)) {
     const header = allocBytes(9)
     header[0] = ID_TAG_NUMBER
-    new DataView(header.buffer, header.byteOffset, header.byteLength).setFloat64(1, id, true)
+    writeDoubleLE(header, 1, id)
     chunks.push(header)
     return
   }

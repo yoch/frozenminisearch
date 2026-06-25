@@ -76,7 +76,7 @@ import FrozenMiniSearch, {
 } from '@yoch/frozenminisearch'
 
 const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: rows.length })
-for (const doc of rows) builder.add(doc)
+builder.addAll(rows) // `addAllAsync` for chunked, non-blocking ingestion (browser)
 const index = freezeFrozenIndexBuilder(builder)
 ```
 

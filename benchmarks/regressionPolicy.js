@@ -96,11 +96,19 @@ export function formatTimingDelta (baseMs, curMs) {
 /**
  * Print one timing comparison row and return status (ok | warn | fail).
  */
-export function compareTimingMetric (label, baseMs, curMs, metricKey, bump, pad = 32) {
+export function compareTimingMetric (label, baseMs, curMs, metricKey, bump, padOrOpts = 32) {
+  const pad = typeof padOrOpts === 'number' ? padOrOpts : (padOrOpts?.pad ?? 32)
+  const informative = typeof padOrOpts === 'object' && padOrOpts.informative === true
+  const deltaStr = formatTimingDelta(baseMs, curMs)
+  if (informative) {
+    console.log(
+      `  info ${label.padEnd(pad)} base=${String(baseMs).padEnd(10)} cur=${String(curMs).padEnd(10)} Δ ${deltaStr}`,
+    )
+    return 'ok'
+  }
   const status = classifyTimingRegression(baseMs, curMs, metricKey)
   bump(status)
   const icon = status === 'fail' ? 'FAIL' : status === 'warn' ? 'warn' : 'ok  '
-  const deltaStr = formatTimingDelta(baseMs, curMs)
   const floorNote = refBelowTimingFloor(baseMs) ? ` (floor; base < ${TIMING_MS_FLOOR} ms)` : ''
   console.log(
     `  ${icon} ${label.padEnd(pad)} base=${String(baseMs).padEnd(10)} cur=${String(curMs).padEnd(10)} Δ ${deltaStr}${floorNote}`,

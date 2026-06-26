@@ -211,7 +211,8 @@ function aggregateScenarioRuns (runs) {
 
   const indexing = {
     addAllMs: medianRound(runs.map((r) => r.indexing.addAllMs), 2),
-    freezeMs: medianRound(runs.map((r) => r.indexing.freezeMs), 2),
+    toJSONMs: medianRound(runs.map((r) => r.indexing.toJSONMs).filter((v) => v != null), 2),
+    freezeMs: medianRound(runs.map((r) => r.indexing.freezeMs).filter((v) => v != null), 2),
     fromDocumentsMs: medianRound(runs.map((r) => r.indexing.fromDocumentsMs), 2),
     jsonSerializeMs: medianRound(runs.map((r) => r.indexing.jsonSerializeMs), 2),
     saveBinaryMs: medianRound(runs.map((r) => r.indexing.saveBinaryMs), 2),
@@ -506,6 +507,7 @@ export function runScenario (scenario, benchOptions = {}) {
   let json
   let binaryBuf
   let indexMs
+  let toJSONMs
   let freezeMs
   let fromDocumentsMs
   let jsonSerializeMs
@@ -518,15 +520,23 @@ export function runScenario (scenario, benchOptions = {}) {
       return m
     })
     indexMs = ms.ms
+    const snap = timedMs(() => ms.result.toJSON())
+    const snapshot = snap.result
+    toJSONMs = snap.ms
+    // Realistic end-to-end JSON persistence cost (stringify invokes toJSON again);
+    // kept on `ms.result` so jsonSerializeMs stays comparable with prior baselines.
     const ser = timedMs(() => JSON.stringify(ms.result))
     json = ser.result
     jsonSerializeMs = ser.ms
-    const fr = timedMs(() => FrozenMiniSearch._fromMiniSearch(ms.result, options))
+    // freezeMs measures import only (no double toJSON): operate on the pre-built snapshot.
+    const fr = timedMs(() => FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options))
     freezeMs = fr.ms
     const bin = timedMs(() => fr.result.saveBinarySync())
     binaryBuf = bin.result
     binarySerializeMs = bin.ms
     if (need.build) {
+      // Isolate fromDocuments from the migrate artifacts built above (toJSON/freeze/saveBinary).
+      gc()
       const direct = timedMs(() => FrozenMiniSearch.fromDocuments(corpus, options))
       fromDocumentsMs = direct.ms
     }
@@ -548,7 +558,7 @@ export function runScenario (scenario, benchOptions = {}) {
   if (need.drift && driftQueries && driftQueries.length > 0) {
     const ms = new MiniSearch(options)
     ms.addAll(corpus)
-    const frozen = FrozenMiniSearch._fromMiniSearch(ms, options)
+    const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(ms.toJSON(), options)
     scoreDrift = driftQueries.map((query) => computeScoreDrift(ms, frozen, query))
   }
 
@@ -572,7 +582,10 @@ export function runScenario (scenario, benchOptions = {}) {
         addAllMs: Number(indexMs.toFixed(2)),
         fromDocumentsMs: Number(fromDocumentsMs.toFixed(2)),
       } : {}),
-      ...(need.migrate ? { freezeMs: Number(freezeMs.toFixed(2)) } : {}),
+      ...(need.migrate ? {
+        toJSONMs: Number(toJSONMs.toFixed(2)),
+        freezeMs: Number(freezeMs.toFixed(2)),
+      } : {}),
       ...(need.save ? {
         jsonSerializeMs: Number(jsonSerializeMs.toFixed(2)),
         saveBinaryMs: Number(binarySerializeMs.toFixed(2)),

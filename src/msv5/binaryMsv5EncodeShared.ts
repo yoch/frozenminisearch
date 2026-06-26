@@ -45,7 +45,7 @@ function resolvePackedTree(
   }
   const tree = termTree ?? deserializeTermIndexTree(snap.treeShape)
   validateTermTreeLeaves(tree, termCount)
-  return fromRadixTree(tree, termCount)
+  return fromRadixTree(tree, termCount, { skipLeafValidation: true })
 }
 
 export function prepareEncodeFrozenSnapshotMsv5(

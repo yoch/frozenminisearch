@@ -125,6 +125,7 @@ function printScenarioSummary(scenario, defaultSurfaces) {
   const notes = []
   if (scenario.loadMs?.binary != null) notes.push(`loadBinary ${scenario.loadMs.binary} ms`)
   if (scenario.diskMb?.binary != null) notes.push(`disk binary ${scenario.diskMb.binary} MB`)
+  if (scenario.indexing?.toJSONMs != null) notes.push(`toJSON ${scenario.indexing.toJSONMs} ms`)
   if (scenario.indexing?.freezeMs != null) notes.push(`freeze ${scenario.indexing.freezeMs} ms`)
   if (scenario.summary?.searchFrozenP50AvgGainPct != null) notes.push(`avg frozen p50 gain ${scenario.summary.searchFrozenP50AvgGainPct}%`)
   const details = notes.length > 0 ? notes.join(', ') : `surfaces=[${scenarioSurfaces.join(',')}]`

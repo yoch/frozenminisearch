@@ -93,6 +93,7 @@ function extract (entry, scenarioId = REF_SCENARIO) {
     loadBinaryMs: s.loadMs?.binary,
     diskJsonMb: s.diskMb?.json,
     diskBinaryMb: s.diskMb?.binary,
+    toJSONMs: s.indexing?.toJSONMs,
     freezeMs: s.indexing?.freezeMs,
     saveBinaryMs: s.indexing?.saveBinaryMs,
     binaryMagic: s.indexing?.binaryMagic,
@@ -110,7 +111,8 @@ function compareMetrics (before, after) {
     ['frozen totalResident (MB)', before.heapFrozenTotalMb, after.heapFrozenTotalMb, pctDelta(before.heapFrozenTotalMb, after.heapFrozenTotalMb), '%', THRESHOLDS.heapFrozenMb, true],
     ['total resident saving vs mutable (pts)', before.heapSavingPct, after.heapSavingPct, ptsDelta(before.heapSavingPct, after.heapSavingPct), ' pts', THRESHOLDS.heapSavingPts, false],
     ['loadBinary (ms)', before.loadBinaryMs, after.loadBinaryMs, pctDelta(before.loadBinaryMs, after.loadBinaryMs), '%', THRESHOLDS.loadBinaryMs, true],
-    ['freeze (ms)', before.freezeMs, after.freezeMs, pctDelta(before.freezeMs, after.freezeMs), '%', THRESHOLDS.freezeMs, true],
+    ['toJSON (ms)', before.toJSONMs, after.toJSONMs, pctDelta(before.toJSONMs, after.toJSONMs), '%', THRESHOLDS.freezeMs, true],
+    ['freeze import (ms)', before.freezeMs, after.freezeMs, pctDelta(before.freezeMs, after.freezeMs), '%', THRESHOLDS.freezeMs, true],
     ['search frozen p50 avg (ms)', before.searchFrozenP50, after.searchFrozenP50, pctDelta(before.searchFrozenP50, after.searchFrozenP50), '%', THRESHOLDS.searchFrozenVsMutablePts, true],
     ['frozen vs mutable p50 (%)', before.searchFrozenVsMutablePct, after.searchFrozenVsMutablePct, ptsDelta(before.searchFrozenVsMutablePct, after.searchFrozenVsMutablePct), ' pts', THRESHOLDS.searchFrozenVsMutablePts, false],
     ['binary magic', before.binaryMagic, after.binaryMagic, null, '', 0, false]

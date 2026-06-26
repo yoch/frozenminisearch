@@ -188,7 +188,7 @@ export class FrozenIndexBuilder<T> {
     const termCount = this._termCount.value
     const postings = this._postings.finalize(termCount, documentCount)
 
-    const index = fromRadixTree(this._termTree!, termCount)
+    const index = fromRadixTree(this._termTree!, termCount, { skipLeafValidation: true })
     this._termTree = null
 
     const avgFieldLength = new Float32Array(this._fieldCount)

@@ -61,7 +61,8 @@ function printScenario (data) {
   if (data.indexing) {
     console.log('\nIndexing:')
     if (data.indexing.addAllMs != null) console.log(`  addAll:         ${data.indexing.addAllMs.toFixed(1)} ms`)
-    if (data.indexing.freezeMs != null) console.log(`  freeze:         ${data.indexing.freezeMs.toFixed(1)} ms  (offline, once)`)
+    if (data.indexing.toJSONMs != null) console.log(`  toJSON:         ${data.indexing.toJSONMs.toFixed(1)} ms  (snapshot export)`)
+    if (data.indexing.freezeMs != null) console.log(`  freeze (import): ${data.indexing.freezeMs.toFixed(1)} ms  (_fromMiniSearchSnapshot)`)
     if (data.indexing.jsonSerializeMs != null) console.log(`  JSON.stringify: ${data.indexing.jsonSerializeMs.toFixed(1)} ms`)
     if (data.indexing.saveBinaryMs != null) {
       console.log(`  saveBinary:     ${data.indexing.saveBinaryMs.toFixed(1)} ms  (format ${data.indexing.binaryMagic})`)

@@ -146,8 +146,11 @@ function compareScenario (ref, cur, { structural = true } = {}) {
     if (ref.indexing?.saveBinaryMs != null && cur.indexing?.saveBinaryMs != null) {
       compareTimingMetric('saveBinary (ms)', ref.indexing.saveBinaryMs, cur.indexing.saveBinaryMs, 'saveBinaryMs', bump)
     }
+    if (ref.indexing?.toJSONMs != null && cur.indexing?.toJSONMs != null) {
+      compareTimingMetric('toJSON (ms)', ref.indexing.toJSONMs, cur.indexing.toJSONMs, 'freezeMs', bump, { informative: true })
+    }
     if (ref.indexing?.freezeMs != null && cur.indexing?.freezeMs != null) {
-      compareTimingMetric('freeze (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
+      compareTimingMetric('freeze import (ms)', ref.indexing.freezeMs, cur.indexing.freezeMs, 'freezeMs', bump)
     }
     if (ref.diskMb?.binary != null && cur.diskMb?.binary != null) {
       bump(compareMetric('disk binary (MB)', ref.diskMb.binary, cur.diskMb.binary, 'heapFrozenMb'))

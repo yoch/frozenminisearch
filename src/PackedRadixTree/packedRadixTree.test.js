@@ -7,6 +7,7 @@ import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { setRadixLeaf } from '../radixTree'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
 import PackedRadixTree, { fromRadixTree } from './index'
+import { packTermsFromList } from './packTermList'
 
 const terms = ['summer', 'acqua', 'aqua', 'acquire', 'poisson', 'qua']
 const keyValues = terms.map((key, i) => [key, i])
@@ -20,6 +21,33 @@ function fromNeutralRadix(entries) {
   }
   return fromRadixTree(tree, entries.length)
 }
+
+test('packTermsFromList matches neutral radix packing', () => {
+  const viaRadix = fromNeutralRadix(keyValues)
+  const direct = packTermsFromList(terms)
+  expect(Array.from(direct.entries())).toEqual(Array.from(viaRadix.entries()))
+  expect(Array.from(direct.prefixRefs('a')).map(({ termIndex }) => [direct.termByIndex(termIndex), termIndex]))
+    .toEqual(Array.from(viaRadix.prefixRefs('a')).map(({ termIndex }) => [viaRadix.termByIndex(termIndex), termIndex]))
+  for (const [term, termIndex] of keyValues) {
+    expect(direct.get(term)).toBe(termIndex)
+    expect(direct.get(term)).toBe(viaRadix.get(term))
+  }
+  expect(direct.size).toBe(viaRadix.size)
+})
+
+test('packTermsFromList preserves split-edge iteration order', () => {
+  const entries = [
+    ['acqua', 0],
+    ['aqua', 1],
+    ['acquire', 2],
+  ]
+  const direct = packTermsFromList(entries.map(([term]) => term))
+  const viaRadix = fromNeutralRadix(entries)
+
+  expect(Array.from(direct.entries())).toEqual(Array.from(viaRadix.entries()))
+  expect(Array.from(direct.prefixRefs('a')).map(({ termIndex }) => direct.termByIndex(termIndex)))
+    .toEqual(Array.from(viaRadix.prefixRefs('a')).map(({ termIndex }) => viaRadix.termByIndex(termIndex)))
+})
 
 test('neutral radix builder matches SearchableMap packing', () => {
   const viaRadix = fromNeutralRadix(keyValues)
@@ -292,6 +320,7 @@ describe('PackedRadixTree module', () => {
     const tree = new Map()
     setRadixLeaf(tree, 'a', 0)
     expect(() => fromRadixTree(tree, 2)).toThrow(/leaf count 1 !== termCount 2/)
+    expect(() => fromRadixTree(tree, 2, { skipLeafValidation: true })).not.toThrow()
   })
 
   test('rejects edge labels that cannot fit the packed length array', () => {

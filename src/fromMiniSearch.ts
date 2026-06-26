@@ -1,11 +1,14 @@
-import { fromRadixTree } from './PackedRadixTree'
+import {
+  createPackedRadixScratch,
+  finalizePackedRadixScratch,
+  insertPackedRadixTerm,
+} from './PackedRadixTree/packTermList'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { materializeFrozenPostings } from './frozenPostings'
 import { resolveIndexingOptions } from './indexingCore'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 import { DISCARDED_DOC_ID } from './flatPostings'
-import { setRadixLeaf, type RadixTree } from './radixTree'
 import type PackedRadixTree from './PackedRadixTree'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { Options } from './searchTypes'
@@ -31,7 +34,7 @@ const SUPPORTED_SERIALIZATION_VERSIONS = new Set([1, 2])
 type MutableFieldTermData = Map<number, Map<number, number>>
 
 type ParsedSnapshotIndex = {
-  tree: RadixTree<number>
+  index: PackedRadixTree
   termDataByIndex: MutableFieldTermData[]
 }
 
@@ -53,11 +56,33 @@ function assertNonNegativeInteger(value: unknown, context: string): number {
   return value as number
 }
 
+// Hot path (one call per posting docId): validate a canonical non-negative
+// integer key with an allocation-free digit scan instead of a regex.
+// Equivalent to /^(0|[1-9]\d*)$/ + Number.isSafeInteger.
 function parseIntegerKey(key: string, context: string): number {
-  if (!/^(0|[1-9]\d*)$/.test(key)) {
+  const len = key.length
+  let valid = len > 0
+  let n = 0
+  if (valid) {
+    const c0 = key.charCodeAt(0)
+    if (c0 < 48 || c0 > 57 || (c0 === 48 && len > 1)) {
+      valid = false
+    } else {
+      n = c0 - 48
+      for (let i = 1; i < len; i++) {
+        const c = key.charCodeAt(i)
+        if (c < 48 || c > 57) {
+          valid = false
+          break
+        }
+        n = n * 10 + (c - 48)
+      }
+    }
+  }
+  if (!valid || !Number.isSafeInteger(n)) {
     throw snapshotError(`${context} key "${key}" must be a non-negative integer`)
   }
-  return assertNonNegativeInteger(Number(key), `${context} key "${key}"`)
+  return n
 }
 
 function assertShortIdInRange(shortId: number, nextId: number, context: string): void {
@@ -102,8 +127,9 @@ function parseSnapshotIndex(
   fieldCount: number,
   nextId: number,
 ): ParsedSnapshotIndex {
-  const tree = new Map() as RadixTree<number>
-  const termDataByIndex: MutableFieldTermData[] = new Array(snapshot.index.length)
+  const termCount = snapshot.index.length
+  const termIndexScratch = createPackedRadixScratch()
+  const termDataByIndex: MutableFieldTermData[] = new Array(termCount)
   const seenTerms = new Set<string>()
   const { index: entries, serializationVersion } = snapshot
 
@@ -122,7 +148,7 @@ function parseSnapshotIndex(
     seenTerms.add(term)
     const dataRecord = assertRecord(data, `index term "${term}"`)
     const dataMap = new Map<number, Map<number, number>>() as MutableFieldTermData
-    for (const fieldId of Object.keys(dataRecord)) {
+    for (const fieldId in dataRecord) {
       const parsedFieldId = parseIntegerKey(fieldId, `index term "${term}" fieldId`)
       if (parsedFieldId >= fieldCount) {
         throw snapshotError(`index term "${term}" fieldId ${parsedFieldId} must be < field count ${fieldCount}`)
@@ -130,18 +156,21 @@ function parseSnapshotIndex(
       const raw = dataRecord[fieldId]
       const indexEntryRecord = parseIndexEntry(raw, serializationVersion, `index term "${term}" field ${fieldId}`)
       const freqs = new Map<number, number>()
-      for (const [docId, freq] of Object.entries(indexEntryRecord)) {
+      for (const docId in indexEntryRecord) {
         const shortId = parseIntegerKey(docId, `index term "${term}" field ${fieldId} docId`)
         assertShortIdInRange(shortId, nextId, `index term "${term}" field ${fieldId}`)
-        freqs.set(shortId, assertFrequency(freq, `index term "${term}" field ${fieldId} docId ${docId}`))
+        freqs.set(shortId, assertFrequency(indexEntryRecord[docId], `index term "${term}" field ${fieldId} docId ${docId}`))
       }
       dataMap.set(parsedFieldId, freqs)
     }
+    insertPackedRadixTerm(termIndexScratch, term, termIndex)
     termDataByIndex[termIndex] = dataMap
-    setRadixLeaf(tree, term, termIndex)
   }
 
-  return { tree, termDataByIndex }
+  return {
+    index: finalizePackedRadixScratch(termIndexScratch.nodes, termCount),
+    termDataByIndex,
+  }
 }
 
 function validateFieldIds(fieldIds: Record<string, unknown>, fieldCount: number): { [fieldName: string]: number } {
@@ -189,7 +218,6 @@ function buildFlatPostingsFromParsedIndex(
   postings: ReturnType<typeof materializeFrozenPostings>
 } {
   const termCount = parsedIndex.termDataByIndex.length
-  const packedIndex = fromRadixTree(parsedIndex.tree, termCount)
 
   const remapDocId = shortIdRemap != null
     ? (docId: number) => shortIdRemap[docId]
@@ -210,8 +238,13 @@ function buildFlatPostingsFromParsedIndex(
     },
   })
 
-  return { termCount, index: packedIndex, postings }
+  return { termCount, index: parsedIndex.index, postings }
 }
+
+/** @internal Freeze benchmark profiler. */
+export type { ParsedSnapshotIndex }
+/** @internal Freeze benchmark profiler. */
+export { parseSnapshotIndex, buildFlatPostingsFromParsedIndex }
 
 /** Build frozen assemble params from a MiniSearch JSON snapshot. */
 export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
@@ -263,27 +296,6 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
       throw snapshotError(`storedFields shortId ${shortId} is missing from documentIds`)
     }
   }
-  for (const [shortIdStr, lengths] of Object.entries(fieldLength)) {
-    const shortId = parseIntegerKey(shortIdStr, 'fieldLength')
-    assertShortIdInRange(shortId, nextId, 'fieldLength')
-    if (!activeShortIdSet.has(shortId)) {
-      throw snapshotError(`fieldLength shortId ${shortId} is missing from documentIds`)
-    }
-    if (!Array.isArray(lengths)) {
-      throw snapshotError(`fieldLength shortId ${shortId} must be an array`)
-    }
-    for (let f = 0; f < fieldCount; f++) {
-      const length = lengths[f] ?? 0
-      if (!Number.isFinite(length) || length < 0) {
-        throw snapshotError(`fieldLength shortId ${shortId} field ${f} must be a non-negative number`)
-      }
-    }
-  }
-  for (const shortId of activeShortIds) {
-    if (!Object.prototype.hasOwnProperty.call(fieldLength, String(shortId))) {
-      throw snapshotError(`fieldLength missing shortId ${shortId}`)
-    }
-  }
   if (snapshot.averageFieldLength.length !== fieldCount) {
     throw snapshotError(`averageFieldLength length must equal field count ${fieldCount}`)
   }
@@ -325,13 +337,31 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   const matrixRows = useDense ? documentCount : nextId
   const matrixCells = matrixRows * fieldCount
   const fieldLengthScratch: number[] = new Array(matrixCells).fill(0)
+  // Single pass over fieldLength: validate keys/rows + fill the matrix + track
+  // coverage (every active document must carry a fieldLength row).
+  let fieldLengthCovered = 0
   for (const [shortIdStr, lengths] of Object.entries(fieldLength)) {
     const shortId = parseIntegerKey(shortIdStr, 'fieldLength')
-    const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
-    if (row === DISCARDED_DOC_ID) continue
-    for (let f = 0; f < fieldCount; f++) {
-      fieldLengthScratch[row * fieldCount + f] = (lengths as number[])[f] ?? 0
+    assertShortIdInRange(shortId, nextId, 'fieldLength')
+    if (!activeShortIdSet.has(shortId)) {
+      throw snapshotError(`fieldLength shortId ${shortId} is missing from documentIds`)
     }
+    if (!Array.isArray(lengths)) {
+      throw snapshotError(`fieldLength shortId ${shortId} must be an array`)
+    }
+    const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
+    const rowBase = row * fieldCount
+    for (let f = 0; f < fieldCount; f++) {
+      const length = (lengths as number[])[f] ?? 0
+      if (!Number.isFinite(length) || length < 0) {
+        throw snapshotError(`fieldLength shortId ${shortId} field ${f} must be a non-negative number`)
+      }
+      fieldLengthScratch[rowBase + f] = length
+    }
+    fieldLengthCovered++
+  }
+  if (fieldLengthCovered !== activeShortIds.length) {
+    throw snapshotError(`fieldLength must cover all ${activeShortIds.length} active documents (got ${fieldLengthCovered})`)
   }
   const fieldLengthMatrix = materializeFieldLengthMatrix(fieldLengthScratch)
 

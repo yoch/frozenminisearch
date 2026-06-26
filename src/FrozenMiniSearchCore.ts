@@ -362,7 +362,7 @@ export default class FrozenMiniSearchCore<T = any> {
   ): I {
     return assembleFrozenInternal(
       buildFrozenAssembleParamsFromMiniSearchSnapshot(JSON.parse(json) as MiniSearchSnapshot, options),
-      true,
+      false,
       'minisearch-json',
       this,
     )
@@ -395,7 +395,7 @@ export default class FrozenMiniSearchCore<T = any> {
   ): I {
     return assembleFrozenInternal(
       buildFrozenAssembleParamsFromMiniSearchSnapshot(snapshot, options),
-      true,
+      false,
       'minisearch-json',
       this,
     )
@@ -409,7 +409,7 @@ export default class FrozenMiniSearchCore<T = any> {
   ): I {
     return assembleFrozenInternal(
       buildFrozenAssembleParamsFromMiniSearchSnapshot(source.toJSON(), options),
-      true,
+      false,
       'minisearch-json',
       this,
     )

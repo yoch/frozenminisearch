@@ -1,12 +1,10 @@
 /**
- * Memory pressure of the freeze import intermediate (parseSnapshotIndex).
+ * Memory pressure of the freeze import intermediate (parseSnapshotIndex accumulator).
  *
- * The freeze path materializes a transient per-(term,field) postings structure
- * before emitting typed arrays. This probe sizes that intermediate and guards it
- * against a reference Map<fieldId, Map<shortId,freq>> representation in the same
- * process. A parallel-array representation was measured here and rejected: it
- * inflated the intermediate by +33..43% on high-term-count snapshots (dense,
- * giant, docId) because per-slot wrapper+array headers outweigh a small Map.
+ * The freeze path streams postings into an IncrementalPostingsAccumulator during
+ * JSON parse before finalize emits typed arrays. This probe sizes that intermediate
+ * and guards it against a reference Map<fieldId, Map<shortId,freq>> representation in the same
+ * process.
  *
  *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-freeze-memory.mjs
  *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-freeze-memory.mjs --runs=5
@@ -71,10 +69,10 @@ function run(scenarioKey) {
 
   for (let i = 0; i < runs; i++) {
     gc()
-    // Isolate the postings intermediate: keep only termDataByIndex alive so the
+    // Isolate the postings intermediate: keep only the accumulator alive so the
     // PackedRadixTree built alongside is collected and not counted here.
     arrayIntermediate.push(
-      measureHeap(() => parseSnapshotIndex(snapshot, fieldCount, nextId).termDataByIndex).heapBytes,
+      measureHeap(() => parseSnapshotIndex(snapshot, fieldCount, nextId).accumulator).heapBytes,
     )
     gc()
     mapIntermediate.push(measureHeap(() => buildMapIntermediate(snapshot)).heapBytes)

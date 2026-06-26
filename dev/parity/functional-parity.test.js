@@ -744,8 +744,7 @@ describe('fieldLengthMatrix adaptive width', () => {
     expect(frozen._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(2)
     const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), opts)
     expect(loaded.search('term0')).toEqual(frozen.search('term0'))
-    // Wire format is always Uint32 per cell; adaptive width is not preserved after load.
-    expect(loaded._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(4)
+    expect(loaded._memoryBreakdown().documents.fieldLengthMatrixBytes).toBe(2)
   })
 
   test('uses Uint32 when a field exceeds 65535 unique terms', () => {

@@ -183,4 +183,16 @@ describe('fromMiniSearch loaders', () => {
     expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
       .toThrow(/invalid MiniSearch snapshot: fieldLength shortId 0 must be an array/)
   })
+
+  test('fromJSON postings layout matches fromDocuments', () => {
+    const reference = new MiniSearch(options)
+    reference.addAll(docs)
+    const fromJson = FrozenMiniSearch.fromJSON(JSON.stringify(reference), options)
+    const fromDocs = FrozenMiniSearch.fromDocuments(docs, options)
+
+    expect(fromJson._memoryBreakdown().postings).toEqual(fromDocs._memoryBreakdown().postings)
+    expect(fromJson.termCount).toBe(fromDocs.termCount)
+    expect(fromJson.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+      .toEqual(fromDocs.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+  })
 })

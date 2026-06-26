@@ -5,7 +5,8 @@ import {
 } from './PackedRadixTree/packTermList'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
-import { materializeFrozenPostings } from './frozenPostings'
+import { IncrementalPostingsAccumulator } from './incrementalPostings'
+import type { FrozenPostingsLayout } from './frozenPostings'
 import { resolveIndexingOptions } from './indexingCore'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 import { DISCARDED_DOC_ID } from './flatPostings'
@@ -31,11 +32,10 @@ export type MiniSearchSnapshot = {
 
 const SUPPORTED_SERIALIZATION_VERSIONS = new Set([1, 2])
 
-type MutableFieldTermData = Map<number, Map<number, number>>
-
 type ParsedSnapshotIndex = {
   index: PackedRadixTree
-  termDataByIndex: MutableFieldTermData[]
+  accumulator: IncrementalPostingsAccumulator
+  termCount: number
 }
 
 function snapshotError(detail: string): Error {
@@ -126,10 +126,11 @@ function parseSnapshotIndex(
   snapshot: MiniSearchSnapshot,
   fieldCount: number,
   nextId: number,
+  shortIdRemap: Uint32Array | null = null,
 ): ParsedSnapshotIndex {
   const termCount = snapshot.index.length
   const termIndexScratch = createPackedRadixScratch()
-  const termDataByIndex: MutableFieldTermData[] = new Array(termCount)
+  const accumulator = new IncrementalPostingsAccumulator(fieldCount)
   const seenTerms = new Set<string>()
   const { index: entries, serializationVersion } = snapshot
 
@@ -147,7 +148,6 @@ function parseSnapshotIndex(
     }
     seenTerms.add(term)
     const dataRecord = assertRecord(data, `index term "${term}"`)
-    const dataMap = new Map<number, Map<number, number>>() as MutableFieldTermData
     for (const fieldId in dataRecord) {
       const parsedFieldId = parseIntegerKey(fieldId, `index term "${term}" fieldId`)
       if (parsedFieldId >= fieldCount) {
@@ -155,21 +155,26 @@ function parseSnapshotIndex(
       }
       const raw = dataRecord[fieldId]
       const indexEntryRecord = parseIndexEntry(raw, serializationVersion, `index term "${term}" field ${fieldId}`)
-      const freqs = new Map<number, number>()
       for (const docId in indexEntryRecord) {
         const shortId = parseIntegerKey(docId, `index term "${term}" field ${fieldId} docId`)
         assertShortIdInRange(shortId, nextId, `index term "${term}" field ${fieldId}`)
-        freqs.set(shortId, assertFrequency(indexEntryRecord[docId], `index term "${term}" field ${fieldId} docId ${docId}`))
+        const resolvedDocId = shortIdRemap != null ? shortIdRemap[shortId]! : shortId
+        if (resolvedDocId === DISCARDED_DOC_ID) continue
+        accumulator.append(
+          termIndex,
+          parsedFieldId,
+          resolvedDocId,
+          assertFrequency(indexEntryRecord[docId], `index term "${term}" field ${fieldId} docId ${docId}`),
+        )
       }
-      dataMap.set(parsedFieldId, freqs)
     }
     insertPackedRadixTerm(termIndexScratch, term, termIndex)
-    termDataByIndex[termIndex] = dataMap
   }
 
   return {
     index: finalizePackedRadixScratch(termIndexScratch.nodes, termCount),
-    termDataByIndex,
+    accumulator,
+    termCount,
   }
 }
 
@@ -209,36 +214,19 @@ function validateActiveShortIds(
 
 function buildFlatPostingsFromParsedIndex(
   parsedIndex: ParsedSnapshotIndex,
-  fieldCount: number,
+  _fieldCount: number,
   nextId: number,
-  shortIdRemap: Uint32Array | null,
+  _shortIdRemap: Uint32Array | null,
 ): {
   termCount: number
   index: PackedRadixTree
-  postings: ReturnType<typeof materializeFrozenPostings>
+  postings: FrozenPostingsLayout
 } {
-  const termCount = parsedIndex.termDataByIndex.length
-
-  const remapDocId = shortIdRemap != null
-    ? (docId: number) => shortIdRemap[docId]
-    : undefined
-
-  const postings = materializeFrozenPostings({
-    fieldCount,
-    termCount,
-    nextId,
-    clampFrequencies: true,
-    remapDocId,
-    forEachPosting(ti, f, emit) {
-      const freqs = parsedIndex.termDataByIndex[ti]?.get(f)
-      if (freqs == null) return
-      for (const [shortId, freq] of freqs) {
-        emit(shortId, freq)
-      }
-    },
-  })
-
-  return { termCount, index: parsedIndex.index, postings }
+  return {
+    termCount: parsedIndex.termCount,
+    index: parsedIndex.index,
+    postings: parsedIndex.accumulator.finalize(parsedIndex.termCount, nextId),
+  }
 }
 
 /** @internal Freeze benchmark profiler. */
@@ -370,12 +358,12 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     avgFieldLength[i] = snapshot.averageFieldLength[i]
   }
 
-  const parsedIndex = parseSnapshotIndex(snapshot, fieldCount, nextId)
+  const parsedIndex = parseSnapshotIndex(snapshot, fieldCount, nextId, shortIdRemap)
   const flat = buildFlatPostingsFromParsedIndex(
     parsedIndex,
     fieldCount,
     resolvedNextId,
-    shortIdRemap,
+    null,
   )
 
   const storedFields = storedFieldsFromRows(storedFieldRows, opts.storeFields)

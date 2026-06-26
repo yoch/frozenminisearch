@@ -44,6 +44,11 @@ import {
   MSV5_ZSTD_LEVEL_OFFSET,
 } from './binaryMsv5Constants'
 import { browserZlibDeflateAsync, browserZlibInflateAsync } from './compressionBrowser'
+import {
+  computeSectionDirectory,
+  concatRawSectionsWithCrc,
+  writeRawSectionsIntoPayload,
+} from './binaryMsv5PayloadAssembly'
 export type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
 
 export interface Msv5AssembledFileBrowser {
@@ -128,29 +133,65 @@ async function choosePayloadCodecAsync(
   }
 }
 
-function concatRawSections(rawSections: BinaryBytes[]): {
-  uncompressed: BinaryBytes
-  entries: Msv5SectionEntry[]
-} {
-  const entries: Msv5SectionEntry[] = []
-  let uncompressedLength = 0
-
-  for (const raw of rawSections) {
-    uncompressedLength = (uncompressedLength + 3) & ~3
-    entries.push({
-      fileOffset: uncompressedLength,
-      uncompressedLength: raw.length,
-      sectionCrc32: crc32Bytes(raw),
-    })
-    uncompressedLength += raw.length
+function buildMsv5CompressionMeta(
+  entries: Msv5SectionEntry[],
+  uncompressedLength: number,
+  compressedLength: number,
+  payloadCrc32: number,
+  codec: number,
+  zstdLevel: number,
+): Msv5SnapshotCompressionMeta {
+  return {
+    formatRev: MSV5_FORMAT_REV_PAYLOAD,
+    payloadCodec: codec,
+    zstdLevel,
+    uncompressedLength,
+    compressedLength,
+    payloadCrc32,
+    sections: entries.map((e, sectionId) => ({
+      sectionId,
+      uncompressedOffset: e.fileOffset,
+      uncompressedLength: e.uncompressedLength,
+      sectionCrc32: e.sectionCrc32,
+    })),
   }
+}
 
-  const uncompressed = allocBytes(uncompressedLength)
-  for (let i = 0; i < rawSections.length; i++) {
-    uncompressed.set(rawSections[i], entries[i].fileOffset)
+function writeMsv5FileHeader(
+  out: BinaryBytes,
+  globalFlags: number,
+  entries: Msv5SectionEntry[],
+  uncompressedLength: number,
+  payloadCrc32: number,
+  compressedLength: number,
+  codec: number,
+  zstdLevel: number,
+): void {
+  writeAscii(out, 0, 'MSv5')
+  writeU16LE(out, 4, 5)
+  writeU16LE(out, 6, globalFlags & 0xffff)
+  writeU8(out, MSV5_PAYLOAD_CODEC_OFFSET, codec)
+  writeU8(out, MSV5_ZSTD_LEVEL_OFFSET, zstdLevel)
+  writeU16LE(out, MSV5_FORMAT_REV_OFFSET, MSV5_FORMAT_REV_PAYLOAD)
+  writeU32LE(out, MSV5_SECTION_COUNT_OFFSET, MSV5_SECTION_COUNT)
+  writeU32LE(out, MSV5_PAYLOAD_COMPRESSED_OFFSET, MSV5_HEADER_SIZE)
+  writeU32LE(out, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET, compressedLength)
+  writeU32LE(out, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET, uncompressedLength)
+  writeU32LE(out, MSV5_PAYLOAD_CRC_OFFSET, payloadCrc32)
+
+  let dirOff = MSV5_SECTION_DIR_OFFSET
+  for (const entry of entries) {
+    writeU32LE(out, dirOff, entry.fileOffset)
+    writeU32LE(out, dirOff + 4, entry.uncompressedLength)
+    writeU32LE(out, dirOff + 8, entry.sectionCrc32)
+    dirOff += MSV5_SECTION_ENTRY_BYTES
   }
+}
 
-  return { uncompressed, entries }
+function assertRawSectionCount(rawSections: BinaryBytes[]): void {
+  if (rawSections.length !== MSV5_SECTION_COUNT) {
+    throw new Error(`MSv5 expects ${MSV5_SECTION_COUNT} sections, got ${rawSections.length}`)
+  }
 }
 
 function concatAndValidateSections(rawSections: BinaryBytes[]): {
@@ -158,14 +199,49 @@ function concatAndValidateSections(rawSections: BinaryBytes[]): {
   entries: Msv5SectionEntry[]
   payloadCrc32: number
 } {
-  if (rawSections.length !== MSV5_SECTION_COUNT) {
-    throw new Error(`MSv5 expects ${MSV5_SECTION_COUNT} sections, got ${rawSections.length}`)
-  }
-  const { uncompressed, entries } = concatRawSections(rawSections)
-  if (uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
+  assertRawSectionCount(rawSections)
+  const result = concatRawSectionsWithCrc(rawSections, allocBytes)
+  if (result.uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
     throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
   }
-  return { uncompressed, entries, payloadCrc32: crc32Bytes(uncompressed) }
+  return result
+}
+
+function assembleMsv5FileRawDirect(
+  globalFlags: number,
+  rawSections: BinaryBytes[],
+): Msv5AssembledFileBrowser {
+  assertRawSectionCount(rawSections)
+  const { entries, uncompressedLength } = computeSectionDirectory(rawSections)
+  if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
+    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
+  }
+
+  const out = allocBytes(MSV5_HEADER_SIZE + uncompressedLength)
+  const payloadCrc32 = writeRawSectionsIntoPayload(out, MSV5_HEADER_SIZE, rawSections, entries)
+  writeMsv5FileHeader(
+    out,
+    globalFlags,
+    entries,
+    uncompressedLength,
+    payloadCrc32,
+    uncompressedLength,
+    CODEC_RAW,
+    0,
+  )
+
+  return {
+    buffer: out,
+    globalFlags,
+    compression: buildMsv5CompressionMeta(
+      entries,
+      uncompressedLength,
+      uncompressedLength,
+      payloadCrc32,
+      CODEC_RAW,
+      0,
+    ),
+  }
 }
 
 function buildMsv5AssembledFile(
@@ -178,45 +254,29 @@ function buildMsv5AssembledFile(
   zstdLevel: number,
 ): Msv5AssembledFileBrowser {
   const out = allocBytes(MSV5_HEADER_SIZE + payload.length)
-  writeAscii(out, 0, 'MSv5')
-  writeU16LE(out, 4, 5)
-  writeU16LE(out, 6, globalFlags & 0xffff)
-  writeU8(out, MSV5_PAYLOAD_CODEC_OFFSET, codec)
-  writeU8(out, MSV5_ZSTD_LEVEL_OFFSET, zstdLevel)
-  writeU16LE(out, MSV5_FORMAT_REV_OFFSET, MSV5_FORMAT_REV_PAYLOAD)
-  writeU32LE(out, MSV5_SECTION_COUNT_OFFSET, MSV5_SECTION_COUNT)
-  writeU32LE(out, MSV5_PAYLOAD_COMPRESSED_OFFSET, MSV5_HEADER_SIZE)
-  writeU32LE(out, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET, payload.length)
-  writeU32LE(out, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET, uncompressedLength)
-  writeU32LE(out, MSV5_PAYLOAD_CRC_OFFSET, payloadCrc32)
-
-  let dirOff = MSV5_SECTION_DIR_OFFSET
-  for (const entry of entries) {
-    writeU32LE(out, dirOff, entry.fileOffset)
-    writeU32LE(out, dirOff + 4, entry.uncompressedLength)
-    writeU32LE(out, dirOff + 8, entry.sectionCrc32)
-    dirOff += MSV5_SECTION_ENTRY_BYTES
-  }
-
+  writeMsv5FileHeader(
+    out,
+    globalFlags,
+    entries,
+    uncompressedLength,
+    payloadCrc32,
+    payload.length,
+    codec,
+    zstdLevel,
+  )
   out.set(payload, MSV5_HEADER_SIZE)
 
   return {
     buffer: out,
     globalFlags,
-    compression: {
-      formatRev: MSV5_FORMAT_REV_PAYLOAD,
-      payloadCodec: codec,
-      zstdLevel,
+    compression: buildMsv5CompressionMeta(
+      entries,
       uncompressedLength,
-      compressedLength: payload.length,
+      payload.length,
       payloadCrc32,
-      sections: entries.map((e, sectionId) => ({
-        sectionId,
-        uncompressedOffset: e.fileOffset,
-        uncompressedLength: e.uncompressedLength,
-        sectionCrc32: e.sectionCrc32,
-      })),
-    },
+      codec,
+      zstdLevel,
+    ),
   }
 }
 
@@ -225,6 +285,9 @@ export async function assembleMsv5FileBrowser(
   rawSections: BinaryBytes[],
   compression: BrowserBinaryCompression = 'auto',
 ): Promise<Msv5AssembledFileBrowser> {
+  if (compression === 'raw') {
+    return assembleMsv5FileRawDirect(globalFlags, rawSections)
+  }
   const { uncompressed, entries, payloadCrc32 } = concatAndValidateSections(rawSections)
   const { payload, codec, zstdLevel } = await choosePayloadCodecAsync(uncompressed, compression)
   return buildMsv5AssembledFile(

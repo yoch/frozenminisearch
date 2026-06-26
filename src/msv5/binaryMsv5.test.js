@@ -21,11 +21,16 @@ import {
   Msv5SectionId,
 } from './binaryMsv5Constants'
 import { overflowFrequencies } from '../../benchmarks/benchmarkScenarios.js'
+import { crc32Buffer, crc32Update } from '../binaryIo'
 import { encodeFrozenSnapshotMsv5 } from './binaryMsv5Encode'
 import {
+  assembleMsv5File,
+  loadMsv5Sections,
   loadMsv5SectionsAsync,
+  readMsv5GlobalFlags,
   readMsv5SectionDirectory,
 } from './binaryMsv5Compression'
+import { computeSectionDirectory } from './binaryMsv5PayloadAssembly'
 
 const options = { fields: ['title', 'text'] }
 const hasZstd = typeof zlib.zstdCompressSync === 'function'
@@ -310,6 +315,35 @@ describe('binaryMsv5', () => {
     expect(meta.payloadCodec).toBe(CODEC_RAW)
     expect(FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] }).search('payload').length)
       .toBeGreaterThan(0)
+  })
+
+  test('raw payload CRC includes 4-byte alignment padding between sections', () => {
+    const seed = bigCompressibleIndex().saveBinarySync({ compression: 'raw' })
+    const directory = readMsv5SectionDirectory(seed)
+    const globalFlags = readMsv5GlobalFlags(seed)
+    const rawSections = loadMsv5Sections(seed, directory).map((section, i) => {
+      if (i >= 3) return section
+      return Buffer.from(section.subarray(0, i + 1))
+    })
+
+    const { entries, uncompressedLength } = computeSectionDirectory(rawSections)
+    expect(entries[1].fileOffset).toBeGreaterThan(entries[0].fileOffset + entries[0].uncompressedLength)
+
+    const assembled = assembleMsv5File(globalFlags, rawSections, 'raw')
+    const meta = readMsv5SnapshotCompressionMeta(assembled.buffer)
+    const payload = assembled.buffer.subarray(MSV5_HEADER_SIZE, MSV5_HEADER_SIZE + uncompressedLength)
+
+    let sectionsOnlyCrc = 0
+    for (const section of rawSections) {
+      sectionsOnlyCrc = crc32Update(sectionsOnlyCrc, section)
+    }
+    expect(sectionsOnlyCrc).not.toBe(meta.payloadCrc32)
+    expect(crc32Buffer(payload)).toBe(meta.payloadCrc32)
+
+    const loaded = loadMsv5Sections(assembled.buffer, readMsv5SectionDirectory(assembled.buffer))
+    for (let i = 0; i < rawSections.length; i++) {
+      expect(Buffer.from(loaded[i])).toEqual(Buffer.from(rawSections[i]))
+    }
   })
 
   test('loaded raw snapshot copies caller wire buffer', () => {

@@ -33,14 +33,3 @@ export function materializeFieldLengthMatrix(data: ArrayLike<number>, length?: n
   return matrix
 }
 
-/**
- * Wire encoding uses adaptive width ({@link fieldLengthMatrixWireFlags});
- * {@link readFieldLengthMatrixSection} restores u8/u16/u32.
- * {@link fieldLengthMatrixForWire} widens in-memory u8/u16 matrices to Uint32 for the encoder.
- */
-export function fieldLengthMatrixForWire(matrix: FieldLengthArray): Uint32Array {
-  if (matrix instanceof Uint32Array) return matrix
-  const out = new Uint32Array(matrix.length)
-  for (let i = 0; i < matrix.length; i++) out[i] = matrix[i]
-  return out
-}

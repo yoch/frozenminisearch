@@ -1,6 +1,5 @@
 import { fieldNamesFromFieldIds, type FrozenSnapshot } from './binaryStructures'
 import { createIdToShortIdLookup } from './frozenIdLookup'
-import { fieldLengthMatrixForWire } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
 import {
   defaultAutoSuggestOptions,
@@ -44,9 +43,9 @@ export function buildBinarySnapshotInput(state: BinarySnapshotState): FrozenSnap
     fieldNames: fieldNamesFromFieldIds(state.fieldIds),
     avgFieldLength: state.avgFieldLength,
     externalIds: state.externalIds,
-    storedFields: new Array(state.nextId),
+    storedFields: state.storedFieldsLayout != null ? [] : new Array(state.nextId),
     storedFieldsLayout: state.storedFieldsLayout,
-    fieldLengthMatrix: fieldLengthMatrixForWire(state.fieldLengthMatrix),
+    fieldLengthMatrix: state.fieldLengthMatrix,
     treeShape: [],
     postings: state.postings,
   }

@@ -1,6 +1,5 @@
 import {
   allocateFieldLengthMatrix,
-  fieldLengthMatrixForWire,
   materializeFieldLengthMatrix,
   maxInArrayLike,
 } from './fieldLengthMatrix'
@@ -38,12 +37,4 @@ describe('fieldLengthMatrix', () => {
     expect(maxInArrayLike([1, 2, 300], 2)).toBe(2)
   })
 
-  test('fieldLengthMatrixForWire converts narrow arrays to Uint32', () => {
-    const u8 = new Uint8Array([1, 2, 3])
-    const wire = fieldLengthMatrixForWire(u8)
-    expect(wire).toBeInstanceOf(Uint32Array)
-    expect(Array.from(wire)).toEqual([1, 2, 3])
-    const u32 = new Uint32Array([4, 5])
-    expect(fieldLengthMatrixForWire(u32)).toBe(u32)
-  })
 })

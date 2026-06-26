@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.5.0 — `@yoch/frozenminisearch`
+
+Minor release: faster MiniSearch JSON import and MSv5 binary I/O, adaptive field-length wire encoding, and `fromJSON` as the canonical migration API.
+
 ### Added
 
 - **`fromJSON`** — canonical static import for MiniSearch wire snapshots (`serializationVersion: 2`), symmetric with `toJSON()`.
@@ -13,7 +17,14 @@
 ### Changed
 
 - **Term index build path** — frozen index construction (`fromJSON`, `FrozenIndexBuilder`) builds a numeric `RadixTree` via `radixTree.ts` helpers instead of routing through `SearchableMap`; packing lives in `PackedRadixTree/fromRadixTree.ts` with `validateRadixLeaves` at finalize.
+- **MSv5 field-length wire width** — save snapshots with the narrowest unsigned width per matrix (u8/u16/u32) instead of always widening to u32; load preserves the on-wire width in memory. Existing snapshots remain readable.
+- **MSv5 raw save path** — single payload allocation for `compression: 'raw'`, incremental payload CRC during section writes, and preallocated columnar term-tree sections (no intermediate `concatBytes` padding chunks).
 - **Heap benchmark protocol v4** — primary RAM comparison uses `totalResidentApprox` (heapUsed + external on both mutable and frozen sides). Heap-only savings remain as `frozenVsMutableHeapOnlySavingPct` for diagnostics. Memory warmup reduced to 2 passes (was up to 100 for small corpora). Heap allowlist expanded to 12 scenarios. See `benchmarks/README.md`.
+
+### Improved
+
+- **MiniSearch JSON import (`fromJSON`)** — stream postings through `IncrementalPostingsAccumulator` during parse (no nested `Map` postings or double-pass materialization); typical freeze import **~20–60% faster** on large corpora with lower transient memory.
+- **MSv5 `saveBinary` / `loadBinary`** — fewer copies on raw and compressed paths; codec-aware buffer ownership on load. Measured save/load **~25–50% faster** on dense 100k scenarios vs v1.4.0 baseline.
 
 ### Fixed
 

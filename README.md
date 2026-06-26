@@ -36,14 +36,14 @@ Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
 | Scenario | Docs | Index RAM | Binary size | Load time | Search p50 |
 |----------|-----:|-----------|------------:|----------:|-----------:|
 | Divina, with stored text | 14,097 | 0.83 vs 16.1 MB total (~95% less) | ~71% less | ~54% faster | ~19% faster |
-| Divina, index only | 14,097 | 0.72 vs 14.9 MB total (~95% less) | ~74% less | ~82% faster | ~17% faster |
-| High-frequency terms | 10,000 | 0.42 vs 7.4 MB total (~94% less) | ~92% less | ~83% faster | ~43% faster |
-| Dense numeric ids | 100,000 | 4.90 vs 91.3 MB total (~95% less) | ~73% less | ~88% faster | ~28% faster |
-| Uint16 doc id boundary | 65,535 | 3.02 vs 58.6 MB total (~95% less) | ~77% less | ~91% faster | ~45% faster |
+| Divina, index only | 14,097 | 0.73 vs 14.9 MB total (~95% less) | ~74% less | ~88% faster | ~19% faster |
+| High-frequency terms | 10,000 | 0.40 vs 7.4 MB total (~95% less) | ~92% less | ~90% faster | ~45% faster |
+| Dense numeric ids | 100,000 | 4.91 vs 91.3 MB total (~95% less) | ~73% less | ~91% faster | ~29% faster |
+| Uint16 doc id boundary | 65,535 | 3.01 vs 58.6 MB total (~95% less) | ~77% less | ~95% faster | ~53% faster |
 
-Across this full run, frozen is faster on **24/27** search cases. Divina `inferno` (exact, paired p50): mutable 14.9 µs → frozen 11.1 µs (**-4 µs**, ratio 0.74).
+Across this full run, frozen is faster on **26/27** search cases. Divina `inferno` (exact, paired p50): mutable 16.2 µs → frozen 11.7 µs (**-4 µs**, ratio 0.72).
 
-Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-21 on Node v24.16.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
+Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-26 on Node v24.16.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
 <!-- vs-reference:end -->
 
 ---

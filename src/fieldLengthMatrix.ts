@@ -32,4 +32,3 @@ export function materializeFieldLengthMatrix(data: ArrayLike<number>, length?: n
   }
   return matrix
 }
-

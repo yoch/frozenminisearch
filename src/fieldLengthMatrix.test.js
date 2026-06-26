@@ -36,5 +36,4 @@ describe('fieldLengthMatrix', () => {
     expect(maxInArrayLike([1, 50, 255, 0])).toBe(255)
     expect(maxInArrayLike([1, 2, 300], 2)).toBe(2)
   })
-
 })

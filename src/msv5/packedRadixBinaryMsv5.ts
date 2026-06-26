@@ -1,4 +1,4 @@
-import { allocBytes, bytesFromView, concatBytes, readU32LE, readUtf8, utf8Bytes, writeU32LE } from '../binaryBytes'
+import { allocBytes, bytesFromView, readU32LE, readUtf8, utf8Bytes, writeU32LE } from '../binaryBytes'
 import type { BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import PackedRadixTree from '../PackedRadixTree'
@@ -13,8 +13,8 @@ function columnWidthCode(arr: PackedIndexArray): number {
   return 2
 }
 
-export function columnWidthFlagsFromTree(tree: PackedRadixTree): number {
-  const cols: PackedIndexArray[] = [
+function termTreeColumns(tree: PackedRadixTree): PackedIndexArray[] {
+  const columns: PackedIndexArray[] = [
     tree.nodeEdgeOffset,
     tree.nodeValue,
     tree.nodeLeafOrder,
@@ -22,9 +22,14 @@ export function columnWidthFlagsFromTree(tree: PackedRadixTree): number {
     tree.edgeLabelLength,
     tree.edgeChild,
   ]
-  if (cols.length !== MSV5_TREE_COLUMN_COUNT) {
+  if (columns.length !== MSV5_TREE_COLUMN_COUNT) {
     throw new Error('MSv5 tree column count mismatch')
   }
+  return columns
+}
+
+export function columnWidthFlagsFromTree(tree: PackedRadixTree): number {
+  const cols = termTreeColumns(tree)
   let flags = 0
   for (let i = 0; i < cols.length; i++) {
     flags |= columnWidthCode(cols[i])! << (i * 2)
@@ -36,30 +41,37 @@ function pad4(n: number): number {
   return (n + 3) & ~3
 }
 
-function appendColumn(chunks: BinaryBytes[], arr: PackedIndexArray): void {
+function writeColumnAt(out: BinaryBytes, offset: number, arr: PackedIndexArray): number {
   const raw = bytesFromView(arr)
-  chunks.push(raw)
-  const pad = pad4(raw.length) - raw.length
-  if (pad > 0) chunks.push(allocBytes(pad))
+  out.set(raw, offset)
+  return offset + pad4(raw.length)
+}
+
+function termTreeColumnarPayloadLength(columns: PackedIndexArray[], labelBytes: BinaryBytes): number {
+  let total = TREE_SECTION_HEADER_BYTES
+  for (const col of columns) {
+    total += pad4(bytesFromView(col).length)
+  }
+  return total + labelBytes.length
 }
 
 export function buildTermTreeSectionColumnar(tree: PackedRadixTree): Uint8Array {
-  const header = allocBytes(TREE_SECTION_HEADER_BYTES)
-  writeU32LE(header, 0, tree.size)
-  writeU32LE(header, 4, tree.nodeCount)
-  writeU32LE(header, 8, tree.edgeCount)
-  writeU32LE(header, 12, columnWidthFlagsFromTree(tree))
+  const columns = termTreeColumns(tree)
+  const labelBytes = utf8Bytes(tree.labelHeap)
+  const out = allocBytes(termTreeColumnarPayloadLength(columns, labelBytes))
 
-  const chunks: BinaryBytes[] = [header]
-  appendColumn(chunks, tree.nodeEdgeOffset)
-  appendColumn(chunks, tree.nodeValue)
-  appendColumn(chunks, tree.nodeLeafOrder)
-  appendColumn(chunks, tree.edgeLabelStart)
-  appendColumn(chunks, tree.edgeLabelLength)
-  appendColumn(chunks, tree.edgeChild)
+  writeU32LE(out, 0, tree.size)
+  writeU32LE(out, 4, tree.nodeCount)
+  writeU32LE(out, 8, tree.edgeCount)
+  writeU32LE(out, 12, columnWidthFlagsFromTree(tree))
 
-  chunks.push(utf8Bytes(tree.labelHeap))
-  return concatBytes(chunks)
+  let offset = TREE_SECTION_HEADER_BYTES
+  for (const col of columns) {
+    offset = writeColumnAt(out, offset, col)
+  }
+  out.set(labelBytes, offset)
+
+  return out
 }
 
 function widthFromFlags(flags: number, columnIndex: number): 1 | 2 | 4 {

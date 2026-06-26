@@ -6,7 +6,6 @@ import {
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
-import type { FrozenPostingsLayout } from './frozenPostings'
 import { resolveIndexingOptions } from './indexingCore'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 import { DISCARDED_DOC_ID } from './flatPostings'
@@ -122,6 +121,9 @@ function assertFieldsMatchSnapshot(
   }
 }
 
+// Postings segments must be sorted by docId for search (binary seek, gates). We do not
+// re-check order here: MiniSearch.toJSON() emits ascending shortIds, dense remap preserves
+// monotonicity, and JS integer object keys are enumerated in ascending order (for…in).
 function parseSnapshotIndex(
   snapshot: MiniSearchSnapshot,
   fieldCount: number,
@@ -212,27 +214,8 @@ function validateActiveShortIds(
   return shortIds
 }
 
-function buildFlatPostingsFromParsedIndex(
-  parsedIndex: ParsedSnapshotIndex,
-  _fieldCount: number,
-  nextId: number,
-  _shortIdRemap: Uint32Array | null,
-): {
-  termCount: number
-  index: PackedRadixTree
-  postings: FrozenPostingsLayout
-} {
-  return {
-    termCount: parsedIndex.termCount,
-    index: parsedIndex.index,
-    postings: parsedIndex.accumulator.finalize(parsedIndex.termCount, nextId),
-  }
-}
-
 /** @internal Freeze benchmark profiler. */
-export type { ParsedSnapshotIndex }
-/** @internal Freeze benchmark profiler. */
-export { parseSnapshotIndex, buildFlatPostingsFromParsedIndex }
+export { parseSnapshotIndex }
 
 /** Build frozen assemble params from a MiniSearch JSON snapshot. */
 export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
@@ -359,12 +342,7 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   }
 
   const parsedIndex = parseSnapshotIndex(snapshot, fieldCount, nextId, shortIdRemap)
-  const flat = buildFlatPostingsFromParsedIndex(
-    parsedIndex,
-    fieldCount,
-    resolvedNextId,
-    null,
-  )
+  const postings = parsedIndex.accumulator.finalize(parsedIndex.termCount, resolvedNextId)
 
   const storedFields = storedFieldsFromRows(storedFieldRows, opts.storeFields)
 
@@ -379,8 +357,8 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     storedFields,
     fieldLengthMatrix,
     avgFieldLength,
-    index: flat.index,
-    termCount: flat.termCount,
-    postings: flat.postings,
+    index: parsedIndex.index,
+    termCount: parsedIndex.termCount,
+    postings,
   }
 }

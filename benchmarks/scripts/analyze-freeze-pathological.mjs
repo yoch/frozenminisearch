@@ -13,7 +13,6 @@ import FrozenMiniSearch from '../../dist/es/index.js'
 import { assembleFrozenWithCtor } from '../../src/FrozenMiniSearchCore.ts'
 import {
   buildFrozenAssembleParamsFromMiniSearchSnapshot,
-  buildFlatPostingsFromParsedIndex,
   parseSnapshotIndex,
 } from '../../src/fromMiniSearch.ts'
 import { packTermsFromList } from '../../src/PackedRadixTree/packTermList.ts'
@@ -105,9 +104,9 @@ function profileScenario(scenario) {
     toJSON: () => ms.toJSON(),
     parseSnapshotIndex: () => parseSnapshotIndex(snapshot, fieldCount, nextId),
     packTermsOnly: () => packTermsFromList(terms),
-    buildFlatPostings: () => {
+    finalizePostings: () => {
       const parsed = parseSnapshotIndex(snapshot, fieldCount, nextId)
-      return buildFlatPostingsFromParsedIndex(parsed, fieldCount, nextId, null)
+      return parsed.accumulator.finalize(parsed.termCount, nextId)
     },
     buildFrozenParams: () => buildFrozenAssembleParamsFromMiniSearchSnapshot(snapshot, options),
     validateTermIndex: () => validateFrozenTermIndexLeaves(params.index, params.termCount),
@@ -137,7 +136,7 @@ function profileScenario(scenario) {
   }
 
   const parseP50 = profile.parseSnapshotIndex.p50
-  const flatP50 = profile.buildFlatPostings.p50
+  const finalizeP50 = profile.finalizePostings.p50
   const paramsP50 = profile.buildFrozenParams.p50
   const freezeP50 = profile.freezeImport.p50
   const validationDelta = profile.assembleUntrusted.p50 - profile.assembleTrusted.p50
@@ -151,8 +150,8 @@ function profileScenario(scenario) {
     },
     profile,
     derived: {
-      postingsMs: Number((flatP50 - parseP50).toFixed(3)),
-      shellMs: Number((paramsP50 - flatP50).toFixed(3)),
+      postingsMs: Number((finalizeP50 - parseP50).toFixed(3)),
+      shellMs: Number((paramsP50 - finalizeP50).toFixed(3)),
       assembleValidationMs: Number(validationDelta.toFixed(3)),
       parseSharePct: freezeP50 > 0 ? Number(((parseP50 / freezeP50) * 100).toFixed(1)) : 0,
       unaccountedMs: Number((freezeP50 - paramsP50).toFixed(3)),
@@ -214,7 +213,7 @@ for (const id of SCENARIO_IDS) {
   const p = row.profile
   const d = row.derived
   console.log(`\n${id}`)
-  console.log(`  parse=${p.parseSnapshotIndex.p50.toFixed(1)} packOnly=${p.packTermsOnly.p50.toFixed(1)} flat=${p.buildFlatPostings.p50.toFixed(1)} params=${p.buildFrozenParams.p50.toFixed(1)} freeze=${p.freezeImport.p50.toFixed(1)}`)
+  console.log(`  parse=${p.parseSnapshotIndex.p50.toFixed(1)} packOnly=${p.packTermsOnly.p50.toFixed(1)} finalize=${p.finalizePostings.p50.toFixed(1)} params=${p.buildFrozenParams.p50.toFixed(1)} freeze=${p.freezeImport.p50.toFixed(1)}`)
   console.log(`  shell=${d.shellMs} postings=${d.postingsMs} assembleΔ(trusted→untrusted)=${d.assembleValidationMs} toJSON=${p.toJSON.p50.toFixed(1)} (excl. freeze) unaccounted=${d.unaccountedMs}`)
   console.log(`  validateTermIndex=${p.validateTermIndex.p50.toFixed(2)} validatePostings=${p.validatePostings.p50.toFixed(2)}`)
 }

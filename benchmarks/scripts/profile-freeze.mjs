@@ -9,7 +9,6 @@ import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
 import {
   buildFrozenAssembleParamsFromMiniSearchSnapshot,
-  buildFlatPostingsFromParsedIndex,
   parseSnapshotIndex,
 } from '../../src/fromMiniSearch.ts'
 import { fromRadixTree } from '../../src/PackedRadixTree/fromRadixTree.ts'
@@ -76,9 +75,9 @@ function main() {
       }
       return fromRadixTree(tree, terms.length)
     },
-    buildFlatPostings: () => {
+    finalizePostings: () => {
       const parsed = parseSnapshotIndex(snapshot, fieldCount, nextId)
-      return buildFlatPostingsFromParsedIndex(parsed, fieldCount, nextId, null)
+      return parsed.accumulator.finalize(parsed.termCount, nextId)
     },
     buildFrozenParams: () => buildFrozenAssembleParamsFromMiniSearchSnapshot(snapshot, options),
     freezeImport: () => FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options),
@@ -94,12 +93,12 @@ function main() {
   }
 
   const parseP50 = timed(phases.parseSnapshotIndex, warmup, iterations).p50
-  const flatP50 = timed(phases.buildFlatPostings, warmup, iterations).p50
+  const finalizeP50 = timed(phases.finalizePostings, warmup, iterations).p50
   const packP50 = timed(phases.packTermsOnly, warmup, iterations).p50
   console.log('\nDerived splits:')
   console.log(`  packTermsOnly                ${packP50.toFixed(3)} ms`)
-  console.log(`  postings (flat − parse)      ${(flatP50 - parseP50).toFixed(3)} ms est.`)
-  console.log(`  snapshot shell (params−flat) ${(timed(phases.buildFrozenParams, warmup, iterations).p50 - flatP50).toFixed(3)} ms est.`)
+  console.log(`  postings (finalize − parse)  ${(finalizeP50 - parseP50).toFixed(3)} ms est.`)
+  console.log(`  snapshot shell (params−finalize) ${(timed(phases.buildFrozenParams, warmup, iterations).p50 - finalizeP50).toFixed(3)} ms est.`)
   const freezeP50 = timed(phases.freezeImport, warmup, iterations).p50
   console.log(`  parseSnapshotIndex share    ${((parseP50 / freezeP50) * 100).toFixed(1)}% of freezeImport`)
 }

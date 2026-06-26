@@ -23,8 +23,23 @@ du `RadixTree` intermédiaire).
 |--------|----------|------|
 | **1 — Contrat / capacité** | `serializationVersion` supportée, `options.fields` vs `fieldIds`, forme du snapshot | Peut-on lire ce wire format avec cette version du package ? |
 | **2 — Garde-fous bornes** | `shortId < nextId`, `fieldId < fieldCount`, tailles de matrices | Évite index silencieusement faux (fichier tronqué / édité) |
-| **3 — Invariants producteur** | termes uniques, `storedFields` ⊆ `documentIds`, cross-checks shell | MiniSearch « ne devrait jamais » émettre ça |
+| **3 — Invariants producteur** | termes uniques, `storedFields` ⊆ `documentIds`, docIds triés par segment, cross-checks shell | MiniSearch « ne devrait jamais » émettre ça |
 | **4 — Re-validation pipeline** | `validateRadixLeaves`, `validateFrozenTermIndexLeaves`, `validateFrozenPostingsLayout` | Notre conversion parse → pack → assemble n’a pas bugué |
+
+### DocIds triés par segment (famille 3, non vérifié au parse)
+
+La recherche suppose des postings **triés par docId** dans chaque segment
+(binaire seek, gates, early break). `parseSnapshotIndex` **ne re-vérifie pas**
+cet ordre : on fait confiance au producteur et au wire JSON.
+
+- MiniSearch indexe avec des shortIds croissants ; `toJSON()` respecte cet ordre.
+- Le remap dense (`shortIdRemap`) mappe les shortIds actifs en ordre croissant.
+- En JavaScript, les clés entières d’un objet sont énumérées en ordre croissant
+  (`for…in` / `Object.entries`), y compris après `JSON.parse`.
+
+Un snapshot crafté avec docIds désordonnés pourrait produire un index
+silencieusement faux ; ce n’est pas un cas supporté sur le chemin migration
+MiniSearch → Frozen.
 
 ## Deux axes de confiance
 

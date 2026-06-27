@@ -7,13 +7,14 @@
 
 [API documentation](https://yoch.github.io/frozenminisearch/) · [Live demo](https://yoch.github.io/frozenminisearch/demo/)
 
-**Memory-optimized, read-only full-text search for Node.js and browsers.** FrozenMiniSearch keeps the serving API close to [MiniSearch](https://github.com/lucaong/minisearch) while using compact, immutable indexes for fixed corpora.
+**Memory-optimized, read-only full-text search for Node.js and browsers.** FrozenMiniSearch is built for fixed corpora, with compact immutable indexes and [MiniSearch](https://github.com/lucaong/minisearch)-compatible query semantics.
 
 Try the [demo application](https://yoch.github.io/frozenminisearch/demo/) (Billboard Hot 100 search and auto-suggest in the browser).
 
 Use it when your documents are built offline, shipped to production, and queried many times. In that shape, frozen indexes use **~94–95% less index RAM** (totalResident = heapUsed + external on both sides) in the main benchmark set, save to compact binary snapshots, and load faster than MiniSearch JSON.
 
-If you need live `add`, `remove`, or `discard`, use MiniSearch. If the corpus is fixed, this package is designed to keep the search experience familiar while making each serving replica much smaller.
+This package is intentionally focused on fixed-corpus serving: build frozen
+directly, persist binary snapshots, then load and query them many times.
 
 ---
 
@@ -24,9 +25,9 @@ FrozenMiniSearch is for the common production path where search data changes els
 - Build or import the index offline.
 - Save it as a compact binary snapshot.
 - Load it in many read-only Node.js processes.
-- Query with MiniSearch-style `search`, `autoSuggest`, filters, boosts, prefix/fuzzy search, wildcard, and `AND` / `OR` / `AND_NOT`.
+- Query with MiniSearch-compatible `search`, `autoSuggest`, filters, boosts, prefix/fuzzy search, wildcard, and `AND` / `OR` / `AND_NOT`.
 
-Internally it replaces mutable JavaScript object graphs with packed radix postings, typed arrays, and columnar stored fields. The result is less flexible than MiniSearch, but much cheaper to keep resident.
+Internally it uses packed radix postings, typed arrays, and columnar stored fields instead of large JavaScript object graphs. The result is a search engine tuned for resident efficiency, fast loads, and repeatable serving workflows.
 
 <!-- vs-reference:start — pnpm bench:readme -->
 ### Measured vs MiniSearch
@@ -41,7 +42,7 @@ Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
 | Dense numeric ids | 100,000 | 4.91 vs 91.3 MB total (~95% less) | ~73% less | ~91% faster | ~29% faster |
 | Uint16 doc id boundary | 65,535 | 3.01 vs 58.6 MB total (~95% less) | ~77% less | ~95% faster | ~53% faster |
 
-Across this full run, frozen is faster on **26/27** search cases. Divina `inferno` (exact, paired p50): mutable 16.2 µs → frozen 11.7 µs (**-4 µs**, ratio 0.72).
+Across this full run, frozen is faster on **26/27** search cases. Divina `inferno` (exact, paired p50): MiniSearch 16.2 µs → frozen 11.7 µs (**-4 µs**, ratio 0.72).
 
 Numbers are from `benchmarks/baselines/reference.json`, captured 2026-06-26 on Node v24.16.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
 <!-- vs-reference:end -->
@@ -115,11 +116,11 @@ index.search('zen art motorcycle')
 // => [{ id, title, category, score, match, ... }, ...]
 ```
 
-Frozen indexes are **read-only**: there is no `add`, `remove`, or `discard`. Rebuild offline or use `createFrozenIndexBuilder` for incremental ingestion before freeze.
+Frozen indexes are **read-only**: there is no `add`, `remove`, or `discard`. Rebuild offline or use `createFrozenIndexBuilder` for incremental ingestion before finalizing the index.
 
 ### Search options
 
-`MiniSearch`-style options work on `search()` and `autoSuggest()`:
+MiniSearch-compatible options work on `search()` and `autoSuggest()`:
 
 ```javascript
 index.search('zen', { fields: ['title'] })
@@ -204,11 +205,11 @@ FrozenMiniSearch.getDefault('extractField')
 FrozenMiniSearch.getDefault('stringifyField')
 ```
 
-Use these when wrapping a custom function and delegating to the library default, same as `MiniSearch.getDefault`.
+Use these when wrapping a custom function and delegating to the library default.
 
 ---
 
-## Migration
+## Migration and interoperability
 
 For fixed corpora, most serving code can stay the same. Change how the index is built or loaded, then keep calling `search`, `autoSuggest`, `has`, and `getStoredFields`.
 
@@ -224,7 +225,7 @@ const FrozenMiniSearch = require('@yoch/frozenminisearch')
 const { FrozenMiniSearch } = require('@yoch/frozenminisearch')
 ```
 
-Build directly:
+The native workflow is to build frozen directly:
 
 ```javascript
 import FrozenMiniSearch from '@yoch/frozenminisearch'
@@ -232,23 +233,23 @@ import FrozenMiniSearch from '@yoch/frozenminisearch'
 const frozen = FrozenMiniSearch.fromDocuments(documents, options)
 ```
 
-Or freeze an existing MiniSearch index:
+Existing MiniSearch JSON snapshots can be imported through the compatibility path:
 
 ```javascript
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '@yoch/frozenminisearch'
 
-const mutable = new MiniSearch(options)
-mutable.addAll(documents)
+const upstream = new MiniSearch(options)
+upstream.addAll(documents)
 
-const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(mutable), options)
+const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(upstream), options)
 ```
 
-MiniSearch is only needed if you still build mutable indexes. Frozen instances do not support live `add`, `remove`, or `discard`.
+This path is useful for migration and interchange. In normal frozen deployments, you typically build with `fromDocuments`, the builder API, or binary snapshots directly.
 
 ---
 
-## Search API (compatible with MiniSearch)
+## Search API (MiniSearch-compatible)
 
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
 - `autoSuggest(queryString, options?)`

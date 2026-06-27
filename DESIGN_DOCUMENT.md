@@ -1,419 +1,483 @@
 # Design Document
 
-This design document has the aim to explain the details of `MiniSearch`
-design and implementation to library developers that intend to contribute to
-this project, or that are simply curious about the internals.
+This design document explains the architecture of `FrozenMiniSearch` to library
+developers who want to contribute to the project, or who are simply curious
+about the internals.
 
-**Latest update: May 29, 2026**
+It focuses on the current package as it exists today: a compact, read-only
+search engine for fixed corpora, with query semantics intentionally aligned
+with [`MiniSearch`](https://github.com/lucaong/minisearch).
+
+The project originally grew out of a need for a module that was less memory
+hungry than `MiniSearch`, especially when indexing significant amounts of
+text. That requirement still shapes the design today, alongside a second
+optimization axis: CPU optimizations that make loading and queries faster.
+
+**Latest update: June 27, 2026**
 
 ## Goals (and non-goals)
 
-`MiniSearch` is aimed at providing rich full-text search functionalities in a
-local setup (e.g. client side, in the browser). It is therefore optimized for:
+`FrozenMiniSearch` is designed for the common production setup where documents
+are indexed ahead of time, then queried many times without in-process updates.
+Typical examples are a documentation search box, a product catalog shipped to
+the browser, or an index loaded by many read-only Node.js processes.
 
-  1. Small memory footprint of the index data structure
-  2. Fast indexing of documents
-  3. Versatile and performant search features, to the extent possible while
-     meeting goals 1 and 2
-  4. Small and simple API surface, on top of which more specific solutions can
-     be built by application developers
-  5. Possibility to add and remove documents from the index at any time
+It is therefore optimized for:
 
-`MiniSearch` is therefore NOT directly aimed at offering:
+  1. Small memory footprint of the resident index
+  2. Fast loading from persisted snapshots
+  3. Faster loading and query execution
+  4. Query behavior aligned with `MiniSearch`
+  5. A small API surface built around read-only serving workflows
+  6. Straightforward interchange with `MiniSearch` JSON snapshots and frozen
+     binary snapshots
 
-  - A solution for use cases requiring large index data structure size
-  - Distributed setup where the index resides on multiple nodes and need to be
-    kept in sync
-  - Turn-key opinionated solutions (e.g. supporting specific locales with custom
-    stemmers, stopwords, etc.): `MiniSearch` _enables_ developer to build these
-    on top of its core API, but does not provide them out of the box.
+These goals imply a deliberate trade-off: `FrozenMiniSearch` is not a mutable
+index. It gives up `add`, `remove`, `discard`, and `vacuum` so that the index
+can be stored in a denser and more cache-friendly representation.
 
-For these points listed as non-goals, other solutions exist that should be
-preferred to `MiniSearch`. Adapting `MiniSearch` to support those goals would in
-fact necessarily go against the primary project goals.
+`FrozenMiniSearch` is therefore NOT directly aimed at offering:
 
+  - In-process incremental mutation of the search index after construction
+  - Distributed indexing workflows or multi-writer synchronization
+  - Opinionated language tooling such as built-in stemming, stop-word lists, or
+    locale-specific analyzers
+  - A general-purpose mutable search data structure API comparable to
+    `MiniSearch.SearchableMap`
 
-## Technical design
+These non-goals are deliberate boundaries of the project, not missing pieces on
+the roadmap. `FrozenMiniSearch` is built for fixed-corpus serving, and its API
+and storage model are optimized for that shape.
 
-`MiniSearch` is composed of two layers:
+## Search semantics
 
-  1. A compact and versatile data structure for indexing terms, providing
-     lookup by exact match, prefix match, and fuzzy match.
-  2. An API layer on top of this data structure, providing the search
-     features.
+Although the storage layer is different, `FrozenMiniSearch` intentionally keeps
+the search model familiar. Exact match, prefix search, fuzzy search, result
+scoring, query combinations, and auto-suggestions follow the same broad rules
+as `MiniSearch`. That compatibility is a design constraint: it gives users a
+known search model while the frozen runtime changes how the index is stored.
 
-Here follows a description of these two layers.
+### Term lookup model
 
-### Index data structure
+The indexed vocabulary is organized as a radix tree. A radix tree is a prefix
+tree where chains of nodes with no siblings are merged into larger
+multi-character labels. This representation is a good fit for local full-text
+search because:
 
-The data structure chosen for the index is a [radix
-tree](https://en.wikipedia.org/wiki/Radix_tree), which is a prefix tree where
-nodes with no siblings are merged with the parent node. The reason for choosing
-this data structure follows from the project goals:
+  - Common prefixes are stored only once
+  - Exact lookup is proportional to term length
+  - Prefix lookups naturally traverse a subtree
+  - Fuzzy search can reuse partial work while traversing the tree
 
-  - The radix tree minimizes the memory footprint of the index, because common
-    prefixes are stored only once, and nodes are compressed into a single
-    multi-character node whenever possible.
-  - Radix trees offer fast key lookup, with performance proportional to the key
-    length, and fast lookup of subtrees sharing the same key prefix. These
-    properties make it possible to offer performant exact match and prefix
-    search.
-  - On top of a radix tree it is possible to implement lookup of keys that are
-    within a certain maximum edit distance from a given key. This search rapidly
-    becomes complex as the maximum distance grows, but for practical search
-    use-cases the maximum distance is small enough for this algorithm to be
-    performant. Other more performant solutions for fuzzy search would require
-    more space (e.g. n-gram indexes).
+Historically, `MiniSearch` served this role with `SearchableMap`, a string-keyed
+map-like radix tree. `FrozenMiniSearch` preserves the same logical lookup
+model, but stores the tree in a packed immutable representation that is purpose
+built for frozen indexes.
 
-The class implementing the radix tree is called `SearchableMap`, because it
-implements the standard JavaScript [`Map`
-interface](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map),
-adding on top of it some key lookup methods:
+### Fuzzy search rationale
 
-  - `SearchableMap.prototype.atPrefix(prefix)`, returning another
-    `SearchableMap` representing a mutable view of the original one, containing
-    only entries where the keys share the given prefix.
-  - `SearchableMap.prototype.fuzzyGet(searchKey, maxEditDistance)`, returning
-    all the entries where the key is within the given edit (Levenshtein)
-    distance from `searchKey`.
+Fuzzy search is based on Levenshtein edit distance, using a tree traversal that
+reuses dynamic-programming state across related prefixes. The important design
+point is the trade-off:
 
-As a trade-off for offering these additional features, `SearchableMap` is
-restricted to use only string keys.
+  - Full-text fuzzy search usually operates with small edit distances
+  - Small edit distances are computationally affordable on top of a radix tree
+  - More specialized fuzzy indexes often use more memory, which conflicts with
+    the primary goal of compact local indexes
 
-The `SearchableMap` data type is part of the public API of `MiniSearch`, exposed
-as `MiniSearch.SearchableMap`. Its usefulness is in fact not limited to
-providing a data structure for the inverted index, and developers can use it as
-a building block for other solutions. When modifying this class, one should
-think about it in terms of a generic data structure, that could in principle be
-released as a separate library.
+The trade-off is deliberate: spend some computation to avoid larger auxiliary
+structures.
 
-### Fuzzy search algorithm
+### Scoring model
 
-Fuzzy search is performed by calculating the [Levenshtein
-distance](https://en.wikipedia.org/wiki/Levenshtein_distance) between the search
-term and the keys in the radix tree. The algorithm used is a variation on the
-[Wagner-Fischer
-algorithm](https://en.wikipedia.org/wiki/Wagner–Fischer_algorithm). This
-algorithm constructs a matrix to calculate the edit distance between two terms.
-Because the search terms are stored in a radix tree, the same matrix can be
-reused for comparisons of child nodes if we do a depth-first traversal of the
-tree.
+Search result scoring follows BM25-style relevance ranking, with the same main
+inputs as `MiniSearch`:
 
-The algorithm to find matching keys within a maximum edit distance from a given
-term is the following:
+  - Term frequency in a document field
+  - Document frequency of the term
+  - Total indexed document count
+  - Field length for the matching document
+  - Average field length across the corpus
 
-  - Create a matrix with `query length + 1` columns and `query length + edit
-    distance + 1` rows. The columns `1..n` correspond to the query characters
-    `0..n-1`. The rows `1..m` correspond to the characters `0..m-1` for every
-    key in the radix tree that is visited.
-  - The first row and and first column is filled with consecutive numbers 0, 1,
-    2, 3, ..., up to at least the edit distance. All other entries are set to
-    `max distance + 1`.
-  - The radix tree is traversed, starting from the root, visiting each node in a
-    depth-first traversal and updating the matrix.
-  - The matrix is updated according to the [Wagner-Fischer
-    algorithm](https://en.wikipedia.org/wiki/Wagner–Fischer_algorithm): the keys
-    for every child node are compared with the characters in the query, and the
-    edit distance for the current matrix entry is calculated based on the
-    positions in the previous column and previous row.
-  - Only the diagonal band of `2 * edit distance + 1` needs to be calculated.
-  - When the current row of the matrix only contains entries above the maximum
-    edit distance, it is guaranteed that any child nodes below the current node
-    will not yield any matches and the entire subtree can be skipped.
-  - For every leaf node, if the edit distance in the lower right corner is equal
-    to or below the maximum edit distance, it is recorded as a match.
+The practical consequence is that `FrozenMiniSearch` is not trying to invent a
+new ranking model. The storage layer changes; the search semantics are meant to
+stay familiar.
 
-Note that this algorithm can get complex if the maximum edit distance is large,
-as many paths would be followed. The reason why this algorithm is employed is a
-trade-off:
+## Search layer and parity strategy
 
-  - For full-text search purposes, the maximum edit distance is small, so the
-    algorithm is performant enough.
-  - A [Levenshtein
-    automaton](https://en.wikipedia.org/wiki/Levenshtein_automaton) is a fast
-    alternative for low edit distances (1 or 2), but can get excessively complex
-    and memory hungry for edit distances above 3. It is also a much more complex
-    algorithm.
-  - Trigram indexes require much more space and often yield worse results (a
-    trigram index cannot match `votka` to `vodka`).
-  - As `MiniSearch` is optimized for local and possibly memory-constrained
-    setup, higher computation complexity is traded in exchange for smaller space
-    requirement for the index.
+The main architectural choice behind `FrozenMiniSearch` is that search
+semantics are kept separate from the low-level storage layout. Query parsing,
+term expansion, BM25 scoring, result aggregation, and suggestion logic are
+factored through abstractions that operate on a frozen query view rather than
+on any particular wire or in-memory representation.
 
-### Search API layer
+This separation is what makes parity maintainable. The compact storage layer is
+free to evolve, while the semantic contract remains anchored to a stable query
+and scoring model.
 
-The search API layer offers a small and simple API surface for application
-developers. It does not assume that a specific locale is used in the indexed
-documents, therefore no stemming nor stop-word filtering is performed, but
-instead offers easy options for developers to provide their own implementation.
-This heuristic will be followed in future development too: rather than providing
-an opinionated solution, the project will offer simple building blocks for
-application developers to implement their own solutions.
+### Query abstractions
 
-The inverted index is implemented with `SearchableMap`, and posting lists are
-stored as values in the Map. This way, the same data structure provides both the
-inverted index and the set of indexed terms. Different document fields are
-indexed within the same index, to further save space. The index is therefore
-structured as following:
+The main interfaces are intentionally narrow:
+
+  - A `QueryIndexView`, which exposes exact, prefix, and fuzzy term lookup, plus
+    iteration over live documents
+  - A posting accessor layer (`FieldTermDataLike` / `PostingListLike`), which
+    answers "for this term and field, which postings exist?"
+
+Within `FrozenMiniSearch`, those abstractions are implemented over packed radix
+lookups and typed-array posting segments. The scoring code only consumes the
+semantic view of a term, field, and posting list, which keeps the runtime model
+decoupled from storage details.
+
+This trade-off favors correctness over overly specialized query code. Keeping
+search semantics concentrated in one place reduces the chance of accidental
+drift from the reference behavior.
+
+### Frozen-specific query optimizations
+
+The frozen runtime adds some storage-aware execution optimizations for combined
+queries, especially `AND` and `AND_NOT`, such as doc-id gating and broad-first
+strategies on exact-only branches. These optimizations are designed to preserve
+the same final scores and results as the logical query plan.
+
+They are part of the broader CPU-optimization story for the package: the aim
+is to keep queries fast while still using a compact frozen representation.
+
+They are intentionally treated as an optimization layer, not as part of the
+public search contract. The exact heuristics are internal and may evolve; the
+main design invariant is that query semantics stay stable.
+
+## Frozen index architecture
+
+This is the core of the project. `FrozenMiniSearch` keeps the same conceptual
+inverted index model as `MiniSearch`, but stores it in a representation
+optimized for read-only serving.
+
+At the logical level, the inverted index still has the familiar shape:
 
 ```
 term -> field -> document -> term frequency
 ```
 
-The fields and documents are referenced in the index with a short numeric ID for
-performance and to save space.
+Frozen indexes store that information in a compact, immutable layout that is
+much friendlier to memory usage and sequential scans than a graph of small
+objects and maps would be.
 
-### Search result scoring
+### Packed term index
 
-When performing a search, the entries corresponding to the search term are
-looked up in the index (optionally searching the index with prefix or fuzzy
-search). If the combination of term, field and document is found, then this
-indicates that the term was present in this particular document field. But it is
-not helpful to return all matching documents in an arbitrary order. We want to
-return the results in order of _relevance_.
+The term dictionary is still a radix tree, but frozen indexes use
+`PackedRadixTree`, an internal module built on typed arrays and shared string
+storage.
 
-For every document field matching a term, a relevance score is calculated. It
-indicates the quality of the match, with a higher score indicating a better
-match. The variables that are used to calculate the score are:
-  - The frequency of the term in the document field that is being scored.
-  - The total number of documents with matching fields for this term.
-  - The total number of indexed documents.
-  - The length of this field.
-  - The average length of this field for all indexed documents.
+Its role is to provide:
 
-The scoring algorithm is based on
-[BM25](https://en.wikipedia.org/wiki/Okapi_BM25) (and its derivative BM25+),
-which is also used in other popular search engines such as Lucene. BM25 is an
-improvement on [TF-IDF](https://en.wikipedia.org/wiki/Tf–idf) and incorporates
-the following ideas:
-  - If a term is less common, the score should be higher (like TD-IDF).
-  - If a term occurs more frequently, the score should be higher (so far this is
-    the same as TD-IDF). But the relationship is not linear. If a term occurs
-    twice as often, the score is _not_ twice as high.
-  - If a document field is shorter, it requires fewer term occurrences to be
-    achieve the same relevance as a longer document field. This encodes the idea
-    that a term occurring once in, say, a title is more relevant than a word
-    occuring once in a long paragraph.
+  - Exact lookup by term
+  - Prefix traversal
+  - Fuzzy traversal
+  - Stable leaf semantics for result parity
 
-The scores are calculated for every document field matching a query term. The
-results are added. To reward documents that match the most terms, the final
-score is multiplied by the number of matching terms in the query.
+Instead of storing postings directly at leaves, the packed tree stores a small
+numeric term index. That term index is then used to address the posting layout.
 
-## FrozenMiniSearch
+This separation matters. The radix tree answers "which term matched?" while the
+posting storage answers "where are this term's postings?"
 
-`FrozenMiniSearch` is a read-only variant of the index, added in this fork. Its
-existence follows directly from the project goals, and in particular from a
-tension within them: goal 5 (adding and removing documents at any time) is what
-makes `MiniSearch` mutable, but mutability has a cost that works against goal 1
-(small memory footprint). Many real applications build an index once and then
-only query it — a search box over a fixed documentation set, a product catalog
-shipped to the client, a precomputed index loaded from disk. For those
-workloads, paying the price of mutability buys nothing.
+### Flat postings
 
-`FrozenMiniSearch` is the answer to that workload. It deliberately gives up the
-ability to mutate the index (all `add`/`remove`/`discard`/`vacuum` methods throw)
-and, in exchange, stores the index in a much more compact and cache-friendly
-form. Giving up mutability is not just a footprint optimization: immutability is
-what makes the compact representation possible in the first place, because the
-data structures never need to grow, shrink, or be rebalanced after construction.
+Postings are stored as global typed-array columns shared by the entire index:
 
-The guiding principle mirrors the rest of the project: rather than reimplement
-search, `FrozenMiniSearch` reuses the existing search and scoring logic and only
-changes how the index is stored. Search behavior — ranking, fuzzy/prefix
-matching, query combinators — is identical to `MiniSearch` by construction.
+  - One global column for document ids
+  - One global column for term frequencies
+  - Metadata columns that locate each posting-list segment
 
-### Sharing the search layer with MiniSearch
+At runtime, a posting list is therefore just an `(offset, length)` window into
+contiguous arrays. No per-list object graph needs to be allocated in order to
+iterate through the postings.
 
-To guarantee that the two index types return the same results, the search API
-layer (query parsing, fuzzy/prefix expansion, BM25 scoring, result combination)
-was extracted into a shared layer that does not know how postings are stored.
-The two storage backends plug into it through two small abstractions:
+This layout is possible precisely because the index is immutable. Posting lists
+never need to grow in place, shrink, or keep insertion-friendly slack. Once the
+build is complete, the final arrays can be packed tightly.
 
-  - A `QueryIndexView`, which exposes exact/prefix/fuzzy term lookup and
-    iteration over active documents. Both backends produce one by wrapping their
-    own radix tree.
-  - A per-term posting accessor (`FieldTermDataLike` → `PostingListLike`), which
-    answers "give me the posting list for this term in this field". The mutable
-    index backs it with nested `Map`s; the frozen index backs it with a window
-    into flat arrays.
+### Dense and sparse field layouts
 
-Because the scoring code only ever sees these interfaces, the same code path
-serves both index types. This is a deliberate trade-off in favor of correctness
-and maintainability: a single scoring implementation cannot drift between the
-mutable and frozen variants.
+The posting metadata uses two layouts depending on field count.
 
-For combined `AND` / `AND_NOT` queries, the frozen engine applies optional
-**doc-id gating** on later branches: when the intersection gate from earlier
-branches is selective enough, only matching documents are scored on the next
-branch (same scores as score-then-intersect). Heuristics include absolute/fraction
-caps and, since v1.2.2, a **posting-length ratio** fallback for large indexes
-where the gate is small relative to the next branch’s posting list; gated
-segments may use binary search instead of scanning full posting lists. Since
-v1.2.3, **exact-only** combined queries may use a **broad-first** path: collect
-the final gate from selective branches (by estimated posting length) before
-scoring, and large AND_NOT exclusions may be collected before scoring the
-positive branch. Prefix/fuzzy AND keeps the sequential gate path. Details:
-[`dev/docs/AND_GATE_PARAMETERS.md`](https://github.com/yoch/frozenminisearch/blob/master/dev/docs/AND_GATE_PARAMETERS.md) (internal, not public API).
+For single-field indexes, the layout is dense: one slot per term is enough, so
+the smallest and fastest representation is a direct offset/length table indexed
+by term id.
 
-### Index data structure: flat arrays instead of nested maps
+For multi-field indexes, most `(term, field)` combinations are empty. A fully
+dense `term × field` matrix would waste space, so frozen indexes store only the
+non-empty field segments for each term, together with a short per-term range
+into that sparse metadata.
 
-This is the core difference from `MiniSearch`. The mutable index stores, at each
-radix-tree leaf, a nested structure `field -> document -> term frequency` built
-out of JavaScript `Map`s. That layout is excellent for incremental updates — any
-posting can be inserted or deleted in (amortized) constant time — but it is
-expensive at rest: every `Map` and every entry carries object and pointer
-overhead, and the postings for a single term are scattered across the heap,
-which is unfriendly to the CPU cache during scoring.
+The caller does not choose between these layouts. The representation is selected
+automatically from the field structure of the index.
 
-`FrozenMiniSearch` keeps a radix tree for term lookup (exact, prefix, and fuzzy —
-see the sections above), but changes how that tree and the postings are stored:
+### Adaptive numeric widths
 
-  - **Leaves hold a numeric term index, not a posting structure.** The tree maps
-    each term string to a small integer used to index the flat postings.
-  - **The term tree is packed in memory.** At runtime and on disk (columnar wire),
-    frozen indexes use `PackedRadixTree`, an internal module under
-    `src/PackedRadixTree/`: typed arrays for nodes and edges, a shared label heap,
-    and the same sibling/leaf traversal order as `SearchableMap` so prefix,
-    fuzzy, and `autoSuggest` parity are preserved. Mutable `MiniSearch` still uses
-    `SearchableMap`; only the frozen path uses the packed representation.
-  - **Postings live in flat typed arrays shared by the whole index.** All
-    document ids and all term frequencies are concatenated into two global
-    arrays, and a side table records, for each `(term, field)` slot, the
-    `(offset, length)` window into those arrays.
+The frozen representation saves further space by adapting element widths to the
+actual corpus:
 
-With this layout a posting list is just a view over a contiguous slice of the
-global arrays — no per-list object is allocated to read it. The footprint
-shrinks because the per-entry overhead of thousands of small `Map`s is replaced
-by a handful of large typed arrays, and scoring becomes a sequential scan over
-contiguous memory. This is the same reasoning that motivated the radix tree in
-the first place (goal 1), applied to the postings.
+  - Document ids use `Uint16` up to 65535 documents, otherwise `Uint32`
+  - Term frequencies use `Uint8` or `Uint16`, never `Uint32`
+  - Field-length data on the binary wire uses adaptive widths as well
 
-The element widths are chosen adaptively to save further space:
+This is another consequence of the fixed-corpus design. Once the final maxima
+are known, the index can choose the narrowest representation that still holds
+the data.
 
-  - Document ids use `Uint16` when the index has at most 65535 documents,
-    otherwise `Uint32`.
-  - Term frequencies use adaptive `Uint8` / `Uint16` (never `Uint32`), chosen
-    from the index max after clamping at 65535 on frozen paths. Typical corpora
-    stay on one byte per posting; indexes with any `(term, field)` tf > 255 use
-    `Uint16` and set `FLAG_FREQ_U16` on the wire. Values above 65535 are clamped
-    (rare; BM25+ is already flat well before that).
+### Stored fields and external ids
 
-### Dense and sparse posting layouts
+The frozen index separates search-time metadata from posting data:
 
-How the `(term, field)` slots map onto the flat arrays depends on the number of
-fields, because the two regimes have very different sparsity:
+  - External document ids are stored independently from posting lists
+  - Stored fields are kept in their own layout and are optional
+  - The internal short-id space is optimized for search and scoring
 
-  - **Single field (dense layout).** There is exactly one slot per term, so a
-    plain offset/length table indexed by term is both the smallest and the
-    fastest option.
-  - **Multiple fields (sparse layout).** A full `term × field` table is mostly
-    empty — most terms occur in only one or two fields — so storing every slot
-    would waste space. Instead, only non-empty slots are stored, together with a
-    field-id column and a per-term range into that column. Looking up a field
-    for a term is a short linear scan over its (few, sorted) entries, which beats
-    binary search at this size.
+This distinction is important because the serving path needs two different
+things:
 
-The layout is selected automatically from the field count; callers never choose
-it.
+  - Dense numeric ids for compact postings and field-length tables
+  - Stable application-facing ids and optional stored fields for final results
 
-### Build paths
+### Field lengths and aggregation data
 
-There are three ways to obtain a frozen index, reflecting three different
-starting points:
+BM25-style scoring needs field-length and corpus-wide aggregation data. Frozen
+indexes therefore store:
 
-  1. **`MiniSearch.freeze()`** — convert an existing mutable index. This is the
-     path to use when you need the mutable features (incremental `add`,
-     `remove`, `discard`) *before* freezing. If documents were discarded, the
-     short ids are no longer dense; `freeze()` optionally remaps them to a dense
-     range so the frozen index does not carry holes.
-  2. **`fromDocuments` / `FrozenIndexBuilder` / `fromAsyncIterable`** — build the
-     flat representation directly from documents, without ever constructing the
-     intermediate nested-`Map` postings. This is cheaper in both time and peak
-     memory for the build-once case, and the async/iterator variants allow
-     streaming large corpora. The builder supports `addAll` / `addAllAsync` (chunked,
-     non-blocking) like mutable `MiniSearch`; `fromAsyncIterable` accepts optional
-     `FrozenIndexBuilderHints` (e.g. `estimatedDocumentCount`) when the final size
-     is known upfront.
-  3. **`saveBinarySync` / `loadBinarySync` / `loadBinaryAsync`** — persist and restore a frozen index
-     to/from disk.
+  - A field-length matrix keyed by short document id and field id
+  - Per-field average lengths
+  - Total live document count
 
+These arrays are part of the frozen runtime snapshot, not derived on demand at
+query time. This keeps the scoring path simple and consistent with the search
+layer.
 
-### On-disk format
+## Construction and import paths
 
-A frozen index can be serialized to a self-describing binary snapshot. The
-design goals for the format are: validate aggressively on load (snapshots may
-come from disk or the network and must not be trusted blindly), and mirror the
-in-memory typed arrays closely enough that loading is mostly a matter of taking
-views over the buffer rather than parsing.
+There are several public ways to obtain a `FrozenMiniSearch` index, each aimed
+at a different workflow.
 
-A snapshot begins with a fixed header (magic bytes, version, global flags, and a
-per-section catalogue) followed by independently addressable sections: core counts,
-field names, external document ids, stored fields, the packed term tree, the
-field-length data, and the flat postings. **`termCount` is stored in the 16-byte
-core header** (no separate dictionary section; term strings live only in the
-term-tree section).
+### Direct trusted builds
 
-The binary encoder (written by **`saveBinarySync()`**) lives in `src/msv5/`: columnar packed
-radix tree (`packedRadixBinaryMsv5.ts`), unified postings wire (dense or sparse via
-flags), adaptive `fieldLengthMatrix` width on disk, and
-optional **single-payload compression** (`node:zlib`): the 12 logical sections are
-concatenated (with 4-byte alignment gaps), then written as **one** stream for a
-better ratio than per-section compression. `saveBinarySync()` / `saveBinaryAsync()`
-accept `{ compression: 'auto' | 'raw' | 'zstd' | 'zlib' }`. In `auto`, payloads smaller
-than 64 B stay raw; larger payloads get one compression attempt (zstd when the runtime
-supports it, otherwise zlib on Node 20+) and stay raw when that attempt does not strictly
-shrink the payload. Explicit `zlib` / `zstd` always write the chosen codec, even when the
-compressed payload is not smaller than raw.
-Explicit `zlib` uses deflate/inflate and stays
-readable on Node 20+; explicit `zstd` requires Node 22.15+ both to write and to read.
-The catalogue stores uncompressed offsets and per-section CRC-32. `loadBinaryAsync()`
-streams compressed payloads and materializes **one section at a time** (bounded JS heap).
-Snapshots larger than 1 GiB (uncompressed payload) are rejected to avoid oversized allocations.
-Each section has a CRC-32 over its uncompressed bytes. The term-tree section uses the
-columnar wire in `packedRadixBinaryMsv5.ts`.
+These paths construct a frozen index directly from application documents:
 
-On load, the reader verifies section CRCs, monotonic file offsets, posting bounds,
-and leaf invariants via `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts`.
+  - `FrozenMiniSearch.fromDocuments(documents, options)`
+  - `buildFrozenFromDocuments(documents, options)`
+  - `createFrozenIndexBuilder(options, hints?)` followed by
+    `freezeFrozenIndexBuilder(builder)`
+  - `FrozenMiniSearch.fromAsyncIterable(iterable, options, hints?)`
 
-**`loadBinarySync()`** reads synchronously. **`loadBinaryAsync()`** is the
-memory-bounded streaming path for compressed payloads. Unsupported older binaries are rejected.
-Use **`saveBinarySync()`** / **`saveBinaryAsync()`** and **`loadBinarySync()`** / **`loadBinaryAsync()`** explicitly.
+The direct build path is the native workflow for fixed corpora. It builds the
+packed representation directly from document input.
 
-### PackedRadixTree module (internal)
+The builder variants exist for cases where documents arrive incrementally or in
+streams. Hints such as `estimatedDocumentCount` can improve preallocation, but
+they do not change the final search behavior.
 
-The packed term tree is implemented as a focused module (`src/PackedRadixTree/`)
-rather than as part of the public package API. Responsibilities are split as
-follows:
+Internally, these paths are treated as trusted builds: the project's own
+builder is producing the structures, so assembly can skip some redundant
+post-build validation that would only re-check invariants the builder itself
+already enforced.
 
-  - **`PackedRadixTree`** — in-memory structure and query traversal (exact,
-    prefix, fuzzy, `entries`).
-  - **`fromRadixTree.ts`** — pack a mutable numeric `RadixTree<number>` built by
-    `radixTree.ts` helpers into the runtime term index.
-  - **`src/msv5/packedRadixBinaryMsv5.ts`** — columnar term-tree section (on-disk wire).
-  - **`frozenTermIndex.ts`** — `FrozenTermIndex` type alias and
-    `validateFrozenTermIndexLeaves` (frozen-only invariants: leaf count, term-index
-    range, array bounds).
+### JSON migration and interchange
 
-`PackedRadixTree` is not re-exported from the package entry point; consumers use
-`FrozenMiniSearch` and binary snapshots. The module is structured so it could be
-extracted or published separately later without pulling in MiniSearch scoring or
-postings code.
+`FrozenMiniSearch` can also import and export the `MiniSearch` JSON wire format:
 
-### Design limits
+  - `FrozenMiniSearch.toJSON()`
+  - `FrozenMiniSearch.fromJSON(json, options?)`
 
-These limits are consequences of the design choices above and are worth keeping
-in mind when contributing:
+This path exists for migration and interoperability. It allows:
 
-  - **Term frequencies cap at 65535** (`Uint16` max; clamp on frozen build). No
-    `Uint32` posting-frequency column.
-  - **`tokenize` and `processTerm` are not persisted.** Functions cannot be
-    serialized safely, so a snapshot only stores data. If you customized these
-    functions at build time, you must pass the same ones to `loadBinarySync`/`loadBinaryAsync`,
-    otherwise queries will be tokenized differently from the indexed terms.
-  - **`fields` is optional on load** (the field names live in the snapshot), but
-    if supplied it must match the indexed fields exactly — a mismatch is an
-    error, not a silent subset.
+  - Importing existing `MiniSearch` snapshots into frozen indexes
+  - Exporting frozen indexes in a format readable by `MiniSearch`
+  - Keeping JSON as an interchange format without requiring the `minisearch`
+    package at runtime
 
-### Suggested optimizations (future)
+Unlike the direct trusted build path, `fromJSON()` validates the imported
+snapshot. This is the right default because JSON input may come from outside
+the current process and should not be trusted blindly.
 
-User-facing summary: [README — FrozenMiniSearch optimizations](./README.md#frozenminisearch--optimizations).
+### Binary persistence
+
+For serving and deployment, the preferred persistence path is the frozen binary
+snapshot API:
+
+  - Node: `saveBinarySync()`, `saveBinaryAsync()`, `loadBinarySync()`,
+    `loadBinaryAsync()`
+  - Browser entry: `saveBinaryAsync()`, `loadBinaryAsync()`
+
+This path is the native on-disk and over-the-wire format for frozen indexes. It
+is the format to optimize for in production deployments.
+
+The Node and browser entry points intentionally differ here. On Node, both sync
+and async binary APIs are available. On the browser entry, binary save/load is
+async-only and works on `Uint8Array` rather than `Buffer`.
+
+### Trust boundaries
+
+The three acquisition paths differ in how much validation they require:
+
+  - Direct frozen builds trust their own construction pipeline
+  - `fromJSON()` validates imported snapshots before assembly
+  - Binary load validates the decoded snapshot during the decode phase, then
+    assembles from that validated data
+
+This split is part of the design. The project tries to validate untrusted
+external representations aggressively, while avoiding needless repeated checks
+inside trusted internal pipelines.
+
+## Binary snapshot design
+
+Frozen indexes can be serialized to a self-describing binary snapshot. The
+format is designed around two goals:
+
+  - Loading should be close to "take views over bytes" rather than rebuild a
+    large object graph
+  - Corrupt or unsupported input should fail clearly and early
+
+### MSv5 framing
+
+The current binary format is the MSv5 snapshot format. A snapshot contains a
+fixed header and a set of independently described sections. The sections cover
+the core metadata required to reconstruct the runtime snapshot, including:
+
+  - counts and global metadata
+  - field names
+  - external document ids
+  - stored fields
+  - packed term index
+  - field-length data
+  - posting data and its metadata
+
+The format is intentionally self-describing enough that readers can validate the
+shape of the snapshot before exposing it as a usable index.
+
+### Section layout and validation
+
+The wire format closely mirrors the in-memory frozen structures. This keeps the
+decode step simple and predictable: read metadata, validate bounds and
+invariants, then materialize the runtime snapshot from typed-array views or
+owned decoded sections.
+
+Validation on load includes checks such as:
+
+  - supported format version and magic bytes
+  - monotonic and in-bounds section offsets
+  - section checksums
+  - posting bounds and layout coherence
+  - packed term-index invariants
+
+The goal is not to "parse whatever bytes are present." The goal is to reject
+snapshots that do not satisfy the invariants required by the frozen runtime.
+
+### Compression strategy
+
+The binary writer uses a single-payload compression strategy rather than
+compressing each logical section independently. The logical sections are first
+assembled into one aligned payload, then that payload may be written raw or
+compressed.
+
+This design typically gives a better compression ratio than per-section
+compression while keeping the format structurally simple.
+
+On Node, the public API exposes codec selection through `saveBinarySync()` and
+`saveBinaryAsync()`. The browser entry exposes async binary save/load with the
+subset of codecs supported by the browser path.
+
+### Runtime split
+
+The runtime split is deliberate:
+
+  - Node supports sync and async binary save/load
+  - Browser supports async binary save/load only
+  - Browser binary APIs operate on `Uint8Array`
+  - Node binary APIs operate on `Buffer`
+
+This keeps the browser API aligned with non-blocking and portable execution
+constraints, while allowing server-side code to choose between synchronous and
+asynchronous workflows.
+
+### Bounded-memory async load
+
+`loadBinaryAsync()` exists for more than API symmetry. When compressed payloads
+are involved, the async path can decompress and materialize data in a bounded
+way, rather than requiring the whole decoded payload to be processed through one
+monolithic synchronous step.
+
+That bounded-memory behavior is especially relevant to large snapshots and is
+part of the reason the binary path is preferred over JSON for serving workloads.
+
+## Design limits and explicit trade-offs
+
+The frozen architecture has some important limits that are consequences of the
+design, not incidental implementation quirks.
+
+  - `FrozenMiniSearch` is read-only. Live mutation is intentionally out of
+    scope; changes should happen by rebuilding frozen data out of band.
+  - Term frequencies are capped at `65535`, because frozen postings use
+    `Uint8`/`Uint16` frequencies and never widen to `Uint32`.
+  - Snapshot data does not serialize executable options such as `tokenize`,
+    `processTerm`, `extractField`, or `stringifyField`. If custom functions were
+    used at build time, the corresponding load/query options must remain
+    consistent.
+  - `fields` is optional on load because field names are embedded in snapshots,
+    but if it is supplied it must match the indexed fields exactly.
+  - Browser binary support is async-only by design.
+  - Validation depth depends on the acquisition path: trusted builds, JSON
+    migration, and binary load do not pay the same validation costs.
+
+These constraints are acceptable because they follow directly from the main
+design goal: optimize the fixed-corpus serving case while preserving a familiar
+search contract.
+
+## Internal modules
+
+The implementation is split into a few internal subsystems with clear
+responsibilities.
+
+### Packed term dictionary
+
+`PackedRadixTree` is the frozen term dictionary module. It owns the packed tree
+representation and term traversal logic used by exact, prefix, fuzzy, and
+iteration-based search operations.
+
+This module is intentionally internal. Users consume it through
+`FrozenMiniSearch`, not as a standalone public data structure.
+
+### Postings and scoring inputs
+
+The postings modules are responsible for:
+
+  - representing dense and sparse posting layouts
+  - exposing flyweight-style access to per-term/per-field postings
+  - validating frozen posting invariants
+  - supplying the shared query engine with the scoring inputs it needs
+
+This separation keeps search semantics independent from the concrete storage
+layout.
+
+### Binary codec layer
+
+The binary codec layer is responsible for:
+
+  - mapping runtime snapshots to MSv5 sections
+  - encoding and decoding binary payloads
+  - handling compression and checksums
+  - validating wire-level invariants before assembly
+
+Its job is persistence, not search logic.
+
+### Builder, assembly, and validation
+
+The project also separates:
+
+  - document ingestion and incremental construction
+  - assembly of a runtime frozen snapshot
+  - validation of imported or decoded data
+
+This split is important because different acquisition paths have different trust
+levels. Direct builds, JSON migration, and binary load all end up producing the
+same frozen runtime shape, but they do not reach it through the same validation
+pipeline.

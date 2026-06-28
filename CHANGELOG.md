@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## v1.6.2 — `@yoch/frozenminisearch`
+
+Patch release: lower post-freeze memory for `FrozenIndexBuilder`, internal stored-fields wire cleanup, and expanded CI coverage. No public API, search semantics, or MSv5 wire-format changes.
+
+### Improved
+
+- **FrozenIndexBuilder** — release incremental postings scratch state after `freeze`, so large builds do not retain slot buffers once the frozen index is assembled.
+
+### Changed
+
+- **CI** — run browser smoke tests as part of `make coverage` (after the bundle check) instead of a separate redundant workflow step.
+- **Internal** — consolidate duplicated stored-fields wire parsing into `readStoredFieldsRowsSection` in `storedFieldsWire.ts`; drop unused `isDocActive` scoring hooks (discarded documents are already filtered at freeze time).
+
+### Removed
+
+- **Internal dead code** — remove the unused query-time `isDocActive` scoring path and related postings metadata.
+
 ## v1.6.1 — `@yoch/frozenminisearch`
 
 Patch release: internal dead-code cleanup and stricter published-bundle guards. No public API, search semantics, or MSv5 wire-format changes.

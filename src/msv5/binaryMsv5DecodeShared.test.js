@@ -53,7 +53,7 @@ describe('binaryMsv5DecodeShared', () => {
 
   test('decodeMsv5Sections rejects a core section whose size is not 16 bytes', () => {
     const { globalFlags, sections } = validMsv5Snapshot()
-    const bad = sections.map((section) => new Uint8Array(section))
+    const bad = sections.map(section => new Uint8Array(section))
     bad[Msv5SectionId.Core] = new Uint8Array(15)
     expect(() => decodeMsv5Sections(globalFlags, bad))
       .toThrow(/core section size mismatch/)

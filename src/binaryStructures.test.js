@@ -1,10 +1,10 @@
 import { LEAF } from './radixTree'
 import {
-  readStoredFieldsSection,
   validateFrozenSnapshot,
   validateFrozenSnapshotNumeric,
 } from './binaryStructures'
 import { buildStoredFieldsSectionWire } from './binaryWireIo'
+import { readStoredFieldsRowsSection } from './storedFieldsWire'
 import { allocBytes, writeU32LE } from './binaryBytes'
 
 function densePostings(termCount, nextId) {
@@ -107,10 +107,10 @@ describe('validateFrozenSnapshot treeShape', () => {
   })
 })
 
-describe('readStoredFieldsSection', () => {
+describe('readStoredFieldsRowsSection', () => {
   test('round-trips stored field rows', () => {
     const section = buildStoredFieldsSectionWire([{ txt: 'x' }, undefined, { txt: 'y' }], 3)
-    expect(readStoredFieldsSection(section, 0, 3, section.length)).toEqual([
+    expect(readStoredFieldsRowsSection(section, 0, 3, section.length)).toEqual([
       { txt: 'x' },
       undefined,
       { txt: 'y' },
@@ -119,18 +119,18 @@ describe('readStoredFieldsSection', () => {
 
   test('rejects corrupted stored-fields sections', () => {
     const section = buildStoredFieldsSectionWire([{ txt: 'x' }], 1)
-    expect(() => readStoredFieldsSection(section, 0, 2, 4))
+    expect(() => readStoredFieldsRowsSection(section, 0, 2, 4))
       .toThrow(/stored fields table out of bounds/)
 
     const tableOnly = allocBytes(4)
     writeU32LE(tableOnly, 0, 1)
-    expect(() => readStoredFieldsSection(tableOnly, 0, 1, 4))
+    expect(() => readStoredFieldsRowsSection(tableOnly, 0, 1, 4))
       .toThrow(/stored fields entry offset out of bounds/)
 
     const badJsonLen = allocBytes(8)
     writeU32LE(badJsonLen, 0, 1)
     writeU32LE(badJsonLen, 4, 99)
-    expect(() => readStoredFieldsSection(badJsonLen, 0, 1, 8))
+    expect(() => readStoredFieldsRowsSection(badJsonLen, 0, 1, 8))
       .toThrow(/stored fields JSON out of bounds/)
   })
 })

@@ -15,7 +15,6 @@ import {
   readExternalId,
   readLengthPrefixedUtf8,
 } from './binaryWireIo'
-import { readU32LE, readUtf8 } from './binaryBytes'
 import type { BinaryBytes } from './binaryBytes'
 import type { StoredFieldsLayout } from './storedFieldsLayout'
 
@@ -161,38 +160,6 @@ export function readExternalIdsSection(
     throw invalidFrozenIndex('external ids section size mismatch')
   }
   return externalIds
-}
-
-export function readStoredFieldsSection(
-  buf: BinaryBytes,
-  storedOff: number,
-  nextId: number,
-  sectionEnd: number,
-): (Record<string, unknown> | undefined)[] {
-  const storedFields: (Record<string, unknown> | undefined)[] = new Array(nextId)
-  const tableEnd = storedOff + nextId * 4
-  if (tableEnd > sectionEnd) {
-    throw invalidFrozenIndex('stored fields table out of bounds')
-  }
-  for (let i = 0; i < nextId; i++) {
-    const rel = readU32LE(buf, storedOff + i * 4)
-    if (rel === 0) {
-      storedFields[i] = undefined
-      continue
-    }
-    const entryOff = tableEnd + rel - 1
-    if (entryOff + 4 > sectionEnd) {
-      throw invalidFrozenIndex('stored fields entry offset out of bounds')
-    }
-    const jsonLen = readU32LE(buf, entryOff)
-    const jsonStart = entryOff + 4
-    const jsonEnd = jsonStart + jsonLen
-    if (jsonEnd > sectionEnd) {
-      throw invalidFrozenIndex('stored fields JSON out of bounds')
-    }
-    storedFields[i] = JSON.parse(readUtf8(buf, jsonStart, jsonEnd)) as Record<string, unknown>
-  }
-  return storedFields
 }
 
 /** Validate structural invariants of a decoded or assembled frozen snapshot. */

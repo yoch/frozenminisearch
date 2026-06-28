@@ -2,14 +2,13 @@ import { readU16LE, readU32LE } from '../binaryBytes'
 import {
   readExternalIdsSection,
   readFieldNamesSection,
-  readStoredFieldsSection,
   validateFrozenSnapshot,
   type FrozenSnapshot,
 } from '../binaryStructures'
 import { invalidFrozenIndex } from '../frozenErrors'
 import { readFieldLengthMatrixSection } from '../fieldLengthMatrixWire'
 import { readFloat32Array } from '../binaryWireIo'
-import { readStoredFieldsWireSection } from '../storedFieldsWire'
+import { readStoredFieldsRowsSection, readStoredFieldsWireSection } from '../storedFieldsWire'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 import {
   MSV5_HEADER_SIZE,
@@ -102,7 +101,7 @@ export function decodeMsv5Sections(
 
   const storedFields = storedFieldsLayout != null
     ? new Array(nextId)
-    : readStoredFieldsSection(
+    : readStoredFieldsRowsSection(
         sections[Msv5SectionId.StoredFields],
         0,
         nextId,

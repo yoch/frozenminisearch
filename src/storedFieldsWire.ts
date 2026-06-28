@@ -113,11 +113,11 @@ export function readStoredFieldsWireSection(
     if (!hasAny) return { kind: 'none' }
   }
 
-  const rows = readStoredFieldsSectionWire(buf, storedOff, nextId, sectionEnd)
+  const rows = readStoredFieldsRowsSection(buf, storedOff, nextId, sectionEnd)
   return storedFieldsFromRows(rows, storeFields)
 }
 
-function readStoredFieldsSectionWire(
+export function readStoredFieldsRowsSection(
   buf: BinaryBytes,
   storedOff: number,
   nextId: number,

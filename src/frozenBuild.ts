@@ -1,11 +1,10 @@
-import { fromRadixTree } from './PackedRadixTree'
+import { packTermsFromList } from './PackedRadixTree/packTermList'
 import type { Options } from './searchTypes'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import type { FrozenAssembleParams } from './frozenTypes'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { getFrozenDefault } from './searchDefaults'
-import { getOrCreateRadixLeaf, type RadixTree } from './radixTree'
 import {
   buildFieldIds,
   collectFieldTermFreqsFromFieldInto,
@@ -35,9 +34,9 @@ export class FrozenIndexBuilder<T> {
   private readonly _options: IndexingOptions<T>
   private readonly _fieldIds: { [key: string]: number }
   private readonly _fieldCount: number
-  private _termTree: RadixTree<number> | null
+  private readonly _termIndex: Map<string, number>
+  private readonly _terms: string[]
   private readonly _postings: IncrementalPostingsAccumulator
-  private readonly _termCount = { value: 0 }
   private readonly _externalIds: unknown[]
   private readonly _storedFields: StoredFieldsLayout
   private readonly _fieldLengthData: number[]
@@ -53,7 +52,8 @@ export class FrozenIndexBuilder<T> {
     this._options = resolveIndexingOptions(options)
     this._fieldIds = buildFieldIds(this._options.fields)
     this._fieldCount = this._options.fields.length
-    this._termTree = new Map() as RadixTree<number>
+    this._termIndex = new Map()
+    this._terms = []
     const estimatedDocs = hints?.estimatedDocumentCount ?? 0
     const perSlot = hints?.estimatedPostingsPerSlot ?? 4
     this._postings = new IncrementalPostingsAccumulator(this._fieldCount, {
@@ -123,7 +123,12 @@ export class FrozenIndexBuilder<T> {
       updateAvgFieldLength(this._avgFieldLength, fieldId, documentCount - 1, fieldLength)
 
       this._fieldTermFreqScratch.forEach((freq, term) => {
-        const ti = getOrCreateRadixLeaf(this._termTree!, term, () => this._termCount.value++)
+        let ti = this._termIndex.get(term)
+        if (ti === undefined) {
+          ti = this._terms.length
+          this._termIndex.set(term, ti)
+          this._terms.push(term)
+        }
         this._postings.append(ti, fieldId, shortId, freq)
       })
     }
@@ -185,11 +190,14 @@ export class FrozenIndexBuilder<T> {
     this._frozen = true
 
     const documentCount = this._nextId
-    const termCount = this._termCount.value
+    const termCount = this._terms.length
     const postings = this._postings.finalize(termCount, documentCount)
 
-    const index = fromRadixTree(this._termTree!, termCount, { skipLeafValidation: true })
-    this._termTree = null
+    // Term dedup is no longer needed; drop it before building the radix to
+    // keep the freeze-time transient (terms[] + scratch + columns) minimal.
+    this._termIndex.clear()
+    const index = packTermsFromList(this._terms)
+    this._terms.length = 0
 
     const avgFieldLength = new Float32Array(this._fieldCount)
     for (let f = 0; f < this._fieldCount; f++) {

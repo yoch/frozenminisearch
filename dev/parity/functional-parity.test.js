@@ -603,6 +603,16 @@ describe('FrozenIndexBuilder', () => {
     expect(loaded.search('zen')).toEqual(fromDocs.search('zen'))
   })
 
+  test('saveBinary is deterministic and path-independent', () => {
+    // The flat term dedup must assign identical term indices on every build,
+    // and fromDocuments / builder-freeze must emit byte-identical output.
+    const a = Buffer.from(buildFrozenDirect().saveBinarySync())
+    const b = Buffer.from(buildFrozenDirect().saveBinarySync())
+    const c = Buffer.from(buildFrozenViaBuilder().saveBinarySync())
+    expect(a.equals(b)).toBe(true)
+    expect(a.equals(c)).toBe(true)
+  })
+
   test('empty index via freeze without add', () => {
     const empty = freezeFrozenIndexBuilder(createFrozenIndexBuilder(options))
     expect(empty.documentCount).toBe(0)

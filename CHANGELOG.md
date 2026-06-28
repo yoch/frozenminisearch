@@ -5,6 +5,7 @@
 ### Improved
 
 - **FrozenIndexBuilder build peak** — replace per-slot `SlotRanges` JS metadata in `IncrementalPostingsAccumulator` with a typed `slotIds` column and stable counting-sort finalize; lowers transient heap during `add` on vocabulary-rich corpora without changing frozen postings layout or wire format. Build-peak benchmarks now also report `peakTotalResidentMb` (heapUsed + external).
+- **FrozenIndexBuilder term index** — `add` now dedupes terms through a flat `Map<string, number>` and the packed radix is built once at `freeze` via `packTermsFromList` (the same path `fromMiniSearch` already uses), instead of maintaining a nested-`Map` radix throughout `add`. Cuts both build-peak memory (−7% to −45% across benchmark scenarios) and build CPU (−13% to −40%), and makes the build-peak deterministic on large vocabularies. The frozen index is logically identical (same search/get/prefix/fuzzy results, loads back identically); the only change is the term-tree node ordering in the emitted bytes (creation order vs prior DFS order), so a `saveBinary` blob built from the same input differs byte-for-byte from previous versions while remaining fully loadable.
 
 ### Changed
 

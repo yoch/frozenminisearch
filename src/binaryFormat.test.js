@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
+import { frozenFromMiniSearch, frozenMemoryBreakdown } from './internal/frozenInternals'
 import PackedRadixTree from './PackedRadixTree'
 import CRC32 from 'crc-32'
 import { LEAF } from './SearchableMap/TreeIterator'
@@ -48,7 +49,7 @@ const options = { fields: ['title', 'text'] }
 function buildSnapshotFromFrozen() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {})
+  const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, {})
   const buf = frozen.saveBinarySync()
   return decodeFrozenSnapshot(buf)
 }
@@ -189,7 +190,7 @@ describe('binaryFormat MSv5', () => {
   test('rejects section CRC mismatch', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const buf = Buffer.from(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
+    const buf = Buffer.from(frozenFromMiniSearch(FrozenMiniSearch, mutable, {}).saveBinarySync())
     const coreDir = msv5SectionDirOffset(Msv5SectionId.Core)
     buf.writeUInt32LE(0, coreDir + 8)
     expect(() => decodeFrozenSnapshot(buf)).toThrow(/CRC mismatch/)
@@ -199,7 +200,7 @@ describe('binaryFormat MSv5', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: 'alpha', text: 'one' })
     mutable.add({ id: 42, text: 'two' })
-    const snap = decodeFrozenSnapshot(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
+    const snap = decodeFrozenSnapshot(frozenFromMiniSearch(FrozenMiniSearch, mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toBe('alpha')
     expect(snap.externalIds[1]).toBe(42)
   })
@@ -239,8 +240,8 @@ describe('binaryFormat MSv5', () => {
     }
     const mutable = new MiniSearch({ fields, storeFields: [] })
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, { fields })
-    expect(frozen._memoryBreakdown().postings.layout).toBe('sparse')
+    const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, { fields })
+    expect(frozenMemoryBreakdown(frozen).postings.layout).toBe('sparse')
 
     const buf = frozen.saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
@@ -261,21 +262,21 @@ describe('binaryFormat MSv5', () => {
     }))
     const options = { fields, storeFields: [] }
     const frozen = FrozenMiniSearch.fromDocuments(docs, options)
-    expect(frozen._memoryBreakdown().postings.layout).toBe('dense')
+    expect(frozenMemoryBreakdown(frozen).postings.layout).toBe('dense')
 
     const buf = frozen.saveBinarySync()
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.readUInt16LE(6) & FLAG_SPARSE_LAYOUT).toBe(0)
 
     const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
-    expect(loaded._memoryBreakdown().postings.layout).toBe('dense')
+    expect(frozenMemoryBreakdown(loaded).postings.layout).toBe('dense')
     expect(loaded.search('term2')).toEqual(frozen.search('term2'))
   })
 
   test('external id JSON blob round-trip', () => {
     const mutable = new MiniSearch({ fields: ['text'] })
     mutable.add({ id: { k: 'complex' }, text: 'data' })
-    const snap = decodeFrozenSnapshot(FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync())
+    const snap = decodeFrozenSnapshot(frozenFromMiniSearch(FrozenMiniSearch, mutable, {}).saveBinarySync())
     expect(snap.externalIds[0]).toEqual({ k: 'complex' })
   })
 
@@ -294,7 +295,7 @@ describe('binaryFormat corruption guards', () => {
   beforeEach(() => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    validBuf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync()
+    validBuf = frozenFromMiniSearch(FrozenMiniSearch, mutable, {}).saveBinarySync()
   })
 
   test('rejects buffer shorter than header', () => {
@@ -412,7 +413,7 @@ describe('FrozenMiniSearch loadBinary fields', () => {
   test('load without fields uses snapshot field names', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
-    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
+    const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
     const buf = frozen.saveBinarySync()
     const loaded = FrozenMiniSearch.loadBinarySync(buf, {})
     expect(loaded.search('zen')).toEqual(frozen.search('zen'))

@@ -1,4 +1,5 @@
 import FrozenMiniSearch from '../../dist/es/index.js'
+import { frozenMemoryBreakdown } from '../harness/frozenDistInternals.mjs'
 import { getScenarioById } from '../scenarioRegistry.mjs'
 import {
   defaultHeapGcPasses,
@@ -47,7 +48,7 @@ export function runHeapScenario (scenarioId, opts = {}) {
   }
 
   const frozenIndex = FrozenMiniSearch.fromDocuments(scenario.corpus, scenario.options)
-  const breakdown = frozenIndex._memoryBreakdown()
+  const breakdown = frozenMemoryBreakdown(frozenIndex)
 
   const heapOnlySavingPct = mutable.heapMb > 0
     ? Number((100 * (1 - frozen.heapMb / mutable.heapMb)).toFixed(1))

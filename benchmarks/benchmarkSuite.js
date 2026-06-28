@@ -1,5 +1,9 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../dist/es/index.js'
+import {
+  frozenFromMiniSearch,
+  frozenFromMiniSearchSnapshot,
+} from '../src/internal/frozenInternals.ts'
 import { median, medianRound } from './benchStats.js'
 import {
   gc,
@@ -33,7 +37,7 @@ function prepareScenarioSearchIndexes (corpus, options) {
   gc()
   const frozenBuild = new MiniSearch(options)
   frozenBuild.addAll(corpus)
-  const frozenSearchIndex = FrozenMiniSearch._fromMiniSearch(frozenBuild, options)
+  const frozenSearchIndex = frozenFromMiniSearch(FrozenMiniSearch, frozenBuild, options)
   gc()
   return { mutableSearchIndex, frozenSearchIndex }
 }
@@ -529,7 +533,7 @@ export function runScenario (scenario, benchOptions = {}) {
     json = ser.result
     jsonSerializeMs = ser.ms
     // freezeMs measures import only (no double toJSON): operate on the pre-built snapshot.
-    const fr = timedMs(() => FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options))
+    const fr = timedMs(() => frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options))
     freezeMs = fr.ms
     const bin = timedMs(() => fr.result.saveBinarySync())
     binaryBuf = bin.result
@@ -558,7 +562,7 @@ export function runScenario (scenario, benchOptions = {}) {
   if (need.drift && driftQueries && driftQueries.length > 0) {
     const ms = new MiniSearch(options)
     ms.addAll(corpus)
-    const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(ms.toJSON(), options)
+    const frozen = frozenFromMiniSearchSnapshot(FrozenMiniSearch, ms.toJSON(), options)
     scoreDrift = driftQueries.map((query) => computeScoreDrift(ms, frozen, query))
   }
 

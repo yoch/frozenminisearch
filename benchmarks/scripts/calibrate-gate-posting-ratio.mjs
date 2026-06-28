@@ -22,7 +22,12 @@ import {
   postingGateMaxRatio,
   resolveGateMaxSize,
 } from '../../src/queryEngineGateLimits.ts'
-import { executeQueryWithRunOptions } from '../../src/queryEngine.ts'
+import {
+  executeRawWithRunOptions,
+  frozenFromMiniSearch,
+  frozenPostings,
+  frozenTermIndex,
+} from '../../src/internal/frozenInternals.ts'
 import { executeRaw } from '../harness/frozenPipelineHarness.ts'
 import {
   docIdUint16Boundary,
@@ -186,9 +191,9 @@ function corpusSharedBucket(docCount, bucketMod, bucketId) {
 }
 
 function postingLengthForTerm(frozen, term) {
-  const ti = frozen._index.get(term)
+  const ti = frozenTermIndex(frozen).get(term)
   if (ti == null) return 0
-  const layout = frozen._postings
+  const layout = frozenPostings(frozen)
   if (layout.layout === 'dense') {
     return layout.denseLengths[ti * layout.fieldCount]
   }
@@ -204,7 +209,7 @@ function buildFrozen(docs, searchOptions = {}) {
   const options = { fields: ['txt'], storeFields: [], searchOptions }
   const ms = new MiniSearch(options)
   ms.addAll(docs)
-  return FrozenMiniSearch._fromMiniSearch(ms, options)
+  return frozenFromMiniSearch(FrozenMiniSearch, ms, options)
 }
 
 function collectRealCases() {
@@ -390,14 +395,13 @@ function evaluatePolicyGrid(syntheticMicro, realCases) {
 }
 
 function timeExecuteQuery(frozen, query, searchOptions, run, warmup, iterations) {
-  const params = frozen._queryEngineParams
   for (let i = 0; i < warmup; i++) {
-    executeQueryWithRunOptions(query, searchOptions, params, run)
+    executeRawWithRunOptions(frozen, query, searchOptions, run)
   }
   const samples = []
   for (let i = 0; i < iterations; i++) {
     const t0 = performance.now()
-    executeQueryWithRunOptions(query, searchOptions, params, run)
+    executeRawWithRunOptions(frozen, query, searchOptions, run)
     samples.push(performance.now() - t0)
   }
   return median(samples)

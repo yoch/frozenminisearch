@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../FrozenMiniSearch'
+import { frozenFromMiniSearch } from '../internal/frozenInternals'
 import {
   CODEC_RAW,
   CODEC_ZLIB,
@@ -26,7 +27,7 @@ const docs = [
 function smallIndexRawSections() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  const buf = FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync({ compression: 'raw' })
+  const buf = frozenFromMiniSearch(FrozenMiniSearch, mutable, options).saveBinarySync({ compression: 'raw' })
   const directory = readMsv5SectionDirectory(buf)
   return {
     globalFlags: readMsv5GlobalFlagsBrowser(buf),
@@ -40,7 +41,7 @@ function bigCompressibleRawSections() {
     id: i,
     text: `payload ${'z'.repeat(120)} ${i}`,
   })))
-  const buf = FrozenMiniSearch._fromMiniSearch(mutable, {}).saveBinarySync({ compression: 'raw' })
+  const buf = frozenFromMiniSearch(FrozenMiniSearch, mutable, {}).saveBinarySync({ compression: 'raw' })
   const directory = readMsv5SectionDirectory(buf)
   return {
     globalFlags: readMsv5GlobalFlagsBrowser(buf),

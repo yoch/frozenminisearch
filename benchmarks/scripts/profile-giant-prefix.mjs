@@ -15,7 +15,12 @@ import {
   resolveGateMaxSize,
 } from '../../src/queryEngineGateLimits.ts'
 import { giantVocabulary } from '../benchmarkScenarios.js'
-import { executeRaw } from '../harness/frozenPipelineHarness.ts'
+import {
+  executeRaw,
+  finalizeRaw,
+  frozenPostings,
+  frozenTermIndex,
+} from '../harness/frozenPipelineHarness.ts'
 
 function argValue(name) {
   for (let i = 0; i < process.argv.length; i++) {
@@ -82,9 +87,9 @@ function countPrefixTerms(index, term) {
 }
 
 function postingLengthForTerm(frozen, term) {
-  const ti = frozen._index.get(term)
+  const ti = frozenTermIndex(frozen).get(term)
   if (ti == null) return null
-  const layout = frozen._postings
+  const layout = frozenPostings(frozen)
   if (layout.layout === 'dense') {
     const base = ti * layout.fieldCount
     return layout.denseLengths[base]
@@ -134,22 +139,6 @@ function combineAnd(a, b) {
   return a
 }
 
-function finalizeRawForProfile(frozen, rawResults) {
-  const results = []
-  for (const [docId, { score, terms, match }] of rawResults) {
-    const quality = terms.length || 1
-    results.push({
-      id: frozen._externalIds[docId],
-      score: score * quality,
-      terms: Object.keys(match),
-      queryTerms: terms,
-      match,
-    })
-  }
-  results.sort((a, b) => b.score - a.score)
-  return results
-}
-
 const runs = intArg('runs', 5)
 const warmup = intArg('warmup', 4)
 const iterations = intArg('iterations', 12)
@@ -160,8 +149,9 @@ const query = 'unique1 common'
 const frozen = FrozenMiniSearch.fromDocuments(giantVocabulary(50000), opts)
 const docCount = 50000
 
-const uniqueStats = countPrefixTerms(frozen._index, 'unique1')
-const commonStats = countPrefixTerms(frozen._index, 'common')
+const index = frozenTermIndex(frozen)
+const uniqueStats = countPrefixTerms(index, 'unique1')
+const commonStats = countPrefixTerms(index, 'common')
 const commonPostingLen = postingLengthForTerm(frozen, 'common')
 
 const gateAfterUnique1 = executeRaw(frozen, 'unique1', andPrefix)
@@ -248,7 +238,7 @@ const decomposition = {
     iterations,
   ).p50,
   finalize_full_raw_ms: timeFn(
-    () => finalizeRawForProfile(frozen, materializedFullRaw),
+    () => finalizeRaw(frozen, materializedFullRaw, query, andPrefix),
     warmup,
     iterations,
   ).p50,

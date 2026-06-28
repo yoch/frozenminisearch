@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
+import { frozenFromMiniSearch, frozenMemoryBreakdown } from './internal/frozenInternals'
 import { createFrozenIndexBuilder } from './frozenBuild'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import {
@@ -189,11 +190,11 @@ describe('IncrementalPostingsAccumulator', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(documents)
 
-    const fromMiniSearch = FrozenMiniSearch._fromMiniSearch(mutable, options)
+    const fromMiniSearch = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
     const fromDocuments = FrozenMiniSearch.fromDocuments(documents, options)
 
-    expect(fromMiniSearch._memoryBreakdown().postings.layout).toBe('dense')
-    expect(fromDocuments._memoryBreakdown().postings.layout).toBe('dense')
+    expect(frozenMemoryBreakdown(fromMiniSearch).postings.layout).toBe('dense')
+    expect(frozenMemoryBreakdown(fromDocuments).postings.layout).toBe('dense')
     expect(searchSnapshot(fromDocuments, 'term2')).toEqual(searchSnapshot(fromMiniSearch, 'term2'))
   })
 

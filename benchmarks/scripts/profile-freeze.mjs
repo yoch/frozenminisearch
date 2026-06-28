@@ -1,6 +1,6 @@
 /**
  * Break down freeze import (freezeMs) cost by phase.
- * Bench freezeMs times _fromMiniSearchSnapshot on a pre-built snapshot (toJSON excluded).
+ * Bench freezeMs times the internal snapshot import helper on a pre-built snapshot (toJSON excluded).
  *
  *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-freeze.mjs
  *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-freeze.mjs --scenario=dense
@@ -9,8 +9,11 @@ import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
 import {
   buildFrozenAssembleParamsFromMiniSearchSnapshot,
-  parseSnapshotIndex,
 } from '../../src/fromMiniSearch.ts'
+import {
+  frozenFromMiniSearchSnapshot,
+  parseSnapshotIndex,
+} from '../../src/internal/frozenInternals.ts'
 import { fromRadixTree } from '../../src/PackedRadixTree/fromRadixTree.ts'
 import { packTermsFromList } from '../../src/PackedRadixTree/packTermList.ts'
 import { setRadixLeaf } from '../../src/radixTree.ts'
@@ -80,7 +83,7 @@ function main() {
       return parsed.accumulator.finalize(parsed.termCount, nextId)
     },
     buildFrozenParams: () => buildFrozenAssembleParamsFromMiniSearchSnapshot(snapshot, options),
-    freezeImport: () => FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options),
+    freezeImport: () => frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options),
   }
 
   console.log(`Profile freeze — ${scenario.name} (${scenarioId})`)

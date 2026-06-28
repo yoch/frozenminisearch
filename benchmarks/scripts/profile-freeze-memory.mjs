@@ -11,7 +11,10 @@
  */
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
-import { parseSnapshotIndex } from '../../src/fromMiniSearch.ts'
+import {
+  frozenFromMiniSearchSnapshot,
+  parseSnapshotIndex,
+} from '../../src/internal/frozenInternals.ts'
 import { getScenarioById } from '../scenarioRegistry.mjs'
 import { measureHeap, gc, medianOf } from '../benchmarkUtils.js'
 import { intArg } from './cpuBenchUtils.mjs'
@@ -77,13 +80,13 @@ function run(scenarioKey) {
     gc()
     mapIntermediate.push(measureHeap(() => buildMapIntermediate(snapshot)).heapBytes)
     gc()
-    finalIndex.push(measureHeap(() => FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options)).heapBytes)
+    finalIndex.push(measureHeap(() => frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options)).heapBytes)
 
     // Transient peak estimate: heapUsed just after the synchronous import,
     // before GC reclaims the dead intermediate, above a freshly-gc'd baseline.
     gc()
     const baseline = process.memoryUsage().heapUsed
-    const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options)
+    const frozen = frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options)
     const afterCall = process.memoryUsage().heapUsed
     void frozen.documentCount
     transientPeak.push(afterCall - baseline)

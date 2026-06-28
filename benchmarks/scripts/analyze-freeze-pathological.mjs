@@ -10,11 +10,14 @@ import { fileURLToPath } from 'node:url'
 import { performance } from 'node:perf_hooks'
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
-import { assembleFrozenWithCtor } from '../../src/FrozenMiniSearchCore.ts'
 import {
   buildFrozenAssembleParamsFromMiniSearchSnapshot,
-  parseSnapshotIndex,
 } from '../../src/fromMiniSearch.ts'
+import {
+  frozenAssembleWithCtor,
+  frozenFromMiniSearchSnapshot,
+  parseSnapshotIndex,
+} from '../../src/internal/frozenInternals.ts'
 import { packTermsFromList } from '../../src/PackedRadixTree/packTermList.ts'
 import { validateFrozenTermIndexLeaves } from '../../src/frozenTermIndex.ts'
 import { validateFrozenPostingsLayout } from '../../src/frozenPostings.ts'
@@ -115,19 +118,19 @@ function profileScenario(scenario) {
       params.documentCount,
       params.nextId,
     ),
-    assembleTrusted: () => assembleFrozenWithCtor(
+    assembleTrusted: () => frozenAssembleWithCtor(
       params,
       true,
       'minisearch-json',
       FrozenMiniSearch,
     ),
-    assembleUntrusted: () => assembleFrozenWithCtor(
+    assembleUntrusted: () => frozenAssembleWithCtor(
       params,
       false,
       'minisearch-json',
       FrozenMiniSearch,
     ),
-    freezeImport: () => FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options),
+    freezeImport: () => frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options),
   }
 
   const profile = {}

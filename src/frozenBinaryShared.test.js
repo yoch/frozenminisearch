@@ -1,6 +1,7 @@
 import FrozenMiniSearch from './FrozenMiniSearch'
 import { buildBinarySnapshotInput } from './frozenBinaryShared'
 import { fieldLengthMatrixWireFlags } from './fieldLengthMatrixWire'
+import { frozenFieldLengthMatrix } from './internal/frozenInternals'
 import {
   FLAG_FL_U8,
   FLAG_FL_U16,
@@ -77,8 +78,9 @@ describe('FrozenMiniSearch saveBinary fieldLengthMatrix wire width', () => {
     }))
     const opts = { fields: ['title', 'text'] }
     const frozen = FrozenMiniSearch.fromDocuments(docs, opts)
-    expect(frozen._fieldLengthMatrix).toBeInstanceOf(Uint8Array)
-    expect(fieldLengthMatrixWireFlags(frozen._fieldLengthMatrix)).toBe(FLAG_FL_U8)
+    const fieldLengthMatrix = frozenFieldLengthMatrix(frozen)
+    expect(fieldLengthMatrix).toBeInstanceOf(Uint8Array)
+    expect(fieldLengthMatrixWireFlags(fieldLengthMatrix)).toBe(FLAG_FL_U8)
 
     const buf = frozen.saveBinarySync({ compression: 'raw' })
     const globalFlags = readMsv5GlobalFlags(buf)
@@ -87,10 +89,10 @@ describe('FrozenMiniSearch saveBinary fieldLengthMatrix wire width', () => {
     const directory = readMsv5SectionDirectory(buf)
     const sections = loadMsv5Sections(buf, directory)
     expect(sections[Msv5SectionId.FieldLengthMatrix].length)
-      .toBe(frozen._fieldLengthMatrix.byteLength)
+      .toBe(fieldLengthMatrix.byteLength)
 
     const loaded = FrozenMiniSearch.loadBinarySync(buf, opts)
-    expect(Array.from(loaded._fieldLengthMatrix))
-      .toEqual(Array.from(frozen._fieldLengthMatrix))
+    expect(Array.from(frozenFieldLengthMatrix(loaded)))
+      .toEqual(Array.from(fieldLengthMatrix))
   })
 })

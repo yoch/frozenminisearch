@@ -5,6 +5,7 @@
  */
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../dist/es/index.js'
+import { frozenFromMiniSearch } from '../src/internal/frozenInternals.ts'
 import { CODEC_RAW, CODEC_ZSTD, MSV5_PAYLOAD_CODEC_OFFSET } from '../src/msv5/binaryMsv5Constants.ts'
 import { gc } from './benchmarkUtils.js'
 import { loadDivinaLines } from './loadDivinaLines.js'
@@ -99,7 +100,7 @@ async function runScenario (scenario: Scenario): Promise<SaveResult> {
 
   const ms = new MiniSearch(options)
   ms.addAll(corpus)
-  const frozen = FrozenMiniSearch._fromMiniSearch(ms, options)
+  const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, options)
 
   const bufSync = frozen.saveBinarySync() as Buffer
   const saveSyncMs = benchSync(() => {

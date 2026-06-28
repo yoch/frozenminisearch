@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
+import { frozenFromMiniSearch, frozenMemoryBreakdown } from './internal/frozenInternals'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea' },
@@ -42,7 +43,7 @@ describe('fromMiniSearch loaders', () => {
   test('fromMiniSearch instance uses toJSON()', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
-    const frozen = FrozenMiniSearch._fromMiniSearch(reference, options)
+    const frozen = frozenFromMiniSearch(FrozenMiniSearch, reference, options)
     expect(frozen.documentCount).toBe(reference.documentCount)
     expect(frozen.search('zen art', { combineWith: 'AND' }).length).toBeGreaterThan(0)
   })
@@ -190,7 +191,7 @@ describe('fromMiniSearch loaders', () => {
     const fromJson = FrozenMiniSearch.fromJSON(JSON.stringify(reference), options)
     const fromDocs = FrozenMiniSearch.fromDocuments(docs, options)
 
-    expect(fromJson._memoryBreakdown().postings).toEqual(fromDocs._memoryBreakdown().postings)
+    expect(frozenMemoryBreakdown(fromJson).postings).toEqual(frozenMemoryBreakdown(fromDocs).postings)
     expect(fromJson.termCount).toBe(fromDocs.termCount)
     expect(fromJson.search('zen art', { combineWith: 'AND' }).map(r => r.id))
       .toEqual(fromDocs.search('zen art', { combineWith: 'AND' }).map(r => r.id))

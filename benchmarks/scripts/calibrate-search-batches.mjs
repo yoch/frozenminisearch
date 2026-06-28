@@ -7,6 +7,7 @@
 import { writeFileSync } from 'node:fs'
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
+import { frozenFromMiniSearch } from '../../src/internal/frozenInternals.ts'
 import { buildScenarioList } from '../benchmarkSuite.js'
 import { median } from '../benchmarkUtils.js'
 import { benchHrtimeNow, benchHrtimeElapsedMs } from '../searchBenchTiming.js'
@@ -62,7 +63,7 @@ for (const scenario of scenarios) {
   mutableIndex.addAll(scenario.corpus)
   const frozenBuild = new MiniSearch(scenario.options)
   frozenBuild.addAll(scenario.corpus)
-  const frozenIndex = FrozenMiniSearch._fromMiniSearch(frozenBuild, scenario.options)
+  const frozenIndex = frozenFromMiniSearch(FrozenMiniSearch, frozenBuild, scenario.options)
 
   console.log(scenario.id)
   for (const { label, q, opts } of scenario.queries) {

@@ -10,6 +10,10 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
 import {
+  frozenFromMiniSearch,
+  frozenMemoryBreakdown,
+} from '../../src/internal/frozenInternals.ts'
+import {
   highFrequencyTerms,
   overflowFrequencies,
   genericStringIds,
@@ -87,7 +91,7 @@ const CASES = {
 function buildPair (corpus, options) {
   const ms = new MiniSearch(options)
   ms.addAll(corpus)
-  const frozen = FrozenMiniSearch._fromMiniSearch(ms, options)
+  const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, options)
   return { ms, frozen }
 }
 
@@ -161,7 +165,7 @@ function runCase (id) {
   const heapFrozen = measureHeap(() => {
     const m = new MiniSearch(spec.options)
     m.addAll(spec.corpus)
-    return FrozenMiniSearch._fromMiniSearch(m, spec.options)
+    return frozenFromMiniSearch(FrozenMiniSearch, m, spec.options)
   })
   const heapMutable = measureHeap(() => {
     const m = new MiniSearch(spec.options)
@@ -170,7 +174,7 @@ function runCase (id) {
   })
   console.log(`heap delta: mutable=${heapMutable.heapMb} MB frozen=${heapFrozen.heapMb} MB external=${heapFrozen.externalMb} MB`)
 
-  const breakdown = frozen._memoryBreakdown()
+  const breakdown = frozenMemoryBreakdown(frozen)
   const rt = breakdown.radixTree
   console.log(`radix: nodes=${rt.nodeCount} edges=${rt.edgeCount} est=${(rt.estimatedBytes / 1024).toFixed(1)} KB structured=${(breakdown.estimatedStructuredBytes / 1024).toFixed(1)} KB`)
 

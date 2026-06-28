@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
+import { frozenFromMiniSearch } from './internal/frozenInternals'
 import FrozenMiniSearchBrowser, {
   buildFrozenFromDocuments,
   freezeFrozenIndexBuilder,
@@ -79,7 +80,7 @@ describe('FrozenMiniSearchBrowser', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const snap = await decodeFrozenSnapshotMsv5Browser(
-      new Uint8Array(FrozenMiniSearch._fromMiniSearch(mutable, options).saveBinarySync({ compression: 'raw' })),
+      new Uint8Array(frozenFromMiniSearch(FrozenMiniSearch, mutable, options).saveBinarySync({ compression: 'raw' })),
     )
     const encoded = await encodeFrozenSnapshotMsv5Browser(snap, undefined, undefined, 'zlib')
     const roundTripped = await decodeFrozenSnapshotMsv5Browser(encoded)

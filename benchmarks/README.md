@@ -69,7 +69,7 @@ Activate with `--surfaces=build,search,save,load,memory,migrate,drift` or `all`.
 | `search-levels` | L0 lookup / L1 `executeQuery` / L2 `search` decomposition |
 | `save` / `load` | binary snapshot round-trip |
 | `memory` | Retained RAM (protocol **v4**: `totalResidentApprox` = heapUsed + external on both sides; isolated scenario process, in-process trials, median+MAD) + internal memory breakdown |
-| `migrate` | MiniSearch `toJSON` + snapshot import (`toJSONMs` + `freezeMs` via `_fromMiniSearchSnapshot`) |
+| `migrate` | MiniSearch `toJSON` + internal snapshot import (`toJSONMs` + `freezeMs`) |
 | `drift` | Score drift vs reference (`toBeCloseTo` tolerance) |
 
 ## Core modules

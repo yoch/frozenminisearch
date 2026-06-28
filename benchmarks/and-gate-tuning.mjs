@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../dist/es/index.js'
+import { frozenFromMiniSearch } from '../src/internal/frozenInternals.ts'
 import {
   DEFAULT_AND_GATE_LIMITS,
   gateIsSelectiveEnough,
@@ -63,7 +64,7 @@ function buildFrozen (docs, searchOptions = { prefix: true, fuzzy: 0.2 }) {
   const options = { fields: ['txt'], storeFields: [], searchOptions }
   const ms = new MiniSearch(options)
   ms.addAll(docs)
-  return FrozenMiniSearch._fromMiniSearch(ms, options)
+  return frozenFromMiniSearch(FrozenMiniSearch, ms, options)
 }
 
 function median (arr) {

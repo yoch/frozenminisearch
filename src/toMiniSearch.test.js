@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
+import { frozenFromMiniSearchSnapshot } from './internal/frozenInternals'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea' },
@@ -77,7 +78,7 @@ describe('toJSON MiniSearch wire export', () => {
       serializationVersion: 2,
     }
 
-    const frozen = FrozenMiniSearch._fromMiniSearchSnapshot(snapshot, options)
+    const frozen = frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options)
     const reloaded = FrozenMiniSearch.fromJSON(JSON.stringify(frozen.toJSON()), options)
 
     expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])

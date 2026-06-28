@@ -1,5 +1,9 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../src/FrozenMiniSearch'
+import {
+  frozenFromMiniSearch,
+  frozenTermIndex,
+} from '../../src/internal/frozenInternals'
 import { searchNaive } from './queryEngineHarness'
 
 const docs = [
@@ -19,7 +23,7 @@ const options = {
 function buildEngines() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  const frozen = FrozenMiniSearch._fromMiniSearch(mutable, options)
+  const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
   return { mutable, frozen }
 }
 
@@ -238,7 +242,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
         searchOptions: { prefix: false },
       })
       ms.addAll(buildUniformCorpus(docCount, i => `alpha beta ${i}`))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       const opts = { combineWith: 'AND' }
       const query = 'alpha beta'
       expectSameAsNaive(frozen, query, opts)
@@ -248,7 +252,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('small selective gate still matches naive oracle', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
       ms.addAll(buildUniformCorpus(200, i => (i < 5 ? `zen item${i}` : `unique${i} alpha`)))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
       const opts = { combineWith: 'AND', prefix: true }
       expectSameAsNaive(frozen, 'zen uniq', opts)
     })
@@ -256,21 +260,21 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('broad-first AND exact matches naive oracle', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND' })
     })
 
     test('broad-first AND prefix matches naive oracle', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
       expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND', prefix: true })
     })
 
     test('broad-first nested AND matches naive oracle', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       const query = {
         combineWith: 'AND',
         queries: [
@@ -284,7 +288,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('broad AND_NOT exclusion removing all matches naive oracle', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       expectSameAsNaive(frozen, 'common alpha', { combineWith: 'AND_NOT' })
       expect(frozen.search('common alpha', { combineWith: 'AND_NOT' })).toEqual([])
     })
@@ -300,7 +304,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('broad-first AND with zero boostDocument matches naive oracle', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       const boostDocument = (id) => (id === 1 ? 0 : 1)
       expectSameAsNaive(frozen, 'common unique1', { combineWith: 'AND', boostDocument })
       expect(frozen.search('common unique1', { combineWith: 'AND', boostDocument })).toEqual([])
@@ -321,7 +325,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
 
       const patchCounter = (frozen) => {
         let count = 0
-        const index = frozen._index
+        const index = frozenTermIndex(frozen)
         const original = index.termByIndex.bind(index)
         index.termByIndex = (termIndex) => {
           count++
@@ -330,12 +334,12 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
         return () => count
       }
 
-      const frozenAnd = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      const frozenAnd = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
       const getAndCount = patchCounter(frozenAnd)
       frozenAnd.search('zen uniq', { combineWith: 'AND', prefix: true })
       const andResolves = getAndCount()
 
-      const frozenOr = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      const frozenOr = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
       const getOrCount = patchCounter(frozenOr)
       frozenOr.search('zen uniq', { combineWith: 'OR', prefix: true })
       const orResolves = getOrCount()
@@ -353,10 +357,10 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       }
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
       ms.addAll(bigDocs)
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
 
       let resolveCount = 0
-      const index = frozen._index
+      const index = frozenTermIndex(frozen)
       const original = index.termByIndex.bind(index)
       index.termByIndex = (termIndex) => {
         resolveCount++
@@ -372,7 +376,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('broad-first AND avoids scoring the full first branch', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       let boostCalls = 0
       const boostDocument = () => {
         boostCalls++
@@ -387,7 +391,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('prefix broad-first probe stays on sequential gating', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: true } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: true } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
       let boostCalls = 0
       const boostDocument = () => {
         boostCalls++
@@ -402,7 +406,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('fuzzy broad-first probe stays on sequential gating', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false, fuzzy: 0.2 } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false, fuzzy: 0.2 } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false, fuzzy: 0.2 } })
       let boostCalls = 0
       const boostDocument = () => {
         boostCalls++
@@ -417,7 +421,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
     test('broad AND_NOT exclusion can return empty without scoring positive branch', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
-      const frozen = FrozenMiniSearch._fromMiniSearch(ms, { fields: ['text'], searchOptions: { prefix: false } })
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
       let boostCalls = 0
       const boostDocument = () => {
         boostCalls++

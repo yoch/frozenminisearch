@@ -4,7 +4,7 @@
 |------|----------|-----------|-------|
 | `isDefaultTokenize` fast path | **High** | [`indexing-parity.test.js`](indexing-parity.test.js) profile `camelCase` / `vocs`; [`indexingCore.test.js`](../../src/indexingCore.test.js) | Reference equality only — no split-equivalent heuristic |
 | `fromDocuments` vs upstream index | **High** | [`indexing-parity.test.js`](indexing-parity.test.js) + [`indexFingerprint.js`](../../testSupport/indexFingerprint.js) | Catches missing terms before score drift |
-| `functional-parity` snapshot-only blind spot | **High** | Addressed by indexing gate above | `_fromMiniSearch` (internal) skips native tokenizer path |
+| `functional-parity` snapshot-only blind spot | **High** | Addressed by indexing gate above | Internal MiniSearch import skips native tokenizer path |
 | Field length vs `processTerm` | Medium | indexing profile `processTerm` | Fixed: raw unique token count (MiniSearch semantics) |
 | Float32 `avgFieldLength` | Low | `toBeCloseTo` in fingerprint helper | Documented acceptable drift |
 | Freq clamp 65535 | Low | overflow tests in functional-parity | Documented acceptable drift |

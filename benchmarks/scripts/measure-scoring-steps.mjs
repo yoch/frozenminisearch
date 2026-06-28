@@ -22,6 +22,11 @@ import {
   passGateByPostingRatio,
   resolveGateMaxSize,
 } from '../../src/queryEngineGateLimits.ts'
+import {
+  frozenFromMiniSearch,
+  frozenPostings,
+  frozenTermIndex,
+} from '../../src/internal/frozenInternals.ts'
 import { executeRaw } from '../harness/frozenPipelineHarness.ts'
 
 function argValue(name) {
@@ -92,7 +97,7 @@ function corpusForSpec(spec) {
 
 function postingLengthForTermIndex(frozen, termIndex) {
   if (termIndex == null) return 0
-  const layout = frozen._postings
+  const layout = frozenPostings(frozen)
   if (layout.layout === 'dense') {
     return layout.denseLengths[termIndex * layout.fieldCount]
   }
@@ -105,12 +110,13 @@ function postingLengthForTermIndex(frozen, termIndex) {
 }
 
 function maxPostingLengthForToken(frozen, token, prefix) {
+  const index = frozenTermIndex(frozen)
   if (!prefix) {
-    return postingLengthForTermIndex(frozen, frozen._index.get(token))
+    return postingLengthForTermIndex(frozen, index.get(token))
   }
 
   let maxLen = 0
-  for (const { termIndex } of frozen._index.prefixRefs(token)) {
+  for (const { termIndex } of index.prefixRefs(token)) {
     maxLen = Math.max(maxLen, postingLengthForTermIndex(frozen, termIndex))
   }
   return maxLen
@@ -122,7 +128,7 @@ function probeAndGate(corpus, query, searchOptions) {
   const ms = new MiniSearch({ ...baseOpts, searchOptions: searchOptions.prefix ? { prefix: true } : {} })
   ms.addAll(corpus)
   const [firstToken, secondToken] = query.trim().split(/\s+/)
-  const frozen = FrozenMiniSearch._fromMiniSearch(ms, baseOpts)
+  const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, baseOpts)
   const gateSize = executeRaw(frozen, firstToken, searchOptions).size
   const maxGate = resolveGateMaxSize(corpus.length, DEFAULT_AND_GATE_LIMITS)
   const branchPostingLength = secondToken == null

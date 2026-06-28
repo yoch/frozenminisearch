@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
+import { frozenFromMiniSearch } from './internal/frozenInternals'
 import {
   createStoredFieldsLayout,
   readStoredFields,
@@ -60,7 +61,7 @@ describe('storedFieldsLayout', () => {
       storeFields: ['title', 'category'],
     })
     mutable.add({ id: 1, title: 'Zen Motorcycle', text: 'zen art', category: 'fiction' })
-    const frozen = FrozenMiniSearch._fromMiniSearch(mutable, {
+    const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, {
       fields: ['title', 'text'],
       storeFields: ['title', 'category'],
     })

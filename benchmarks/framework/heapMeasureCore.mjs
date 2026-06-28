@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../../dist/es/index.js'
+import { frozenFromMiniSearch } from '../harness/frozenDistInternals.mjs'
 import { measureRetainedHeap, aggregateHeapSamples } from '../benchmarkUtils.js'
 
 /**
@@ -23,7 +24,7 @@ export function heapFactoryForKind (kind, scenario, artifacts = {}) {
       return () => {
         const ms = new MiniSearch(options)
         ms.addAll(corpus)
-        return FrozenMiniSearch._fromMiniSearch(ms, options)
+        return frozenFromMiniSearch(FrozenMiniSearch, ms, options)
       }
     case 'loadJSON':
       if (artifacts.json == null) throw new Error('loadJSON heap path requires json artifact')
@@ -72,6 +73,6 @@ export function buildLoadArtifacts (scenario) {
   const ms = new MiniSearch(scenario.options)
   ms.addAll(scenario.corpus)
   const json = JSON.stringify(ms.toJSON())
-  const frozen = FrozenMiniSearch._fromMiniSearch(ms, scenario.options)
+  const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, scenario.options)
   return { json, binaryBuf: frozen.saveBinarySync() }
 }

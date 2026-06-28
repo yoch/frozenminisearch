@@ -5,7 +5,6 @@ import { type AggregateContext, type RawResult, finalizeRawSearchResults } from 
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import {
   createFrozenFieldTermFlyweight,
-  postingsTypedBytes,
   validateFrozenPostingsLayout,
   type FrozenFieldTermFlyweight,
   type FrozenPostingsLayout,
@@ -32,7 +31,6 @@ import type {
 import { type FieldLengthArray } from './fieldLengthMatrix'
 import type {
   FrozenAssembleParams,
-  FrozenMemoryBreakdown,
   OptionsWithDefaults,
 } from './frozenTypes'
 import { forEachLiveShortId } from './forEachLiveShortId'
@@ -48,8 +46,6 @@ import { readU8 } from './binaryBytes'
 import { MSV5_PAYLOAD_CODEC_OFFSET } from './msv5/binaryMsv5Constants'
 import {
   readStoredFields,
-  storedFieldsJsonBytes,
-  storedFieldsSlotCount,
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
@@ -57,6 +53,7 @@ import { getFrozenDefault, type FrozenDefaultOptionName } from './searchDefaults
 
 const noStoredFields = (): undefined => undefined
 type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (params: FrozenAssembleParams<T>) => I
+export type { FrozenMiniSearchCtor }
 
 function assembleFrozenInternal<T>(
   params: FrozenAssembleParams<T>,
@@ -91,16 +88,6 @@ function assembleFrozenInternal<T, I extends FrozenMiniSearchCore<T>>(
     return new FrozenMiniSearchCore(owned)
   }
   return new Ctor(owned)
-}
-
-/** @internal Shared assembly path; optional constructor for Node subclass. */
-export function assembleFrozenWithCtor<T, I extends FrozenMiniSearchCore<T>>(
-  params: FrozenAssembleParams<T>,
-  trustedSource: boolean,
-  ownershipMode: SnapshotOwnershipMode,
-  Ctor: FrozenMiniSearchCtor<T, I>,
-): I {
-  return assembleFrozenInternal(params, trustedSource, ownershipMode, Ctor)
 }
 
 /**
@@ -210,56 +197,6 @@ export default class FrozenMiniSearchCore<T = any> {
 
   get documentCount(): number { return this._documentCount }
   get termCount(): number { return this._termCount }
-
-  /** @internal Benchmark-only retained structure estimate. */
-  protected _memoryBreakdown(): FrozenMemoryBreakdown {
-    const termCount = this.termCount
-    const postingsStats = postingsTypedBytes(this._postings)
-
-    const storedJson = storedFieldsJsonBytes(this._storedFields)
-
-    const radixEst = this._index.packedByteLength()
-    const idMapBytes = this._idLookup.mode === 'lazy-map' ? this._idLookup.mapEntryCount * 32 : 0
-
-    const estimatedStructuredBytes
-      = postingsStats.totalTypedBytes
-        + this._fieldLengthMatrix.byteLength
-        + this._avgFieldLength.byteLength
-        + radixEst
-        + storedJson
-        + idMapBytes
-
-    return {
-      termCount,
-      documentCount: this._documentCount,
-      nextId: this._nextId,
-      postings: {
-        slotCount: postingsStats.slotCount,
-        layout: this._postings.layout,
-        docIdWidth: this._postings.docIdWidth,
-        allDocIdsBytes: postingsStats.allDocIdsBytes,
-        allFreqsBytes: postingsStats.allFreqsBytes,
-        offsetsBytes: postingsStats.offsetsBytes,
-        lengthsBytes: postingsStats.lengthsBytes,
-        totalTypedBytes: postingsStats.totalTypedBytes,
-      },
-      radixTree: {
-        nodeCount: this._index.packedNodeCount(),
-        edgeCount: this._index.packedEdgeCount(),
-        estimatedBytes: radixEst,
-      },
-      documents: {
-        externalIdsSlots: this._externalIds.length,
-        storedFieldsSlots: storedFieldsSlotCount(this._storedFields),
-        idLookupMode: this._idLookup.mode,
-        idToShortIdEntries: this._idLookup.mapEntryCount,
-        fieldLengthMatrixBytes: this._fieldLengthMatrix.byteLength,
-        avgFieldLengthBytes: this._avgFieldLength.byteLength,
-        storedFieldsJsonBytes: storedJson,
-      },
-      estimatedStructuredBytes,
-    }
-  }
 
   /** Whether a document with the given external id is in the index. */
   has(id: unknown): boolean {
@@ -381,38 +318,6 @@ export default class FrozenMiniSearchCore<T = any> {
       json,
       options as Options<any>,
     ) as I
-  }
-
-  /**
-   * @internal Benchmark/test helper — same as {@link fromJSON} with a pre-parsed snapshot object.
-   * `storedFields` are shallow-copied; callers must not mutate nested values
-   * after load if they intend to keep the index immutable.
-   */
-  protected static _fromMiniSearchSnapshot<T, I extends FrozenMiniSearchCore<T>>(
-    this: FrozenMiniSearchCtor<T, I>,
-    snapshot: MiniSearchSnapshot,
-    options: Options<T> = {} as Options<T>,
-  ): I {
-    return assembleFrozenInternal(
-      buildFrozenAssembleParamsFromMiniSearchSnapshot(snapshot, options),
-      false,
-      'minisearch-json',
-      this,
-    )
-  }
-
-  /** @internal Benchmark/test helper — object exposing MiniSearch `toJSON()`. */
-  protected static _fromMiniSearch<T, I extends FrozenMiniSearchCore<T>>(
-    this: FrozenMiniSearchCtor<T, I>,
-    source: { toJSON(): MiniSearchSnapshot },
-    options: Options<T> = {} as Options<T>,
-  ): I {
-    return assembleFrozenInternal(
-      buildFrozenAssembleParamsFromMiniSearchSnapshot(source.toJSON(), options),
-      false,
-      'minisearch-json',
-      this,
-    )
   }
 
   /**

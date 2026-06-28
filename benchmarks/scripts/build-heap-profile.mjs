@@ -10,6 +10,7 @@ import {
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
 } from '../../dist/es/index.js'
+import { frozenMemoryBreakdown } from '../harness/frozenDistInternals.mjs'
 import {
   loadAllCorpusExportSpecs,
   scanCorpusExportStats,
@@ -62,7 +63,7 @@ async function runBuildProfileFromStream (label, spec, options, stats) {
 
   gc()
   const retainedMb = Number((measureHeap(() => frozen).heapBytes / 1024 / 1024).toFixed(4))
-  const breakdown = frozen._memoryBreakdown()
+  const breakdown = frozenMemoryBreakdown(frozen)
 
   return {
     id: label,
@@ -113,7 +114,7 @@ function runBuildProfile (label, documents, options) {
 
   gc()
   const retainedMb = Number((measureHeap(() => frozen).heapBytes / 1024 / 1024).toFixed(4))
-  const breakdown = frozen._memoryBreakdown()
+  const breakdown = frozenMemoryBreakdown(frozen)
 
   return {
     id: label,

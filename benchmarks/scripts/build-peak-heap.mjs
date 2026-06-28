@@ -12,6 +12,7 @@ import {
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
 } from '../../dist/es/index.js'
+import { frozenMemoryBreakdown } from '../harness/frozenDistInternals.mjs'
 import { loadDivinaLines } from '../loadDivinaLines.js'
 import { highFrequencyTerms } from '../benchmarkScenarios.js'
 import {
@@ -70,7 +71,7 @@ function measurePhasedBuild (corpus, options) {
   const frozen = freezeFrozenIndexBuilder(builder)
   sampler.sample()
   const finished = sampler.finish(frozen)
-  const breakdown = frozen._memoryBreakdown()
+  const breakdown = frozenMemoryBreakdown(frozen)
 
   const postingsMb = mbRound(breakdown.postings.totalTypedBytes)
   const radixMb = mbRound(breakdown.radixTree.estimatedBytes)

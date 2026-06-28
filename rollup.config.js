@@ -9,7 +9,7 @@ const terserPlugin = terser({
     passes: 2,
     pure_getters: true,
     unsafe_arrows: true,
-    //dead_code: true,
+    dead_code: true,
   },
   mangle: {
     properties: {

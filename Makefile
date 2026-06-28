@@ -97,10 +97,13 @@ coverage:
 # Lint
 # ----------------------------------------------------------------------------
 
-.PHONY: lint lint-fix typecheck
+.PHONY: lint lint-fix typecheck knip
 lint: typecheck
 	$(RUN) eslint 'src/**/*.{js,ts}'
 	node scripts/assert-internal-boundary.cjs
+
+knip:
+	$(RUN) knip
 
 typecheck:
 	$(RUN) tsc --noEmit

@@ -6,6 +6,7 @@ import {
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
 import { setRadixLeaf } from '../radixTree'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
+import { packedPrefixEntries } from './devStringIterators'
 import PackedRadixTree, { fromRadixTree } from './index'
 import { packTermsFromList } from './packTermList'
 
@@ -131,11 +132,11 @@ describe('PackedRadixTree module', () => {
     expect(Array.from(packed.entries())).toEqual(Array.from(map.entries()))
   })
 
-  test('entries and prefixEntries preserve leaf position before child edges', () => {
+  test('entries and prefix iteration preserve leaf position before child edges', () => {
     expectPackedParity([['a', 0], ['ab', 1], ['ac', 2]])
   })
 
-  test('entries and prefixEntries preserve leaf position after child edges', () => {
+  test('entries and prefix iteration preserve leaf position after child edges', () => {
     expectPackedParity([['ab', 1], ['ac', 2], ['a', 0]])
   })
 
@@ -241,29 +242,15 @@ describe('PackedRadixTree module', () => {
     }
   })
 
-  test('fuzzyEntries remains parity-equivalent to SearchableMap fuzzyGet', () => {
-    for (const distance of [0, 1, 2, 3]) {
-      expect(sortedFuzzyTuples(packed.fuzzyEntries('acqua', distance)))
-        .toEqual(sortedMapFuzzy(map.fuzzyGet('acqua', distance)))
-    }
-    const refs = Array.from(packed.fuzzyRefs('acqua', 2))
-      .map(({ termIndex, distance }) => [termIndex, distance])
-      .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]))
-    const entries = Array.from(packed.fuzzyEntries('acqua', 2))
-      .map(([, termIndex, distance]) => [termIndex, distance])
-      .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]))
-    expect(refs).toEqual(entries)
-  })
-
-  test('prefixEntries remains parity-equivalent to SearchableMap atPrefix', () => {
+  test('packedPrefixEntries remains parity-equivalent to SearchableMap atPrefix', () => {
     for (const prefix of ['', 'a', 'ac', 'sum', 'xyz']) {
-      expect(Array.from(packed.prefixEntries(prefix)))
+      expect(Array.from(packedPrefixEntries(packed, prefix)))
         .toEqual(Array.from(map.atPrefix(prefix).entries()))
     }
     const prefix = 'ac'
     const refs = Array.from(packed.prefixRefs(prefix))
       .map(({ termIndex }) => [packed.termByIndex(termIndex), termIndex])
-    expect(Array.from(packed.prefixEntries(prefix))).toEqual(refs)
+    expect(Array.from(packedPrefixEntries(packed, prefix))).toEqual(refs)
   })
 
   test('mid-edge prefix includes full terms', () => {

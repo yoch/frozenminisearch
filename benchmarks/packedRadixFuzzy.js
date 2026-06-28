@@ -1,5 +1,5 @@
 /**
- * Compare SearchableMap#fuzzyGet vs PackedRadixTree#fuzzyEntries on identical trees.
+ * Compare SearchableMap#fuzzyGet vs PackedRadixTree#fuzzyRefs (+ termByIndex) on identical trees.
  * Uses interleaved map/packed timing (one variant per round) for stable packed-vs-map ratios.
  */
 import SearchableMap from '../src/SearchableMap/SearchableMap.js'
@@ -46,7 +46,8 @@ function benchCaseInterleaved (map, packed, { query, maxDistance }) {
     map.fuzzyGet(query, maxDistance)
     const mapMs = performance.now() - t0
     t0 = performance.now()
-    Array.from(packed.fuzzyEntries(query, maxDistance))
+    Array.from(packed.fuzzyRefs(query, maxDistance))
+      .map(({ termIndex, distance }) => [packed.termByIndex(termIndex), termIndex, distance])
     const packedMs = performance.now() - t0
     if (round >= WARMUP) {
       mapTimes.push(mapMs)

@@ -99,7 +99,8 @@ function runPathWarmup (corpus, cases, label) {
   let done = 0
   for (const c of cases) {
     corpus.map.fuzzyGet(c.query, c.maxDistance)
-    Array.from(corpus.tree.fuzzyEntries(c.query, c.maxDistance))
+    Array.from(corpus.tree.fuzzyRefs(c.query, c.maxDistance))
+      .map(({ termIndex, distance }) => [corpus.tree.termByIndex(termIndex), termIndex, distance])
     done++
     if (done % reportEvery === 0) {
       console.log(`  … ${done}/${cases.length}`)
@@ -160,7 +161,10 @@ async function main () {
   for (const c of cases) {
     const mapMs = medianTimed(() => { corpus.map.fuzzyGet(c.query, c.maxDistance) }, iters)
     const packedMs = medianTimed(
-      () => { Array.from(corpus.tree.fuzzyEntries(c.query, c.maxDistance)) },
+      () => {
+        Array.from(corpus.tree.fuzzyRefs(c.query, c.maxDistance))
+          .map(({ termIndex, distance }) => [corpus.tree.termByIndex(termIndex), termIndex, distance])
+      },
       iters,
     )
     rows.push({

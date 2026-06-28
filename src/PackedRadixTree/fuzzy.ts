@@ -19,19 +19,6 @@ export function packedRadixFuzzyRefs(
   return runFuzzy(tree, query, maxDistance)
 }
 
-/** @deprecated Internal benchmark/compat wrapper. Prefer `packedRadixFuzzyRefs`. */
-export function packedRadixFuzzyEntries(
-  tree: PackedRadixTree,
-  query: string,
-  maxDistance: number,
-): Iterable<[string, number, number]> {
-  const results: Array<[string, number, number]> = []
-  for (const { termIndex, distance } of packedRadixFuzzyRefs(tree, query, maxDistance)) {
-    results.push([tree.termByIndex(termIndex), termIndex, distance])
-  }
-  return results
-}
-
 function* runFuzzy(
   tree: PackedRadixTree,
   query: string,

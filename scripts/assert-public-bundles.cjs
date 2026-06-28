@@ -19,6 +19,7 @@ const forbiddenPatterns = [
   { name: 'legacy Map-radix packer', pattern: /\bfromRadixTree\b|\bdeserializeRadixTreeShape\b|\bdeserializeTermIndexTree\b/ },
   { name: 'benchmark harness paths', pattern: /benchmarks\/|testSupport\/|dev\/parity/ },
   { name: 'legacy encode shared fallback module', pattern: /\bbinaryMsv5EncodeShared\b/ },
+  { name: 'deprecated PackedRadix string wrappers', pattern: /\bprefixEntries\b|\bfuzzyEntries\b|\bpackedRadixFuzzyEntries\b|\bpackedPrefixEntries\b|\bdevStringIterators\b/ },
 ]
 
 function stripComments (source) {

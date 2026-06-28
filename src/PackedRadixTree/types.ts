@@ -24,15 +24,6 @@ export interface PackedStringRadixMap<V = number> {
   fuzzyRefs(term: string, maxDistance: number): Iterable<PackedFuzzyRef>
   termByIndex(termIndex: number): string
   termLengthByIndex(termIndex: number): number
-  /** @deprecated Internal benchmark/compat wrapper. Prefer `prefixRefs` + `termByIndex`. */
-  prefixEntries(prefix: string): Iterable<[string, V]>
-  /**
-   * @deprecated Internal benchmark/compat wrapper. Prefer `fuzzyRefs` + `termByIndex`.
-   *
-   * Fuzzy matches for `term` within `maxDistance` edit distance. Yields every matching
-   * `[term, value, distance]`; iteration order is implementation-defined (compare sets, not order).
-   */
-  fuzzyEntries(term: string, maxDistance: number): Iterable<[string, V, number]>
   packedByteLength(): number
   packedNodeCount(): number
   packedEdgeCount(): number

@@ -14,6 +14,11 @@ In-memory packed radix tree for string keys with numeric payloads.
 
 Frozen search uses `prefixRefs` / `fuzzyRefs` plus lazy `termByIndex` only when a posting is scored (match keys, `boostDocument`, etc.).
 
+## Deprecated dev helpers
+
+- **`packedPrefixEntries(tree, prefix)`** (`devStringIterators.ts`) — string iterator scoped to a prefix (bench/parity, same DFS path as `entries()`). Not shipped in published bundles. Production code should use `prefixRefs` and call `termByIndex` only when a term string is needed.
+- Fuzzy string tuples: use `fuzzyRefs` + `termByIndex` (the former `fuzzyEntries` wrapper was removed).
+
 ## Product build path
 
 Document build and MiniSearch JSON import both pack terms through **`packTermsFromList`** in snapshot/insertion order (`terms[i]` → leaf index `i`):

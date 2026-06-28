@@ -20,7 +20,176 @@ Travail effectue:
 
 Le coeur produit est deja serieux, bien teste, et globalement bien cadre pour un usage production; la principale dette n'est pas dans l'algorithme central, mais dans la taille et le couplage de la surface interne/outillage autour de lui.
 
+## Suivi de l'audit
+
+Mise a jour de suivi realisee par inspection du repo et de la CI le 2026-06-28.
+
+Legende:
+
+- `fait`: recommandation implementee de maniere claire
+- `partiel`: direction prise, mais la cible de l'audit n'est pas encore atteinte
+- `pas fait`: le constat d'origine reste globalement vrai
+- `evalue mais non prioritaire`: piste analysee et volontairement non engagee a ce stade
+
+| Priorite | Sujet | Statut | Commentaire court |
+|---|---|---|---|
+| P0 | Frontiere API publique / internals | `fait` | frontiere explicite deja mise en place; les acces restants passent par les harness autorises |
+| P0 | CI alignee sur Node `>=20` | `fait` | matrice `20.x` + `22.x` en place, avec `24.x` en suivi |
+| P0 | Moratoire / rationalisation bench tooling | `partiel` | meilleure documentation des couches bench, mais la surface exposee reste tres large |
+| P1 | Ne pas redecouper `queryEngine.ts` / `scoring.ts` sans motif | `fait` | pas de grand redecoupage artificiel observe |
+| P1 | Reduire la dette d'API heritee MiniSearch | `partiel` | `fromJson` et `autoVacuum` sont sortis; `logger` est conserve intentionnellement comme point d'extension no-op |
+| P1 | Isoler `fromMiniSearch` / `fromJSON` comme adaptateur | `partiel` | le role d'import/migration est mieux explicite, mais pas encore separe en sous-module distinct |
+| P1 | Optimiser la memoire de build avant le runtime | `evalue mais non prioritaire` | piste analysee, jugee peu rentable a ce stade, donc volontairement non implementee |
+| P2 | Ajouter `verify-npm-pack` a la CI | `fait` | verification package publiee executee dans la CI |
+| P2 | Eviter une campagne de micro-optimisations CPU diffuse | `fait` | pas de campagne large observee; la priorite structurelle reste dominante |
+
+### Detail par point
+
+#### P0 - Frontiere entre API publique et internals
+
+Statut: `fait`
+
+Constat actuel:
+
+- un point d'entree interne explicite existe dans [`src/internal/frozenInternals.ts`](src/internal/frozenInternals.ts)
+- un harness benchmark dedie existe dans [`benchmarks/harness/frozenDistInternals.mjs`](benchmarks/harness/frozenDistInternals.mjs)
+- un garde-fou automatise existe dans [`scripts/assert-internal-boundary.cjs`](scripts/assert-internal-boundary.cjs)
+- ce garde-fou est deja branche dans la routine de lint
+
+Lecture revisee:
+
+- le fait que tests et benches consomment `src/internal/frozenInternals.ts` n'est plus en soi un probleme: c'est justement la frontiere interne explicite introduite pour eviter la diffusion des acces prives
+- le harness benchmark `dist` continue a lire des champs prives (`_index`, `_postings`, `_fieldLengthMatrix`, etc.), mais de maniere centralisee et volontaire dans un point autorise
+- le sujet ne me parait plus relever d'un manque de frontiere, mais plutot d'un choix de maintenance sur la taille du harness interne
+
+Verdict:
+
+- le point P0 me parait traite
+- les evolutions futures devraient surtout viser a garder cette frontiere stable et etroite, pas a relancer un chantier structurel sur ce sujet
+
+#### P0 - CI alignee sur la promesse Node
+
+Statut: `fait`
+
+Constat actuel:
+
+- [`package.json`](package.json) annonce toujours `node >=20`
+- la CI principale dans [`.github/workflows/main.yml`](.github/workflows/main.yml) teste `20.x`, `22.x` et `24.x`
+
+Impact:
+
+- la recommandation de l'audit est couverte
+- le `24.x` ajoute un suivi du futur sans changer la promesse officielle
+
+#### P0 - Moratoire / rationalisation bench tooling
+
+Statut: `partiel`
+
+Ce qui a ete fait:
+
+- [`benchmarks/SCRIPTS.md`](benchmarks/SCRIPTS.md) distingue clairement `bench:*` (profiled) et `benchmark:*` (expert)
+- la doc bench a gagne en structure et en vocabulaire de frontiere
+
+Ce qui n'est pas encore fait:
+
+- [`package.json`](package.json) expose toujours une matrice tres large de commandes top-level bench et benchmark
+- la cible "6 a 8 commandes bench officielles maximum" n'est pas atteinte
+- il n'y a pas encore de vraie de-promotion de la surface experte hors du premier niveau
+
+Verdict:
+
+- le probleme est mieux documente
+- il n'est pas encore reellement resolu
+
+#### P1 - Ne pas redecouper `queryEngine.ts` / `scoring.ts` sans motif concret
+
+Statut: `fait`
+
+Constat actuel:
+
+- pas de grand redecoupage "cosmetique" observe
+- la logique principale reste regroupee dans les modules coeur
+- les nettoyages recents vont plutot dans le sens de la simplification locale que d'une abstraction supplementaire
+
+Verdict:
+
+- la recommandation a ete respectee
+
+#### P1 - Reduire la dette d'API heritee MiniSearch
+
+Statut: `partiel`
+
+Ce qui a ete fait:
+
+- l'alias public `fromJson` a ete retire; les tests verifient que seul `fromJSON` reste expose
+- `autoVacuum` n'est plus expose comme option par defaut frozen; un test le verrouille dans [`src/getDefault.test.js`](src/getDefault.test.js)
+- le `CHANGELOG` documente explicitement ce nettoyage
+
+Ce qui reste ouvert:
+
+- [`src/searchTypes.ts`](src/searchTypes.ts) conserve `logger` dans `Options<T>`
+- ce `logger` est documente comme hook de compatibilite/no-op; il peut aussi servir de point d'instrumentation strategique si une politique de logging est introduite
+- il n'y a pas encore de separation nette entre options coeur frozen et options de compatibilite amont
+
+Verdict:
+
+- le bruit le plus visible a ete reduit
+- `logger` ne doit pas etre lu comme un reliquat a supprimer d'office: c'est un point d'extension acceptable tant qu'il reste no-op par defaut
+
+#### P1 - Isoler le chemin d'import MiniSearch JSON comme adaptateur
+
+Statut: `partiel`
+
+Ce qui a ete fait:
+
+- [`src/FrozenMiniSearchCore.ts`](src/FrozenMiniSearchCore.ts) documente clairement `fromJSON` comme un chemin "import / migration"
+- [`src/internal/frozenInternals.ts`](src/internal/frozenInternals.ts) concentre les helpers internes lies a ce chemin
+
+Ce qui reste ouvert:
+
+- [`src/fromMiniSearch.ts`](src/fromMiniSearch.ts) reste un module coeur de `src/`, pas un sous-module de compatibilite explicite
+- l'architecture n'a pas encore separe visiblement le chemin ideal "build frozen direct + binaire" du chemin d'interoperabilite JSON
+
+Verdict:
+
+- le cadrage conceptuel est meilleur
+- la separation structurelle reste incomplete
+
+#### P1 - Optimiser la memoire de build avant le runtime
+
+Statut: `evalue mais non prioritaire`
+
+Constat actuel:
+
+- [`src/frozenBuild.ts`](src/frozenBuild.ts) conserve `_fieldLengthData` en `number[]`
+- la recommandation centrale de l'audit reste techniquement valide, mais elle a deja ete evaluee comme peu rentable a court terme
+
+Nuance utile:
+
+- l'outillage de mesure existe bien (`bench:build-peak`, `bench:build-heap-profile`, `bench:medicaments-build-peak`)
+- autrement dit, la mesure est la, la piste a ete regardee, puis volontairement laissee de cote faute de ROI suffisant a ce stade
+
+#### P2 - Garde-fou CI sur le packaging publie
+
+Statut: `fait`
+
+Constat actuel:
+
+- [`.github/workflows/main.yml`](.github/workflows/main.yml) execute `node scripts/verify-npm-pack.cjs`
+- le check est limite a la variante Node `22.x`, ce qui est raisonnable pour eviter de dupliquer inutilement le meme controle sur chaque job
+
+#### P2 - Eviter une campagne de micro-optimisations CPU diffuse
+
+Statut: `fait`
+
+Constat actuel:
+
+- pas de signal d'une campagne large et dispersee de micro-tuning
+- les changements recents semblent rester concentres sur des simplifications locales ou des sujets structurels
+
 ## Verification de l'etat courant
+
+Cette section est le snapshot de verification du jour de l'audit initial. Le suivi ci-dessus decrit l'etat d'avancement des recommandations sans rerouler ici l'integralite de cette verification.
 
 - Working tree git: propre
 - `pnpm lint`: OK

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { fromRadixTree } from '../src/PackedRadixTree/index.js'
+import { packedPrefixEntries } from '../src/PackedRadixTree/devStringIterators.js'
 import { corpora } from './packedRadixCorpora.js'
 import { fuzzyCasesFromProbe } from './packedRadixFuzzyCases.js'
 import {
@@ -59,10 +60,13 @@ function runCpuSmoke (tree, probes) {
   suite
     .add('get(hit)', () => { tree.get(probes.getHit) }, BENCH_OPTS)
     .add('get(miss)', () => { tree.get(probes.getMiss) }, BENCH_OPTS)
-    .add('prefix(short)', () => { Array.from(tree.prefixEntries(probes.prefixShort)) }, BENCH_OPTS)
+    .add('prefix(short)', () => { Array.from(packedPrefixEntries(tree, probes.prefixShort)) }, BENCH_OPTS)
 
   for (const { label, query, maxDistance } of fuzzyCasesFromProbe(probes.fuzzyQuery)) {
-    suite.add(label, () => { Array.from(tree.fuzzyEntries(query, maxDistance)) }, BENCH_OPTS)
+    suite.add(label, () => {
+      Array.from(tree.fuzzyRefs(query, maxDistance))
+        .map(({ termIndex, distance }) => [tree.termByIndex(termIndex), termIndex, distance])
+    }, BENCH_OPTS)
   }
 
   return new Promise((resolve) => {

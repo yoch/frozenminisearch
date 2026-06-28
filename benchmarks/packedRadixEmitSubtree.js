@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import SearchableMap from '../src/SearchableMap/SearchableMap.js'
 import { fromRadixTree } from '../src/PackedRadixTree/index.js'
+import { packedPrefixEntries } from '../src/PackedRadixTree/devStringIterators.js'
 import { corpora } from './packedRadixCorpora.js'
 import { loadMedicamentsCorpus } from './medicamentsIndexes.js'
 import { collectRunMetadata, median } from './benchmarkUtils.js'
@@ -48,7 +49,7 @@ function benchCorpus (tree, scenarioList) {
         prefix,
         terms,
         exec: () => {
-          Array.from(tree.prefixEntries(prefix))
+          Array.from(packedPrefixEntries(tree, prefix))
         },
       }
     }),

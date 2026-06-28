@@ -23,6 +23,9 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - name: Check for unused exports
+        if: matrix.node-version == '22.x'
+        run: pnpm knip
       - run: pnpm build
       - name: Verify published package contents
         if: matrix.node-version == '22.x'

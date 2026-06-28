@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-06-07T14:10:14.701Z",
+  "capturedAt": "2026-06-28T10:28:42.082Z",
   "node": "v24.16.0",
   "gcExposed": true,
   "runs": 1,
@@ -7,6 +7,264 @@
   "corpusExportDir": null,
   "note": "Corpus JSONL post-parse (indexed fields + id only). Bench models fromDocuments after ETL, not loadBinary.",
   "scenarios": [
+    {
+      "id": "bdpm-avis_asmr",
+      "source": "jsonl",
+      "file": "bdpm_avis_asmr.jsonl",
+      "indexedFields": [
+        "libelle_asmr",
+        "valeur_asmr"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 3.805,
+      "corpusHeapMb": 2.259,
+      "corpusMeta": {
+        "documentCount": 9906,
+        "fields": [
+          "libelle_asmr",
+          "valeur_asmr"
+        ],
+        "corpusTextBytes": 3989547,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_avis_asmr.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 40.5916,
+        "peakAfterAddMb": 38.363,
+        "freezeDeltaMb": 2.2286,
+        "peakRssMb": 153.43,
+        "retainedHeapMb": 0.7175,
+        "peakVsRetainedRatio": 56.57,
+        "breakdownMb": {
+          "postings": 1.444,
+          "radixTree": 0.264,
+          "storedFieldsJson": 0.103,
+          "structuredTotal": 1.83
+        },
+        "termCount": 13150,
+        "documentCount": 9906
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-avis_smr",
+      "source": "jsonl",
+      "file": "bdpm_avis_smr.jsonl",
+      "indexedFields": [
+        "libelle_smr",
+        "valeur_smr"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 3.503,
+      "corpusHeapMb": 8.73,
+      "corpusMeta": {
+        "documentCount": 15284,
+        "fields": [
+          "libelle_smr",
+          "valeur_smr"
+        ],
+        "corpusTextBytes": 3673629,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_avis_smr.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 29.4715,
+        "peakAfterAddMb": 29.471,
+        "freezeDeltaMb": 0.0005,
+        "peakRssMb": 173.707,
+        "retainedHeapMb": 0,
+        "peakVsRetainedRatio": null,
+        "breakdownMb": {
+          "postings": 1.404,
+          "radixTree": 0.241,
+          "storedFieldsJson": 0.164,
+          "structuredTotal": 1.839
+        },
+        "termCount": 11555,
+        "documentCount": 15284
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-compositions",
+      "source": "jsonl",
+      "file": "bdpm_compositions.jsonl",
+      "indexedFields": [
+        "cis",
+        "denomination_substance",
+        "dosage"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 1.378,
+      "corpusHeapMb": 3.602,
+      "corpusMeta": {
+        "documentCount": 32396,
+        "fields": [
+          "cis",
+          "denomination_substance",
+          "dosage"
+        ],
+        "corpusTextBytes": 1444511,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_compositions.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 32.4399,
+        "peakAfterAddMb": 32.44,
+        "freezeDeltaMb": -0.0001,
+        "peakRssMb": 186.848,
+        "retainedHeapMb": 1.9999,
+        "peakVsRetainedRatio": 16.22,
+        "breakdownMb": {
+          "postings": 0.899,
+          "radixTree": 0.483,
+          "storedFieldsJson": 0.36,
+          "structuredTotal": 1.835
+        },
+        "termCount": 20834,
+        "documentCount": 32396
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-conditions",
+      "source": "jsonl",
+      "file": "bdpm_conditions.jsonl",
+      "indexedFields": [
+        "condition"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.963,
+      "corpusHeapMb": 45.053,
+      "corpusMeta": {
+        "documentCount": 28255,
+        "fields": [
+          "condition"
+        ],
+        "corpusTextBytes": 1010060,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_conditions.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 54.2529,
+        "peakAfterAddMb": 54.253,
+        "freezeDeltaMb": -0.0001,
+        "peakRssMb": 208.387,
+        "retainedHeapMb": 1.2999,
+        "peakVsRetainedRatio": 41.74,
+        "breakdownMb": {
+          "postings": 0.389,
+          "radixTree": 0.008,
+          "storedFieldsJson": 0.313,
+          "structuredTotal": 0.736
+        },
+        "termCount": 349,
+        "documentCount": 28255
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-generiques",
+      "source": "jsonl",
+      "file": "bdpm_generiques.jsonl",
+      "indexedFields": [
+        "libelle_groupe"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.961,
+      "corpusHeapMb": 19.031,
+      "corpusMeta": {
+        "documentCount": 10721,
+        "fields": [
+          "libelle_groupe"
+        ],
+        "corpusTextBytes": 1007664,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_generiques.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 54.8751,
+        "peakAfterAddMb": 54.875,
+        "freezeDeltaMb": 0.0001,
+        "peakRssMb": 216.238,
+        "retainedHeapMb": 0.5893,
+        "peakVsRetainedRatio": 93.12,
+        "breakdownMb": {
+          "postings": 0.31,
+          "radixTree": 0.048,
+          "storedFieldsJson": 0.112,
+          "structuredTotal": 0.481
+        },
+        "termCount": 2055,
+        "documentCount": 10721
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-mitm",
+      "source": "jsonl",
+      "file": "bdpm_mitm.jsonl",
+      "indexedFields": [
+        "cis",
+        "code_atc",
+        "denomination"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.488,
+      "corpusHeapMb": 14.043,
+      "corpusMeta": {
+        "documentCount": 7711,
+        "fields": [
+          "cis",
+          "code_atc",
+          "denomination"
+        ],
+        "corpusTextBytes": 511645,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_mitm.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 54.2088,
+        "peakAfterAddMb": 42.543,
+        "freezeDeltaMb": 11.6658,
+        "peakRssMb": 218.609,
+        "retainedHeapMb": 0.4731,
+        "peakVsRetainedRatio": 114.58,
+        "breakdownMb": {
+          "postings": 0.356,
+          "radixTree": 0.242,
+          "storedFieldsJson": 0.08,
+          "structuredTotal": 0.7
+        },
+        "termCount": 11724,
+        "documentCount": 7711
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
     {
       "id": "bdpm-presentations",
       "source": "jsonl",
@@ -22,7 +280,7 @@
         "id"
       ],
       "corpusTextMb": 2.263,
-      "corpusHeapMb": 2.697,
+      "corpusHeapMb": 50.599,
       "corpusMeta": {
         "documentCount": 20905,
         "fields": [
@@ -37,12 +295,12 @@
         "file": "bdpm_presentations.jsonl"
       },
       "build": {
-        "peakHeapMb": 78.5255,
-        "peakAfterAddMb": 78.525,
-        "freezeDeltaMb": 0.0005,
-        "peakRssMb": 210.195,
-        "retainedHeapMb": 3.0163,
-        "peakVsRetainedRatio": 26.03,
+        "peakHeapMb": 74.0192,
+        "peakAfterAddMb": 55.86,
+        "freezeDeltaMb": 18.1592,
+        "peakRssMb": 241.836,
+        "retainedHeapMb": 1.7699,
+        "peakVsRetainedRatio": 41.82,
         "breakdownMb": {
           "postings": 1.436,
           "radixTree": 0.777,
@@ -51,6 +309,221 @@
         },
         "termCount": 37288,
         "documentCount": 20905
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-ruptures",
+      "source": "jsonl",
+      "file": "bdpm_ruptures.jsonl",
+      "indexedFields": [
+        "libelle_statut"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.018,
+      "corpusHeapMb": 1.248,
+      "corpusMeta": {
+        "documentCount": 779,
+        "fields": [
+          "libelle_statut"
+        ],
+        "corpusTextBytes": 18377,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_ruptures.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 2.1847,
+        "peakAfterAddMb": 2.155,
+        "freezeDeltaMb": 0.0297,
+        "peakRssMb": 231.488,
+        "retainedHeapMb": 0.0855,
+        "peakVsRetainedRatio": 25.55,
+        "breakdownMb": {
+          "postings": 0.007,
+          "radixTree": 0,
+          "storedFieldsJson": 0.007,
+          "structuredTotal": 0.015
+        },
+        "termCount": 11,
+        "documentCount": 779
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-specialites",
+      "source": "jsonl",
+      "file": "bdpm_specialites.jsonl",
+      "indexedFields": [
+        "cis",
+        "denomination",
+        "forme_pharma",
+        "titulaire"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 1.541,
+      "corpusHeapMb": 32.146,
+      "corpusMeta": {
+        "documentCount": 15848,
+        "fields": [
+          "cis",
+          "denomination",
+          "forme_pharma",
+          "titulaire"
+        ],
+        "corpusTextBytes": 1615718,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_specialites.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 56.2802,
+        "peakAfterAddMb": 56.28,
+        "freezeDeltaMb": 0.0002,
+        "peakRssMb": 237.168,
+        "retainedHeapMb": 1.1513,
+        "peakVsRetainedRatio": 48.88,
+        "breakdownMb": {
+          "postings": 0.926,
+          "radixTree": 0.534,
+          "storedFieldsJson": 0.171,
+          "structuredTotal": 1.691
+        },
+        "termCount": 23068,
+        "documentCount": 15848
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "bdpm-substances",
+      "source": "jsonl",
+      "file": "bdpm_substances.jsonl",
+      "indexedFields": [
+        "denomination"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.105,
+      "corpusHeapMb": 6.141,
+      "corpusMeta": {
+        "documentCount": 3896,
+        "fields": [
+          "denomination"
+        ],
+        "corpusTextBytes": 110019,
+        "source": "corpus-jsonl-stream",
+        "file": "bdpm_substances.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 13.4311,
+        "peakAfterAddMb": 11.698,
+        "freezeDeltaMb": 1.7331,
+        "peakRssMb": 231.527,
+        "retainedHeapMb": 0.226,
+        "peakVsRetainedRatio": 59.43,
+        "breakdownMb": {
+          "postings": 0.065,
+          "radixTree": 0.094,
+          "storedFieldsJson": 0.04,
+          "structuredTotal": 0.203
+        },
+        "termCount": 3849,
+        "documentCount": 3896
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "vet-compositions",
+      "source": "jsonl",
+      "file": "vet_compositions.jsonl",
+      "indexedFields": [
+        "substance",
+        "num"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.136,
+      "corpusHeapMb": 7.762,
+      "corpusMeta": {
+        "documentCount": 4842,
+        "fields": [
+          "substance",
+          "num"
+        ],
+        "corpusTextBytes": 142277,
+        "source": "corpus-jsonl-stream",
+        "file": "vet_compositions.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 22.0269,
+        "peakAfterAddMb": 17.007,
+        "freezeDeltaMb": 5.0199,
+        "peakRssMb": 223.074,
+        "retainedHeapMb": 0.3448,
+        "peakVsRetainedRatio": 63.88,
+        "breakdownMb": {
+          "postings": 0.108,
+          "radixTree": 0.094,
+          "storedFieldsJson": 0.05,
+          "structuredTotal": 0.261
+        },
+        "termCount": 4555,
+        "documentCount": 4842
+      },
+      "loadBinary": null,
+      "termCountMatch": null,
+      "runs": 1
+    },
+    {
+      "id": "vet-medicaments",
+      "source": "jsonl",
+      "file": "vet_medicaments.jsonl",
+      "indexedFields": [
+        "nom",
+        "num"
+      ],
+      "storeFields": [
+        "id"
+      ],
+      "corpusTextMb": 0.185,
+      "corpusHeapMb": 6.121,
+      "corpusMeta": {
+        "documentCount": 3213,
+        "fields": [
+          "nom",
+          "num"
+        ],
+        "corpusTextBytes": 193506,
+        "source": "corpus-jsonl-stream",
+        "file": "vet_medicaments.jsonl"
+      },
+      "build": {
+        "peakHeapMb": 23.4325,
+        "peakAfterAddMb": 17.662,
+        "freezeDeltaMb": 5.7705,
+        "peakRssMb": 223.352,
+        "retainedHeapMb": 0.239,
+        "peakVsRetainedRatio": 98.04,
+        "breakdownMb": {
+          "postings": 0.161,
+          "radixTree": 0.117,
+          "storedFieldsJson": 0.033,
+          "structuredTotal": 0.317
+        },
+        "termCount": 5852,
+        "documentCount": 3213
       },
       "loadBinary": null,
       "termCountMatch": null,

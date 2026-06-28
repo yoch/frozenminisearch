@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.6.0 — `@yoch/frozenminisearch`
+
+Minor release: lower FrozenIndexBuilder build peak (postings scratch + flat term dedup), unified `fromJSON` / document term packing, and packed-only `saveBinary` bundles without legacy Map-radix fallbacks.
+
 ### Improved
 
 - **FrozenIndexBuilder build peak** — replace per-slot `SlotRanges` JS metadata in `IncrementalPostingsAccumulator` with a typed `slotIds` column and stable counting-sort finalize; lowers transient heap during `add` on vocabulary-rich corpora without changing frozen postings layout or wire format. Build-peak benchmarks now also report `peakTotalResidentMb` (heapUsed + external).

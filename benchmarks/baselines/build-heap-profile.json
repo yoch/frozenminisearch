@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-06-28T09:50:24.655Z",
+  "capturedAt": "2026-06-28T10:28:31.291Z",
   "node": "v24.16.0",
   "note": "One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ radix growth. synthetic-1field isolates multi-field per-doc cost.",
   "scenarios": {
@@ -33,14 +33,14 @@
       "fieldCount": 5,
       "corpusTextMb": 2.492,
       "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 38.767,
-      "peakAfterAddTotalResidentMb": 48.337,
-      "peakTotalMb": 38.767,
-      "peakTotalResidentMb": 48.337,
+      "peakAfterAddMb": 38.764,
+      "peakAfterAddTotalResidentMb": 48.333,
+      "peakTotalMb": 38.764,
+      "peakTotalResidentMb": 48.333,
       "peakFreezeDeltaMb": 0,
       "peakFreezeDeltaTotalResidentMb": 0,
-      "retainedMb": 0,
-      "transientMb": 38.767,
+      "retainedMb": 0.0008,
+      "transientMb": 38.763,
       "structuredMb": 1.525,
       "componentsMb": {
         "postings": 1.196,
@@ -55,15 +55,15 @@
       "termCount": 4,
       "fieldCount": 1,
       "corpusTextMb": 0.498,
-      "corpusHoldMb": 0.006,
-      "peakAfterAddMb": 25.664,
-      "peakAfterAddTotalResidentMb": 26.462,
-      "peakTotalMb": 25.721,
-      "peakTotalResidentMb": 26.778,
-      "peakFreezeDeltaMb": 0.057,
-      "peakFreezeDeltaTotalResidentMb": 0.316,
+      "corpusHoldMb": 0.001,
+      "peakAfterAddMb": 25.677,
+      "peakAfterAddTotalResidentMb": 26.475,
+      "peakTotalMb": 26.211,
+      "peakTotalResidentMb": 27.268,
+      "peakFreezeDeltaMb": 0.534,
+      "peakFreezeDeltaTotalResidentMb": 0.793,
       "retainedMb": 0.001,
-      "transientMb": 25.72,
+      "transientMb": 26.21,
       "structuredMb": 0.488,
       "componentsMb": {
         "postings": 0.239,
@@ -74,8 +74,8 @@
     }
   },
   "inference": {
-    "radixHeavyTransientMb": 4.114,
-    "multiFieldPremiumMb": 17.161,
+    "radixHeavyTransientMb": 4.118,
+    "multiFieldPremiumMb": 16.671,
     "structuredPostingsPct": 56.5,
     "transientVsStructuredRatio": 16.9
   }

@@ -180,6 +180,24 @@ describe('IncrementalPostingsAccumulator', () => {
     const layout = buildIncremental(1, [{ termIndex: 0, fieldId: 0, docId: 70000, freq: 1 }], 70001)
     expect(layout.docIdWidth).toBe(32)
   })
+
+  test('finalize releases growable scratch buffers', () => {
+    const acc = new IncrementalPostingsAccumulator(1, { estimatedTotalPostings: 64 })
+    acc.append(0, 0, 1, 1)
+    acc.append(0, 0, 2, 2)
+
+    const layout = acc.finalize(1, 10)
+
+    expect(layout.allDocIds.length).toBe(2)
+    expect(acc.totalPostings).toBe(0)
+    expect(acc.maxFreq).toBe(0)
+    expect(acc._docIds.length).toBe(0)
+    expect(acc._freqs.length).toBe(0)
+    expect(acc._slotIds.length).toBe(0)
+    expect(acc._docIds._buf.length).toBe(1)
+    expect(acc._freqs._buf.length).toBe(1)
+    expect(acc._slotIds._buf.length).toBe(1)
+  })
 })
 
 function buildIncrementally(documents, options) {
@@ -234,6 +252,25 @@ function registerGoldenDatasetTests({ id, documents, options, query }) {
 
     expect(loaded.termCount).toBe(built.termCount)
     expect(searchSnapshot(loaded, query)).toEqual(searchSnapshot(built, query))
+  })
+
+  test(`${id} freezeParams releases builder transients after assembling params`, () => {
+    const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: documents.length + 2 })
+    for (const doc of documents) builder.add(doc)
+
+    const params = builder.freezeParams()
+
+    expect(params.documentCount).toBe(documents.length)
+    expect(params.externalIds.length).toBe(documents.length)
+    expect(params.fieldLengthMatrix.length).toBe(params.documentCount * params.fieldCount)
+    expect(builder._externalIds).toEqual([])
+    expect(builder._fieldLengthData).toEqual([])
+    expect(builder._avgFieldLength).toEqual([])
+    expect(builder._terms).toEqual([])
+    expect(builder._seenIds.size).toBe(0)
+    expect(builder._fieldTermFreqScratch.size).toBe(0)
+    expect(builder._rawTokenScratch.size).toBe(0)
+    expect(builder._tokenScratch).toEqual([])
   })
 }
 

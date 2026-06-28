@@ -37,8 +37,8 @@ export class FrozenIndexBuilder<T> {
   private readonly _termIndex: Map<string, number>
   private readonly _terms: string[]
   private readonly _postings: IncrementalPostingsAccumulator
-  private readonly _externalIds: unknown[]
-  private readonly _storedFields: StoredFieldsLayout
+  private _externalIds: unknown[]
+  private _storedFields: StoredFieldsLayout
   private readonly _fieldLengthData: number[]
   private readonly _avgFieldLength: number[]
   private readonly _seenIds: Set<unknown>
@@ -179,6 +179,20 @@ export class FrozenIndexBuilder<T> {
     return promise.then(() => this.addAll(chunk))
   }
 
+  private releaseTransientState(): void {
+    this._postings.release()
+    this._termIndex.clear()
+    this._terms.length = 0
+    this._externalIds = []
+    this._storedFields = createStoredFieldsLayout(this._options.storeFields, 0)
+    this._fieldLengthData.length = 0
+    this._avgFieldLength.length = 0
+    this._seenIds.clear()
+    this._fieldTermFreqScratch.clear()
+    this._rawTokenScratch.clear()
+    this._tokenScratch.length = 0
+  }
+
   /**
    * Finalize this builder into assembly params. Call {@link freezeFrozenIndexBuilder}
    * to obtain a {@link FrozenMiniSearch} instance.
@@ -210,10 +224,11 @@ export class FrozenIndexBuilder<T> {
       ? this._externalIds.slice(0, documentCount)
       : this._externalIds
     const storedFields = resizeStoredFields(this._storedFields, documentCount)
+    const fieldLengthMatrix = materializeFieldLengthMatrix(this._fieldLengthData, documentCount * this._fieldCount)
 
     const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 
-    return {
+    const params = {
       options: this._options,
       documentCount,
       nextId: documentCount,
@@ -222,12 +237,15 @@ export class FrozenIndexBuilder<T> {
       externalIds,
       idLookup,
       storedFields,
-      fieldLengthMatrix: materializeFieldLengthMatrix(this._fieldLengthData, documentCount * this._fieldCount),
+      fieldLengthMatrix,
       avgFieldLength,
       index,
       termCount,
       postings,
     }
+
+    this.releaseTransientState()
+    return params
   }
 }
 

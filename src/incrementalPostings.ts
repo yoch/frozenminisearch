@@ -45,6 +45,11 @@ class GrowableUint32Column {
       this._buf = this._buf.slice(0, length)
     }
   }
+
+  release(): void {
+    this._buf = new Uint32Array(1)
+    this._len = 0
+  }
 }
 
 /** Growable frequency column (u16 cells; matches frozen clamp range). */
@@ -80,6 +85,11 @@ class GrowableFreqColumn {
     if (length > 0 && length < this._buf.length) {
       this._buf = this._buf.slice(0, length)
     }
+  }
+
+  release(): void {
+    this._buf = new Uint16Array(1)
+    this._len = 0
   }
 }
 
@@ -129,6 +139,14 @@ export class IncrementalPostingsAccumulator {
     this._docIds.truncate(0)
     this._freqs.truncate(0)
     this._slotIds.truncate(0)
+  }
+
+  release(): void {
+    this._docIds.release()
+    this._freqs.release()
+    this._slotIds.release()
+    this._totalPostings = 0
+    this._maxFreq = 0
   }
 
   private scatterPostings(
@@ -191,7 +209,7 @@ export class IncrementalPostingsAccumulator {
       const denseLengths = counts
 
       this.scatterPostings(allDocIds, allFreqs, cursors, docIdWidth)
-      this.clear()
+      this.release()
 
       return {
         fieldCount,
@@ -227,7 +245,7 @@ export class IncrementalPostingsAccumulator {
     }
 
     this.scatterPostings(allDocIds, allFreqs, cursors, docIdWidth)
-    this.clear()
+    this.release()
 
     const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
       ? new Uint16Array(sparseFieldIdsScratch)

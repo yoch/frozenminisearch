@@ -161,35 +161,35 @@ Cible concrete:
 - 6 a 8 commandes bench "officielles" maximum
 - le reste documente mais de-promu
 
-## P1 - Redecouper `queryEngine.ts` sans re-abstraire excessivement
+## P1 - Ne pas redecouper `queryEngine.ts` / `scoring.ts` sans motif concret
 
-Constat:
+Constat revise:
 
 - `src/queryEngine.ts`: ~825 lignes
 - `src/scoring.ts`: ~604 lignes
-- la logique de normalisation, expansion prefix/fuzzy, gating, two-phase, combinaison AND/AND_NOT, collecte de docIds et execution sont entremeles
+- la zone est dense, mais l'entrelacement reste local et comprehensible
+- il n'y a pas de cycle de dependance majeur, ni de fuite d'API publique a corriger ici
 
-Ce n'est pas "mauvais code", mais c'est une concentration de complexite.
+Decision:
 
-Pourquoi c'est important:
+- Reporter tout grand redecoupage.
+- Garder `queryEngine.ts` et `scoring.ts` tels quels tant qu'un changement fonctionnel ou perf ne force pas une extraction.
+- Appliquer la regle: extraire uniquement le bloc deja modifie par un travail concret.
 
-- C'est la zone la plus rentable a stabiliser avant toute optimisation fine.
-- Aujourd'hui, comprendre une modification de perf demande de charger un gros volume de contexte en memoire.
+Micro-refactor autorise sans autre motif:
 
-Recommandation:
+- Sortir `finalizeSearchResults` / `finalizeRawSearchResults` vers un petit module dedie, si cela reduit effectivement les imports ou clarifie un changement en cours.
 
-- Scinder par responsabilite, sans introduire de framework interne inutile:
-  - `queryNormalization.ts`
-  - `queryPlanning.ts`
-  - `queryExecution.ts`
-  - `queryDocSet.ts` si besoin
-- Garder `scoring.ts` focalise sur le scoring/agregation, pas sur l'orchestration
-- Conserver les heuristiques actuelles, mais les rendre lisibles comme un "plan" puis une "execution"
+Hors scope pour l'instant:
 
-Important:
+- Ne pas extraire gating, prefix/fuzzy, two-phase AND/AND_NOT ou l'adaptateur d'index sans travail direct sur ces chemins.
+- Ne pas creer de planner, strategie, registry, ou couche abstraite.
 
-- Ne pas sur-abstraire.
-- Le bon resultat n'est pas "plus d'objets", mais "moins d'entrelacement".
+Critere de succes:
+
+- Simplification percue, pas seulement moins de lignes par fichier.
+- Aucun changement comportemental ou public.
+- Toute extraction doit reduire la complexite d'un module important, pas seulement deplacer le code.
 
 ## P1 - Reduire la dette d'API heritee de MiniSearch
 
@@ -305,7 +305,7 @@ Recommendation:
 
 - rationaliser les commandes bench exposees
 - classer `benchmarks/scripts/*` en `supported` / `advanced` / `lab`
-- redecouper `queryEngine.ts` sans changer le comportement
+- ne pas redecouper `queryEngine.ts` / `scoring.ts` sans motif concret; extraire seulement un bloc deja touche
 
 ### Iteration 3 - Optimisation memoire pragmatique
 
@@ -324,4 +324,4 @@ Recommendation:
 
 Le repo est deja plus proche d'un vrai produit que d'un prototype de recherche. Le risque principal n'est pas un manque de sophistication technique; c'est au contraire que l'outillage, les chemins de compatibilite et les hooks internes finissent par rendre le projet plus large que necessaire.
 
-Si je devais resumer la priorite absolue: proteger le coeur en reduisant le couplage avec l'outillage, puis simplifier la zone `queryEngine/scoring`, puis reprendre l'optimisation memoire cote build. C'est le meilleur levier pour conserver un projet rapide, robuste, et encore "humain" a maintenir.
+Si je devais resumer la priorite absolue: proteger le coeur en reduisant le couplage avec l'outillage, rationaliser ce qui grossit vraiment la maintenance, puis reprendre l'optimisation memoire cote build. C'est le meilleur levier pour conserver un projet rapide, robuste, et encore "humain" a maintenir.

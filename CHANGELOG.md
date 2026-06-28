@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Changed
+
+- **CI** — main workflow now runs lint, build, browser smoke, and coverage on Node `20.x`, `22.x`, and `24.x`, matching the `engines.node >=20` promise. `verify-npm-pack.cjs` runs after build to block dev-only paths from the published tarball.
+- **Tooling** — pin `packageManager` to pnpm 10.34.4 so local/CI installs work on Node 20 (pnpm 11 requires Node 22.13+). zstd-specific tests remain gated on runtime support (Node 22.15+).
+
 ### Removed
 
 - **Breaking** — removed the legacy `fromJson` static alias; use `fromJSON` for MiniSearch JSON migration.

@@ -55,9 +55,6 @@ export interface AggregateContext {
   getFieldLength: (docId: number, fieldId: number) => number
   getExternalId: (docId: number) => unknown
   getStoredFields: (docId: number) => Record<string, unknown> | undefined
-  /** If false, doc is skipped (mutable: discarded docs). Optional on frozen. */
-  isDocActive?: (docId: number) => boolean
-  onInactiveDoc?: (docId: number, fieldId: number, derivedTerm: string) => void
 }
 
 export const defaultBM25params: BM25Params = { k: 1.2, b: 0.7, d: 0.5 }
@@ -231,23 +228,15 @@ function aggregateSegmentPostingList(
   bm25params: BM25Params,
   results: RawResult,
   allowedDocs?: DocIdGate,
-): number {
-  let matchingFields = list.length
+): void {
+  const matchingFields = list.length
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
-  const hoistedIdf = context.isDocActive == null
-    ? bm25Idf(matchingFields, context.documentCount)
-    : undefined
+  const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
   const { docIds, freqs, offset, length } = list
   const derivedTermCache: { value?: string } = {}
 
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
     for (const docId of allowedDocs) {
-      if (context.isDocActive != null && !context.isDocActive(docId)) {
-        context.onInactiveDoc?.(docId, fieldId, getDerivedTerm(derivedTerm, derivedTermCache))
-        matchingFields -= 1
-        continue
-      }
-
       const index = findDocIndexInSortedSegment(docIds, offset, length, docId)
       if (index < 0) continue
 
@@ -258,18 +247,12 @@ function aggregateSegmentPostingList(
         hoistedIdf,
       )
     }
-    return matchingFields
+    return
   }
 
   for (let i = 0; i < length; i++) {
     const docId = readDocId(docIds, offset + i)
     const termFreq = freqs[offset + i]
-
-    if (context.isDocActive != null && !context.isDocActive(docId)) {
-      context.onInactiveDoc?.(docId, fieldId, getDerivedTerm(derivedTerm, derivedTermCache))
-      matchingFields -= 1
-      continue
-    }
 
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
 
@@ -280,7 +263,6 @@ function aggregateSegmentPostingList(
       hoistedIdf,
     )
   }
-  return matchingFields
 }
 
 export function aggregateTerm(
@@ -316,20 +298,12 @@ export function aggregateTerm(
       continue
     }
 
-    let matchingFields = postingList.size
+    const matchingFields = postingList.size
     const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
-    const hoistedIdf = context.isDocActive == null
-      ? bm25Idf(matchingFields, context.documentCount)
-      : undefined
+    const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
     const derivedTermCache: { value?: string } = {}
 
     postingList.forEachDoc((docId, termFreq) => {
-      if (context.isDocActive != null && !context.isDocActive(docId)) {
-        context.onInactiveDoc?.(docId, fieldId, getDerivedTerm(derivedTerm, derivedTermCache))
-        matchingFields -= 1
-        return
-      }
-
       if (allowedDocs != null && !allowedDocs.has(docId)) return
 
       scorePostingDoc(
@@ -346,14 +320,12 @@ export function aggregateTerm(
 
 function collectDocIdsFromSegmentPostingList(
   list: SegmentPostingList,
-  context: AggregateContext,
   docIds: Set<number>,
   allowedDocs?: DocIdGate,
 ): void {
   const { docIds: ids, offset, length } = list
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
     for (const docId of allowedDocs) {
-      if (context.isDocActive != null && !context.isDocActive(docId)) continue
       if (findDocIndexInSortedSegment(ids, offset, length, docId) >= 0) {
         docIds.add(docId)
       }
@@ -363,7 +335,6 @@ function collectDocIdsFromSegmentPostingList(
 
   for (let i = 0; i < length; i++) {
     const docId = readDocId(ids, offset + i)
-    if (context.isDocActive != null && !context.isDocActive(docId)) continue
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
     docIds.add(docId)
   }
@@ -385,12 +356,11 @@ export function collectDocIdsFromFieldTermData(
     if (postingList == null) continue
 
     if (postingList instanceof SegmentPostingList) {
-      collectDocIdsFromSegmentPostingList(postingList, context, docIds, allowedDocs)
+      collectDocIdsFromSegmentPostingList(postingList, docIds, allowedDocs)
       continue
     }
 
     postingList.forEachDoc((docId) => {
-      if (context.isDocActive != null && !context.isDocActive(docId)) return
       if (allowedDocs != null && !allowedDocs.has(docId)) return
       docIds.add(docId)
     })

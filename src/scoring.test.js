@@ -126,22 +126,6 @@ describe('aggregateTerm', () => {
     expect(Array.from(results.keys()).sort()).toEqual([1, 3])
   })
 
-  test('skips inactive docs and notifies onInactiveDoc', () => {
-    const inactive = []
-    const fieldTermData = mapPostings(0, [[0, 1], [1, 2], [2, 1]])
-    const results = aggregateTerm(
-      'beta', 'beta', 1, 1,
-      fieldTermData, fieldBoosts,
-      makeContext({
-        isDocActive: docId => docId !== 1,
-        onInactiveDoc: (docId, fieldId, term) => inactive.push({ docId, fieldId, term }),
-      }),
-      undefined, defaultBM25params,
-    )
-    expect(Array.from(results.keys())).toEqual([0, 2])
-    expect(inactive).toEqual([{ docId: 1, fieldId: 0, term: 'beta' }])
-  })
-
   test('excludes docs when boostDocumentFn returns 0', () => {
     const fieldTermData = mapPostings(0, [[0, 1], [1, 2]])
     const results = aggregateTerm(
@@ -222,17 +206,5 @@ describe('collectDocIdsFromFieldTermData', () => {
       new Set([4, 16, 99]),
     )
     expect(Array.from(docIds).sort((a, b) => a - b)).toEqual([4, 16])
-  })
-
-  test('skips inactive docs while collecting ids', () => {
-    const fieldTermData = mapPostings(0, [[0, 1], [1, 2], [2, 1]])
-    const docIds = new Set()
-    collectDocIdsFromFieldTermData(
-      fieldTermData,
-      fieldBoosts,
-      makeContext({ isDocActive: docId => docId !== 1 }),
-      docIds,
-    )
-    expect(Array.from(docIds).sort()).toEqual([0, 2])
   })
 })

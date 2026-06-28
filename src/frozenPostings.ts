@@ -187,7 +187,7 @@ function findSparseSlotByFieldId(
  *
  * **Threading / reentrancy:** query execution is synchronous and single-threaded today.
  * Safe while `search()` does not yield and callers do not re-enter the engine from
- * callbacks (`filter`, `boostDocument`, `isDocActive`) on the same index instance.
+ * callbacks (`filter`, `boostDocument`) on the same index instance.
  * If the engine becomes async, concurrent, or shared across Workers without copying
  * the index, pass a per-query scratch (or move scratch onto the flyweight instance).
  */
@@ -259,13 +259,11 @@ function collectDocIdsFromFrozenSegment(
   allDocIds: DocIdArray,
   offset: number,
   length: number,
-  context: AggregateContext,
   docIds: Set<number>,
   allowedDocs?: DocIdGate,
 ): void {
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
     for (const docId of allowedDocs) {
-      if (context.isDocActive != null && !context.isDocActive(docId)) continue
       if (findDocIndexInSortedSegment(allDocIds, offset, length, docId) >= 0) {
         docIds.add(docId)
       }
@@ -275,7 +273,6 @@ function collectDocIdsFromFrozenSegment(
 
   for (let i = 0; i < length; i++) {
     const docId = readDocId(allDocIds, offset + i)
-    if (context.isDocActive != null && !context.isDocActive(docId)) continue
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
     docIds.add(docId)
   }
@@ -298,7 +295,6 @@ export function collectDocIdsFromFrozenLayout(
       layout.allDocIds,
       postingSliceScratch.offset,
       postingSliceScratch.length,
-      context,
       docIds,
       allowedDocs,
     )

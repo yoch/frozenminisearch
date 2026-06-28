@@ -92,6 +92,27 @@ describe('fromMiniSearch loaders', () => {
     expect(frozen.search('gamma').map(r => r.id)).toEqual(['c'])
   })
 
+  test('fromJSON ignores postings for discarded shortIds in dirty snapshots', () => {
+    const snapshot = {
+      documentCount: 2,
+      nextId: 3,
+      documentIds: { 0: 'a', 2: 'c' },
+      fieldIds: { t: 0 },
+      fieldLength: { 0: [1], 2: [1] },
+      averageFieldLength: [1],
+      storedFields: {},
+      dirtCount: 1,
+      index: [
+        ['alpha', { 0: { 0: 1, 1: 1 } }],
+        ['gamma', { 0: { 2: 1 } }],
+      ],
+      serializationVersion: 2,
+    }
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['t'] })
+    expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])
+    expect(frozen.search('gamma').map(r => r.id)).toEqual(['c'])
+  })
+
   test('fromJSON loads an empty snapshot', () => {
     const snapshot = {
       documentCount: 0,

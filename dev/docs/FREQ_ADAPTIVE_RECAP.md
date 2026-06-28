@@ -59,8 +59,8 @@ flowchart TD
   alloc -->|max gt 255| u16 --> wire
 ```
 
-- **Dense**: [`src/flatPostings.ts`](../../src/flatPostings.ts) — 2 passes (count+max, write).
-- **Sparse**: [`src/frozenPostings.ts`](../../src/frozenPostings.ts) — 2 passes (metadata sparse + count+max, write).
+- **Build**: [`src/incrementalPostings.ts`](../../src/incrementalPostings.ts) — append once, then finalize into dense/sparse typed buffers.
+- **Layout/runtime**: [`src/frozenPostings.ts`](../../src/frozenPostings.ts) — layout choice, storage shape, and query-time access.
 - **Search**: [`SegmentPostingList`](../../src/compactPostings.ts) reads `freqs[i]` without a width branch in the BM25 loop ([`src/scoring.ts`](../../src/scoring.ts)).
 
 ---
@@ -79,7 +79,7 @@ flowchart TD
 | File | Changes |
 |---------|-------------|
 | [`src/compactPostings.ts`](../../src/compactPostings.ts) | `MAX_FREQ`, `FreqArray`, `allocateFreqs`, `clampFreq(65535)`, `SegmentPostingList.freqs: FreqArray` |
-| [`src/flatPostings.ts`](../../src/flatPostings.ts) | `postingFreqValue`, pass 1 count+max, pass 2 write ; `allFreqs: FreqArray` |
+| [`src/incrementalPostings.ts`](../../src/incrementalPostings.ts) | `GrowableFreqColumn`, clamp on append, finalize into contiguous `allFreqs: FreqArray` |
 | [`src/frozenPostings.ts`](../../src/frozenPostings.ts) | `FrozenPostingsLayout.allFreqs: FreqArray`, pass 1 metadata+count+max, pass 2 write (sparse) |
 | [`src/msv5/binaryMsv5Constants.ts`](../../src/msv5/binaryMsv5Constants.ts) | `FLAG_FREQ_U16 = 32` |
 | [`src/msv5/binaryMsv5Encode.ts`](../../src/msv5/binaryMsv5Encode.ts) | `globalFlags \|= freqWireFlags(snap.postings.allFreqs)` (sync + async) |

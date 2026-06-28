@@ -4,7 +4,6 @@ import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import { resolveIndexingOptions } from './indexingCore'
 import { storedFieldsFromRows } from './storedFieldsLayout'
-import { DISCARDED_DOC_ID } from './flatPostings'
 import type PackedRadixTree from './PackedRadixTree'
 import type { FrozenAssembleParams } from './frozenTypes'
 import type { Options } from './searchTypes'
@@ -26,6 +25,8 @@ export type MiniSearchSnapshot = {
 }
 
 const SUPPORTED_SERIALIZATION_VERSIONS = new Set([1, 2])
+/** Sentinel short id used while compacting sparse MiniSearch snapshots to dense ids. */
+const DISCARDED_DOC_ID = 0xffffffff
 
 type ParsedSnapshotIndex = {
   index: PackedRadixTree

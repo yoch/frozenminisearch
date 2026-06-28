@@ -5,13 +5,12 @@ import MiniSearch from 'minisearch'
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { frozenFromMiniSearch, frozenMemoryBreakdown } from './internal/frozenInternals'
 import { createFrozenIndexBuilder } from './frozenBuild'
+import { MAX_FREQ, readDocId } from './compactPostings'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import {
   createFrozenFieldTermFlyweight,
-  materializeFrozenPostings,
   validateFrozenPostingsLayout,
 } from './frozenPostings'
-import { readDocId } from './compactPostings'
 
 /** Each (term, field) slot occupies one contiguous [offset, offset+length) in global SoA buffers. */
 function assertSegmentsPartitionBuffers(layout) {
@@ -50,49 +49,6 @@ function assertHotPathSequentialAccess(layout, termIndex, fieldId) {
   }
 }
 
-function layoutsEqual(a, b) {
-  expect(a.fieldCount).toBe(b.fieldCount)
-  expect(a.termCount).toBe(b.termCount)
-  expect(a.nextId).toBe(b.nextId)
-  expect(a.layout).toBe(b.layout)
-  expect(a.docIdWidth).toBe(b.docIdWidth)
-  if (a.layout === 'sparse') {
-    expect(a.sparseFieldIdWidth).toBe(b.sparseFieldIdWidth)
-  }
-  expect(a.allDocIds.length).toBe(b.allDocIds.length)
-  expect(a.allFreqs.length).toBe(b.allFreqs.length)
-  for (let i = 0; i < a.allDocIds.length; i++) {
-    expect(readDocId(a.allDocIds, i)).toBe(readDocId(b.allDocIds, i))
-    expect(a.allFreqs[i]).toBe(b.allFreqs[i])
-  }
-  if (a.layout === 'dense') {
-    expect(Array.from(a.denseOffsets)).toEqual(Array.from(b.denseOffsets))
-    expect(Array.from(a.denseLengths)).toEqual(Array.from(b.denseLengths))
-  } else {
-    expect(Array.from(a.sparseTermStarts)).toEqual(Array.from(b.sparseTermStarts))
-    expect(Array.from(a.sparseFieldIds)).toEqual(Array.from(b.sparseFieldIds))
-    expect(Array.from(a.sparseOffsets)).toEqual(Array.from(b.sparseOffsets))
-    expect(Array.from(a.sparseLengths)).toEqual(Array.from(b.sparseLengths))
-  }
-}
-
-function buildCallback(fieldCount, postings, nextId = 100) {
-  const termCount = postings.reduce((m, p) => Math.max(m, p.termIndex + 1), 0)
-  return materializeFrozenPostings({
-    fieldCount,
-    termCount,
-    nextId,
-    forEachPosting(termIndex, fieldId, emit) {
-      for (const posting of postings) {
-        if (posting.termIndex === termIndex && posting.fieldId === fieldId) {
-          emit(posting.docId, posting.freq)
-        }
-      }
-    },
-    clampFrequencies: true,
-  })
-}
-
 function buildIncremental(fieldCount, postings, nextId = 100) {
   const acc = new IncrementalPostingsAccumulator(fieldCount)
   for (const { termIndex, fieldId, docId, freq } of postings) {
@@ -103,7 +59,7 @@ function buildIncremental(fieldCount, postings, nextId = 100) {
 }
 
 describe('IncrementalPostingsAccumulator', () => {
-  test('dense layout matches legacy materialize', () => {
+  test('dense layout', () => {
     const postings = [
       { termIndex: 0, fieldId: 0, docId: 1, freq: 2 },
       { termIndex: 0, fieldId: 0, docId: 3, freq: 1 },
@@ -112,10 +68,11 @@ describe('IncrementalPostingsAccumulator', () => {
     ]
     const layout = buildIncremental(1, postings)
     expect(layout.layout).toBe('dense')
-    layoutsEqual(layout, buildCallback(1, postings))
+    validateFrozenPostingsLayout(layout, 100, 100)
+    assertSegmentsPartitionBuffers(layout)
   })
 
-  test('sparse layout matches legacy materialize when sparse is cheaper', () => {
+  test('sparse layout when sparse is cheaper', () => {
     const postings = [
       { termIndex: 0, fieldId: 0, docId: 1, freq: 1 },
       { termIndex: 0, fieldId: 2, docId: 1, freq: 3 },
@@ -125,7 +82,8 @@ describe('IncrementalPostingsAccumulator', () => {
     ]
     const layout = buildIncremental(4, postings)
     expect(layout.layout).toBe('sparse')
-    layoutsEqual(layout, buildCallback(4, postings))
+    validateFrozenPostingsLayout(layout, 100, 100)
+    assertSegmentsPartitionBuffers(layout)
   })
 
   test('multi-field dense layout is selected when dense metadata is cheaper', () => {
@@ -137,7 +95,6 @@ describe('IncrementalPostingsAccumulator', () => {
     }
     const layout = buildIncremental(4, postings)
     expect(layout.layout).toBe('dense')
-    layoutsEqual(layout, buildCallback(4, postings))
     validateFrozenPostingsLayout(layout, 100, 100)
     assertSegmentsPartitionBuffers(layout)
     assertHotPathSequentialAccess(layout, 1, 2)
@@ -150,31 +107,15 @@ describe('IncrementalPostingsAccumulator', () => {
       { termIndex: 0, fieldId: 1, docId: 2, freq: 1 },
       { termIndex: 5, fieldId: 0, docId: 3, freq: 1 },
     ]
-    layoutsEqual(buildIncremental(3, postings), buildCallback(3, postings))
+    const layout = buildIncremental(3, postings)
+    validateFrozenPostingsLayout(layout, 100, 100)
+    assertHotPathSequentialAccess(layout, 0, 1)
+    assertHotPathSequentialAccess(layout, 5, 0)
   })
 
-  test('flat materialization chooses the same dense multi-field layout', () => {
-    const postings = []
-    for (let termIndex = 0; termIndex < 3; termIndex++) {
-      for (let fieldId = 0; fieldId < 4; fieldId++) {
-        postings.push({ termIndex, fieldId, docId: termIndex, freq: fieldId + 1 })
-      }
-    }
-    const flat = materializeFrozenPostings({
-      fieldCount: 4,
-      termCount: 3,
-      nextId: 100,
-      forEachPosting(termIndex, fieldId, emit) {
-        for (const posting of postings) {
-          if (posting.termIndex === termIndex && posting.fieldId === fieldId) {
-            emit(posting.docId, posting.freq)
-          }
-        }
-      },
-      clampFrequencies: true,
-    })
-    expect(flat.layout).toBe('dense')
-    layoutsEqual(flat, buildIncremental(4, postings))
+  test('finalize clamps frequencies to MAX_FREQ', () => {
+    const layout = buildIncremental(1, [{ termIndex: 0, fieldId: 0, docId: 0, freq: MAX_FREQ + 50 }])
+    expect(layout.allFreqs[0]).toBe(MAX_FREQ)
   })
 
   test('fromMiniSearch and incremental builder choose the same dense layout', () => {

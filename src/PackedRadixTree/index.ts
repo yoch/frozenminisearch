@@ -1,5 +1,2 @@
-export { PACKED_NO_VALUE, MAX_PACKED_EDGE_LABEL_LENGTH } from './constants'
-export { labelSlice } from './strings'
-export type { PackedRadixTreeData, PackedStringRadixMap } from './types'
 export { fromRadixTree } from './fromRadixTree'
 export { default } from './PackedRadixTree'

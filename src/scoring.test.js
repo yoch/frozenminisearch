@@ -8,8 +8,27 @@ import {
   collectDocIdsFromFieldTermData,
   combineResults,
   defaultBM25params,
-  mapFieldTermData,
 } from './scoring'
+
+function mapPostingList(freqs) {
+  return {
+    get size() { return freqs.size },
+    forEachDoc(callback) {
+      for (const [docId, termFreq] of freqs) {
+        callback(docId, termFreq)
+      }
+    },
+  }
+}
+
+function mapFieldTermData(data) {
+  return {
+    get(fieldId) {
+      const freqs = data.get(fieldId)
+      return freqs == null ? undefined : mapPostingList(freqs)
+    },
+  }
+}
 
 function makeContext(overrides = {}) {
   return {

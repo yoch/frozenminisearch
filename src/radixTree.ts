@@ -63,21 +63,8 @@ export function lookupRadixNode<T>(tree: RadixTree<T>, key: string): RadixTree<T
   }
 }
 
-export function lookupRadixLeaf<T>(tree: RadixTree<T>, key: string): T | undefined {
-  const node = lookupRadixNode(tree, key)
-  return node !== undefined ? node.get(LEAF) : undefined
-}
-
 export function setRadixLeaf<T>(tree: RadixTree<T>, key: string, value: T): void {
   createRadixPath(tree, key).set(LEAF, value)
-}
-
-export function getOrCreateRadixLeaf<T>(tree: RadixTree<T>, key: string, createValue: () => T): T {
-  const existing = lookupRadixLeaf(tree, key)
-  if (existing !== undefined) return existing
-  const value = createValue()
-  setRadixLeaf(tree, key, value)
-  return value
 }
 
 export function validateRadixLeaves(

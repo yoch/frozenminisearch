@@ -14,7 +14,7 @@ import {
 const DEFAULT_CAPACITY = 16
 
 /** Growable unsigned 32-bit column (build scratch; narrowed to u16 at finalize when possible). */
-export class GrowableUint32Column {
+class GrowableUint32Column {
   private _buf: Uint32Array
   private _len = 0
 
@@ -48,7 +48,7 @@ export class GrowableUint32Column {
 }
 
 /** Growable frequency column (u16 cells; matches frozen clamp range). */
-export class GrowableFreqColumn {
+class GrowableFreqColumn {
   private _buf: Uint16Array
   private _len = 0
 

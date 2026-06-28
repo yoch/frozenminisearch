@@ -1,5 +1,4 @@
 import {
-  allocateFreqs,
   findDocIndexInSortedSegment,
   readDocId,
   SegmentPostingList,
@@ -8,11 +7,6 @@ import {
   type FreqArray,
 } from './compactPostings'
 import type { AggregateContext, DocIdGate, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
-import {
-  DISCARDED_DOC_ID,
-  postingFreqValue,
-  type FlatPostingsMaterializeParams,
-} from './flatPostings'
 
 export type { DocIdArray } from './compactPostings'
 
@@ -63,170 +57,6 @@ export function choosePostingsLayout(
   const sparseFieldIdBytes = chooseSparseFieldIdWidth(fieldCount) === 16 ? 2 : 1
   const sparseBytes = (termCount + 1) * 4 + nonEmptySlots * (sparseFieldIdBytes + 8)
   return denseBytes <= sparseBytes ? 'dense' : 'sparse'
-}
-
-export interface PostingsSlotTargets {
-  allDocIds: DocIdArray
-  allFreqs: FreqArray
-  docIdWidth: 16 | 32
-}
-
-/** Slot source for {@link buildFrozenPostingsLayout} (callback or incremental paths). */
-export interface PostingsSlotSource {
-  readonly nonEmptySlots: number
-  slotLength(termIndex: number, fieldId: number): number
-  writeSlot(
-    termIndex: number,
-    fieldId: number,
-    writeOffset: number,
-    targets: PostingsSlotTargets,
-  ): number
-}
-
-/** Shared dense/sparse layout emission; callers supply per-slot length and copy. */
-export function buildFrozenPostingsLayout(
-  fieldCount: number,
-  termCount: number,
-  nextId: number,
-  totalPostings: number,
-  maxFreq: number,
-  source: PostingsSlotSource,
-): FrozenPostingsLayout {
-  const layout = choosePostingsLayout(fieldCount, termCount, source.nonEmptySlots)
-  const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
-  const allDocIds: DocIdArray = docIdWidth === 16
-    ? new Uint16Array(totalPostings)
-    : new Uint32Array(totalPostings)
-  const allFreqs = allocateFreqs(totalPostings, maxFreq)
-  const targets: PostingsSlotTargets = { allDocIds, allFreqs, docIdWidth }
-
-  if (layout === 'dense') {
-    const slotCount = termCount * fieldCount
-    const denseOffsets = new Uint32Array(slotCount)
-    const denseLengths = new Uint32Array(slotCount)
-    let write = 0
-    for (let ti = 0; ti < termCount; ti++) {
-      const base = ti * fieldCount
-      for (let f = 0; f < fieldCount; f++) {
-        const slot = base + f
-        const len = source.slotLength(ti, f)
-        denseOffsets[slot] = write
-        denseLengths[slot] = len
-        if (len > 0) {
-          write = source.writeSlot(ti, f, write, targets)
-        }
-      }
-    }
-    return {
-      fieldCount,
-      termCount,
-      nextId,
-      layout: 'dense',
-      docIdWidth,
-      allDocIds,
-      allFreqs,
-      denseOffsets,
-      denseLengths,
-    }
-  }
-
-  const sparseFieldIdWidth = chooseSparseFieldIdWidth(fieldCount)
-  const sparseFieldIdsScratch: number[] = []
-  const sparseOffsets: number[] = []
-  const sparseLengths: number[] = []
-  const termStarts: number[] = new Array(termCount + 1).fill(0)
-  let write = 0
-
-  for (let ti = 0; ti < termCount; ti++) {
-    termStarts[ti] = sparseFieldIdsScratch.length
-    for (let f = 0; f < fieldCount; f++) {
-      const len = source.slotLength(ti, f)
-      if (len === 0) continue
-      sparseFieldIdsScratch.push(f)
-      sparseOffsets.push(write)
-      sparseLengths.push(len)
-      write = source.writeSlot(ti, f, write, targets)
-    }
-    termStarts[ti + 1] = sparseFieldIdsScratch.length
-  }
-
-  const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
-    ? new Uint16Array(sparseFieldIdsScratch)
-    : new Uint8Array(sparseFieldIdsScratch)
-
-  return {
-    fieldCount,
-    termCount,
-    nextId,
-    layout: 'sparse',
-    docIdWidth,
-    sparseFieldIdWidth,
-    allDocIds,
-    allFreqs,
-    sparseTermStarts: new Uint32Array(termStarts),
-    sparseFieldIds,
-    sparseOffsets: new Uint32Array(sparseOffsets),
-    sparseLengths: new Uint32Array(sparseLengths),
-  }
-}
-
-export function materializeFrozenPostings(
-  params: FlatPostingsMaterializeParams & { nextId: number },
-): FrozenPostingsLayout {
-  const { fieldCount, termCount, nextId } = params
-  const { forEachPosting, remapDocId, clampFrequencies } = params
-  const slotCount = termCount * fieldCount
-  const slotLengths = new Uint32Array(slotCount)
-
-  let totalPostings = 0
-  let maxFreq = 0
-  let nonEmptySlots = 0
-  for (let ti = 0; ti < termCount; ti++) {
-    const base = ti * fieldCount
-    for (let f = 0; f < fieldCount; f++) {
-      let count = 0
-      forEachPosting(ti, f, (rawDocId, freq) => {
-        const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-        if (docId === DISCARDED_DOC_ID) return
-        count++
-        const v = postingFreqValue(freq, clampFrequencies)
-        if (v > maxFreq) maxFreq = v
-      })
-      if (count === 0) continue
-      slotLengths[base + f] = count
-      totalPostings += count
-      nonEmptySlots++
-    }
-  }
-
-  return buildFrozenPostingsLayout(
-    fieldCount,
-    termCount,
-    nextId,
-    totalPostings,
-    maxFreq,
-    {
-      nonEmptySlots,
-      slotLength(ti, f) {
-        return slotLengths[ti * fieldCount + f]
-      },
-      writeSlot(ti, f, write, targets) {
-        const { allDocIds: outDocIds, allFreqs: outFreqs, docIdWidth: width } = targets
-        forEachPosting(ti, f, (rawDocId, freq) => {
-          const docId = remapDocId != null ? remapDocId(rawDocId) : rawDocId
-          if (docId === DISCARDED_DOC_ID) return
-          if (width === 16) {
-            (outDocIds as Uint16Array)[write] = docId
-          } else {
-            (outDocIds as Uint32Array)[write] = docId
-          }
-          outFreqs[write] = postingFreqValue(freq, clampFrequencies)
-          write++
-        })
-        return write
-      },
-    },
-  )
 }
 
 export function postingsTypedBytes(layout: FrozenPostingsLayout): {
@@ -333,7 +163,7 @@ export function validateFrozenPostingsLayout(
 /**
  * Locate the slot for `fieldId` within a term's range.
  *
- * `sparseFieldIds[start..end)` is sorted ascending (see materializeFrozenPostings),
+ * `sparseFieldIds[start..end)` is sorted ascending (see {@link IncrementalPostingsAccumulator}),
  * and the range is short (at most `fieldCount`, usually 1-3 fields per term). A linear
  * scan with early exit beats binary search at this size: sequential access, predictable
  * branches, no per-step division. The sorted invariant only powers the early break.

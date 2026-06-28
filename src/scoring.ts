@@ -147,28 +147,6 @@ export const assignUniqueTerms = (target: string[], source: readonly string[]): 
 export type Scored = { score: number }
 export const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
-/** Wrap Map<shortId, freq> as PostingListLike */
-export function mapPostingList(freqs: Map<number, number>): PostingListLike {
-  return {
-    get size() { return freqs.size },
-    forEachDoc(callback) {
-      for (const [docId, termFreq] of freqs) {
-        callback(docId, termFreq)
-      }
-    },
-  }
-}
-
-/** Wrap Map<fieldId, Map<shortId, freq>> as FieldTermDataLike */
-export function mapFieldTermData(data: Map<number, Map<number, number>>): FieldTermDataLike {
-  return {
-    get(fieldId) {
-      const freqs = data.get(fieldId)
-      return freqs == null ? undefined : mapPostingList(freqs)
-    },
-  }
-}
-
 /** Eager materialized term, or lazy resolver for indexed derived matches. */
 export type AggregateDerivedTerm
   = | string

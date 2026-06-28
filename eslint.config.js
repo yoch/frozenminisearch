@@ -13,12 +13,6 @@ const styleConfig = stylistic.configs.customize({
 })
 
 export default [
-  {
-    ignores: [
-      'benchmarks/fuzzyPrefixVariant.ts',
-      'benchmarks/packedRadixFuzzyAlgoCompare.js',
-    ],
-  },
   ...neostandard({ ts: true, noStyle: true }),
   styleConfig,
   {

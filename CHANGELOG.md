@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## v1.6.1 — `@yoch/frozenminisearch`
+
+Patch release: internal dead-code cleanup and stricter published-bundle guards. No public API, search semantics, or MSv5 wire-format changes.
+
+### Changed
+
+- **Published bundles** — enable Terser `dead_code` and extend `assert-public-bundles.cjs` so dev-only PackedRadix string helpers (`packedPrefixEntries`, legacy wrapper names) cannot ship in `dist/es`, `dist/cjs`, or `dist/browser`.
+- **CI** — add a `knip` check (Node 22.x) to catch orphan exports in `src/`.
+
+### Removed
+
+- **Internal dead code** — drop unused radix helpers, legacy postings materialize path (`materializeFrozenPostings` / `buildFrozenPostingsLayout`), `flatPostings`, and deprecated PackedRadix fuzzy string wrappers (`fuzzyEntries` / `packedRadixFuzzyEntries`). Prefix string iteration for benches/parity moves to `devStringIterators.ts` (not on the product import graph).
+
 ## v1.6.0 — `@yoch/frozenminisearch`
 
 Minor release: lower FrozenIndexBuilder build peak (postings scratch + flat term dedup), unified `fromJSON` / document term packing, and packed-only `saveBinary` bundles without legacy Map-radix fallbacks.

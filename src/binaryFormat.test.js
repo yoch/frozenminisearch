@@ -7,6 +7,7 @@ import { LEAF } from './SearchableMap/TreeIterator'
 import {
   encodeFrozenSnapshot,
   decodeFrozenSnapshot,
+  decodeFrozenSnapshotAsync,
   deserializeTermIndexTree,
   validateFrozenSnapshot,
   crc32Buffer,
@@ -468,5 +469,10 @@ describe('crc32Buffer verification', () => {
     const ourCrcPartial = crc32Buffer(buf, start, end)
     const expectedCrcPartial = CRC32.buf(buf.subarray(start, end)) >>> 0
     expect(ourCrcPartial).toBe(expectedCrcPartial)
+  })
+
+  test('decodeFrozenSnapshotAsync rejects an unsupported frozen binary snapshot', async () => {
+    await expect(decodeFrozenSnapshotAsync(Buffer.alloc(8), {}))
+      .rejects.toThrow(/Unsupported frozen binary snapshot/)
   })
 })

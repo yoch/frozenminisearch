@@ -36,7 +36,10 @@ describe('binaryIo', () => {
     const u32 = Buffer.alloc(9)
     u32.writeUInt32LE(0x01020304, 1)
     u32.writeUInt32LE(0x05060708, 5)
-    expect(Array.from(readUint32Array(u32, 1, 8))).toEqual([0x01020304, 0x05060708])
+    const copied = readUint32Array(u32, 1, 8)
+    expect(Array.from(copied)).toEqual([0x01020304, 0x05060708])
+    copied[0] = 0
+    expect(u32.readUInt32LE(1)).toBe(0x01020304)
 
     const u16 = Buffer.alloc(5)
     u16.writeUInt16LE(0x1234, 1)

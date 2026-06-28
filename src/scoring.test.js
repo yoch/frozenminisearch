@@ -111,6 +111,12 @@ describe('combineResults', () => {
     const { a, b } = makeOperands()
     expect(() => combineResults([a, b], 'xor')).toThrow(/invalid combination operator/)
   })
+
+  test('returns empty map for empty operand list', () => {
+    expect(combineResults([], OR)).toEqual(new Map())
+    expect(combineResults([], AND)).toEqual(new Map())
+    expect(combineResults([], AND_NOT)).toEqual(new Map())
+  })
 })
 
 describe('aggregateTerm', () => {

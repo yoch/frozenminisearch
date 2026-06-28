@@ -32,6 +32,8 @@ import {
   readMsv5SectionDirectory,
 } from './binaryMsv5Compression'
 import { computeSectionDirectory } from './binaryMsv5PayloadAssembly'
+import { buildMsv5EncodePrepared } from './binaryMsv5EncodeSections'
+import PackedRadixTree from '../PackedRadixTree'
 
 const options = { fields: ['title', 'text'] }
 const hasZstd = typeof zlib.zstdCompressSync === 'function'
@@ -516,6 +518,52 @@ describe('binaryMsv5 zstd unavailable (Node without zstd)', () => {
     } finally {
       restore()
     }
+  })
+})
+
+describe('buildMsv5EncodePrepared', () => {
+  function loadedSnapshot() {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
+    return decodeFrozenSnapshot(frozen.saveBinarySync())
+  }
+
+  test('builds wire sections for a valid snapshot', () => {
+    const snap = loadedSnapshot()
+    const prepared = buildMsv5EncodePrepared(snap, snap.packedTermIndex)
+    expect(prepared.rawSections.length).toBeGreaterThanOrEqual(11)
+    expect(prepared.globalFlags).toBeGreaterThanOrEqual(0)
+  })
+
+  test('rejects invalid snapshot state before encode', () => {
+    const snap = loadedSnapshot()
+    snap.fieldCount = 0
+    expect(() => buildMsv5EncodePrepared(snap, snap.packedTermIndex))
+      .toThrow(/fieldCount must be positive/)
+
+    const badNames = loadedSnapshot()
+    badNames.fieldNames = ['only-one']
+    badNames.fieldCount = 2
+    expect(() => buildMsv5EncodePrepared(badNames, badNames.packedTermIndex))
+      .toThrow(/fieldNames length mismatch/)
+
+    const badTree = loadedSnapshot()
+    const tree = badTree.packedTermIndex
+    badTree.packedTermIndex = PackedRadixTree.fromData({
+      size: tree.size + 1,
+      nodeCount: tree.nodeCount,
+      edgeCount: tree.edgeCount,
+      labelHeap: tree.labelHeap,
+      nodeEdgeOffset: tree.nodeEdgeOffset,
+      nodeValue: tree.nodeValue,
+      nodeLeafOrder: tree.nodeLeafOrder,
+      edgeLabelStart: tree.edgeLabelStart,
+      edgeLabelLength: tree.edgeLabelLength,
+      edgeChild: tree.edgeChild,
+    })
+    expect(() => buildMsv5EncodePrepared(badTree, badTree.packedTermIndex))
+      .toThrow(/size .* !== termCount/)
   })
 })
 

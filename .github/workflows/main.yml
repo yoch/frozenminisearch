@@ -30,7 +30,6 @@ jobs:
       - name: Verify published package contents
         if: matrix.node-version == '22.x'
         run: node scripts/verify-npm-pack.cjs
-      - run: pnpm test:browser
       - run: pnpm coverage
       - name: Upload coverage to Codecov
         if: matrix.node-version == '22.x'

@@ -90,8 +90,9 @@ test-fuzzysearch:
 test-benchmarks:
 	$(RUN) vitest run benchmarks/
 
-coverage:
-	$(RUN) vitest run --coverage src/ dev/parity/
+coverage: $(DIST_MARKER)
+	node scripts/assert-browser-bundle.cjs
+	$(RUN) vitest run --coverage src/ dev/parity/ dev/browser/
 
 # ----------------------------------------------------------------------------
 # Lint
@@ -345,7 +346,7 @@ help:
 	@echo "  make test                   vitest run (src + dev + benchmarks)"
 	@echo "  make test-browser           assert-browser-bundle + vitest dev/browser/"
 	@echo "  make test-fuzzysearch       vitest run dev/internal/"
-	@echo "  make coverage               vitest run --coverage"
+	@echo "  make coverage               build + browser bundle check + vitest --coverage (src, parity, browser)"
 	@echo ""
 	@echo "Benchmarks (profiled interface, via cli.mjs):"
 	@echo "  make bench                  run --profile=dev --quick"

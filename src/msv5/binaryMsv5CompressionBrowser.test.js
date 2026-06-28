@@ -1,12 +1,17 @@
+import { randomBytes } from 'node:crypto'
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from '../FrozenMiniSearch'
 import { frozenFromMiniSearch } from '../internal/frozenInternals'
+import { writeU32LE } from '../binaryBytes'
 import {
   CODEC_RAW,
   CODEC_ZLIB,
   CODEC_ZSTD,
+  MSV5_HEADER_SIZE,
   MSV5_PAYLOAD_CODEC_OFFSET,
+  MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_SECTION_COUNT,
+  MSV5_SECTION_COUNT_OFFSET,
 } from './binaryMsv5Constants'
 import {
   assembleMsv5FileBrowser,
@@ -47,6 +52,23 @@ function bigCompressibleRawSections() {
     globalFlags: readMsv5GlobalFlagsBrowser(buf),
     rawSections: loadMsv5Sections(buf, directory),
   }
+}
+
+function tinyRawSections(totalBytes = 48) {
+  const perSection = Math.floor(totalBytes / MSV5_SECTION_COUNT)
+  return Array.from({ length: MSV5_SECTION_COUNT }, () => new Uint8Array(perSection))
+}
+
+function incompressibleRawSections(totalBytes = 200) {
+  const bytes = randomBytes(totalBytes)
+  const perSection = Math.floor(totalBytes / MSV5_SECTION_COUNT)
+  const sections = []
+  let off = 0
+  for (let i = 0; i < MSV5_SECTION_COUNT; i++) {
+    sections.push(bytes.subarray(off, off + perSection))
+    off += perSection
+  }
+  return sections
 }
 
 describe('binaryMsv5CompressionBrowser', () => {
@@ -101,5 +123,60 @@ describe('binaryMsv5CompressionBrowser', () => {
     const { globalFlags, rawSections } = smallIndexRawSections()
     await expect(assembleMsv5FileBrowser(globalFlags, rawSections.slice(0, 1), 'raw'))
       .rejects.toThrow(new RegExp(`expects ${MSV5_SECTION_COUNT} sections`))
+  })
+
+  test('auto keeps raw for payloads smaller than MSV5_MIN_COMPRESS_BYTES', async () => {
+    const assembled = await assembleMsv5FileBrowser(0, tinyRawSections(48), 'auto')
+    expect(readMsv5SnapshotCompressionMetaBrowser(assembled.buffer).payloadCodec).toBe(CODEC_RAW)
+  })
+
+  test('auto keeps raw when zlib does not shrink the payload', async () => {
+    const assembled = await assembleMsv5FileBrowser(0, incompressibleRawSections(200), 'auto')
+    expect(readMsv5SnapshotCompressionMetaBrowser(assembled.buffer).payloadCodec).toBe(CODEC_RAW)
+  })
+
+  test('readMsv5SectionDirectory rejects a truncated header', () => {
+    expect(() => readMsv5SectionDirectory(new Uint8Array(10)))
+      .toThrow(/buffer too short/)
+  })
+
+  test('readMsv5SectionDirectory rejects an inconsistent section count', async () => {
+    const { globalFlags, rawSections } = smallIndexRawSections()
+    const assembled = await assembleMsv5FileBrowser(globalFlags, rawSections, 'raw')
+    const buf = new Uint8Array(assembled.buffer)
+    writeU32LE(buf, MSV5_SECTION_COUNT_OFFSET, MSV5_SECTION_COUNT + 1)
+    expect(() => readMsv5SectionDirectory(buf))
+      .toThrow(/section count mismatch/)
+  })
+
+  test('loadMsv5SectionsBrowser rejects a payload CRC mismatch', async () => {
+    const { globalFlags, rawSections } = smallIndexRawSections()
+    const assembled = await assembleMsv5FileBrowser(globalFlags, rawSections, 'raw')
+    const buf = new Uint8Array(assembled.buffer)
+    buf[MSV5_HEADER_SIZE] ^= 0xff
+    const directory = readMsv5SectionDirectory(buf)
+    await expect(loadMsv5SectionsBrowser(buf, directory))
+      .rejects.toThrow(/payload CRC mismatch/)
+  })
+
+  test('loadMsv5SectionsBrowser rejects an unknown payload codec', async () => {
+    const { globalFlags, rawSections } = smallIndexRawSections()
+    const assembled = await assembleMsv5FileBrowser(globalFlags, rawSections, 'raw')
+    const buf = new Uint8Array(assembled.buffer)
+    buf[MSV5_PAYLOAD_CODEC_OFFSET] = 99
+    const directory = readMsv5SectionDirectory(buf)
+    await expect(loadMsv5SectionsBrowser(buf, directory))
+      .rejects.toThrow(/unknown payload codec 99/)
+  })
+
+  test('loadMsv5SectionsBrowser rejects raw payload with wrong compressed length', async () => {
+    const { globalFlags, rawSections } = smallIndexRawSections()
+    const assembled = await assembleMsv5FileBrowser(globalFlags, rawSections, 'raw')
+    const meta = readMsv5SnapshotCompressionMetaBrowser(assembled.buffer)
+    const buf = new Uint8Array(assembled.buffer)
+    writeU32LE(buf, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET, meta.uncompressedLength - 1)
+    const directory = readMsv5SectionDirectory(buf)
+    await expect(loadMsv5SectionsBrowser(buf, directory))
+      .rejects.toThrow(/raw payload length/)
   })
 })

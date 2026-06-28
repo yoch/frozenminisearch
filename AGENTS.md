@@ -13,7 +13,7 @@ All `package.json` scripts are thin aliases to a `Makefile` target (`make <targe
 - `pnpm test` (`make test`): runs vitest tests in `src/`, `dev/`, and `benchmarks/`.
 - `pnpm test:fuzzysearch` (`make test-fuzzysearch`): runs long fuzzy parity sweeps from `dev/internal/`.
 - `pnpm test:benchmarks` (`make test-benchmarks`): runs benchmark test files, separate from normal CI tests.
-- `pnpm coverage` (`make coverage`): runs vitest coverage for `src/`.
+- `pnpm coverage` (`make coverage`): runs vitest coverage for `src/`, `dev/parity/`, and `dev/browser/` (requires `make build` for the browser bundle smoke).
 - `pnpm lint` / `pnpm lint:fix` (`make lint` / `make lint-fix`): checks or fixes ESLint style issues in `src/`.
 - `pnpm build` (`make build`): cleans `dist/`, builds ESM/CJS bundles with Rollup, and patches CJS output.
 - `make bench`: quick local performance check (`cli.mjs run --profile=dev --quick`).

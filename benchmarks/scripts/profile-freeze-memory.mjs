@@ -17,7 +17,15 @@ import {
 } from '../../src/internal/frozenInternals.ts'
 import { getScenarioById } from '../scenarioRegistry.mjs'
 import { measureHeap, gc, medianOf } from '../benchmarkUtils.js'
+import {
+  emitGcAuditMarker,
+  gcAuditChildEnabled,
+  gcAuditRequested,
+  gcAuditRuns,
+  runGcAuditScript,
+} from '../gcAudit.js'
 import { intArg } from './cpuBenchUtils.mjs'
+import { fileURLToPath } from 'node:url'
 
 const SCENARIOS = {
   dense: 'denseNumericIds-100k',
@@ -28,6 +36,8 @@ const SCENARIOS = {
 }
 
 const runs = intArg('runs', 3, { min: 1 })
+const SCRIPT_PATH = fileURLToPath(import.meta.url)
+const GC_AUDIT_CHILD = gcAuditChildEnabled()
 
 /** Reference representation the parsed intermediate must not regress beyond. */
 function buildMapIntermediate(snapshot) {
@@ -71,25 +81,34 @@ function run(scenarioKey) {
   const transientPeak = []
 
   for (let i = 0; i < runs; i++) {
+    const auditMeta = GC_AUDIT_CHILD ? { scenarioId: scenario.id, run: i } : null
     gc()
+    if (auditMeta != null) emitGcAuditMarker('parse-start', { ...auditMeta, measureWindow: true })
     // Isolate the postings intermediate: keep only the accumulator alive so the
     // PackedRadixTree built alongside is collected and not counted here.
     arrayIntermediate.push(
       measureHeap(() => parseSnapshotIndex(snapshot, fieldCount, nextId).accumulator).heapBytes,
     )
+    if (auditMeta != null) emitGcAuditMarker('parse-end', { ...auditMeta, measureWindow: true })
     gc()
+    if (auditMeta != null) emitGcAuditMarker('map-start', { ...auditMeta, measureWindow: true })
     mapIntermediate.push(measureHeap(() => buildMapIntermediate(snapshot)).heapBytes)
+    if (auditMeta != null) emitGcAuditMarker('map-end', { ...auditMeta, measureWindow: true })
     gc()
+    if (auditMeta != null) emitGcAuditMarker('final-start', { ...auditMeta, measureWindow: true })
     finalIndex.push(measureHeap(() => frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options)).heapBytes)
+    if (auditMeta != null) emitGcAuditMarker('final-end', { ...auditMeta, measureWindow: true })
 
     // Transient peak estimate: heapUsed just after the synchronous import,
     // before GC reclaims the dead intermediate, above a freshly-gc'd baseline.
     gc()
+    if (auditMeta != null) emitGcAuditMarker('transient-start', { ...auditMeta, measureWindow: true })
     const baseline = process.memoryUsage().heapUsed
     const frozen = frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options)
     const afterCall = process.memoryUsage().heapUsed
     void frozen.documentCount
     transientPeak.push(afterCall - baseline)
+    if (auditMeta != null) emitGcAuditMarker('transient-end', { ...auditMeta, measureWindow: true })
   }
 
   const toMb = (b) => b / 1024 / 1024
@@ -127,3 +146,17 @@ for (const key of keys) {
 }
 console.log('\nAll values MB. current=parseSnapshotIndex intermediate, mapRef=reference Map representation.')
 console.log('transient = heapUsed delta right after import before GC (dead intermediate still resident).')
+
+if (!GC_AUDIT_CHILD && gcAuditRequested()) {
+  const scriptArgs = process.argv.slice(2).filter(arg => arg !== '--gc-audit')
+  if (!scriptArgs.some(arg => arg === '--runs' || arg.startsWith('--runs='))) {
+    scriptArgs.push(`--runs=${gcAuditRuns(runs)}`)
+  }
+  const audit = runGcAuditScript({
+    scriptPath: SCRIPT_PATH,
+    scriptArgs,
+    env: process.env,
+    extraNodeArgs: ['--import', 'tsx'],
+  })
+  console.log(`GC audit: ${audit.clean ? 'clean' : 'major GC observed'} (${audit.unexpectedMajorGcCount} unexpected major GC in measured windows)`)
+}

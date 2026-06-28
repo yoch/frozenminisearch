@@ -23,9 +23,12 @@ pnpm bench:micro -- --list
 pnpm bench:build-peak                   # transient heap peak during FrozenIndexBuilder
 pnpm bench:memory                       # isolated heap phase only (protocol v4)
 pnpm bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
+BENCH_GC_AUDIT=1 pnpm bench:build-peak  # same benchmark + trace-gc audit in a child process
 ```
 
 `bench:build-peak` writes `benchmarks/baselines/build-peak-heap.json` (peak vs retained heap, radix share estimate).
+
+`BENCH_GC_AUDIT=1` enables a secondary child-process audit with `--trace-gc-nvp` (fallback `--trace-gc`) on selected memory scripts. The published metrics still come from the normal run; the audit only reports whether unexpected major GC happened inside measured windows.
 
 `bench:medicaments-build-peak` measures `FrozenIndexBuilder` peak on real post-parse JSONL when available (`/home/yoch/fr.gouv.medicaments.rest/data/corpus-export`, override with `CORPUS_EXPORT_DIR`). Documents contain **indexed fields + `id` only** (`buildIndexDocument`). Fallback: invert `.msbin` fixtures (`SOURCE=msbin`). Output: `medicaments-build-peak-heap.json` (jsonl) or `medicaments-build-peak-heap-msbin.json`. Filter: `ONLY=bdpm-presentations`.
 

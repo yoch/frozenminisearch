@@ -22,9 +22,18 @@ import {
   measureHeap,
   medianOf,
 } from '../benchmarkUtils.js'
+import {
+  emitGcAuditMarker,
+  gcAuditChildEnabled,
+  gcAuditRequested,
+  gcAuditRuns,
+  runGcAuditScript,
+} from '../gcAudit.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUT = join(__dirname, '../baselines/build-peak-heap.json')
+const SCRIPT_PATH = fileURLToPath(import.meta.url)
+const GC_AUDIT_CHILD = gcAuditChildEnabled()
 
 function parseRuns () {
   const env = Number(process.env.RUNS)
@@ -57,19 +66,25 @@ const SCENARIOS = [
   },
 ]
 
-function measurePhasedBuild (corpus, options) {
+function measurePhasedBuild (corpus, options, auditMeta = null) {
+  if (auditMeta != null) emitGcAuditMarker('baseline-gc-start', auditMeta)
   const sampler = createPeakHeapSampler()
+  if (auditMeta != null) emitGcAuditMarker('baseline-gc-end', auditMeta)
   const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: corpus.length })
 
+  if (auditMeta != null) emitGcAuditMarker('add-start', { ...auditMeta, measureWindow: true })
   for (const document of corpus) {
     builder.add(document)
     sampler.sample()
   }
+  if (auditMeta != null) emitGcAuditMarker('add-end', { ...auditMeta, measureWindow: true })
   sampler.sample()
   const peakAfterAddMb = sampler.peakHeapMb()
   const peakAfterAddTotalResidentMb = sampler.peakTotalResidentMb()
 
+  if (auditMeta != null) emitGcAuditMarker('freeze-start', { ...auditMeta, measureWindow: true })
   const frozen = freezeFrozenIndexBuilder(builder)
+  if (auditMeta != null) emitGcAuditMarker('freeze-end', { ...auditMeta, measureWindow: true })
   sampler.sample()
   const finished = sampler.finish(frozen)
   const breakdown = frozenMemoryBreakdown(frozen)
@@ -109,26 +124,29 @@ function measurePhasedBuild (corpus, options) {
   }
 }
 
-function measureRetainedBuild (corpus, options) {
+function measureRetainedBuild (corpus, options, auditMeta = null) {
+  if (auditMeta != null) emitGcAuditMarker('retained-start', auditMeta)
   const sample = measureHeap(() => {
     const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: corpus.length })
     for (const document of corpus) builder.add(document)
     return freezeFrozenIndexBuilder(builder)
   })
+  if (auditMeta != null) emitGcAuditMarker('retained-end', auditMeta)
   return {
     retainedHeapMb: Number((sample.heapBytes / 1024 / 1024).toFixed(4)),
     retainedHeapKb: Number((sample.heapBytes / 1024).toFixed(1)),
   }
 }
 
-function medianScenario (runs, corpus, options) {
+function medianScenario (runs, corpus, options, scenarioId) {
   const peakSamples = []
   const retainedSamples = []
   for (let i = 0; i < runs; i++) {
     gc()
-    peakSamples.push(measurePhasedBuild(corpus, options))
+    const auditMeta = GC_AUDIT_CHILD ? { scenarioId, run: i } : null
+    peakSamples.push(measurePhasedBuild(corpus, options, auditMeta))
     gc()
-    retainedSamples.push(measureRetainedBuild(corpus, options))
+    retainedSamples.push(measureRetainedBuild(corpus, options, auditMeta))
   }
   const pickPeak = (key) => medianOf(peakSamples.map((s) => s[key]))
   const retainedHeapMb = medianOf(retainedSamples.map((s) => s.retainedHeapMb))
@@ -164,6 +182,7 @@ function main () {
   }
 
   const runs = parseRuns()
+  const gcAuditEnabled = gcAuditRequested()
   const capturedAt = new Date().toISOString()
   const scenarios = []
 
@@ -171,7 +190,7 @@ function main () {
     const corpus = spec.corpus()
     console.log(`\n${spec.name} (${corpus.length} docs, ${runs} run(s))`)
 
-    const build = medianScenario(runs, corpus, spec.options)
+    const build = medianScenario(runs, corpus, spec.options, spec.id)
 
     console.log(`  peak heap:       ${build.peakHeapMb} MB (${build.peakHeapKb} KB)  after add: ${build.peakAfterAddMb} MB  freeze +${build.freezeDeltaMb} MB`)
     console.log(`  peak total:      ${build.peakTotalResidentMb} MB (${build.peakTotalResidentKb} KB)  after add: ${build.peakAfterAddTotalResidentMb} MB  freeze +${build.freezeDeltaTotalResidentMb} MB`)
@@ -196,6 +215,19 @@ function main () {
     opt1Hint: 'OPT-1 targets freezeDeltaMb and radix overlap at freeze. If peakAfterAdd ≈ peak total, prioritize postings/storedFields pressure over radix pack.',
     scenarios,
   }
+
+  if (!GC_AUDIT_CHILD && gcAuditEnabled) {
+    payload.gcAudit = runGcAuditScript({
+      scriptPath: SCRIPT_PATH,
+      env: {
+        ...process.env,
+        RUNS: String(gcAuditRuns(runs)),
+      },
+    })
+    console.log(`\nGC audit: ${payload.gcAudit.clean ? 'clean' : 'major GC observed'} (${payload.gcAudit.unexpectedMajorGcCount} unexpected major GC in measured windows)`)
+  }
+
+  if (GC_AUDIT_CHILD) return
 
   writeFileSync(OUT, `${JSON.stringify(payload, null, 2)}\n`)
   console.log(`\nWrote ${OUT}`)

@@ -136,13 +136,10 @@ export type Options<T = any> = {
   /** Function used to process a term before indexing or search (e.g. stemming). */
   processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
   /**
-   *  Function called to log messages from the library. (inherited from MiniSearch upstream).
-   * FrozenMiniSearch never calls this function, whereas MiniSearch calls it for diagnostic messages on mutable operations.
-   * TODO: decide whether to keep or remove this option.
+   * Function called to log diagnostic messages. Kept for MiniSearch-compatible
+   * options; FrozenMiniSearch currently treats it as a no-op hook.
    */
   logger?: (level: LogLevel, message: string, code?: string) => void
-  /** Auto-vacuum behaviour after MiniSearch `discard`; defaults to `true`. */
-  autoVacuum?: boolean | AutoVacuumOptions
   /** Default search options. */
   searchOptions?: SearchOptions
   /** Default auto-suggest options. */
@@ -162,7 +159,6 @@ export type OptionsWithDefaults<T = any> = Options<T> & {
   tokenize: (text: string, fieldName: string) => string[]
   processTerm: (term: string, fieldName: string) => string | string[] | null | undefined | false
   logger: (level: LogLevel, message: string, code?: string) => void
-  autoVacuum: false | AutoVacuumOptions
   searchOptions: SearchOptionsWithDefaults
   autoSuggestOptions: SearchOptions
 }
@@ -243,30 +239,3 @@ export type Wildcard = typeof WILDCARD_QUERY
  * several queries with `AND`/`OR`/`AND_NOT`, or the wildcard symbol.
  */
 export type Query = QueryCombination | string | Wildcard
-
-/**
- * Options controlling vacuuming behaviour.
- */
-export type VacuumOptions = {
-  /** Number of terms traversed per batch. Defaults to 1000. */
-  batchSize?: number
-  /** Wait time between batches in milliseconds. Defaults to 10. */
-  batchWait?: number
-}
-
-/**
- * Minimum thresholds for `dirtCount` and `dirtFactor` triggering an automatic
- * vacuum.
- */
-export type VacuumConditions = {
-  /** Minimum dirt count; defaults to 20. */
-  minDirtCount?: number
-  /** Minimum dirt factor; defaults to 0.1. */
-  minDirtFactor?: number
-}
-
-/**
- * Options controlling auto-vacuum behaviour. Combines {@link VacuumOptions} and
- * {@link VacuumConditions}.
- */
-export type AutoVacuumOptions = VacuumOptions & VacuumConditions

@@ -40,6 +40,11 @@ describe('fromMiniSearch loaders', () => {
     )
   })
 
+  test('fromJSON is the only public MiniSearch JSON loader name', () => {
+    expect(typeof FrozenMiniSearch.fromJSON).toBe('function')
+    expect('fromJson' in FrozenMiniSearch).toBe(false)
+  })
+
   test('fromMiniSearch instance uses toJSON()', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
@@ -188,12 +193,12 @@ describe('fromMiniSearch loaders', () => {
   test('fromJSON postings layout matches fromDocuments', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
-    const fromJson = FrozenMiniSearch.fromJSON(JSON.stringify(reference), options)
+    const fromJSON = FrozenMiniSearch.fromJSON(JSON.stringify(reference), options)
     const fromDocs = FrozenMiniSearch.fromDocuments(docs, options)
 
-    expect(frozenMemoryBreakdown(fromJson).postings).toEqual(frozenMemoryBreakdown(fromDocs).postings)
-    expect(fromJson.termCount).toBe(fromDocs.termCount)
-    expect(fromJson.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+    expect(frozenMemoryBreakdown(fromJSON).postings).toEqual(frozenMemoryBreakdown(fromDocs).postings)
+    expect(fromJSON.termCount).toBe(fromDocs.termCount)
+    expect(fromJSON.search('zen art', { combineWith: 'AND' }).map(r => r.id))
       .toEqual(fromDocs.search('zen art', { combineWith: 'AND' }).map(r => r.id))
   })
 })

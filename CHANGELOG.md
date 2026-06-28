@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Removed
+
+- **Breaking** — removed the legacy `fromJson` static alias; use `fromJSON` for MiniSearch JSON migration.
+- **Legacy MiniSearch options** — removed the unused `autoVacuum` option and vacuum option types from the frozen TypeScript API. The `logger` diagnostics hook remains available.
+
 ## v1.5.0 — `@yoch/frozenminisearch`
 
 Minor release: faster MiniSearch JSON import and MSv5 binary I/O, adaptive field-length wire encoding, and `fromJSON` as the canonical migration API.

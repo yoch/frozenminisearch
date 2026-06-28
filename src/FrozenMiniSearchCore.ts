@@ -306,21 +306,6 @@ export default class FrozenMiniSearchCore<T = any> {
   }
 
   /**
-   * @deprecated Use {@link fromJSON} instead.
-   */
-  static fromJson<T, I extends FrozenMiniSearchCore<T>>(
-    this: FrozenMiniSearchCtor<T, I>,
-    json: string,
-    options: Options<T> = {} as Options<T>,
-  ): I {
-    return FrozenMiniSearchCore.fromJSON.call(
-      this as FrozenMiniSearchCtor<any, any>,
-      json,
-      options as Options<any>,
-    ) as I
-  }
-
-  /**
    * Build a read-only index from an async stream of documents (e.g. CSV parser).
    * For sync iterables, use {@link createFrozenIndexBuilder} with `for...of` instead.
    *

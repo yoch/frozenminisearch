@@ -17,4 +17,10 @@ describe('FrozenMiniSearch.getDefault', () => {
       'FrozenMiniSearch: unknown option "notExisting"',
     )
   })
+
+  test('autoVacuum is not exposed as a frozen default', () => {
+    expect(() => FrozenMiniSearch.getDefault('autoVacuum')).toThrow(
+      'FrozenMiniSearch: unknown option "autoVacuum"',
+    )
+  })
 })

@@ -54,12 +54,15 @@ async function runBuildProfileFromStream (label, spec, options, stats) {
     sampler.sample()
   }
   const peakAfterAddMb = sampler.peakHeapMb()
+  const peakAfterAddTotalResidentMb = sampler.peakTotalResidentMb()
 
   const frozen = freezeFrozenIndexBuilder(builder)
   sampler.sample()
   const finished = sampler.finish(frozen)
   const peakTotalMb = finished.peakHeapMb
+  const peakTotalResidentMb = finished.peakTotalResidentMb
   const peakFreezeDeltaMb = Number((peakTotalMb - peakAfterAddMb).toFixed(3))
+  const peakFreezeDeltaTotalResidentMb = Number((peakTotalResidentMb - peakAfterAddTotalResidentMb).toFixed(3))
 
   gc()
   const retainedMb = Number((measureHeap(() => frozen).heapBytes / 1024 / 1024).toFixed(4))
@@ -73,8 +76,11 @@ async function runBuildProfileFromStream (label, spec, options, stats) {
     corpusTextMb: corpusText,
     corpusHoldMb,
     peakAfterAddMb,
+    peakAfterAddTotalResidentMb,
     peakTotalMb,
+    peakTotalResidentMb,
     peakFreezeDeltaMb,
+    peakFreezeDeltaTotalResidentMb,
     retainedMb,
     transientMb: Number((peakTotalMb - retainedMb).toFixed(3)),
     structuredMb: mbRound(breakdown.estimatedStructuredBytes),
@@ -105,12 +111,15 @@ function runBuildProfile (label, documents, options) {
     sampler.sample()
   }
   const peakAfterAddMb = sampler.peakHeapMb()
+  const peakAfterAddTotalResidentMb = sampler.peakTotalResidentMb()
 
   const frozen = freezeFrozenIndexBuilder(builder)
   sampler.sample()
   const finished = sampler.finish(frozen)
   const peakTotalMb = finished.peakHeapMb
+  const peakTotalResidentMb = finished.peakTotalResidentMb
   const peakFreezeDeltaMb = Number((peakTotalMb - peakAfterAddMb).toFixed(3))
+  const peakFreezeDeltaTotalResidentMb = Number((peakTotalResidentMb - peakAfterAddTotalResidentMb).toFixed(3))
 
   gc()
   const retainedMb = Number((measureHeap(() => frozen).heapBytes / 1024 / 1024).toFixed(4))
@@ -124,8 +133,11 @@ function runBuildProfile (label, documents, options) {
     corpusTextMb: corpusText,
     corpusHoldMb,
     peakAfterAddMb,
+    peakAfterAddTotalResidentMb,
     peakTotalMb,
+    peakTotalResidentMb,
     peakFreezeDeltaMb,
+    peakFreezeDeltaTotalResidentMb,
     retainedMb,
     transientMb: Number((peakTotalMb - retainedMb).toFixed(3)),
     structuredMb: mbRound(breakdown.estimatedStructuredBytes),
@@ -194,7 +206,7 @@ async function main () {
   console.log(`\n=== build heap profile: ${only} ===\n`)
   for (const row of [real, synthetic, syntheticOneField]) {
     console.log(`  [${row.id}]`)
-    console.log(`    terms ${row.termCount}  peak ${row.peakTotalMb} MB (add ${row.peakAfterAddMb}  freeze Δ${row.peakFreezeDeltaMb})`)
+    console.log(`    terms ${row.termCount}  peak heap ${row.peakTotalMb} MB / total ${row.peakTotalResidentMb} MB (add heap ${row.peakAfterAddMb} / total ${row.peakAfterAddTotalResidentMb}  freeze Δheap ${row.peakFreezeDeltaMb} / Δtotal ${row.peakFreezeDeltaTotalResidentMb})`)
     console.log(`    retained ${row.retainedMb} MB  transient ${row.transientMb} MB  structured ${row.structuredMb} MB`)
     console.log(`    components: postings ${row.componentsMb.postings}  radix ${row.componentsMb.radixTree}  stored ${row.componentsMb.storedFieldsJson}`)
     console.log('')

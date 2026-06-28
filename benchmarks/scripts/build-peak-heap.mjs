@@ -67,6 +67,7 @@ function measurePhasedBuild (corpus, options) {
   }
   sampler.sample()
   const peakAfterAddMb = sampler.peakHeapMb()
+  const peakAfterAddTotalResidentMb = sampler.peakTotalResidentMb()
 
   const frozen = freezeFrozenIndexBuilder(builder)
   sampler.sample()
@@ -78,11 +79,15 @@ function measurePhasedBuild (corpus, options) {
   const storedMb = mbRound(breakdown.documents.storedFieldsJsonBytes)
   const structuredMb = mbRound(breakdown.estimatedStructuredBytes)
   const peakHeapMb = finished.peakHeapBytes / 1024 / 1024
+  const peakTotalResidentMb = finished.peakTotalResidentBytes / 1024 / 1024
 
   return {
     peakHeapMb,
     peakHeapKb: Number((finished.peakHeapBytes / 1024).toFixed(1)),
+    peakTotalResidentMb,
+    peakTotalResidentKb: Number((finished.peakTotalResidentBytes / 1024).toFixed(1)),
     peakAfterAddMb,
+    peakAfterAddTotalResidentMb,
     peakRssMb: finished.peakRssMb,
     retainedHeapMb: null,
     retainedHeapKb: null,
@@ -128,12 +133,17 @@ function medianScenario (runs, corpus, options) {
   const pickPeak = (key) => medianOf(peakSamples.map((s) => s[key]))
   const retainedHeapMb = medianOf(retainedSamples.map((s) => s.retainedHeapMb))
   const peakHeapMb = pickPeak('peakHeapMb')
+  const peakTotalResidentMb = pickPeak('peakTotalResidentMb')
   const first = peakSamples[0]
   return {
     peakHeapMb: Number(peakHeapMb.toFixed(4)),
     peakHeapKb: Number(medianOf(peakSamples.map((s) => s.peakHeapKb)).toFixed(1)),
+    peakTotalResidentMb: Number(peakTotalResidentMb.toFixed(4)),
+    peakTotalResidentKb: Number(medianOf(peakSamples.map((s) => s.peakTotalResidentKb)).toFixed(1)),
     peakAfterAddMb: Number(medianOf(peakSamples.map((s) => s.peakAfterAddMb)).toFixed(4)),
+    peakAfterAddTotalResidentMb: Number(medianOf(peakSamples.map((s) => s.peakAfterAddTotalResidentMb)).toFixed(4)),
     freezeDeltaMb: Number((peakHeapMb - medianOf(peakSamples.map((s) => s.peakAfterAddMb))).toFixed(4)),
+    freezeDeltaTotalResidentMb: Number((peakTotalResidentMb - medianOf(peakSamples.map((s) => s.peakAfterAddTotalResidentMb))).toFixed(4)),
     peakRssMb: Number(pickPeak('peakRssMb').toFixed(3)),
     retainedHeapMb,
     retainedHeapKb: medianOf(retainedSamples.map((s) => s.retainedHeapKb)),
@@ -163,7 +173,8 @@ function main () {
 
     const build = medianScenario(runs, corpus, spec.options)
 
-    console.log(`  peak (total):    ${build.peakHeapMb} MB (${build.peakHeapKb} KB)  after add: ${build.peakAfterAddMb} MB  freeze +${build.freezeDeltaMb} MB`)
+    console.log(`  peak heap:       ${build.peakHeapMb} MB (${build.peakHeapKb} KB)  after add: ${build.peakAfterAddMb} MB  freeze +${build.freezeDeltaMb} MB`)
+    console.log(`  peak total:      ${build.peakTotalResidentMb} MB (${build.peakTotalResidentKb} KB)  after add: ${build.peakAfterAddTotalResidentMb} MB  freeze +${build.freezeDeltaTotalResidentMb} MB`)
     console.log(`  retained:        ${build.retainedHeapMb} MB (${build.retainedHeapKb} KB)  peak/retained: ${build.peakVsRetainedRatio}x`)
     console.log(`  radix ~${build.peakRadixShareEstimatePct}% of peak (structured share ${build.radixShareOfStructuredPct}%)`)
 
@@ -181,7 +192,7 @@ function main () {
     node: process.version,
     gcExposed: typeof global.gc === 'function',
     runs,
-    note: 'peakHeapMb is max heapUsed above post-gc baseline during build; retainedHeapMb is measureHeap delta after gc.',
+    note: 'peakHeapMb is max heapUsed above post-gc baseline during build; peakTotalResidentMb is max heapUsed+external; retainedHeapMb is measureHeap delta after gc.',
     opt1Hint: 'OPT-1 targets freezeDeltaMb and radix overlap at freeze. If peakAfterAdd ≈ peak total, prioritize postings/storedFields pressure over radix pack.',
     scenarios,
   }

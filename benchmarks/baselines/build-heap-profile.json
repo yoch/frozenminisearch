@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-06-07T14:11:22.335Z",
+  "capturedAt": "2026-06-28T09:21:45.929Z",
   "node": "v24.16.0",
   "note": "One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ radix growth. synthetic-1field isolates multi-field per-doc cost.",
   "scenarios": {
@@ -10,11 +10,14 @@
       "fieldCount": 5,
       "corpusTextMb": 2.263,
       "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 77.052,
-      "peakTotalMb": 77.052,
-      "peakFreezeDeltaMb": 0,
-      "retainedMb": 0.0009,
-      "transientMb": 77.051,
+      "peakAfterAddMb": 47.94,
+      "peakAfterAddTotalResidentMb": 53.163,
+      "peakTotalMb": 54.592,
+      "peakTotalResidentMb": 66.406,
+      "peakFreezeDeltaMb": 6.652,
+      "peakFreezeDeltaTotalResidentMb": 13.243,
+      "retainedMb": 0.0008,
+      "transientMb": 54.591,
       "structuredMb": 2.541,
       "componentsMb": {
         "postings": 1.436,
@@ -30,11 +33,14 @@
       "fieldCount": 5,
       "corpusTextMb": 2.492,
       "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 68.311,
-      "peakTotalMb": 68.405,
-      "peakFreezeDeltaMb": 0.094,
-      "retainedMb": 0.0007,
-      "transientMb": 68.404,
+      "peakAfterAddMb": 39.043,
+      "peakAfterAddTotalResidentMb": 48.612,
+      "peakTotalMb": 39.043,
+      "peakTotalResidentMb": 48.612,
+      "peakFreezeDeltaMb": 0,
+      "peakFreezeDeltaTotalResidentMb": 0,
+      "retainedMb": 0,
+      "transientMb": 39.043,
       "structuredMb": 1.525,
       "componentsMb": {
         "postings": 1.196,
@@ -49,12 +55,15 @@
       "termCount": 4,
       "fieldCount": 1,
       "corpusTextMb": 0.498,
-      "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 31.15,
-      "peakTotalMb": 31.216,
-      "peakFreezeDeltaMb": 0.066,
-      "retainedMb": 0,
-      "transientMb": 31.216,
+      "corpusHoldMb": 0.006,
+      "peakAfterAddMb": 31.086,
+      "peakAfterAddTotalResidentMb": 31.884,
+      "peakTotalMb": 31.149,
+      "peakTotalResidentMb": 32.206,
+      "peakFreezeDeltaMb": 0.063,
+      "peakFreezeDeltaTotalResidentMb": 0.322,
+      "retainedMb": 0.001,
+      "transientMb": 31.148,
       "structuredMb": 0.488,
       "componentsMb": {
         "postings": 0.239,
@@ -65,9 +74,9 @@
     }
   },
   "inference": {
-    "radixHeavyTransientMb": 8.647,
-    "multiFieldPremiumMb": 45.835,
+    "radixHeavyTransientMb": 15.548,
+    "multiFieldPremiumMb": 23.443,
     "structuredPostingsPct": 56.5,
-    "transientVsStructuredRatio": 30.3
+    "transientVsStructuredRatio": 21.5
   }
 }

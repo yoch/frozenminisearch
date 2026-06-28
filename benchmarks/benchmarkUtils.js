@@ -80,24 +80,35 @@ export function pctDeltaRound (base, value, digits = 1) {
 }
 
 /**
- * Tracks max `heapUsed` above a post-gc baseline while a build runs.
+ * Tracks max `heapUsed` and `heapUsed + external` above a post-gc baseline while a build runs.
  * Use for transient peak during `add` / `freezeParams` (not retained heap after gc).
  */
 export function createPeakHeapSampler () {
   gc()
-  const baselineHeap = heapBytes()
-  const baselineRss = process.memoryUsage().rss
+  const baseline = process.memoryUsage()
+  const baselineHeap = baseline.heapUsed
+  const baselineExternal = baseline.external
+  const baselineTotalResident = baselineHeap + baselineExternal
+  const baselineRss = baseline.rss
   let peakHeap = baselineHeap
+  let peakExternal = baselineExternal
+  let peakTotalResident = baselineTotalResident
   let peakRss = baselineRss
 
   return {
     sample () {
       const u = process.memoryUsage()
       if (u.heapUsed > peakHeap) peakHeap = u.heapUsed
+      if (u.external > peakExternal) peakExternal = u.external
+      const totalResident = u.heapUsed + u.external
+      if (totalResident > peakTotalResident) peakTotalResident = totalResident
       if (u.rss > peakRss) peakRss = u.rss
     },
     peakHeapMb () {
       return mbRound(peakHeap - baselineHeap)
+    },
+    peakTotalResidentMb () {
+      return mbRound(peakTotalResident - baselineTotalResident)
     },
     finish (value) {
       return {
@@ -105,6 +116,10 @@ export function createPeakHeapSampler () {
         baselineHeapMb: mbRound(baselineHeap),
         peakHeapMb: mbRound(peakHeap - baselineHeap),
         peakHeapBytes: peakHeap - baselineHeap,
+        peakExternalMb: mbRound(peakExternal - baselineExternal),
+        peakExternalBytes: peakExternal - baselineExternal,
+        peakTotalResidentMb: mbRound(peakTotalResident - baselineTotalResident),
+        peakTotalResidentBytes: peakTotalResident - baselineTotalResident,
         peakRssMb: mbRound(peakRss),
         peakRssDeltaMb: mbRound(peakRss - baselineRss),
       }

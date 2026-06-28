@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Improved
+
+- **FrozenIndexBuilder build peak** — replace per-slot `SlotRanges` JS metadata in `IncrementalPostingsAccumulator` with a typed `slotIds` column and stable counting-sort finalize; lowers transient heap during `add` on vocabulary-rich corpora without changing frozen postings layout or wire format. Build-peak benchmarks now also report `peakTotalResidentMb` (heapUsed + external).
+
 ### Changed
 
 - **CI** — main workflow now runs lint, build, browser smoke, and coverage on Node `20.x`, `22.x`, and `24.x`, matching the `engines.node >=20` promise. `verify-npm-pack.cjs` runs after build to block dev-only paths from the published tarball.

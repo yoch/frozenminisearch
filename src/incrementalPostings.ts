@@ -1,10 +1,13 @@
 import {
+  allocateFreqs,
   clampFreq,
   type DocIdArray,
   type FreqArray,
 } from './compactPostings'
 import {
-  buildFrozenPostingsLayout,
+  choosePostingsLayout,
+  chooseSparseFieldIdWidth,
+  type FieldIdArray,
   type FrozenPostingsLayout,
 } from './frozenPostings'
 
@@ -23,6 +26,10 @@ export class GrowableUint32Column {
     return this._len
   }
 
+  get(index: number): number {
+    return this._buf[index]!
+  }
+
   push(value: number): void {
     if (this._len >= this._buf.length) {
       const grown = new Uint32Array(Math.max(1, this._buf.length * 2))
@@ -30,22 +37,6 @@ export class GrowableUint32Column {
       this._buf = grown
     }
     this._buf[this._len++] = value
-  }
-
-  copyRangeInto(
-    sourceOffset: number,
-    length: number,
-    target: DocIdArray,
-    targetOffset: number,
-    docIdWidth: 16 | 32,
-  ): void {
-    if (docIdWidth === 16) {
-      const out = target as Uint16Array
-      for (let i = 0; i < length; i++) out[targetOffset + i] = this._buf[sourceOffset + i]!
-    } else {
-      const out = target as Uint32Array
-      for (let i = 0; i < length; i++) out[targetOffset + i] = this._buf[sourceOffset + i]!
-    }
   }
 
   truncate(length: number): void {
@@ -69,19 +60,19 @@ export class GrowableFreqColumn {
     return this._len
   }
 
-  push(freq: number): void {
+  get(index: number): number {
+    return this._buf[index]!
+  }
+
+  push(freq: number): number {
+    const v = clampFreq(freq)
     if (this._len >= this._buf.length) {
       const grown = new Uint16Array(Math.max(1, this._buf.length * 2))
       grown.set(this._buf)
       this._buf = grown
     }
-    this._buf[this._len++] = clampFreq(freq)
-  }
-
-  copyRangeInto(sourceOffset: number, length: number, target: FreqArray, targetOffset: number): void {
-    for (let i = 0; i < length; i++) {
-      target[targetOffset + i] = this._buf[sourceOffset + i]!
-    }
+    this._buf[this._len++] = v
+    return v
   }
 
   truncate(length: number): void {
@@ -92,12 +83,6 @@ export class GrowableFreqColumn {
   }
 }
 
-/** Contiguous or multi-range view of postings for one (term, field) slot in the global buffers. */
-type SlotRanges = {
-  starts: number[]
-  lengths: number[]
-}
-
 export type IncrementalPostingsHints = {
   /** Initial capacity for global posting buffers. */
   estimatedTotalPostings?: number
@@ -105,13 +90,13 @@ export type IncrementalPostingsHints = {
 
 /**
  * Single-pass postings accumulator for {@link FrozenIndexBuilder}.
- * One global TypedArray stream per docIds/freqs; per-slot range metadata only.
+ * One global TypedArray stream per docIds/freqs/slotIds; finalize compacts by stable counting sort.
  */
 export class IncrementalPostingsAccumulator {
   private readonly _fieldCount: number
   private readonly _docIds: GrowableUint32Column
   private readonly _freqs: GrowableFreqColumn
-  private readonly _slots = new Map<number, SlotRanges>()
+  private readonly _slotIds: GrowableUint32Column
   private _totalPostings = 0
   private _maxFreq = 0
 
@@ -120,6 +105,7 @@ export class IncrementalPostingsAccumulator {
     const cap = Math.max(DEFAULT_CAPACITY, hints?.estimatedTotalPostings ?? 0)
     this._docIds = new GrowableUint32Column(cap)
     this._freqs = new GrowableFreqColumn(cap)
+    this._slotIds = new GrowableUint32Column(cap)
   }
 
   get totalPostings(): number {
@@ -132,88 +118,134 @@ export class IncrementalPostingsAccumulator {
 
   append(termIndex: number, fieldId: number, docId: number, freq: number): void {
     const slot = termIndex * this._fieldCount + fieldId
-    const writeIdx = this._docIds.length
     this._docIds.push(docId)
-    const v = clampFreq(freq)
-    this._freqs.push(v)
+    const v = this._freqs.push(freq)
+    this._slotIds.push(slot)
     if (v > this._maxFreq) this._maxFreq = v
     this._totalPostings++
-
-    let ranges = this._slots.get(slot)
-    if (ranges == null) {
-      ranges = { starts: [writeIdx], lengths: [1] }
-      this._slots.set(slot, ranges)
-      return
-    }
-    const last = ranges.starts.length - 1
-    const end = ranges.starts[last]! + ranges.lengths[last]!
-    if (end === writeIdx) {
-      ranges.lengths[last]!++
-    } else {
-      ranges.starts.push(writeIdx)
-      ranges.lengths.push(1)
-    }
   }
 
   clear(): void {
-    this._slots.clear()
-    // Drop global scratch backing so finalize does not retain duplicate posting bytes.
     this._docIds.truncate(0)
     this._freqs.truncate(0)
+    this._slotIds.truncate(0)
   }
 
-  private copySlot(
-    ranges: SlotRanges,
+  private scatterPostings(
     allDocIds: DocIdArray,
     allFreqs: FreqArray,
-    write: number,
+    cursors: Uint32Array,
     docIdWidth: 16 | 32,
-  ): number {
-    for (let r = 0; r < ranges.starts.length; r++) {
-      const start = ranges.starts[r]!
-      const len = ranges.lengths[r]!
-      this._docIds.copyRangeInto(start, len, allDocIds, write, docIdWidth)
-      this._freqs.copyRangeInto(start, len, allFreqs, write)
-      write += len
+  ): void {
+    const n = this._slotIds.length
+    for (let i = 0; i < n; i++) {
+      const slot = this._slotIds.get(i)
+      const dest = cursors[slot]!
+      cursors[slot] = dest + 1
+      const docId = this._docIds.get(i)
+      const freq = this._freqs.get(i)
+      if (docIdWidth === 16) {
+        (allDocIds as Uint16Array)[dest] = docId
+      } else {
+        (allDocIds as Uint32Array)[dest] = docId
+      }
+      allFreqs[dest] = freq
     }
-    return write
-  }
-
-  private slotLength(ranges: SlotRanges): number {
-    let n = 0
-    for (let i = 0; i < ranges.lengths.length; i++) n += ranges.lengths[i]!
-    return n
   }
 
   finalize(termCount: number, nextId: number): FrozenPostingsLayout {
     const fieldCount = this._fieldCount
     const totalPostings = this._totalPostings
     const maxFreq = this._maxFreq
-    const slots = this._slots
+    const slotCount = termCount * fieldCount
 
-    const layout = buildFrozenPostingsLayout(
+    if (slotCount > 0xffffffff) {
+      throw new Error(`postings slot count ${slotCount} exceeds u32 range`)
+    }
+
+    const counts = new Uint32Array(slotCount)
+    let nonEmptySlots = 0
+    const slotIdsLen = this._slotIds.length
+    for (let i = 0; i < slotIdsLen; i++) {
+      const slot = this._slotIds.get(i)
+      if (counts[slot] === 0) nonEmptySlots++
+      counts[slot]++
+    }
+
+    const layout = choosePostingsLayout(fieldCount, termCount, nonEmptySlots)
+    const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
+    const allDocIds: DocIdArray = docIdWidth === 16
+      ? new Uint16Array(totalPostings)
+      : new Uint32Array(totalPostings)
+    const allFreqs = allocateFreqs(totalPostings, maxFreq)
+    const slotOffsets = new Uint32Array(slotCount)
+    let write = 0
+    for (let slot = 0; slot < slotCount; slot++) {
+      slotOffsets[slot] = write
+      write += counts[slot]
+    }
+    const cursors = new Uint32Array(slotOffsets)
+
+    if (layout === 'dense') {
+      const denseOffsets = slotOffsets
+      const denseLengths = counts
+
+      this.scatterPostings(allDocIds, allFreqs, cursors, docIdWidth)
+      this.clear()
+
+      return {
+        fieldCount,
+        termCount,
+        nextId,
+        layout: 'dense',
+        docIdWidth,
+        allDocIds,
+        allFreqs,
+        denseOffsets,
+        denseLengths,
+      }
+    }
+
+    const sparseFieldIdWidth = chooseSparseFieldIdWidth(fieldCount)
+    const sparseFieldIdsScratch: number[] = []
+    const sparseOffsetsScratch: number[] = []
+    const sparseLengthsScratch: number[] = []
+    const termStarts = new Uint32Array(termCount + 1)
+
+    for (let ti = 0; ti < termCount; ti++) {
+      termStarts[ti] = sparseFieldIdsScratch.length
+      const base = ti * fieldCount
+      for (let f = 0; f < fieldCount; f++) {
+        const slot = base + f
+        const len = counts[slot]
+        if (len === 0) continue
+        sparseFieldIdsScratch.push(f)
+        sparseOffsetsScratch.push(slotOffsets[slot])
+        sparseLengthsScratch.push(len)
+      }
+      termStarts[ti + 1] = sparseFieldIdsScratch.length
+    }
+
+    this.scatterPostings(allDocIds, allFreqs, cursors, docIdWidth)
+    this.clear()
+
+    const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
+      ? new Uint16Array(sparseFieldIdsScratch)
+      : new Uint8Array(sparseFieldIdsScratch)
+
+    return {
       fieldCount,
       termCount,
       nextId,
-      totalPostings,
-      maxFreq,
-      {
-        nonEmptySlots: slots.size,
-        slotLength: (ti, f) => {
-          const ranges = slots.get(ti * fieldCount + f)
-          return ranges == null ? 0 : this.slotLength(ranges)
-        },
-        writeSlot: (ti, f, write, targets) => {
-          const slot = ti * fieldCount + f
-          const ranges = slots.get(slot)!
-          const next = this.copySlot(ranges, targets.allDocIds, targets.allFreqs, write, targets.docIdWidth)
-          slots.delete(slot)
-          return next
-        },
-      },
-    )
-    slots.clear()
-    this.clear()
-    return layout
+      layout: 'sparse',
+      docIdWidth,
+      sparseFieldIdWidth,
+      allDocIds,
+      allFreqs,
+      sparseTermStarts: termStarts,
+      sparseFieldIds,
+      sparseOffsets: new Uint32Array(sparseOffsetsScratch),
+      sparseLengths: new Uint32Array(sparseLengthsScratch),
+    }
   }
 }

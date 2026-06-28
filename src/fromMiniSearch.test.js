@@ -201,4 +201,16 @@ describe('fromMiniSearch loaders', () => {
     expect(fromJSON.search('zen art', { combineWith: 'AND' }).map(r => r.id))
       .toEqual(fromDocs.search('zen art', { combineWith: 'AND' }).map(r => r.id))
   })
+
+  test('fromJSON frozen toJSON round-trip is deterministic and search-equivalent', () => {
+    const direct = FrozenMiniSearch.fromDocuments(docs, options)
+    const snapshot = JSON.stringify(direct.toJSON())
+    const viaJsonA = FrozenMiniSearch.fromJSON(snapshot, options)
+    const viaJsonB = FrozenMiniSearch.fromJSON(snapshot, options)
+    const a = Buffer.from(viaJsonA.saveBinarySync())
+    const b = Buffer.from(viaJsonB.saveBinarySync())
+    expect(a.equals(b)).toBe(true)
+    expect(viaJsonA.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+      .toEqual(direct.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+  })
 })

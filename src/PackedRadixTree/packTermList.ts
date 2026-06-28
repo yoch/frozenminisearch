@@ -6,7 +6,7 @@ export type EdgeScratch = { label: string, child: number }
 export type NodeScratch = { value: number, leafOrder: number, edges: EdgeScratch[] }
 export type PackedRadixScratch = { nodes: NodeScratch[], rootId: number }
 
-export function createPackedRadixScratch(): PackedRadixScratch {
+function createPackedRadixScratch(): PackedRadixScratch {
   const nodes: NodeScratch[] = [{ value: PACKED_NO_VALUE, leafOrder: PACKED_NO_VALUE, edges: [] }]
   return { nodes, rootId: 0 }
 }
@@ -15,7 +15,7 @@ export function createPackedRadixScratch(): PackedRadixScratch {
  * Insert one term with its leaf index into a mutable scratch radix trie.
  * Mirrors {@link setRadixLeaf} / {@link createRadixPath} without nested `Map` nodes.
  */
-export function insertPackedRadixTerm(
+function insertPackedRadixTerm(
   scratch: PackedRadixScratch,
   term: string,
   termIndex: number,

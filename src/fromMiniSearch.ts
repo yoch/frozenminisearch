@@ -1,8 +1,4 @@
-import {
-  createPackedRadixScratch,
-  finalizePackedRadixScratch,
-  insertPackedRadixTerm,
-} from './PackedRadixTree/packTermList'
+import { packTermsFromList } from './PackedRadixTree/packTermList'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
@@ -131,7 +127,7 @@ function parseSnapshotIndex(
   shortIdRemap: Uint32Array | null = null,
 ): ParsedSnapshotIndex {
   const termCount = snapshot.index.length
-  const termIndexScratch = createPackedRadixScratch()
+  const terms: string[] = []
   const accumulator = new IncrementalPostingsAccumulator(fieldCount)
   const seenTerms = new Set<string>()
   const { index: entries, serializationVersion } = snapshot
@@ -149,6 +145,7 @@ function parseSnapshotIndex(
       throw snapshotError(`index term "${term}" is duplicated`)
     }
     seenTerms.add(term)
+    terms.push(term)
     const dataRecord = assertRecord(data, `index term "${term}"`)
     for (const fieldId in dataRecord) {
       const parsedFieldId = parseIntegerKey(fieldId, `index term "${term}" fieldId`)
@@ -170,11 +167,10 @@ function parseSnapshotIndex(
         )
       }
     }
-    insertPackedRadixTerm(termIndexScratch, term, termIndex)
   }
 
   return {
-    index: finalizePackedRadixScratch(termIndexScratch.nodes, termCount),
+    index: packTermsFromList(terms),
     accumulator,
     termCount,
   }

@@ -48,6 +48,7 @@ clean-build:
 build: clean-build
 	NODE_ENV=production $(RUN) rollup -c
 	node scripts/postbuild-cjs.cjs
+	node scripts/assert-public-bundles.cjs
 
 # Specialised build for PackedRadixTree benchmarks (rollup in bench mode).
 # Produces benchmarks/dist/packedRadix*.cjs, NOT dist/.
@@ -62,6 +63,7 @@ $(DIST_MARKER): $(BUILD_SOURCES)
 	rm -rf dist
 	NODE_ENV=production $(RUN) rollup -c
 	node scripts/postbuild-cjs.cjs
+	node scripts/assert-public-bundles.cjs
 
 # Marker for the packed-radix bench build.
 benchmarks/dist/packedRadixTree.cjs: $(PACKED_SOURCES)
@@ -315,6 +317,7 @@ docs-sync-media:
 prepublish-only:
 	$(RUN) vitest run
 	$(MAKE) build
+	node scripts/assert-public-bundles.cjs
 	node scripts/verify-npm-pack.cjs
 
 release-beta:

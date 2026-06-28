@@ -14,7 +14,21 @@ In-memory packed radix tree for string keys with numeric payloads.
 
 Frozen search uses `prefixRefs` / `fuzzyRefs` plus lazy `termByIndex` only when a posting is scored (match keys, `boostDocument`, etc.).
 
-## Usage
+## Product build path
+
+Document build and MiniSearch JSON import both pack terms through **`packTermsFromList`** in snapshot/insertion order (`terms[i]` → leaf index `i`):
+
+```typescript
+import { packTermsFromList } from './PackedRadixTree/packTermList'
+
+const index = packTermsFromList(terms)
+```
+
+`FrozenIndexBuilder` dedupes during `add` with a flat `Map<string, number>` and calls `packTermsFromList` once at `freeze`. `fromJSON` collects validated snapshot terms and calls the same primitive after postings are parsed.
+
+## Legacy / test helpers
+
+`fromRadixTree` converts a nested-`Map` radix (`radixTree.ts` / `SearchableMap`) into a packed tree. It remains for parity tests, benchmarks, and low-level encode fallbacks (`treeShape` wire), but is **not** on the product `saveBinary` path.
 
 ```typescript
 import PackedRadixTree, { fromRadixTree } from './PackedRadixTree'
@@ -25,19 +39,6 @@ setRadixLeaf(radixTree, 'foo', 0)
 setRadixLeaf(radixTree, 'bar', 1)
 
 const tree = fromRadixTree(radixTree, 2)
-
-tree.get('foo') // 0
-Array.from(tree.prefixRefs('f'))
-Array.from(tree.fuzzyRefs('fxo', 1))
-```
-
-During frozen index build, term indexes are assigned before insertion and stored
-as numeric radix leaves:
-
-```typescript
-import { getOrCreateRadixLeaf, type RadixTree } from '../radixTree'
-
-const termIndex = getOrCreateRadixLeaf(radixTree, term, () => nextIndex++)
 ```
 
 Binary encode/decode for frozen MiniSearch indices: columnar wire in `src/msv5/packedRadixBinaryMsv5.ts`. Leaf invariants are checked by `validateRadixLeaves` in `radixTree.ts` at pack time (`fromRadixTree`) and by `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts` on the packed runtime index.

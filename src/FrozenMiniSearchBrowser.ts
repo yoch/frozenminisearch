@@ -1,5 +1,5 @@
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
-import { encodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5EncodeBrowser'
+import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodePacked'
 import { buildBinarySnapshotInput } from './frozenBinaryShared'
 import {
   defaultFrozenLoadOptions,
@@ -29,15 +29,14 @@ export function freezeFrozenIndexBuilder<T>(
 
 export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCore<T> {
   async saveBinaryAsync(saveOptions: BrowserSaveBinaryAsyncOptions = {}): Promise<Uint8Array> {
-    return encodeFrozenSnapshotMsv5Browser(
+    return encodeFrozenSnapshotMsv5PackedBrowser(
       this._binarySnapshotInput(),
-      undefined,
       this._index,
       saveOptions.compression,
     )
   }
 
-  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotMsv5Browser>[0] {
+  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotMsv5PackedBrowser>[0] {
     return buildBinarySnapshotInput({
       documentCount: this._documentCount,
       nextId: this._nextId,

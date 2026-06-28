@@ -1,9 +1,8 @@
 import {
   decodeFrozenSnapshot,
   decodeFrozenSnapshotAsync,
-  encodeFrozenSnapshot,
-  encodeFrozenSnapshotAsync,
 } from './binaryFormat'
+import { encodeFrozenSnapshotPacked, encodeFrozenSnapshotPackedAsync } from './binaryEncodePacked'
 import { buildBinarySnapshotInput } from './frozenBinaryShared'
 import {
   defaultFrozenLoadOptions,
@@ -29,15 +28,15 @@ export function freezeFrozenIndexBuilder<T>(builder: FrozenIndexBuilder<T>): Fro
 export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   /** Serialize this index as a frozen binary snapshot (synchronous). */
   saveBinarySync(saveOptions: SaveBinaryOptions = {}): Buffer {
-    return encodeFrozenSnapshot(this._binarySnapshotInput(), undefined, this._index, saveOptions.compression)
+    return encodeFrozenSnapshotPacked(this._binarySnapshotInput(), this._index, saveOptions.compression)
   }
 
   /** Non-blocking snapshot serialization with the selected compression codec. */
   async saveBinaryAsync(saveOptions: SaveBinaryOptions = {}): Promise<Buffer> {
-    return encodeFrozenSnapshotAsync(this._binarySnapshotInput(), undefined, this._index, saveOptions.compression)
+    return encodeFrozenSnapshotPackedAsync(this._binarySnapshotInput(), this._index, saveOptions.compression)
   }
 
-  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshot>[0] {
+  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotPacked>[0] {
     return buildBinarySnapshotInput({
       documentCount: this._documentCount,
       nextId: this._nextId,

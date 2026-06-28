@@ -613,6 +613,18 @@ describe('FrozenIndexBuilder', () => {
     expect(a.equals(c)).toBe(true)
   })
 
+  test('fromJSON frozen toJSON round-trip is deterministic and search-equivalent', () => {
+    const fromDocs = buildFrozenDirect()
+    const snapshot = JSON.stringify(fromDocs.toJSON())
+    const viaJsonA = FrozenMiniSearch.fromJSON(snapshot, options)
+    const viaJsonB = FrozenMiniSearch.fromJSON(snapshot, options)
+    const a = Buffer.from(viaJsonA.saveBinarySync())
+    const b = Buffer.from(viaJsonB.saveBinarySync())
+    expect(a.equals(b)).toBe(true)
+    expectSameResults(fromDocs, viaJsonA, 'zen whale', { combineWith: 'OR' })
+    expectSameResults(fromDocs, viaJsonB, 'zen whale', { combineWith: 'OR' })
+  })
+
   test('empty index via freeze without add', () => {
     const empty = freezeFrozenIndexBuilder(createFrozenIndexBuilder(options))
     expect(empty.documentCount).toBe(0)

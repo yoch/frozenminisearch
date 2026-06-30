@@ -1,10 +1,6 @@
 import type { Options, OptionsWithDefaults } from './searchTypes'
-import {
-  defaultSearchOptions,
-  defaultAutoSuggestOptions,
-  defaultFrozenLoadOptions,
-  getFrozenDefault,
-} from './searchDefaults'
+import { getFrozenDefault } from './searchDefaults'
+import { resolveFrozenOptions } from './frozenOptions'
 
 /**
  * Indexing-time view of options: same shape as the canonical {@link OptionsWithDefaults}
@@ -13,15 +9,7 @@ import {
 export type IndexingOptions<T> = OptionsWithDefaults<T>
 
 export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<T> {
-  if (options?.fields == null) {
-    throw new Error('FrozenMiniSearch: option "fields" must be provided')
-  }
-  return {
-    ...defaultFrozenLoadOptions,
-    ...options,
-    searchOptions: { ...defaultSearchOptions, ...(options.searchOptions || {}) },
-    autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
-  } as IndexingOptions<T>
+  return resolveFrozenOptions(options)
 }
 
 export function buildFieldIds(fields: string[]): { [key: string]: number } {

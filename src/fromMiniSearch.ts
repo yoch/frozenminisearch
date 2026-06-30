@@ -2,7 +2,7 @@ import { packTermsFromList } from './PackedRadixTree/packTermList'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
-import { resolveIndexingOptions } from './indexingCore'
+import { assertFieldsMatchSnapshot, resolveFrozenOptions } from './frozenOptions'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 import type PackedRadixTree from './PackedRadixTree'
 import type { FrozenAssembleParams } from './frozenTypes'
@@ -103,19 +103,6 @@ function parseIndexEntry(
     return assertRecord((entry as { ds: unknown }).ds, context)
   }
   return assertRecord(entry, context)
-}
-
-function assertFieldsMatchSnapshot(
-  optionsFields: readonly string[],
-  snapFieldIds: { [field: string]: number },
-): void {
-  const snapNames = Object.keys(snapFieldIds).sort()
-  const optNames = [...optionsFields].sort()
-  if (snapNames.length !== optNames.length || snapNames.some((name, i) => name !== optNames[i])) {
-    throw new Error(
-      `FrozenMiniSearch: option "fields" must match the indexed fields exactly (expected: ${snapNames.join(', ')})`,
-    )
-  }
 }
 
 // Postings segments must be sorted by docId for search (binary seek, gates). We do not
@@ -246,7 +233,7 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   if (options.fields?.length) {
     assertFieldsMatchSnapshot(fields, snapshot.fieldIds)
   }
-  const opts = resolveIndexingOptions({ ...options, fields })
+  const opts = resolveFrozenOptions({ ...options, fields })
 
   const fieldCount = opts.fields.length
   const documentCount = assertNonNegativeInteger(snapshot.documentCount, 'documentCount')

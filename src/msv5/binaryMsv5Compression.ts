@@ -1,46 +1,37 @@
 import zlib from 'node:zlib'
 import type { Transform } from 'node:stream'
 import { crc32Buffer, crc32Update } from '../binaryIo'
-import { readAscii, readU16LE, readU8, readU32LE } from '../binaryBytes'
 import type { BinaryCompression } from '../searchTypes'
 import type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
 import {
   CODEC_RAW,
   CODEC_ZLIB,
   CODEC_ZSTD,
-  MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER,
   MSV5_ERR_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH,
   MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH,
   MSV5_ERR_PAYLOAD_CRC_MISMATCH,
   MSV5_ERR_PAYLOAD_EXCEEDS_1GIB,
-  MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS,
-  MSV5_ERR_RAW_PAYLOAD_LENGTH,
   MSV5_ERR_SECTION_CRC_MISMATCH,
-  MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC,
-  MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED,
-  MSV5_ERR_SECTION_OUT_OF_BOUNDS,
-  MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH,
-  MSV5_FORMAT_REV_OFFSET,
-  MSV5_FORMAT_REV_PAYLOAD,
   MSV5_HEADER_SIZE,
   MSV5_MIN_COMPRESS_BYTES,
-  MSV5_PAYLOAD_CODEC_OFFSET,
-  MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
-  MSV5_PAYLOAD_COMPRESSED_OFFSET,
-  MSV5_PAYLOAD_CRC_OFFSET,
-  MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET,
-  MSV5_SECTION_COUNT,
-  MSV5_SECTION_COUNT_OFFSET,
-  MSV5_SECTION_DIR_OFFSET,
-  MSV5_SECTION_ENTRY_BYTES,
   MSV5_ZSTD_LEVEL,
-  MSV5_ZSTD_LEVEL_OFFSET,
 } from './binaryMsv5Constants'
 import {
   computeSectionDirectory,
   concatRawSectionsWithCrc,
   writeRawSectionsIntoPayload,
 } from './binaryMsv5PayloadAssembly'
+import {
+  assertRawSectionCount,
+  buildMsv5CompressionMeta,
+  isMsv5Bytes,
+  MSV5_MAX_UNCOMPRESSED_BYTES,
+  preparePayload as prepareMsv5Payload,
+  readMsv5GlobalFlags as readMsv5GlobalFlagsShared,
+  readMsv5SectionDirectory as readMsv5SectionDirectoryShared,
+  readMsv5SnapshotCompressionMeta as readMsv5SnapshotCompressionMetaShared,
+  writeMsv5FileHeader,
+} from './binaryMsv5ContainerShared'
 export type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
 
 export interface Msv5AssembledFile {
@@ -50,12 +41,11 @@ export interface Msv5AssembledFile {
 }
 
 /** Hard cap on the uncompressed payload, rejected before allocation (compressed-bomb guard).
- *  This is the single trust boundary for untrusted snapshots: {@link readPayloadMeta} rejects
+ *  This is the single trust boundary for untrusted snapshots: {@link preparePayload} rejects
  *  headers above this size; sync decompress uses the same cap via `maxOutputLength`.
  *  A malicious header can still declare up to 1 GiB — no tighter native limit helps without
  *  trusting `uncompressedLength` from that same header. Semantic integrity (length match,
  *  payload CRC, per-section CRC) is enforced after decode. */
-const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 
 // zstd landed in node:zlib at Node 22.15.0 (22.x line) / 23.8.0, where the whole family
 // (zstdCompress[Sync], zstdDecompressSync, createZstdDecompress) ships together — so probing one
@@ -81,93 +71,6 @@ function zstdUnavailableReadError(): Error {
     + '(added in Node 22.15.0). Upgrade Node.js to read this snapshot, or re-save it from a '
     + 'newer runtime with compression: "raw" or "zlib".',
   )
-}
-
-function assertPayloadFormatRev(buf: Buffer | Uint8Array): void {
-  const rev = readU16LE(buf, MSV5_FORMAT_REV_OFFSET)
-  if (rev !== MSV5_FORMAT_REV_PAYLOAD) {
-    throw new Error(`MSv5 unsupported format revision ${rev}`)
-  }
-}
-
-function readPayloadMeta(fileBuf: Buffer | Uint8Array): {
-  payloadOffset: number
-  compressedLength: number
-  uncompressedLength: number
-  payloadCrc32: number
-  payloadCodec: number
-} {
-  const payloadOffset = readU32LE(fileBuf, MSV5_PAYLOAD_COMPRESSED_OFFSET)
-  const compressedLength = readU32LE(fileBuf, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)
-  const uncompressedLength = readU32LE(fileBuf, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
-  const payloadCrc32 = readU32LE(fileBuf, MSV5_PAYLOAD_CRC_OFFSET)
-  const payloadCodec = readU8(fileBuf, MSV5_PAYLOAD_CODEC_OFFSET)
-  if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
-  }
-  return { payloadOffset, compressedLength, uncompressedLength, payloadCrc32, payloadCodec }
-}
-
-function buildMsv5CompressionMeta(
-  entries: Msv5SectionEntry[],
-  uncompressedLength: number,
-  compressedLength: number,
-  payloadCrc32: number,
-  codec: number,
-  zstdLevel: number,
-): Msv5SnapshotCompressionMeta {
-  return {
-    formatRev: MSV5_FORMAT_REV_PAYLOAD,
-    payloadCodec: codec,
-    zstdLevel,
-    uncompressedLength,
-    compressedLength,
-    payloadCrc32,
-    sections: entries.map((e, sectionId) => ({
-      sectionId,
-      uncompressedOffset: e.fileOffset,
-      uncompressedLength: e.uncompressedLength,
-      sectionCrc32: e.sectionCrc32,
-    })),
-  }
-}
-
-function writeMsv5FileHeader(
-  out: Buffer,
-  globalFlags: number,
-  entries: Msv5SectionEntry[],
-  uncompressedLength: number,
-  payloadCrc32: number,
-  compressedLength: number,
-  codec: number,
-  zstdLevel: number,
-): void {
-  out.write('MSv5', 0, 4, 'ascii')
-  out.writeUInt16LE(5, 4)
-  out.writeUInt16LE(globalFlags & 0xffff, 6)
-  out.writeUInt8(codec, MSV5_PAYLOAD_CODEC_OFFSET)
-  out.writeUInt8(zstdLevel, MSV5_ZSTD_LEVEL_OFFSET)
-  out.writeUInt16LE(MSV5_FORMAT_REV_PAYLOAD, MSV5_FORMAT_REV_OFFSET)
-  out.writeUInt32LE(MSV5_SECTION_COUNT, MSV5_SECTION_COUNT_OFFSET)
-
-  out.writeUInt32LE(MSV5_HEADER_SIZE, MSV5_PAYLOAD_COMPRESSED_OFFSET)
-  out.writeUInt32LE(compressedLength, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)
-  out.writeUInt32LE(uncompressedLength, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
-  out.writeUInt32LE(payloadCrc32, MSV5_PAYLOAD_CRC_OFFSET)
-
-  let dirOff = MSV5_SECTION_DIR_OFFSET
-  for (const e of entries) {
-    out.writeUInt32LE(e.fileOffset, dirOff)
-    out.writeUInt32LE(e.uncompressedLength, dirOff + 4)
-    out.writeUInt32LE(e.sectionCrc32, dirOff + 8)
-    dirOff += MSV5_SECTION_ENTRY_BYTES
-  }
-}
-
-function assertRawSectionCount(rawSections: Array<Buffer | Uint8Array>): void {
-  if (rawSections.length !== MSV5_SECTION_COUNT) {
-    throw new Error(`MSv5 expects ${MSV5_SECTION_COUNT} sections, got ${rawSections.length}`)
-  }
 }
 
 function concatAndValidateSections(rawSections: Array<Buffer | Uint8Array>): {
@@ -482,43 +385,11 @@ export async function assembleMsv5FileAsync(
 }
 
 export function readMsv5SectionDirectory(buf: Buffer | Uint8Array): Msv5SectionEntry[] {
-  if (buf.length < MSV5_HEADER_SIZE) {
-    throw new Error(MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER)
-  }
-  const sectionCount = readU32LE(buf, MSV5_SECTION_COUNT_OFFSET)
-  if (sectionCount !== MSV5_SECTION_COUNT) {
-    throw new Error(`MSv5 section count mismatch: ${sectionCount}`)
-  }
-  assertPayloadFormatRev(buf)
-  const entries: Msv5SectionEntry[] = []
-  let dirOff = MSV5_SECTION_DIR_OFFSET
-  for (let i = 0; i < sectionCount; i++) {
-    entries.push({
-      fileOffset: readU32LE(buf, dirOff),
-      uncompressedLength: readU32LE(buf, dirOff + 4),
-      sectionCrc32: readU32LE(buf, dirOff + 8),
-    })
-    dirOff += MSV5_SECTION_ENTRY_BYTES
-  }
-  return entries
+  return readMsv5SectionDirectoryShared(buf)
 }
 
 export function readMsv5SnapshotCompressionMeta(buf: Buffer | Uint8Array): Msv5SnapshotCompressionMeta {
-  const directory = readMsv5SectionDirectory(buf)
-  return {
-    formatRev: MSV5_FORMAT_REV_PAYLOAD,
-    payloadCodec: readU8(buf, MSV5_PAYLOAD_CODEC_OFFSET),
-    zstdLevel: readU8(buf, MSV5_ZSTD_LEVEL_OFFSET),
-    uncompressedLength: readU32LE(buf, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET),
-    compressedLength: readU32LE(buf, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET),
-    payloadCrc32: readU32LE(buf, MSV5_PAYLOAD_CRC_OFFSET),
-    sections: directory.map((e, sectionId) => ({
-      sectionId,
-      uncompressedOffset: e.fileOffset,
-      uncompressedLength: e.uncompressedLength,
-      sectionCrc32: e.sectionCrc32,
-    })),
-  }
+  return readMsv5SnapshotCompressionMetaShared(buf)
 }
 
 function verifySectionCrc(section: Buffer, expected: number): void {
@@ -696,28 +567,6 @@ function loadMsv5SectionsFromCompressedStream(
   })
 }
 
-function validatePayloadDirectory(
-  directory: Msv5SectionEntry[],
-  uncompressedLength: number,
-): void {
-  let prevEnd = 0
-  for (const entry of directory) {
-    if ((entry.fileOffset & 3) !== 0) {
-      throw new Error(MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED)
-    }
-    if (entry.fileOffset < prevEnd) {
-      throw new Error(MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC)
-    }
-    if (entry.fileOffset + entry.uncompressedLength > uncompressedLength) {
-      throw new Error(MSV5_ERR_SECTION_OUT_OF_BOUNDS)
-    }
-    prevEnd = entry.fileOffset + entry.uncompressedLength
-  }
-  if (prevEnd !== uncompressedLength) {
-    throw new Error(MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH)
-  }
-}
-
 interface PreparedPayload {
   payloadCodec: number
   slice: Buffer
@@ -727,21 +576,10 @@ interface PreparedPayload {
 
 /** Shared validation + bounds for both the sync and async load paths. */
 function preparePayload(fileBuf: Buffer, directory: Msv5SectionEntry[]): PreparedPayload {
-  assertPayloadFormatRev(fileBuf)
-  const { payloadOffset, compressedLength, uncompressedLength, payloadCrc32, payloadCodec }
-    = readPayloadMeta(fileBuf)
-  validatePayloadDirectory(directory, uncompressedLength)
-
-  if (payloadOffset !== MSV5_HEADER_SIZE || payloadOffset + compressedLength > fileBuf.length) {
-    throw new Error(MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS)
-  }
-  if (payloadCodec === CODEC_RAW && compressedLength !== uncompressedLength) {
-    throw new Error(MSV5_ERR_RAW_PAYLOAD_LENGTH)
-  }
-
+  const { payloadCodec, slice, uncompressedLength, payloadCrc32 } = prepareMsv5Payload(fileBuf, directory)
   return {
     payloadCodec,
-    slice: fileBuf.subarray(payloadOffset, payloadOffset + compressedLength),
+    slice: slice as Buffer,
     uncompressedLength,
     payloadCrc32,
   }
@@ -813,9 +651,9 @@ export async function loadMsv5SectionsAsync(
 }
 
 export function isMsv5Buffer(buf: Buffer | Uint8Array): boolean {
-  return buf.length >= 4 && readAscii(buf, 0, 4) === 'MSv5'
+  return isMsv5Bytes(buf)
 }
 
 export function readMsv5GlobalFlags(buf: Buffer | Uint8Array): number {
-  return readU16LE(buf, 6)
+  return readMsv5GlobalFlagsShared(buf)
 }

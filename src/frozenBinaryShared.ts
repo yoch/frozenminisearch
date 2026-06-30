@@ -2,10 +2,9 @@ import { fieldNamesFromFieldIds, type FrozenSnapshot } from './binaryStructures'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import type { FrozenAssembleParams } from './frozenTypes'
 import {
-  defaultAutoSuggestOptions,
-  defaultFrozenLoadOptions,
-  defaultSearchOptions,
-} from './searchDefaults'
+  assertFieldsMatchSnapshot,
+  resolveFrozenOptions,
+} from './frozenOptions'
 import type { Options } from './searchTypes'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 
@@ -19,19 +18,6 @@ type BinarySnapshotState = {
   storedFieldsLayout: FrozenSnapshot['storedFieldsLayout']
   fieldLengthMatrix: FrozenSnapshot['fieldLengthMatrix']
   postings: FrozenSnapshot['postings']
-}
-
-function assertFieldsMatchSnapshot(
-  optionsFields: readonly string[],
-  snapFieldIds: { [field: string]: number },
-): void {
-  const snapNames = Object.keys(snapFieldIds).sort()
-  const optNames = [...optionsFields].sort()
-  if (snapNames.length !== optNames.length || snapNames.some((name, i) => name !== optNames[i])) {
-    throw new Error(
-      `FrozenMiniSearch: option "fields" must match the indexed fields exactly (expected: ${snapNames.join(', ')})`,
-    )
-  }
 }
 
 export function buildBinarySnapshotInput(state: BinarySnapshotState): FrozenSnapshot {
@@ -59,19 +45,7 @@ export function assembleParamsFromBinarySnapshot<T>(
     assertFieldsMatchSnapshot(options.fields, snap.fieldIds)
   }
 
-  const resolvedOptions = {
-    ...defaultFrozenLoadOptions,
-    ...options,
-    fields: options.fields ?? snapshotFields,
-    searchOptions: {
-      ...defaultSearchOptions,
-      ...(options.searchOptions || {}),
-    },
-    autoSuggestOptions: {
-      ...defaultAutoSuggestOptions,
-      ...(options.autoSuggestOptions || {}),
-    },
-  } as FrozenAssembleParams<T>['options']
+  const resolvedOptions = resolveFrozenOptions(options, snapshotFields)
 
   const index = snap.packedTermIndex
   if (index == null) {

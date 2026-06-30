@@ -3,7 +3,6 @@ import {
   decodeFrozenSnapshotAsync,
 } from './binaryFormat'
 import { encodeFrozenSnapshotPacked, encodeFrozenSnapshotPackedAsync } from './binaryEncodePacked'
-import { buildBinarySnapshotInput } from './frozenBinaryShared'
 import {
   defaultFrozenLoadOptions,
 } from './searchDefaults'
@@ -34,20 +33,6 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   /** Non-blocking snapshot serialization with the selected compression codec. */
   async saveBinaryAsync(saveOptions: SaveBinaryOptions = {}): Promise<Buffer> {
     return encodeFrozenSnapshotPackedAsync(this._binarySnapshotInput(), this._index, saveOptions.compression)
-  }
-
-  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotPacked>[0] {
-    return buildBinarySnapshotInput({
-      documentCount: this._documentCount,
-      nextId: this._nextId,
-      fieldIds: this._fieldIds,
-      fieldCount: this._fieldCount,
-      avgFieldLength: this._avgFieldLength,
-      externalIds: this._externalIds,
-      storedFieldsLayout: this._storedFields,
-      fieldLengthMatrix: this._fieldLengthMatrix,
-      postings: this._postings,
-    })
   }
 
   /** Load a frozen binary snapshot. */

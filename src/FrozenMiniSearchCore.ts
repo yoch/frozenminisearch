@@ -40,7 +40,7 @@ import {
   materializeOwnedSnapshot,
   type SnapshotOwnershipMode,
 } from './frozenOwnedSnapshot'
-import { assembleParamsFromBinarySnapshot } from './frozenBinaryShared'
+import { assembleParamsFromBinarySnapshot, buildBinarySnapshotInput } from './frozenBinaryShared'
 import type { FrozenSnapshot } from './binaryStructures'
 import { readU8 } from './binaryBytes'
 import { MSV5_PAYLOAD_CODEC_OFFSET } from './msv5/binaryMsv5Constants'
@@ -54,6 +54,26 @@ import { getFrozenDefault, type FrozenDefaultOptionName } from './searchDefaults
 const noStoredFields = (): undefined => undefined
 type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (params: FrozenAssembleParams<T>) => I
 export type { FrozenMiniSearchCtor }
+
+export function materializeFrozenAssembleParams<T>(
+  params: FrozenAssembleParams<T>,
+  trustedSource: boolean,
+  ownershipMode: SnapshotOwnershipMode,
+): FrozenAssembleParams<T> {
+  const owned = materializeOwnedSnapshot(params, ownershipMode)
+  const termCount = owned.termCount
+  if (owned.fieldLengthMatrix.length !== owned.nextId * owned.fieldCount) {
+    throw new Error('FrozenMiniSearch: fieldLengthMatrix size mismatch')
+  }
+  if (owned.avgFieldLength.length !== owned.fieldCount) {
+    throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
+  }
+  if (!trustedSource) {
+    validateFrozenPostingsLayout(owned.postings, owned.documentCount, owned.nextId)
+    validateFrozenTermIndexLeaves(owned.index, termCount)
+  }
+  return owned
+}
 
 function assembleFrozenInternal<T>(
   params: FrozenAssembleParams<T>,
@@ -72,18 +92,7 @@ function assembleFrozenInternal<T, I extends FrozenMiniSearchCore<T>>(
   ownershipMode: SnapshotOwnershipMode,
   Ctor?: FrozenMiniSearchCtor<T, I>,
 ): FrozenMiniSearchCore<T> | I {
-  const owned = materializeOwnedSnapshot(params, ownershipMode)
-  const termCount = owned.termCount
-  if (owned.fieldLengthMatrix.length !== owned.nextId * owned.fieldCount) {
-    throw new Error('FrozenMiniSearch: fieldLengthMatrix size mismatch')
-  }
-  if (owned.avgFieldLength.length !== owned.fieldCount) {
-    throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
-  }
-  if (!trustedSource) {
-    validateFrozenPostingsLayout(owned.postings, owned.documentCount, owned.nextId)
-    validateFrozenTermIndexLeaves(owned.index, termCount)
-  }
+  const owned = materializeFrozenAssembleParams(params, trustedSource, ownershipMode)
   if (Ctor == null) {
     return new FrozenMiniSearchCore(owned)
   }
@@ -323,6 +332,20 @@ export default class FrozenMiniSearchCore<T = any> {
       builder.add(document)
     }
     return assembleFrozenInternal(builder.freezeParams(), true, 'trusted-build', this)
+  }
+
+  protected _binarySnapshotInput(): ReturnType<typeof buildBinarySnapshotInput> {
+    return buildBinarySnapshotInput({
+      documentCount: this._documentCount,
+      nextId: this._nextId,
+      fieldIds: this._fieldIds,
+      fieldCount: this._fieldCount,
+      avgFieldLength: this._avgFieldLength,
+      externalIds: this._externalIds,
+      storedFieldsLayout: this._storedFields,
+      fieldLengthMatrix: this._fieldLengthMatrix,
+      postings: this._postings,
+    })
   }
 
   private _getFieldLength(docId: number, fieldId: number): number {

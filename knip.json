@@ -13,7 +13,7 @@
     "**/*.test.ts",
     "src/PackedRadixTree/devStringIterators.ts",
     "src/binaryEncode.ts",
-    "src/binaryMsv5EncodeShared.ts",
+    "src/msv5/binaryMsv5EncodeShared.ts",
     "src/binaryBytes.ts",
     "src/internal/frozenInternals.ts",
     "src/msv5/binaryMsv5Constants.ts"

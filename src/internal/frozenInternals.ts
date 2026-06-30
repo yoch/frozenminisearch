@@ -1,16 +1,15 @@
 import type FrozenMiniSearchCore from '../FrozenMiniSearchCore'
-import type { FrozenMiniSearchCtor } from '../FrozenMiniSearchCore'
+import { materializeFrozenAssembleParams, type FrozenMiniSearchCtor } from '../FrozenMiniSearchCore'
 import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot, parseSnapshotIndex } from '../fromMiniSearch'
-import { type FrozenTermIndex, validateFrozenTermIndexLeaves } from '../frozenTermIndex'
+import { type FrozenTermIndex } from '../frozenTermIndex'
 import type { IdToShortIdLookup } from '../frozenIdLookup'
 import {
   postingsTypedBytes,
-  validateFrozenPostingsLayout,
   type FrozenPostingsLayout,
 } from '../frozenPostings'
 import type { FieldLengthArray } from '../fieldLengthMatrix'
 import type { FrozenAssembleParams, FrozenMemoryBreakdown, OptionsWithDefaults } from '../frozenTypes'
-import { materializeOwnedSnapshot, type SnapshotOwnershipMode } from '../frozenOwnedSnapshot'
+import { type SnapshotOwnershipMode } from '../frozenOwnedSnapshot'
 import type { StoredFieldsLayout } from '../storedFieldsLayout'
 import {
   readStoredFields,
@@ -53,19 +52,7 @@ export function frozenAssembleWithCtor<T, I extends FrozenMiniSearchCore<T>>(
   ownershipMode: SnapshotOwnershipMode,
   Ctor: FrozenMiniSearchCtor<T, I>,
 ): I {
-  const owned = materializeOwnedSnapshot(params, ownershipMode)
-  const termCount = owned.termCount
-  if (owned.fieldLengthMatrix.length !== owned.nextId * owned.fieldCount) {
-    throw new Error('FrozenMiniSearch: fieldLengthMatrix size mismatch')
-  }
-  if (owned.avgFieldLength.length !== owned.fieldCount) {
-    throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
-  }
-  if (!trustedSource) {
-    validateFrozenPostingsLayout(owned.postings, owned.documentCount, owned.nextId)
-    validateFrozenTermIndexLeaves(owned.index, termCount)
-  }
-  return new Ctor(owned)
+  return new Ctor(materializeFrozenAssembleParams(params, trustedSource, ownershipMode))
 }
 
 /** Test/benchmark-only import path from a pre-parsed MiniSearch snapshot. */

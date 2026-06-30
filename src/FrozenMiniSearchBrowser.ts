@@ -1,6 +1,5 @@
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
 import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodePacked'
-import { buildBinarySnapshotInput } from './frozenBinaryShared'
 import {
   defaultFrozenLoadOptions,
 } from './searchDefaults'
@@ -34,20 +33,6 @@ export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCo
       this._index,
       saveOptions.compression,
     )
-  }
-
-  private _binarySnapshotInput(): Parameters<typeof encodeFrozenSnapshotMsv5PackedBrowser>[0] {
-    return buildBinarySnapshotInput({
-      documentCount: this._documentCount,
-      nextId: this._nextId,
-      fieldIds: this._fieldIds,
-      fieldCount: this._fieldCount,
-      avgFieldLength: this._avgFieldLength,
-      externalIds: this._externalIds,
-      storedFieldsLayout: this._storedFields,
-      fieldLengthMatrix: this._fieldLengthMatrix,
-      postings: this._postings,
-    })
   }
 
   static async loadBinaryAsync<T>(

@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-Core TypeScript sources live in `src/`. Public exports start at `src/index.ts` and `src/FrozenMiniSearch.ts`; binary snapshot code is split between `src/binary*.ts` and `src/msv5/`; packed radix internals are in `src/PackedRadixTree/`; SearchableMap compatibility code is in `src/SearchableMap/`. Unit tests sit beside sources as `*.test.js` or `*.test.ts`. Parity tests against upstream MiniSearch are under `dev/parity/`, longer internal sweeps under `dev/internal/`, shared test helpers under `testSupport/`, examples under `examples/`, and performance tooling plus baselines under `benchmarks/`. Generated outputs such as `dist/`, `coverage/`, and `docs/` should not be hand-edited.
+Core TypeScript sources live in `src/`. Public exports start at `src/index.ts` and `src/FrozenMiniSearch.ts`; binary snapshot code is split between `src/binary*.ts` and `src/msv5/`; packed radix internals are in `src/PackedRadixTree/`. SearchableMap parity now uses upstream MiniSearch adapters under `testSupport/`, not an in-tree runtime fork. Unit tests sit beside sources as `*.test.js` or `*.test.ts`. Parity tests against upstream MiniSearch are under `dev/parity/`, longer internal sweeps under `dev/internal/`, shared test helpers under `testSupport/`, examples under `examples/`, and performance tooling plus baselines under `benchmarks/`. Generated outputs such as `dist/`, `coverage/`, and `docs/` should not be hand-edited.
 
 ## Build, Test, and Development Commands
 

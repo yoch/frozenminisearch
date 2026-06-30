@@ -4,7 +4,6 @@ export type {
   BinaryCompression,
   LowercaseCombinationOperator,
   CombinationOperator,
-  LogLevel,
   SearchOptions,
   Options,
   SaveBinaryOptions,

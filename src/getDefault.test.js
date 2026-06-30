@@ -23,4 +23,10 @@ describe('FrozenMiniSearch.getDefault', () => {
       'FrozenMiniSearch: unknown option "autoVacuum"',
     )
   })
+
+  test('logger is not exposed as a frozen default', () => {
+    expect(() => FrozenMiniSearch.getDefault('logger')).toThrow(
+      'FrozenMiniSearch: unknown option "logger"',
+    )
+  })
 })

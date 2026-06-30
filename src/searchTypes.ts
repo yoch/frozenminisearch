@@ -12,8 +12,6 @@ export type BM25Params = {
 export type LowercaseCombinationOperator = 'or' | 'and' | 'and_not'
 export type CombinationOperator = LowercaseCombinationOperator | Uppercase<LowercaseCombinationOperator> | Capitalize<LowercaseCombinationOperator>
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
-
 /**
  * Search options to customize the search behavior.
  */
@@ -135,11 +133,6 @@ export type Options<T = any> = {
   tokenize?: (text: string, fieldName?: string) => string[]
   /** Function used to process a term before indexing or search (e.g. stemming). */
   processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
-  /**
-   * Function called to log diagnostic messages. Kept for MiniSearch-compatible
-   * options; FrozenMiniSearch currently treats it as a no-op hook.
-   */
-  logger?: (level: LogLevel, message: string, code?: string) => void
   /** Default search options. */
   searchOptions?: SearchOptions
   /** Default auto-suggest options. */
@@ -158,7 +151,6 @@ export type OptionsWithDefaults<T = any> = Options<T> & {
   stringifyField: (fieldValue: any, fieldName: string) => string
   tokenize: (text: string, fieldName: string) => string[]
   processTerm: (term: string, fieldName: string) => string | string[] | null | undefined | false
-  logger: (level: LogLevel, message: string, code?: string) => void
   searchOptions: SearchOptionsWithDefaults
   autoSuggestOptions: SearchOptions
 }

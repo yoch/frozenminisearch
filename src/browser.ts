@@ -11,7 +11,6 @@ export type {
   SearchResult,
   Suggestion,
   Wildcard,
-  LogLevel,
   BrowserBinaryCompression,
   BrowserSaveBinaryAsyncOptions,
 } from './searchTypes'

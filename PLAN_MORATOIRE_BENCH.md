@@ -238,7 +238,7 @@ Issues produit/maintenabilité identifiées lors de l'audit initial — **pas de
 | Frontière API / internals | fait | `frozenInternals` + `assert-internal-boundary` |
 | CI Node 20/22/24 | fait | |
 | `verify-npm-pack` en CI | fait | |
-| API héritée MiniSearch (`logger`, etc.) | partiel | `fromJson` retiré ; `logger` conservé comme hook no-op |
+| API héritée MiniSearch (`autoVacuum`, `logger`, etc.) | fait | `fromJson`, `autoVacuum`, et `logger` retirés ; diagnostics via exceptions |
 | Adaptateur `fromMiniSearch` / `fromJSON` | partiel | Cadrage doc OK ; pas de sous-module dédié |
 | Pic mémoire build (`fieldLengthData`) | évalué, non prioritaire | Mesure via `bench:build-peak` ; ROI jugé faible |
 | Redécoupage `queryEngine.ts` / `scoring.ts` | reporté | Extraire seulement lors d'un changement fonctionnel |

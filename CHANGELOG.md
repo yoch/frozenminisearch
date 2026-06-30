@@ -9,6 +9,7 @@
 ### Removed
 
 - **Legacy MiniSearch internals** — remove the in-tree `SearchableMap` fork, the mutable-radix bridge (`radixTree.ts`, `PackedRadixTree/fromRadixTree.ts`), and packed snapshot fallbacks based on `treeShape` / `termTree`. Tests and parity benches now use upstream `minisearch/SearchableMap` through the local `testSupport` adapter only.
+- **Legacy MiniSearch options** — remove the unused `logger` diagnostics hook and `LogLevel` type from the public API; use thrown errors for failure reporting instead.
 - **Unused dev dependency** — drop `fast-check` from the root workspace; it was no longer imported anywhere in the main repo.
 
 ## v1.6.2 — `@yoch/frozenminisearch`

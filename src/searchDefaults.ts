@@ -27,8 +27,6 @@ export const defaultFrozenLoadOptions = {
   tokenize: (text: string) => text.split(SPACE_OR_PUNCTUATION),
   processTerm: (term: string) => term.toLowerCase(),
   storeFields: [] as string[],
-  /** Logger no-op kept as a MiniSearch-compatible diagnostics hook. */
-  logger: (): void => {},
 }
 
 export type FrozenDefaultOptionName = keyof typeof defaultFrozenLoadOptions

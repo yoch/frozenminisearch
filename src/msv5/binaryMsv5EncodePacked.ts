@@ -3,17 +3,18 @@ import type { FrozenTermIndex } from '../frozenTermIndex'
 import type { BinaryCompression, BrowserBinaryCompression } from '../searchTypes'
 import { assembleMsv5File, assembleMsv5FileAsync } from './binaryMsv5Compression'
 import { assembleMsv5FileBrowser } from './binaryMsv5CompressionBrowser'
-import { buildMsv5EncodePrepared } from './binaryMsv5EncodeSections'
+import { prepareMsv5Encode } from './binaryMsv5EncodeShared'
 
 /**
- * Product encode path: requires a packed term index already held by the runtime
- * index. Does not import any legacy compatibility path.
+ * Product encode path: the runtime already owns the packed term index, so the
+ * snapshot input can stay as the lighter binary-facing shape built by
+ * `buildBinarySnapshotInput`.
  */
 export function prepareEncodeFrozenSnapshotMsv5Packed(
   snap: FrozenSnapshot,
   packedTermIndex: FrozenTermIndex,
 ) {
-  return buildMsv5EncodePrepared(snap, packedTermIndex)
+  return prepareMsv5Encode(snap, packedTermIndex)
 }
 
 export function encodeFrozenSnapshotMsv5Packed(

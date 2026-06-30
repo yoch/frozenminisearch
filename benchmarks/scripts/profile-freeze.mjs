@@ -14,10 +14,9 @@ import {
   frozenFromMiniSearchSnapshot,
   parseSnapshotIndex,
 } from '../../src/internal/frozenInternals.ts'
-import { fromRadixTree } from '../../src/PackedRadixTree/fromRadixTree.ts'
 import { packTermsFromList } from '../../src/PackedRadixTree/packTermList.ts'
-import { setRadixLeaf } from '../../src/radixTree.ts'
 import { validateFrozenTermIndexLeaves } from '../../src/frozenTermIndex.ts'
+import SearchableMap, { packSearchableMap } from '../../testSupport/upstreamSearchableMap.js'
 import { getScenarioById } from '../scenarioRegistry.mjs'
 import { intArg, timed } from './cpuBenchUtils.mjs'
 
@@ -71,12 +70,9 @@ function main() {
       validateFrozenTermIndexLeaves(packed, terms.length)
       return packed
     },
-    fromRadixTree: () => {
-      const tree = new Map()
-      for (let i = 0; i < terms.length; i++) {
-        setRadixLeaf(tree, terms[i], i)
-      }
-      return fromRadixTree(tree, terms.length)
+    packSearchableMap: () => {
+      const map = SearchableMap.from(terms.map((term, i) => [term, i]))
+      return packSearchableMap(map)
     },
     finalizePostings: () => {
       const parsed = parseSnapshotIndex(snapshot, fieldCount, nextId)

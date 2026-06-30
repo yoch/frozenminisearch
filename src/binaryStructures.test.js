@@ -1,4 +1,3 @@
-import { LEAF } from './radixTree'
 import {
   validateFrozenSnapshot,
   validateFrozenSnapshotNumeric,
@@ -6,6 +5,7 @@ import {
 import { buildStoredFieldsSectionWire } from './binaryWireIo'
 import { readStoredFieldsRowsSection } from './storedFieldsWire'
 import { allocBytes, writeU32LE } from './binaryBytes'
+import { packTermsFromList } from './PackedRadixTree/packTermList'
 
 function densePostings(termCount, nextId) {
   return {
@@ -34,7 +34,7 @@ function validNumericSnap(overrides = {}) {
   }
 }
 
-function validTreeShapeSnap(treeShape, overrides = {}) {
+function validPackedSnap(overrides = {}) {
   return {
     documentCount: 2,
     nextId: 2,
@@ -44,7 +44,7 @@ function validTreeShapeSnap(treeShape, overrides = {}) {
     externalIds: ['a', 'b'],
     storedFields: [undefined, undefined],
     fieldLengthMatrix: new Uint32Array([1, 1]),
-    treeShape,
+    packedTermIndex: packTermsFromList(['alpha', 'beta']),
     postings: densePostings(2, 2),
     ...overrides,
   }
@@ -78,32 +78,14 @@ describe('validateFrozenSnapshotNumeric', () => {
   })
 })
 
-describe('validateFrozenSnapshot treeShape', () => {
-  const goodShape = [
-    ['alpha', [[LEAF, 0]]],
-    ['beta', [[LEAF, 1]]],
-  ]
-
-  test('accepts a valid tree shape', () => {
-    expect(() => validateFrozenSnapshot(validTreeShapeSnap(goodShape))).not.toThrow()
+describe('validateFrozenSnapshot packed term index', () => {
+  test('accepts a valid packed term index', () => {
+    expect(() => validateFrozenSnapshot(validPackedSnap())).not.toThrow()
   })
 
-  test('rejects malformed tree shape nodes and leaves', () => {
-    expect(() => validateFrozenSnapshot(validTreeShapeSnap('bad')))
-      .toThrow(/treeShape node must be an array/)
-    expect(() => validateFrozenSnapshot(validTreeShapeSnap([['only-key']])))
-      .toThrow(/treeShape entry must be a \[key, value\] pair/)
-    expect(() => validateFrozenSnapshot(validTreeShapeSnap([
-      ['alpha', [[LEAF, 99]]],
-      ['beta', [[LEAF, 1]]],
-    ]))).toThrow(/leaf term index out of range/)
-    expect(() => validateFrozenSnapshot(validTreeShapeSnap([
-      ['alpha', [[LEAF, 0]]],
-      ['beta', [[LEAF, 0]]],
-    ]))).toThrow(/duplicate leaf index/)
-    expect(() => validateFrozenSnapshot(validTreeShapeSnap([
-      ['alpha', [[LEAF, 0]]],
-    ]))).toThrow(/leaf count .* !== termCount/)
+  test('rejects snapshots without a packed term index', () => {
+    expect(() => validateFrozenSnapshot(validPackedSnap({ packedTermIndex: undefined })))
+      .toThrow(/packedTermIndex is required/)
   })
 })
 

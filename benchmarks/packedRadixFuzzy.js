@@ -2,8 +2,7 @@
  * Compare SearchableMap#fuzzyGet vs PackedRadixTree#fuzzyRefs (+ termByIndex) on identical trees.
  * Uses interleaved map/packed timing (one variant per round) for stable packed-vs-map ratios.
  */
-import SearchableMap from '../src/SearchableMap/SearchableMap.js'
-import { fromRadixTree } from '../src/PackedRadixTree/index.js'
+import SearchableMap, { packSearchableMap } from '../testSupport/upstreamSearchableMap.js'
 import { index as divinaIndex } from './divinaCommedia.js'
 import { corpora } from './packedRadixCorpora.js'
 import { DIVINA_FUZZY_CASES, fuzzyCasesFromProbe } from './packedRadixFuzzyCases.js'
@@ -75,7 +74,7 @@ function runCaseSuite (map, packed, cases) {
 
 function buildPair (entries) {
   const map = SearchableMap.from(entries)
-  const packed = fromRadixTree(map.radixTree, map.size)
+  const packed = packSearchableMap(map)
   return { map, packed, size: map.size }
 }
 
@@ -97,7 +96,7 @@ function benchMedicamentsCorpus (corpus) {
 
 function benchDivina () {
   const map = divinaIndex
-  const packed = fromRadixTree(map.radixTree, map.size)
+  const packed = packSearchableMap(map)
   const cases = DIVINA_FUZZY_CASES.map((c) => ({
     ...c,
     label: `divina ${c.query}@k=${c.maxDistance}`,

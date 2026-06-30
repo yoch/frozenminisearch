@@ -1,17 +1,13 @@
 import type { FrozenSnapshot } from '../binaryStructures'
-import type { FrozenTermIndex } from '../frozenTermIndex'
-import type { RadixTree } from '../radixTree'
 import type { BrowserBinaryCompression } from '../searchTypes'
 import { assembleMsv5FileBrowser } from './binaryMsv5CompressionBrowser'
 import { prepareEncodeFrozenSnapshotMsv5 } from './binaryMsv5EncodeShared'
 
 export async function encodeFrozenSnapshotMsv5Browser(
   snap: FrozenSnapshot,
-  termTree?: RadixTree<number>,
-  packedTermIndex?: FrozenTermIndex,
   compression?: BrowserBinaryCompression,
 ): Promise<Uint8Array> {
-  const { globalFlags, rawSections } = prepareEncodeFrozenSnapshotMsv5(snap, termTree, packedTermIndex)
+  const { globalFlags, rawSections } = prepareEncodeFrozenSnapshotMsv5(snap)
   const file = await assembleMsv5FileBrowser(globalFlags, rawSections, compression)
   return file.buffer
 }

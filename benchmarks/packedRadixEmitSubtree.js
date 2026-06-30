@@ -1,8 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import SearchableMap from '../src/SearchableMap/SearchableMap.js'
-import { fromRadixTree } from '../src/PackedRadixTree/index.js'
+import SearchableMap, { packSearchableMap } from '../testSupport/upstreamSearchableMap.js'
 import { packedPrefixEntries } from '../src/PackedRadixTree/devStringIterators.js'
 import { corpora } from './packedRadixCorpora.js'
 import { loadMedicamentsCorpus } from './medicamentsIndexes.js'
@@ -17,7 +16,7 @@ const LATEST_PATH = join(BASELINES_DIR, 'packed-emit-latest.json')
 
 function buildTree (entries) {
   const map = SearchableMap.from(entries)
-  return fromRadixTree(map.radixTree, map.size)
+  return packSearchableMap(map)
 }
 
 /**

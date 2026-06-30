@@ -1,18 +1,17 @@
 /** Long fuzzy-sweep parity (~7000 queries). Excluded from `pnpm test`; run via `pnpm test:fuzzysearch`. */
-import SearchableMap from '../../src/SearchableMap/SearchableMap'
+import SearchableMap, { packSearchableMap } from '../../testSupport/upstreamSearchableMap.js'
 import {
   buildFuzzySweepQueries,
   collectTerms,
   planSweepSize,
 } from '../../testSupport/fuzzyQueryMutations'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity'
-import { fromRadixTree } from '../../src/PackedRadixTree/index'
 
 const PARITY_SEED = 0x50415249 // 'PARI'
 
 function buildIndexFromTerms (terms) {
   const map = SearchableMap.from(terms.map((term, i) => [term, i]))
-  const packed = fromRadixTree(map.radixTree, map.size)
+  const packed = packSearchableMap(map)
   return { map, packed, terms: collectTerms(packed) }
 }
 

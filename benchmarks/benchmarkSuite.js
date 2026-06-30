@@ -282,10 +282,10 @@ function aggregateScenarioRuns (runs) {
           lengthsBytes: Math.round(median(runs.map((r) => r.memoryBreakdown.postings.lengthsBytes))),
           totalTypedBytes: Math.round(median(runs.map((r) => r.memoryBreakdown.postings.totalTypedBytes)))
         },
-        radixTree: {
-          nodeCount: base.memoryBreakdown.radixTree.nodeCount,
-          edgeCount: base.memoryBreakdown.radixTree.edgeCount,
-          estimatedBytes: Math.round(median(runs.map((r) => r.memoryBreakdown.radixTree.estimatedBytes)))
+        termIndex: {
+          nodeCount: base.memoryBreakdown.termIndex.nodeCount,
+          edgeCount: base.memoryBreakdown.termIndex.edgeCount,
+          estimatedBytes: Math.round(median(runs.map((r) => r.memoryBreakdown.termIndex.estimatedBytes)))
         },
         documents: {
           externalIdsSlots: base.memoryBreakdown.documents.externalIdsSlots,

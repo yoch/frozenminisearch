@@ -2,8 +2,7 @@ import Benchmark from 'benchmark'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import SearchableMap from '../src/SearchableMap/SearchableMap.js'
-import { fromRadixTree } from '../src/PackedRadixTree/index.js'
+import SearchableMap, { packSearchableMap } from '../testSupport/upstreamSearchableMap.js'
 import { packedPrefixEntries } from '../src/PackedRadixTree/devStringIterators.js'
 import { corpora } from './packedRadixCorpora.js'
 import { fuzzyCasesFromProbe } from './packedRadixFuzzyCases.js'
@@ -36,7 +35,7 @@ import { measureStructuredBytes } from './packedRadixMetrics.js'
 
 function buildTree (entries) {
   const map = SearchableMap.from(entries)
-  return fromRadixTree(map.radixTree, map.size)
+  return packSearchableMap(map)
 }
 
 /** Incremental heap after GC (--expose-gc): TypedArrays often show up in external/arrayBuffers. */

@@ -76,7 +76,7 @@ export function frozenMemoryBreakdown (frozen) {
       lengthsBytes: postingsStats.lengthsBytes,
       totalTypedBytes: postingsStats.totalTypedBytes,
     },
-    radixTree: {
+    termIndex: {
       nodeCount: frozen._index.packedNodeCount(),
       edgeCount: frozen._index.packedEdgeCount(),
       estimatedBytes: radixEst,

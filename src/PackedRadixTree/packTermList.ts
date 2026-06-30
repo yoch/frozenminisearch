@@ -13,7 +13,7 @@ function createPackedRadixScratch(): PackedRadixScratch {
 
 /**
  * Insert one term with its leaf index into a mutable scratch radix trie.
- * Mirrors {@link setRadixLeaf} / {@link createRadixPath} without nested `Map` nodes.
+ * Mirrors the old mutable-radix insertion semantics without nested `Map` nodes.
  */
 function insertPackedRadixTerm(
   scratch: PackedRadixScratch,
@@ -49,8 +49,7 @@ function insertPackedRadixTerm(
       const intermediateId = nodes.length
       nodes.push({ value: PACKED_NO_VALUE, leafOrder: PACKED_NO_VALUE, edges: [] })
       nodes[intermediateId].edges.push({ label: label.slice(offset), child: childId })
-      // createRadixPath appends the replacement edge at the parent; prefix
-      // iteration depends on this insertion order.
+      // Preserve the historical edge replacement order so prefix iteration stays stable.
       node.edges.splice(ei, 1)
       node.edges.push({ label: term.slice(pos, pos + offset), child: intermediateId })
       nodeId = intermediateId

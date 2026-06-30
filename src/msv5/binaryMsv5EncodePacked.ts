@@ -7,7 +7,7 @@ import { buildMsv5EncodePrepared } from './binaryMsv5EncodeSections'
 
 /**
  * Product encode path: requires a packed term index already held by the runtime
- * index. Does not import legacy Map-radix fallbacks (`fromRadixTree`, `treeShape`).
+ * index. Does not import any legacy compatibility path.
  */
 export function prepareEncodeFrozenSnapshotMsv5Packed(
   snap: FrozenSnapshot,

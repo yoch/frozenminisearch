@@ -102,7 +102,7 @@ function measurePhasedBuild (corpus, options) {
     peakRssMb: finished.peakRssMb,
     breakdownMb: {
       postings: mbRound(breakdown.postings.totalTypedBytes),
-      radixTree: mbRound(breakdown.radixTree.estimatedBytes),
+      termIndex: mbRound(breakdown.termIndex.estimatedBytes),
       storedFieldsJson: mbRound(breakdown.documents.storedFieldsJsonBytes),
       structuredTotal: mbRound(breakdown.estimatedStructuredBytes),
     },
@@ -149,7 +149,7 @@ async function measurePhasedBuildFromStream (spec, options, estimatedDocumentCou
     peakRssMb: finished.peakRssMb,
     breakdownMb: {
       postings: mbRound(breakdown.postings.totalTypedBytes),
-      radixTree: mbRound(breakdown.radixTree.estimatedBytes),
+      termIndex: mbRound(breakdown.termIndex.estimatedBytes),
       storedFieldsJson: mbRound(breakdown.documents.storedFieldsJsonBytes),
       structuredTotal: mbRound(breakdown.estimatedStructuredBytes),
     },

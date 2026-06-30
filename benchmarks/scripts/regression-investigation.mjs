@@ -175,8 +175,8 @@ function runCase (id) {
   console.log(`heap delta: mutable=${heapMutable.heapMb} MB frozen=${heapFrozen.heapMb} MB external=${heapFrozen.externalMb} MB`)
 
   const breakdown = frozenMemoryBreakdown(frozen)
-  const rt = breakdown.radixTree
-  console.log(`radix: nodes=${rt.nodeCount} edges=${rt.edgeCount} est=${(rt.estimatedBytes / 1024).toFixed(1)} KB structured=${(breakdown.estimatedStructuredBytes / 1024).toFixed(1)} KB`)
+  const termIndex = breakdown.termIndex
+  console.log(`term index: nodes=${termIndex.nodeCount} edges=${termIndex.edgeCount} est=${(termIndex.estimatedBytes / 1024).toFixed(1)} KB structured=${(breakdown.estimatedStructuredBytes / 1024).toFixed(1)} KB`)
 
   if (id === 'overflowHeap') {
     const drift = scoreDrift(ms, frozen, 'alpha')

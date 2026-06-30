@@ -46,7 +46,6 @@ export function buildBinarySnapshotInput(state: BinarySnapshotState): FrozenSnap
     storedFields: state.storedFieldsLayout != null ? [] : new Array(state.nextId),
     storedFieldsLayout: state.storedFieldsLayout,
     fieldLengthMatrix: state.fieldLengthMatrix,
-    treeShape: [],
     postings: state.postings,
   }
 }

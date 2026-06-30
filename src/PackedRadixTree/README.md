@@ -31,19 +31,14 @@ const index = packTermsFromList(terms)
 
 `FrozenIndexBuilder` dedupes during `add` with a flat `Map<string, number>` and calls `packTermsFromList` once at `freeze`. `fromJSON` collects validated snapshot terms and calls the same primitive after postings are parsed.
 
-## Legacy / test helpers
+## Test / benchmark oracle
 
-`fromRadixTree` converts a nested-`Map` radix (`radixTree.ts` / `SearchableMap`) into a packed tree. It remains for parity tests, benchmarks, and low-level encode fallbacks (`treeShape` wire), but is **not** on the product `saveBinary` path.
+Parity tests and micro-benchmarks now use upstream `minisearch/SearchableMap`
+through [`testSupport/upstreamSearchableMap.js`](../../testSupport/upstreamSearchableMap.js).
+That adapter exposes MiniSearch’s internal `_tree` only for repo-local tooling,
+and packs it directly into `PackedRadixTree` without any product/runtime call
+site.
 
-```typescript
-import PackedRadixTree, { fromRadixTree } from './PackedRadixTree'
-import { setRadixLeaf, type RadixTree } from '../radixTree'
-
-const radixTree = new Map() as RadixTree<number>
-setRadixLeaf(radixTree, 'foo', 0)
-setRadixLeaf(radixTree, 'bar', 1)
-
-const tree = fromRadixTree(radixTree, 2)
-```
-
-Binary encode/decode for frozen MiniSearch indices: columnar wire in `src/msv5/packedRadixBinaryMsv5.ts`. Leaf invariants are checked by `validateRadixLeaves` in `radixTree.ts` at pack time (`fromRadixTree`) and by `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts` on the packed runtime index.
+Binary encode/decode for frozen MiniSearch indices: columnar wire in
+`src/msv5/packedRadixBinaryMsv5.ts`. Runtime validation happens on the packed
+index via `validateFrozenTermIndexLeaves` in `frozenTermIndex.ts`.

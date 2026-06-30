@@ -2,13 +2,12 @@ import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
 import { frozenFromMiniSearch, frozenMemoryBreakdown } from './internal/frozenInternals'
 import PackedRadixTree from './PackedRadixTree'
+import { packTermsFromList } from './PackedRadixTree/packTermList'
 import CRC32 from 'crc-32'
-import { LEAF } from './SearchableMap/TreeIterator'
 import {
   encodeFrozenSnapshot,
   decodeFrozenSnapshot,
   decodeFrozenSnapshotAsync,
-  deserializeTermIndexTree,
   validateFrozenSnapshot,
   crc32Buffer,
   BINARY_MAGIC_V5,
@@ -61,10 +60,6 @@ function msv5SectionDirOffset(sectionId) {
 
 describe('binaryFormat MSv5', () => {
   test('round-trip preserves flat postings', () => {
-    const treeShape = [
-      ['hello', [[LEAF, 0]]],
-      ['world', [[LEAF, 1]]],
-    ]
     const snap = {
       documentCount: 2,
       nextId: 2,
@@ -75,7 +70,7 @@ describe('binaryFormat MSv5', () => {
       externalIds: [1, 2],
       storedFields: [undefined, undefined],
       fieldLengthMatrix: new Uint32Array([1, 2]),
-      treeShape,
+      packedTermIndex: packTermsFromList(['hello', 'world']),
       postings: densePostings(
         1, 2, 2,
         new Uint32Array([0, 1]),
@@ -85,7 +80,7 @@ describe('binaryFormat MSv5', () => {
       ),
     }
 
-    const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(treeShape))
+    const buf = encodeFrozenSnapshot(snap)
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.readUInt16LE(4)).toBe(5)
 
@@ -101,7 +96,7 @@ describe('binaryFormat MSv5', () => {
 
   test('encodeFrozenSnapshot accepts explicit zlib compression', () => {
     const snap = buildSnapshotFromFrozen()
-    const buf = encodeFrozenSnapshot(snap, undefined, undefined, 'zlib')
+    const buf = encodeFrozenSnapshot(snap, 'zlib')
     expect(buf.readUInt8(8)).toBe(CODEC_ZLIB)
     expect(decodeFrozenSnapshot(buf).documentCount).toBe(snap.documentCount)
   })
@@ -217,7 +212,7 @@ describe('binaryFormat MSv5', () => {
       externalIds: new Array(70000).fill(0).map((_, i) => i),
       storedFields: new Array(70000),
       fieldLengthMatrix: new Uint32Array(70000),
-      treeShape: [['only', [[LEAF, 0]]]],
+      packedTermIndex: packTermsFromList(['only']),
       postings: densePostings(
         1, 1, 70000,
         new Uint32Array([0]),
@@ -226,7 +221,7 @@ describe('binaryFormat MSv5', () => {
         new Uint8Array([1]),
       ),
     }
-    const buf = encodeFrozenSnapshot(snap, deserializeTermIndexTree(snap.treeShape))
+    const buf = encodeFrozenSnapshot(snap)
     expect(buf.toString('ascii', 0, 4)).toBe(BINARY_MAGIC_V5)
     expect(buf.readUInt16LE(4)).toBe(5)
     expect(decodeFrozenSnapshot(buf).packedTermIndex.get('only')).toBe(0)

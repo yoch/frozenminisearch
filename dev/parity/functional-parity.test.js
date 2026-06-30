@@ -751,7 +751,7 @@ describe('memoryBreakdown', () => {
     const b = frozenMemoryBreakdown(frozen)
     expect(b.termCount).toBeGreaterThan(0)
     expect(b.postings.totalTypedBytes).toBeGreaterThan(0)
-    expect(b.radixTree.nodeCount).toBeGreaterThan(0)
+    expect(b.termIndex.nodeCount).toBeGreaterThan(0)
     expect(b.estimatedStructuredBytes).toBeGreaterThan(0)
   })
 })

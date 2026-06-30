@@ -26,7 +26,7 @@ pnpm bench:medicaments-build-peak       # rebuild peak from corpus extracted out
 BENCH_GC_AUDIT=1 pnpm bench:build-peak  # same benchmark + trace-gc audit in a child process
 ```
 
-`bench:build-peak` writes `benchmarks/baselines/build-peak-heap.json` (peak vs retained heap, radix share estimate).
+`bench:build-peak` writes `benchmarks/baselines/build-peak-heap.json` (peak vs retained heap, packed term-index share estimate).
 
 `BENCH_GC_AUDIT=1` enables a secondary child-process audit with `--trace-gc-nvp` (fallback `--trace-gc`) on selected memory scripts. The published metrics still come from the normal run; the audit only reports whether unexpected major GC happened inside measured windows.
 
@@ -50,7 +50,7 @@ Fast **ops/sec** probes on the Divine Commedia corpus via [Benchmark.js](https:/
 | `filter` | `MiniSearch#search` with filter |
 | `autosuggest` | `MiniSearch#autoSuggest` |
 
-Corpus fixture: `benchmarks/divinaCommedia.js` (MiniSearch). Suite modules live alongside under `benchmarks/*.js`; registry in `benchmarks/micro/registry.mjs`.
+Corpus fixture: `benchmarks/divinaCommedia.js` (MiniSearch, upstream `SearchableMap`). Suite modules live alongside under `benchmarks/*.js`; registry in `benchmarks/micro/registry.mjs`.
 
 ### Search timing protocol (v2)
 

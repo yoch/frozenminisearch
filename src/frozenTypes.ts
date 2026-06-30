@@ -22,7 +22,7 @@ export interface FrozenMemoryBreakdown {
     lengthsBytes: number
     totalTypedBytes: number
   }
-  radixTree: {
+  termIndex: {
     nodeCount: number
     edgeCount: number
     estimatedBytes: number

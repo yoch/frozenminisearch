@@ -82,7 +82,7 @@ describe('FrozenMiniSearchBrowser', () => {
     const snap = await decodeFrozenSnapshotMsv5Browser(
       new Uint8Array(frozenFromMiniSearch(FrozenMiniSearch, mutable, options).saveBinarySync({ compression: 'raw' })),
     )
-    const encoded = await encodeFrozenSnapshotMsv5Browser(snap, undefined, undefined, 'zlib')
+    const encoded = await encodeFrozenSnapshotMsv5Browser(snap, 'zlib')
     const roundTripped = await decodeFrozenSnapshotMsv5Browser(encoded)
     expect(roundTripped.documentCount).toBe(snap.documentCount)
     expect(roundTripped.fieldNames).toEqual(snap.fieldNames)

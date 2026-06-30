@@ -11,9 +11,6 @@
   "ignore": [
     "**/*.test.js",
     "**/*.test.ts",
-    "src/SearchableMap/**",
-    "src/radixTree.ts",
-    "src/PackedRadixTree/fromRadixTree.ts",
     "src/PackedRadixTree/devStringIterators.ts",
     "src/binaryEncode.ts",
     "src/binaryMsv5EncodeShared.ts",

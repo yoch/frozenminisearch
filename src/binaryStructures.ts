@@ -1,10 +1,3 @@
-import {
-  LEAF,
-  deserializeRadixTreeShape,
-  validateRadixLeaves,
-  type RadixTree,
-  type RadixTreeShape,
-} from './radixTree'
 import type { FieldLengthArray } from './fieldLengthMatrix'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import { validateFrozenPostingsLayout } from './frozenPostings'
@@ -17,8 +10,6 @@ import {
 } from './binaryWireIo'
 import type { BinaryBytes } from './binaryBytes'
 import type { StoredFieldsLayout } from './storedFieldsLayout'
-
-export type TreeShape = RadixTreeShape
 
 /** Flat frozen snapshot (runtime; on disk use {@link encodeFrozenSnapshot}). */
 export interface FrozenSnapshot {
@@ -34,45 +25,9 @@ export interface FrozenSnapshot {
   /** When set, MSv5 wire path uses layout directly; storedFields may be a length-only placeholder. */
   storedFieldsLayout?: StoredFieldsLayout
   fieldLengthMatrix: FieldLengthArray
-  treeShape: TreeShape
-  /** Radix tree from JSON snapshot wire; absent when {@link packedTermIndex} is set (MSv5 binary). */
-  termTree?: RadixTree<number>
   /** Preferred runtime term index after binary decode. */
   packedTermIndex?: FrozenTermIndex
   postings: FrozenPostingsLayout
-}
-
-function validateTreeShape(shape: TreeShape, termCount: number): void {
-  const seen = new Set<number>()
-
-  function visit(node: TreeShape): void {
-    if (!Array.isArray(node)) {
-      throw invalidFrozenIndex('treeShape node must be an array')
-    }
-    for (const entry of node) {
-      if (!Array.isArray(entry) || entry.length !== 2) {
-        throw invalidFrozenIndex('treeShape entry must be a [key, value] pair')
-      }
-      const [key, value] = entry
-      if (key === LEAF) {
-        const idx = value as number
-        if (!Number.isInteger(idx) || idx < 0 || idx >= termCount) {
-          throw invalidFrozenIndex(`treeShape leaf term index out of range: ${idx}`)
-        }
-        if (seen.has(idx)) {
-          throw invalidFrozenIndex(`treeShape duplicate leaf index: ${idx}`)
-        }
-        seen.add(idx)
-      } else {
-        visit(value as TreeShape)
-      }
-    }
-  }
-
-  visit(shape)
-  if (seen.size !== termCount) {
-    throw invalidFrozenIndex(`treeShape leaf count ${seen.size} !== termCount ${termCount}`)
-  }
 }
 
 export function termCountOf(snap: { postings: FrozenPostingsLayout }): number {
@@ -166,25 +121,14 @@ export function readExternalIdsSection(
 export function validateFrozenSnapshot(snap: FrozenSnapshot): void {
   validateFrozenSnapshotNumeric(snap)
   const termCount = termCountOf(snap)
-  if (snap.packedTermIndex != null) {
-    validateFrozenTermIndexLeaves(snap.packedTermIndex, termCount)
-  } else if (snap.termTree != null) {
-    validateTermTreeLeaves(snap.termTree, termCount)
-  } else {
-    validateTreeShape(snap.treeShape, termCount)
+  if (snap.packedTermIndex == null) {
+    throw invalidFrozenIndex('packedTermIndex is required')
   }
+  validateFrozenTermIndexLeaves(snap.packedTermIndex, termCount)
 }
 
 export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): string[] {
   const names = Object.keys(fieldIds)
   names.sort((a, b) => fieldIds[a] - fieldIds[b])
   return names
-}
-
-export function validateTermTreeLeaves(tree: RadixTree<number>, termCount: number): void {
-  validateRadixLeaves(tree, termCount, (detail) => { throw invalidFrozenIndex(detail) })
-}
-
-export function deserializeTermIndexTree(shape: TreeShape): RadixTree<number> {
-  return deserializeRadixTreeShape(shape)
 }

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- **Bench diagnostics** — internal/benchmark memory breakdown now names the packed term structure `termIndex` instead of the legacy `radixTree` label. Generated baselines must be refreshed to pick up the renamed payload keys.
+
+### Removed
+
+- **Legacy MiniSearch internals** — remove the in-tree `SearchableMap` fork, the mutable-radix bridge (`radixTree.ts`, `PackedRadixTree/fromRadixTree.ts`), and packed snapshot fallbacks based on `treeShape` / `termTree`. Tests and parity benches now use upstream `minisearch/SearchableMap` through the local `testSupport` adapter only.
+- **Unused dev dependency** — drop `fast-check` from the root workspace; it was no longer imported anywhere in the main repo.
+
 ## v1.6.2 — `@yoch/frozenminisearch`
 
 Patch release: lower post-freeze memory for `FrozenIndexBuilder`, internal stored-fields wire cleanup, and expanded CI coverage. No public API, search semantics, or MSv5 wire-format changes.

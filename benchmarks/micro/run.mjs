@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Micro-benchmarks: Benchmark.js ops/sec on lucaong MiniSearch + SearchableMap (Divina corpus).
+ * Micro-benchmarks: Benchmark.js ops/sec on upstream MiniSearch + SearchableMap (Divina corpus).
  *
  *   pnpm bench:micro
  *   pnpm bench:micro -- --only=fuzzy,ranking

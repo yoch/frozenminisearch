@@ -86,7 +86,7 @@ async function runBuildProfileFromStream (label, spec, options, stats) {
     structuredMb: mbRound(breakdown.estimatedStructuredBytes),
     componentsMb: {
       postings: mbRound(breakdown.postings.totalTypedBytes),
-      radixTree: mbRound(breakdown.radixTree.estimatedBytes),
+      termIndex: mbRound(breakdown.termIndex.estimatedBytes),
       storedFieldsJson: mbRound(breakdown.documents.storedFieldsJsonBytes),
       fieldLengthMatrix: mbRound(breakdown.documents.fieldLengthMatrixBytes),
     },
@@ -143,7 +143,7 @@ function runBuildProfile (label, documents, options) {
     structuredMb: mbRound(breakdown.estimatedStructuredBytes),
     componentsMb: {
       postings: mbRound(breakdown.postings.totalTypedBytes),
-      radixTree: mbRound(breakdown.radixTree.estimatedBytes),
+      termIndex: mbRound(breakdown.termIndex.estimatedBytes),
       storedFieldsJson: mbRound(breakdown.documents.storedFieldsJsonBytes),
       fieldLengthMatrix: mbRound(breakdown.documents.fieldLengthMatrixBytes),
     },
@@ -189,10 +189,10 @@ async function main () {
   const payload = {
     capturedAt: new Date().toISOString(),
     node: process.version,
-    note: 'One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ radix growth. synthetic-1field isolates multi-field per-doc cost.',
+    note: 'One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ term-index growth. synthetic-1field isolates multi-field per-doc cost.',
     scenarios: { real, synthetic, syntheticOneField },
     inference: {
-      radixHeavyTransientMb: Number((real.transientMb - synthetic.transientMb).toFixed(3)),
+      termIndexHeavyTransientMb: Number((real.transientMb - synthetic.transientMb).toFixed(3)),
       multiFieldPremiumMb: Number((real.transientMb - syntheticOneField.transientMb).toFixed(3)),
       structuredPostingsPct: real.structuredMb > 0
         ? Number((100 * real.componentsMb.postings / real.structuredMb).toFixed(1))
@@ -208,10 +208,10 @@ async function main () {
     console.log(`  [${row.id}]`)
     console.log(`    terms ${row.termCount}  peak heap ${row.peakTotalMb} MB / total ${row.peakTotalResidentMb} MB (add heap ${row.peakAfterAddMb} / total ${row.peakAfterAddTotalResidentMb}  freeze Δheap ${row.peakFreezeDeltaMb} / Δtotal ${row.peakFreezeDeltaTotalResidentMb})`)
     console.log(`    retained ${row.retainedMb} MB  transient ${row.transientMb} MB  structured ${row.structuredMb} MB`)
-    console.log(`    components: postings ${row.componentsMb.postings}  radix ${row.componentsMb.radixTree}  stored ${row.componentsMb.storedFieldsJson}`)
+    console.log(`    components: postings ${row.componentsMb.postings}  termIndex ${row.componentsMb.termIndex}  stored ${row.componentsMb.storedFieldsJson}`)
     console.log('')
   }
-  console.log(`  radix-heavy transient (real − few-terms):  ~${payload.inference.radixHeavyTransientMb} MB`)
+  console.log(`  term-index-heavy transient (real − few-terms):  ~${payload.inference.termIndexHeavyTransientMb} MB`)
   console.log(`  multi-field premium (real − 1-field syn):  ~${payload.inference.multiFieldPremiumMb} MB`)
   console.log(`  transient / structured (real):             ~${payload.inference.transientVsStructuredRatio}×`)
   console.log(`\nWrote ${OUT}`)

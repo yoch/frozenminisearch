@@ -39,4 +39,6 @@ Validated in [`indexing-parity.test.js`](indexing-parity.test.js) — **MiniSear
 
 ## Reference
 
-Upstream reference: `minisearch` npm package (devDependency), not the former in-tree fork.
+Upstream reference: `minisearch` npm package (devDependency). Repo-local parity
+and benchmark helpers use `minisearch/SearchableMap` via
+`testSupport/upstreamSearchableMap.js`; the former in-tree fork is gone.

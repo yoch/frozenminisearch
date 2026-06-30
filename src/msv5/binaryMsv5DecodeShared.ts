@@ -149,7 +149,6 @@ export function decodeMsv5Sections(
     storedFields,
     storedFieldsLayout,
     fieldLengthMatrix,
-    treeShape: [],
     packedTermIndex,
     postings,
   }

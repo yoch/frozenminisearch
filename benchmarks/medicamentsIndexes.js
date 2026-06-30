@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { decodeFrozenSnapshotMsv5 } from '../src/msv5/binaryMsv5Decode.ts'
-import SearchableMap from '../src/SearchableMap/SearchableMap.js'
+import SearchableMap from '../testSupport/upstreamSearchableMap.js'
 import { measureStructuredBytes } from './packedRadixMetrics.js'
 import { fuzzyCasesFromProbe } from './packedRadixFuzzyCases.js'
 

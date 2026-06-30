@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-06-28T10:28:31.291Z",
+  "capturedAt": "2026-06-30T06:53:27.841Z",
   "node": "v24.16.0",
-  "note": "One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ radix growth. synthetic-1field isolates multi-field per-doc cost.",
+  "note": "One sampler per build (add+freeze). Compare real vs synthetic-few-terms: extra transient ≈ term-index growth. synthetic-1field isolates multi-field per-doc cost.",
   "scenarios": {
     "real": {
       "id": "bdpm-presentations",
@@ -10,18 +10,18 @@
       "fieldCount": 5,
       "corpusTextMb": 2.263,
       "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 42.881,
-      "peakAfterAddTotalResidentMb": 48.166,
-      "peakTotalMb": 42.881,
-      "peakTotalResidentMb": 48.166,
-      "peakFreezeDeltaMb": 0,
-      "peakFreezeDeltaTotalResidentMb": 0,
-      "retainedMb": 0.0004,
-      "transientMb": 42.881,
+      "peakAfterAddMb": 39.613,
+      "peakAfterAddTotalResidentMb": 44.96,
+      "peakTotalMb": 45.247,
+      "peakTotalResidentMb": 50.681,
+      "peakFreezeDeltaMb": 5.634,
+      "peakFreezeDeltaTotalResidentMb": 5.721,
+      "retainedMb": 0,
+      "transientMb": 45.247,
       "structuredMb": 2.541,
       "componentsMb": {
         "postings": 1.436,
-        "radixTree": 0.777,
+        "termIndex": 0.777,
         "storedFieldsJson": 0.229,
         "fieldLengthMatrix": 0.1
       }
@@ -33,18 +33,18 @@
       "fieldCount": 5,
       "corpusTextMb": 2.492,
       "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 38.764,
-      "peakAfterAddTotalResidentMb": 48.333,
-      "peakTotalMb": 38.764,
-      "peakTotalResidentMb": 48.333,
+      "peakAfterAddMb": 38.77,
+      "peakAfterAddTotalResidentMb": 48.339,
+      "peakTotalMb": 38.77,
+      "peakTotalResidentMb": 48.339,
       "peakFreezeDeltaMb": 0,
       "peakFreezeDeltaTotalResidentMb": 0,
-      "retainedMb": 0.0008,
-      "transientMb": 38.763,
+      "retainedMb": 0,
+      "transientMb": 38.77,
       "structuredMb": 1.525,
       "componentsMb": {
         "postings": 1.196,
-        "radixTree": 0,
+        "termIndex": 0,
         "storedFieldsJson": 0.229,
         "fieldLengthMatrix": 0.1
       }
@@ -55,28 +55,28 @@
       "termCount": 4,
       "fieldCount": 1,
       "corpusTextMb": 0.498,
-      "corpusHoldMb": 0.001,
-      "peakAfterAddMb": 25.677,
-      "peakAfterAddTotalResidentMb": 26.475,
-      "peakTotalMb": 26.211,
-      "peakTotalResidentMb": 27.268,
-      "peakFreezeDeltaMb": 0.534,
-      "peakFreezeDeltaTotalResidentMb": 0.793,
+      "corpusHoldMb": 0.006,
+      "peakAfterAddMb": 25.66,
+      "peakAfterAddTotalResidentMb": 26.457,
+      "peakTotalMb": 25.721,
+      "peakTotalResidentMb": 26.777,
+      "peakFreezeDeltaMb": 0.061,
+      "peakFreezeDeltaTotalResidentMb": 0.32,
       "retainedMb": 0.001,
-      "transientMb": 26.21,
+      "transientMb": 25.72,
       "structuredMb": 0.488,
       "componentsMb": {
         "postings": 0.239,
-        "radixTree": 0,
+        "termIndex": 0,
         "storedFieldsJson": 0.229,
         "fieldLengthMatrix": 0.02
       }
     }
   },
   "inference": {
-    "radixHeavyTransientMb": 4.118,
-    "multiFieldPremiumMb": 16.671,
+    "termIndexHeavyTransientMb": 6.477,
+    "multiFieldPremiumMb": 19.527,
     "structuredPostingsPct": 56.5,
-    "transientVsStructuredRatio": 16.9
+    "transientVsStructuredRatio": 17.8
   }
 }

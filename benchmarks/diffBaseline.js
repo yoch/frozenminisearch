@@ -157,7 +157,7 @@ function compareScenario (ref, cur, { structural = true } = {}) {
     }
     if (ref.memoryBreakdown?.postings && cur.memoryBreakdown?.postings) {
       bump(compareMetric('postings typed (MB)', mb(ref.memoryBreakdown.postings.totalTypedBytes), mb(cur.memoryBreakdown.postings.totalTypedBytes), 'heapFrozenMb'))
-      bump(compareMetric('radix est. (MB)', mb(ref.memoryBreakdown.radixTree.estimatedBytes), mb(cur.memoryBreakdown.radixTree.estimatedBytes), 'heapFrozenMb'))
+      bump(compareMetric('term index est. (MB)', mb(ref.memoryBreakdown.termIndex.estimatedBytes), mb(cur.memoryBreakdown.termIndex.estimatedBytes), 'heapFrozenMb'))
     }
   } else {
     console.log('  (indexing / heap / disk / load — skipped, search-only profile)')

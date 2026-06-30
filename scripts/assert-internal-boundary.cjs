@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const { spawnSync } = require('node:child_process')
-const { readFileSync } = require('node:fs')
+const { existsSync, readFileSync } = require('node:fs')
 
 const allowedFiles = new Set([
   'src/internal/frozenInternals.ts',
@@ -72,6 +72,7 @@ const files = gitLsFiles.stdout
 const violations = []
 
 for (const file of files) {
+  if (!existsSync(file)) continue
   const source = readFileSync(file, 'utf8')
   for (const rule of forbidden) {
     rule.pattern.lastIndex = 0

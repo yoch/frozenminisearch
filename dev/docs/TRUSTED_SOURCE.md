@@ -10,12 +10,10 @@ Le freeze / `fromJSON` convertit un snapshot MiniSearch (`toJSON`) en index
 `FrozenMiniSearch`. Le pipeline comporte plusieurs couches de vérification,
 dont certaines re-parcourent des structures qu’on vient de construire.
 
-Depuis la régression freeze liée au `PackedRadixTree` (commit `c216e26`), une
-option interne `trusted` sur `fromRadixTree` sautait `validateRadixLeaves`, et
-`assembleFrozenInternal(..., trustedSource: true)` sautait
-`validateFrozenPostingsLayout` + `validateFrozenTermIndexLeaves` sur le chemin
-JSON. Cela masquait une partie du coût sans résoudre le poste dominant (rebuild
-du `RadixTree` intermédiaire).
+Avant le nettoyage legacy, un ancien pont `fromRadixTree` pouvait sauter une
+validation sur un arbre radix mutable intermédiaire. Ce pont a été supprimé :
+`fromJSON` construit maintenant directement un `PackedRadixTree` via
+`packTermsFromList`, sans structure mutable locale de type `RadixTree`.
 
 ## Quatre familles de validation
 
@@ -24,7 +22,7 @@ du `RadixTree` intermédiaire).
 | **1 — Contrat / capacité** | `serializationVersion` supportée, `options.fields` vs `fieldIds`, forme du snapshot | Peut-on lire ce wire format avec cette version du package ? |
 | **2 — Garde-fous bornes** | `shortId < nextId`, `fieldId < fieldCount`, tailles de matrices | Évite index silencieusement faux (fichier tronqué / édité) |
 | **3 — Invariants producteur** | termes uniques, `storedFields` ⊆ `documentIds`, docIds triés par segment, cross-checks shell | MiniSearch « ne devrait jamais » émettre ça |
-| **4 — Re-validation pipeline** | `validateRadixLeaves`, `validateFrozenTermIndexLeaves`, `validateFrozenPostingsLayout` | Notre conversion parse → pack → assemble n’a pas bugué |
+| **4 — Re-validation pipeline** | `validateFrozenTermIndexLeaves`, `validateFrozenPostingsLayout` | Notre conversion parse → pack → assemble n’a pas bugué |
 
 ### DocIds triés par segment (famille 3, non vérifié au parse)
 
@@ -70,10 +68,9 @@ Cross-checks **famille 3** dans le shell snapshot (hors index) :
 | dense | ~45 |
 | giant | ~20 |
 
-Le poste dominant reste la **construction de l’index termes** (ancien
-`RadixTree` via `setRadixLeaf`, ~75 %+ du chemin index). Optimisation livrée :
-`packTermsFromList` — pack direct depuis `snapshot.index` sans `RadixTree`
-intermédiaire (piste B).
+Le poste dominant historique était la **construction de l’index termes** via un
+`RadixTree` mutable intermédiaire. Ce poste a été supprimé du chemin courant:
+`packTermsFromList` packe directement `snapshot.index`.
 
 ## Proposition retenue pour plus tard
 
@@ -90,12 +87,6 @@ trustedSource?: boolean  // défaut: false sur fromJSON
 
 Chemins qui restent **trusted en interne** (pas d’option exposée) :
 
-- `FrozenIndexBuilder` / `fromDocuments` → `skipLeafValidation` sur
-  `fromRadixTree` + `trustedSource: true` à l’assemble (`trusted-build`).
+- `FrozenIndexBuilder` / `fromDocuments` → construction directe packed +
+  assemble trusted.
 - `loadBinary` → validation au decode ; assemble trusted.
-
-## Renommage interne
-
-`FromRadixTreeOptions.trusted` a été renommé en `skipLeafValidation` pour
-clarifier qu’il ne s’agit que de sauter `validateRadixLeaves` sur le chemin
-builder, pas d’une option publique de confiance JSON.

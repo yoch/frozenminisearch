@@ -16,9 +16,8 @@ export { decodeFrozenSnapshotMsv5, isMsv5Buffer } from './msv5/binaryMsv5Decode'
 
 export { crc32Buffer } from './binaryIo'
 
-export type { FrozenSnapshot, TreeShape } from './binaryStructures'
+export type { FrozenSnapshot } from './binaryStructures'
 export {
-  deserializeTermIndexTree,
   fieldNamesFromFieldIds,
   termCountOf,
   validateFrozenSnapshot,

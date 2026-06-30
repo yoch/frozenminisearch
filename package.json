@@ -58,7 +58,6 @@
     "benchmark": "^2.1.4",
     "crc-32": "^1.2.2",
     "eslint": "^9.39.4",
-    "fast-check": "^4.8.0",
     "globals": "^17.6.0",
     "knip": "5.33.3",
     "minisearch": "^7.2.0",

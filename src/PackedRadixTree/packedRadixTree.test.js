@@ -1,39 +1,39 @@
-import SearchableMap from '../SearchableMap/SearchableMap'
+import SearchableMap, {
+  packSearchableMap,
+  packSearchableMapEntries,
+  packSearchableMapTree,
+  searchableMapTree,
+} from '../../testSupport/upstreamSearchableMap.js'
 import {
   buildTermTreeSectionColumnar,
   readPackedTermTreeSectionColumnar,
 } from '../msv5/packedRadixBinaryMsv5'
 import { validateFrozenTermIndexLeaves } from '../frozenTermIndex'
-import { setRadixLeaf } from '../radixTree'
 import { sortedFuzzyTuples, sortedMapFuzzy } from '../../testSupport/fuzzyParity.js'
 import { packedPrefixEntries } from './devStringIterators'
-import PackedRadixTree, { fromRadixTree } from './index'
+import PackedRadixTree from './index'
 import { packTermsFromList } from './packTermList'
 
 const terms = ['summer', 'acqua', 'aqua', 'acquire', 'poisson', 'qua']
 const keyValues = terms.map((key, i) => [key, i])
 const map = SearchableMap.from(keyValues)
-const packed = fromRadixTree(map.radixTree, map.size)
+const packed = packSearchableMap(map)
 
-function fromNeutralRadix(entries) {
-  const tree = new Map()
-  for (const [term, termIndex] of entries) {
-    setRadixLeaf(tree, term, termIndex)
-  }
-  return fromRadixTree(tree, entries.length)
+function packEntries(entries) {
+  return packSearchableMapEntries(entries)
 }
 
-test('packTermsFromList matches neutral radix packing', () => {
-  const viaRadix = fromNeutralRadix(keyValues)
+test('packTermsFromList matches SearchableMap packing', () => {
+  const viaSearchableMap = packEntries(keyValues)
   const direct = packTermsFromList(terms)
-  expect(Array.from(direct.entries())).toEqual(Array.from(viaRadix.entries()))
+  expect(Array.from(direct.entries())).toEqual(Array.from(viaSearchableMap.entries()))
   expect(Array.from(direct.prefixRefs('a')).map(({ termIndex }) => [direct.termByIndex(termIndex), termIndex]))
-    .toEqual(Array.from(viaRadix.prefixRefs('a')).map(({ termIndex }) => [viaRadix.termByIndex(termIndex), termIndex]))
+    .toEqual(Array.from(viaSearchableMap.prefixRefs('a')).map(({ termIndex }) => [viaSearchableMap.termByIndex(termIndex), termIndex]))
   for (const [term, termIndex] of keyValues) {
     expect(direct.get(term)).toBe(termIndex)
-    expect(direct.get(term)).toBe(viaRadix.get(term))
+    expect(direct.get(term)).toBe(viaSearchableMap.get(term))
   }
-  expect(direct.size).toBe(viaRadix.size)
+  expect(direct.size).toBe(viaSearchableMap.size)
 })
 
 test('packTermsFromList preserves split-edge iteration order', () => {
@@ -43,19 +43,19 @@ test('packTermsFromList preserves split-edge iteration order', () => {
     ['acquire', 2],
   ]
   const direct = packTermsFromList(entries.map(([term]) => term))
-  const viaRadix = fromNeutralRadix(entries)
+  const viaSearchableMap = packEntries(entries)
 
-  expect(Array.from(direct.entries())).toEqual(Array.from(viaRadix.entries()))
+  expect(Array.from(direct.entries())).toEqual(Array.from(viaSearchableMap.entries()))
   expect(Array.from(direct.prefixRefs('a')).map(({ termIndex }) => direct.termByIndex(termIndex)))
-    .toEqual(Array.from(viaRadix.prefixRefs('a')).map(({ termIndex }) => viaRadix.termByIndex(termIndex)))
+    .toEqual(Array.from(viaSearchableMap.prefixRefs('a')).map(({ termIndex }) => viaSearchableMap.termByIndex(termIndex)))
 })
 
-test('neutral radix builder matches SearchableMap packing', () => {
-  const viaRadix = fromNeutralRadix(keyValues)
-  expect(Array.from(viaRadix.entries())).toEqual(Array.from(packed.entries()))
-  expect(Array.from(viaRadix.prefixRefs('a')).map(({ termIndex }) => [viaRadix.termByIndex(termIndex), termIndex]))
+test('SearchableMap _tree adapter matches SearchableMap packing', () => {
+  const viaAdapterTree = packSearchableMapTree(searchableMapTree(map), map.size)
+  expect(Array.from(viaAdapterTree.entries())).toEqual(Array.from(packed.entries()))
+  expect(Array.from(viaAdapterTree.prefixRefs('a')).map(({ termIndex }) => [viaAdapterTree.termByIndex(termIndex), termIndex]))
     .toEqual(Array.from(map.atPrefix('a').entries()))
-  expectFuzzyMultiset(viaRadix, map, 'acqua', 2)
+  expectFuzzyMultiset(viaAdapterTree, map, 'acqua', 2)
 })
 
 function expectFuzzyMultiset(packed, map, query, maxDistance) {
@@ -74,8 +74,8 @@ function expectPackedParity(entries, probes = {}) {
   } = probes
 
   const m = SearchableMap.from(entries)
-  const p = fromRadixTree(m.radixTree, m.size)
-  const built = fromNeutralRadix(entries)
+  const p = packSearchableMap(m)
+  const built = packEntries(entries)
   const packedBuf = buildTermTreeSectionColumnar(p)
 
   // entries() must match Map iteration order exactly (not just as a set).
@@ -164,7 +164,7 @@ describe('PackedRadixTree module', () => {
 
   test('get returns undefined for a strict prefix that ends mid-edge', () => {
     const m = SearchableMap.from([['acquire', 0]])
-    const p = fromRadixTree(m.radixTree, m.size)
+    const p = packSearchableMap(m)
     expect(p.get('acq')).toBeUndefined()
     expect(p.get('acquire')).toBe(0)
     expect(p.get('acquired')).toBeUndefined()
@@ -172,7 +172,7 @@ describe('PackedRadixTree module', () => {
 
   test('empty index packs, validates and round-trips', () => {
     const m = SearchableMap.from([])
-    const p = fromRadixTree(m.radixTree, m.size)
+    const p = packSearchableMap(m)
     expect(() => validateFrozenTermIndexLeaves(p, 0)).not.toThrow()
     expect(Array.from(p.entries())).toEqual([])
     const buf = buildTermTreeSectionColumnar(p)
@@ -191,7 +191,7 @@ describe('PackedRadixTree module', () => {
     for (const ordering of orderings) {
       const entries = ordering.map((term, i) => [term, i])
       const m = SearchableMap.from(entries)
-      const p = fromRadixTree(m.radixTree, m.size)
+      const p = packSearchableMap(m)
 
       for (const term of generatedTerms.concat(['d', 'aaad'])) {
         expect(p.get(term)).toBe(m.get(term))
@@ -255,7 +255,7 @@ describe('PackedRadixTree module', () => {
 
   test('mid-edge prefix includes full terms', () => {
     const m = SearchableMap.from([['acquire', 0]])
-    const p = fromRadixTree(m.radixTree, m.size)
+    const p = packSearchableMap(m)
     expect(Array.from(p.prefixRefs('acq')).map(({ termIndex }) => [p.termByIndex(termIndex), termIndex]))
       .toEqual([['acquire', 0]])
   })
@@ -301,20 +301,10 @@ describe('PackedRadixTree module', () => {
     expect(() => validateFrozenTermIndexLeaves(malformed, 0)).toThrow(/child out of bounds/)
   })
 
-  test('fromRadixTree rejects inconsistent leaf indices', () => {
-    expect(() => fromNeutralRadix([['a', 0], ['b', 0]])).toThrow(/duplicate leaf index/)
-
-    const tree = new Map()
-    setRadixLeaf(tree, 'a', 0)
-    expect(() => fromRadixTree(tree, 2)).toThrow(/leaf count 1 !== termCount 2/)
-    expect(() => fromRadixTree(tree, 2, { skipLeafValidation: true })).not.toThrow()
-  })
-
   test('rejects edge labels that cannot fit the packed length array', () => {
     const longLabel = 'x'.repeat(0x10000)
-    const m = SearchableMap.from([[longLabel, 0]])
-    expect(() => fromRadixTree(m.radixTree, m.size)).toThrow(/edge label too long/)
-    expect(() => fromNeutralRadix([[longLabel, 0]])).toThrow(/edge label too long/)
+    expect(() => packEntries([[longLabel, 0]])).toThrow(/edge label too long/)
+    expect(() => packTermsFromList([longLabel])).toThrow(/edge label too long/)
   })
 
   test('term tree section round-trips through MSv5 columnar wire', () => {

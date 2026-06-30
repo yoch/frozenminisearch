@@ -121,7 +121,7 @@ export function frozenMemoryBreakdown<T>(frozen: FrozenMiniSearchCore<T>): Froze
       lengthsBytes: postingsStats.lengthsBytes,
       totalTypedBytes: postingsStats.totalTypedBytes,
     },
-    radixTree: {
+    termIndex: {
       nodeCount: view._index.packedNodeCount(),
       edgeCount: view._index.packedEdgeCount(),
       estimatedBytes: radixEst,

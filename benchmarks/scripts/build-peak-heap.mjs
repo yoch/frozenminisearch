@@ -3,7 +3,7 @@
  *
  *   pnpm bench:build-peak
  *
- * Writes benchmarks/baselines/build-peak-heap.json for OPT-1 go/no-go (radix share of peak).
+ * Writes benchmarks/baselines/build-peak-heap.json for OPT-1 go/no-go (term-index share of peak).
  */
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -90,7 +90,7 @@ function measurePhasedBuild (corpus, options, auditMeta = null) {
   const breakdown = frozenMemoryBreakdown(frozen)
 
   const postingsMb = mbRound(breakdown.postings.totalTypedBytes)
-  const radixMb = mbRound(breakdown.radixTree.estimatedBytes)
+  const termIndexMb = mbRound(breakdown.termIndex.estimatedBytes)
   const storedMb = mbRound(breakdown.documents.storedFieldsJsonBytes)
   const structuredMb = mbRound(breakdown.estimatedStructuredBytes)
   const peakHeapMb = finished.peakHeapBytes / 1024 / 1024
@@ -109,15 +109,15 @@ function measurePhasedBuild (corpus, options, auditMeta = null) {
     peakVsRetainedRatio: null,
     breakdownMb: {
       postings: postingsMb,
-      radixTree: radixMb,
+      termIndex: termIndexMb,
       storedFieldsJson: storedMb,
       structuredTotal: structuredMb,
     },
-    radixShareOfStructuredPct: structuredMb > 0
-      ? Number((100 * radixMb / structuredMb).toFixed(1))
+    termIndexShareOfStructuredPct: structuredMb > 0
+      ? Number((100 * termIndexMb / structuredMb).toFixed(1))
       : null,
-    peakRadixShareEstimatePct: peakHeapMb > 0
-      ? Number((100 * radixMb / peakHeapMb).toFixed(1))
+    peakTermIndexShareEstimatePct: peakHeapMb > 0
+      ? Number((100 * termIndexMb / peakHeapMb).toFixed(1))
       : null,
     termCount: frozen.termCount,
     documentCount: frozen.documentCount,
@@ -169,8 +169,8 @@ function medianScenario (runs, corpus, options, scenarioId) {
       ? Number((peakHeapMb / retainedHeapMb).toFixed(2))
       : null,
     breakdownMb: first.breakdownMb,
-    radixShareOfStructuredPct: first.radixShareOfStructuredPct,
-    peakRadixShareEstimatePct: Number(medianOf(peakSamples.map((s) => s.peakRadixShareEstimatePct)).toFixed(1)),
+    termIndexShareOfStructuredPct: first.termIndexShareOfStructuredPct,
+    peakTermIndexShareEstimatePct: Number(medianOf(peakSamples.map((s) => s.peakTermIndexShareEstimatePct)).toFixed(1)),
     termCount: first.termCount,
     documentCount: first.documentCount,
   }
@@ -195,7 +195,7 @@ function main () {
     console.log(`  peak heap:       ${build.peakHeapMb} MB (${build.peakHeapKb} KB)  after add: ${build.peakAfterAddMb} MB  freeze +${build.freezeDeltaMb} MB`)
     console.log(`  peak total:      ${build.peakTotalResidentMb} MB (${build.peakTotalResidentKb} KB)  after add: ${build.peakAfterAddTotalResidentMb} MB  freeze +${build.freezeDeltaTotalResidentMb} MB`)
     console.log(`  retained:        ${build.retainedHeapMb} MB (${build.retainedHeapKb} KB)  peak/retained: ${build.peakVsRetainedRatio}x`)
-    console.log(`  radix ~${build.peakRadixShareEstimatePct}% of peak (structured share ${build.radixShareOfStructuredPct}%)`)
+    console.log(`  term index ~${build.peakTermIndexShareEstimatePct}% of peak (structured share ${build.termIndexShareOfStructuredPct}%)`)
 
     scenarios.push({
       id: spec.id,
@@ -212,7 +212,7 @@ function main () {
     gcExposed: typeof global.gc === 'function',
     runs,
     note: 'peakHeapMb is max heapUsed above post-gc baseline during build; peakTotalResidentMb is max heapUsed+external; retainedHeapMb is measureHeap delta after gc.',
-    opt1Hint: 'OPT-1 targets freezeDeltaMb and radix overlap at freeze. If peakAfterAdd ≈ peak total, prioritize postings/storedFields pressure over radix pack.',
+    opt1Hint: 'OPT-1 targets freezeDeltaMb and term-index overlap at freeze. If peakAfterAdd ≈ peak total, prioritize postings/storedFields pressure over term-index pack.',
     scenarios,
   }
 

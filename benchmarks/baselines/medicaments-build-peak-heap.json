@@ -1,5 +1,5 @@
 {
-  "capturedAt": "2026-06-28T10:28:42.082Z",
+  "capturedAt": "2026-06-30T06:54:14.568Z",
   "node": "v24.16.0",
   "gcExposed": true,
   "runs": 1,
@@ -19,7 +19,7 @@
         "id"
       ],
       "corpusTextMb": 3.805,
-      "corpusHeapMb": 2.259,
+      "corpusHeapMb": 1.718,
       "corpusMeta": {
         "documentCount": 9906,
         "fields": [
@@ -31,15 +31,15 @@
         "file": "bdpm_avis_asmr.jsonl"
       },
       "build": {
-        "peakHeapMb": 40.5916,
-        "peakAfterAddMb": 38.363,
-        "freezeDeltaMb": 2.2286,
-        "peakRssMb": 153.43,
-        "retainedHeapMb": 0.7175,
-        "peakVsRetainedRatio": 56.57,
+        "peakHeapMb": 42.8587,
+        "peakAfterAddMb": 39.492,
+        "freezeDeltaMb": 3.3667,
+        "peakRssMb": 155.398,
+        "retainedHeapMb": 0.2459,
+        "peakVsRetainedRatio": 174.29,
         "breakdownMb": {
           "postings": 1.444,
-          "radixTree": 0.264,
+          "termIndex": 0.264,
           "storedFieldsJson": 0.103,
           "structuredTotal": 1.83
         },
@@ -62,7 +62,7 @@
         "id"
       ],
       "corpusTextMb": 3.503,
-      "corpusHeapMb": 8.73,
+      "corpusHeapMb": 8.785,
       "corpusMeta": {
         "documentCount": 15284,
         "fields": [
@@ -74,15 +74,15 @@
         "file": "bdpm_avis_smr.jsonl"
       },
       "build": {
-        "peakHeapMb": 29.4715,
-        "peakAfterAddMb": 29.471,
-        "freezeDeltaMb": 0.0005,
-        "peakRssMb": 173.707,
-        "retainedHeapMb": 0,
-        "peakVsRetainedRatio": null,
+        "peakHeapMb": 44.4811,
+        "peakAfterAddMb": 44.481,
+        "freezeDeltaMb": 0.0001,
+        "peakRssMb": 182.945,
+        "retainedHeapMb": 0.0437,
+        "peakVsRetainedRatio": 1017.87,
         "breakdownMb": {
           "postings": 1.404,
-          "radixTree": 0.241,
+          "termIndex": 0.241,
           "storedFieldsJson": 0.164,
           "structuredTotal": 1.839
         },
@@ -106,7 +106,7 @@
         "id"
       ],
       "corpusTextMb": 1.378,
-      "corpusHeapMb": 3.602,
+      "corpusHeapMb": 3.499,
       "corpusMeta": {
         "documentCount": 32396,
         "fields": [
@@ -119,15 +119,15 @@
         "file": "bdpm_compositions.jsonl"
       },
       "build": {
-        "peakHeapMb": 32.4399,
-        "peakAfterAddMb": 32.44,
-        "freezeDeltaMb": -0.0001,
-        "peakRssMb": 186.848,
-        "retainedHeapMb": 1.9999,
-        "peakVsRetainedRatio": 16.22,
+        "peakHeapMb": 34.3913,
+        "peakAfterAddMb": 34.391,
+        "freezeDeltaMb": 0.0003,
+        "peakRssMb": 192.406,
+        "retainedHeapMb": 0.1402,
+        "peakVsRetainedRatio": 245.3,
         "breakdownMb": {
           "postings": 0.899,
-          "radixTree": 0.483,
+          "termIndex": 0.483,
           "storedFieldsJson": 0.36,
           "structuredTotal": 1.835
         },
@@ -160,15 +160,15 @@
         "file": "bdpm_conditions.jsonl"
       },
       "build": {
-        "peakHeapMb": 54.2529,
-        "peakAfterAddMb": 54.253,
-        "freezeDeltaMb": -0.0001,
-        "peakRssMb": 208.387,
-        "retainedHeapMb": 1.2999,
-        "peakVsRetainedRatio": 41.74,
+        "peakHeapMb": 54.2486,
+        "peakAfterAddMb": 54.249,
+        "freezeDeltaMb": -0.0004,
+        "peakRssMb": 213.695,
+        "retainedHeapMb": 0.0389,
+        "peakVsRetainedRatio": 1394.57,
         "breakdownMb": {
           "postings": 0.389,
-          "radixTree": 0.008,
+          "termIndex": 0.008,
           "storedFieldsJson": 0.313,
           "structuredTotal": 0.736
         },
@@ -201,15 +201,15 @@
         "file": "bdpm_generiques.jsonl"
       },
       "build": {
-        "peakHeapMb": 54.8751,
-        "peakAfterAddMb": 54.875,
-        "freezeDeltaMb": 0.0001,
-        "peakRssMb": 216.238,
-        "retainedHeapMb": 0.5893,
-        "peakVsRetainedRatio": 93.12,
+        "peakHeapMb": 54.9386,
+        "peakAfterAddMb": 54.939,
+        "freezeDeltaMb": -0.0004,
+        "peakRssMb": 209.137,
+        "retainedHeapMb": 0.0333,
+        "peakVsRetainedRatio": 1649.81,
         "breakdownMb": {
           "postings": 0.31,
-          "radixTree": 0.048,
+          "termIndex": 0.048,
           "storedFieldsJson": 0.112,
           "structuredTotal": 0.481
         },
@@ -233,7 +233,7 @@
         "id"
       ],
       "corpusTextMb": 0.488,
-      "corpusHeapMb": 14.043,
+      "corpusHeapMb": 14.045,
       "corpusMeta": {
         "documentCount": 7711,
         "fields": [
@@ -246,15 +246,15 @@
         "file": "bdpm_mitm.jsonl"
       },
       "build": {
-        "peakHeapMb": 54.2088,
-        "peakAfterAddMb": 42.543,
-        "freezeDeltaMb": 11.6658,
-        "peakRssMb": 218.609,
-        "retainedHeapMb": 0.4731,
-        "peakVsRetainedRatio": 114.58,
+        "peakHeapMb": 54.2102,
+        "peakAfterAddMb": 42.541,
+        "freezeDeltaMb": 11.6692,
+        "peakRssMb": 213.438,
+        "retainedHeapMb": 0.037,
+        "peakVsRetainedRatio": 1465.14,
         "breakdownMb": {
           "postings": 0.356,
-          "radixTree": 0.242,
+          "termIndex": 0.242,
           "storedFieldsJson": 0.08,
           "structuredTotal": 0.7
         },
@@ -280,7 +280,7 @@
         "id"
       ],
       "corpusTextMb": 2.263,
-      "corpusHeapMb": 50.599,
+      "corpusHeapMb": 50.602,
       "corpusMeta": {
         "documentCount": 20905,
         "fields": [
@@ -295,15 +295,15 @@
         "file": "bdpm_presentations.jsonl"
       },
       "build": {
-        "peakHeapMb": 74.0192,
-        "peakAfterAddMb": 55.86,
-        "freezeDeltaMb": 18.1592,
-        "peakRssMb": 241.836,
-        "retainedHeapMb": 1.7699,
-        "peakVsRetainedRatio": 41.82,
+        "peakHeapMb": 74.1294,
+        "peakAfterAddMb": 55.857,
+        "freezeDeltaMb": 18.2724,
+        "peakRssMb": 245.754,
+        "retainedHeapMb": 0.0406,
+        "peakVsRetainedRatio": 1825.85,
         "breakdownMb": {
           "postings": 1.436,
-          "radixTree": 0.777,
+          "termIndex": 0.777,
           "storedFieldsJson": 0.229,
           "structuredTotal": 2.541
         },
@@ -336,15 +336,15 @@
         "file": "bdpm_ruptures.jsonl"
       },
       "build": {
-        "peakHeapMb": 2.1847,
+        "peakHeapMb": 2.1864,
         "peakAfterAddMb": 2.155,
-        "freezeDeltaMb": 0.0297,
-        "peakRssMb": 231.488,
-        "retainedHeapMb": 0.0855,
-        "peakVsRetainedRatio": 25.55,
+        "freezeDeltaMb": 0.0314,
+        "peakRssMb": 228.059,
+        "retainedHeapMb": 0.0541,
+        "peakVsRetainedRatio": 40.41,
         "breakdownMb": {
           "postings": 0.007,
-          "radixTree": 0,
+          "termIndex": 0,
           "storedFieldsJson": 0.007,
           "structuredTotal": 0.015
         },
@@ -383,15 +383,15 @@
         "file": "bdpm_specialites.jsonl"
       },
       "build": {
-        "peakHeapMb": 56.2802,
-        "peakAfterAddMb": 56.28,
-        "freezeDeltaMb": 0.0002,
-        "peakRssMb": 237.168,
-        "retainedHeapMb": 1.1513,
-        "peakVsRetainedRatio": 48.88,
+        "peakHeapMb": 56.2828,
+        "peakAfterAddMb": 56.283,
+        "freezeDeltaMb": -0.0002,
+        "peakRssMb": 233.852,
+        "retainedHeapMb": 0.3552,
+        "peakVsRetainedRatio": 158.45,
         "breakdownMb": {
           "postings": 0.926,
-          "radixTree": 0.534,
+          "termIndex": 0.534,
           "storedFieldsJson": 0.171,
           "structuredTotal": 1.691
         },
@@ -424,15 +424,15 @@
         "file": "bdpm_substances.jsonl"
       },
       "build": {
-        "peakHeapMb": 13.4311,
+        "peakHeapMb": 13.4324,
         "peakAfterAddMb": 11.698,
-        "freezeDeltaMb": 1.7331,
-        "peakRssMb": 231.527,
-        "retainedHeapMb": 0.226,
-        "peakVsRetainedRatio": 59.43,
+        "freezeDeltaMb": 1.7344,
+        "peakRssMb": 228.336,
+        "retainedHeapMb": 0.0954,
+        "peakVsRetainedRatio": 140.8,
         "breakdownMb": {
           "postings": 0.065,
-          "radixTree": 0.094,
+          "termIndex": 0.094,
           "storedFieldsJson": 0.04,
           "structuredTotal": 0.203
         },
@@ -467,15 +467,15 @@
         "file": "vet_compositions.jsonl"
       },
       "build": {
-        "peakHeapMb": 22.0269,
+        "peakHeapMb": 22.0646,
         "peakAfterAddMb": 17.007,
-        "freezeDeltaMb": 5.0199,
-        "peakRssMb": 223.074,
-        "retainedHeapMb": 0.3448,
-        "peakVsRetainedRatio": 63.88,
+        "freezeDeltaMb": 5.0576,
+        "peakRssMb": 228.574,
+        "retainedHeapMb": 0.1058,
+        "peakVsRetainedRatio": 208.55,
         "breakdownMb": {
           "postings": 0.108,
-          "radixTree": 0.094,
+          "termIndex": 0.094,
           "storedFieldsJson": 0.05,
           "structuredTotal": 0.261
         },
@@ -510,15 +510,15 @@
         "file": "vet_medicaments.jsonl"
       },
       "build": {
-        "peakHeapMb": 23.4325,
-        "peakAfterAddMb": 17.662,
-        "freezeDeltaMb": 5.7705,
-        "peakRssMb": 223.352,
-        "retainedHeapMb": 0.239,
-        "peakVsRetainedRatio": 98.04,
+        "peakHeapMb": 23.4392,
+        "peakAfterAddMb": 17.67,
+        "freezeDeltaMb": 5.7692,
+        "peakRssMb": 228.707,
+        "retainedHeapMb": 0.1117,
+        "peakVsRetainedRatio": 209.84,
         "breakdownMb": {
           "postings": 0.161,
-          "radixTree": 0.117,
+          "termIndex": 0.117,
           "storedFieldsJson": 0.033,
           "structuredTotal": 0.317
         },

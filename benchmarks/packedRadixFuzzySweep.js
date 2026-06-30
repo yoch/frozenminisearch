@@ -13,7 +13,7 @@ import {
 import { median, medianTimed } from './benchmarkUtils.js'
 import { loadMedicamentsCorpus } from './medicamentsIndexes.js'
 import { printEdgeLabelHistogram } from './packedRadixEdgeStats.js'
-import { fromRadixTree } from '../src/PackedRadixTree/index.js'
+import { packSearchableMap } from '../testSupport/upstreamSearchableMap.js'
 
 const DEFAULT_TARGET_QUERIES = 10000
 const DEFAULT_WARMUP_QUERIES = 1000
@@ -44,7 +44,7 @@ function loadCorpus (corpusId) {
     return {
       id: 'divina',
       map,
-      tree: fromRadixTree(map.radixTree, map.size),
+      tree: packSearchableMap(map),
       termCount: map.size,
     }
   }

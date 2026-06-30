@@ -246,6 +246,9 @@ const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(upstream), options)
 ```
 
 This path is useful for migration and interchange. In normal frozen deployments, you typically build with `fromDocuments`, the builder API, or binary snapshots directly.
+Internally, `fromJSON` now packs terms directly into the immutable packed term
+index; it no longer routes through any local `SearchableMap` or mutable radix
+fallback.
 
 ---
 

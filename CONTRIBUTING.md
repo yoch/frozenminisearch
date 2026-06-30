@@ -33,11 +33,21 @@ Follow the full release runbook in [`RELEASE.md`](RELEASE.md). Manual docs redep
 ## Benchmarks
 
 ```bash
-pnpm run bench -- run --profile=dev --quick
-pnpm run bench -- run --profile=vs-reference
+pnpm bench              # quick smoke (dev profile, 1 run × 10 iterations)
+pnpm bench:run          # full suite: frozen vs MiniSearch (regression profile)
+pnpm bench:record       # capture benchmarks/baselines/latest.json
+pnpm bench:diff         # diff latest.json vs reference.json (run record first)
 ```
 
-See [`benchmarks/README.md`](benchmarks/README.md).
+For the `vs-reference` profile (reference corpus, e.g. before refreshing `reference.json`):
+
+```bash
+NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs run --profile=vs-reference
+```
+
+See [`benchmarks/README.md`](benchmarks/README.md) and [`benchmarks/SCRIPTS.md`](benchmarks/SCRIPTS.md).
+
+**Bench tooling moratorium (active):** do not add bench scripts, top-level `bench:*` / `benchmark:*` aliases, or versioned baselines without a documented exception. See [`PLAN_MORATOIRE_BENCH.md`](PLAN_MORATOIRE_BENCH.md).
 
 ## Pull requests
 

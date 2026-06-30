@@ -11,19 +11,25 @@ Modular harness under `benchmarks/framework/` with three **profiles**:
 ## Commands
 
 ```bash
-pnpm bench                              # regression run
-pnpm bench -- run --profile=vs-reference
-pnpm bench -- run --profile=dev --quick
-pnpm bench:record                       # capture baseline
-pnpm bench:diff                         # diff vs baseline
-pnpm bench:history                      # history analysis
+pnpm bench                              # quick smoke (dev profile, 1 run × 10 iterations)
+pnpm bench:run                          # full suite: frozen vs MiniSearch (regression profile)
+pnpm bench:record                       # capture benchmarks/baselines/latest.json
+pnpm bench:diff                         # diff latest.json vs reference.json (run record first)
+pnpm bench:history                      # append perf-history.jsonl
 pnpm bench:micro                        # Benchmark.js micro suites (Divina corpus)
-pnpm bench -- micro --only=fuzzy,ranking
-pnpm bench:micro -- --list
 pnpm bench:build-peak                   # transient heap peak during FrozenIndexBuilder
 pnpm bench:memory                       # isolated heap phase only (protocol v4)
 pnpm bench:medicaments-build-peak       # rebuild peak from corpus extracted out of .msbin fixtures
 BENCH_GC_AUDIT=1 pnpm bench:build-peak  # same benchmark + trace-gc audit in a child process
+```
+
+Profiles and flags go through `cli.mjs` directly (`pnpm bench` / `pnpm bench:*` map to `make` targets and do not forward extra arguments):
+
+```bash
+NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs run --profile=vs-reference
+NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs micro --only=fuzzy,ranking
+NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs micro --list
+node benchmarks/scripts/generate-readme-comparison.mjs --from=benchmarks/baselines/latest.json
 ```
 
 `bench:build-peak` writes `benchmarks/baselines/build-peak-heap.json` (peak vs retained heap, packed term-index share estimate).
@@ -104,8 +110,9 @@ Optional Chrome validation: `node --expose-gc benchmarks/scripts/heap-snapshot-p
 Committed reference: `benchmarks/baselines/reference.json` (search protocol **v2**, heap protocol **v4**).
 
 ```bash
-pnpm run bench:reference:update   # RUNS=3 vs-reference → reference.json + README table
-pnpm run bench:readme               # regenerate README comparison only
+pnpm bench:reference:update   # RUNS=3 vs-reference → reference.json + README table
+pnpm bench:readme             # regenerate README comparison from reference.json
+node benchmarks/scripts/generate-readme-comparison.mjs --from=benchmarks/baselines/latest.json
 ```
 
 Legacy: `pnpm benchmark:baseline:update` (re-runs with default regression surfaces).

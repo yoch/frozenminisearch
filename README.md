@@ -294,9 +294,11 @@ Raw snapshots load in the browser without native compression APIs. zlib snapshot
 See [benchmarks/README.md](benchmarks/README.md).
 
 ```bash
-pnpm bench -- run --profile=vs-reference   # compare frozen vs minisearch
-pnpm bench:diff                            # regression vs reference.json
-pnpm bench:readme -- --from=benchmarks/baselines/latest.json
+pnpm bench                                 # quick smoke (dev profile)
+pnpm bench:run                             # full suite (regression profile)
+NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs run --profile=vs-reference
+pnpm bench:record && pnpm bench:diff       # capture then diff vs reference.json
+node benchmarks/scripts/generate-readme-comparison.mjs --from=benchmarks/baselines/latest.json
 ```
 
 ---

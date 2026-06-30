@@ -1,6 +1,0 @@
-{
-  "note": "Baseline before P0-lite storedFields columnar (build-peak-heap, divina-storeFields retainedHeapMb)",
-  "capturedAt": "2026-06-07",
-  "divinaStoreFieldsRetainedHeapMb": 1.0367,
-  "divinaIndexOnlyRetainedHeapMb": 0.2808
-}

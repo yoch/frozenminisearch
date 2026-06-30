@@ -7,5 +7,3 @@ export {
   sampleTerms,
   SINGLE_EDIT_MUTATIONS,
 } from '../testSupport/fuzzyQueryMutations.js'
-
-export { mulberry32 } from '../testSupport/mulberry32.js'

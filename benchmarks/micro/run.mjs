@@ -3,8 +3,8 @@
  * Micro-benchmarks: Benchmark.js ops/sec on upstream MiniSearch + SearchableMap (Divina corpus).
  *
  *   pnpm bench:micro
- *   pnpm bench:micro -- --only=fuzzy,ranking
- *   pnpm bench:micro -- --list
+ *   NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs micro --only=fuzzy,ranking
+ *   NODE_OPTIONS='--expose-gc' node benchmarks/framework/cli.mjs micro --list
  */
 import { lines, miniSearch } from '../divinaCommedia.js'
 import { MICRO_SUITES, resolveMicroSuites } from './registry.mjs'

@@ -140,6 +140,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     return { node, prefixLength, keyFullyConsumed: true }
   }
 
+  // Iterable API; keep frame walk in sync with visitSubtreeRefs (query hot path).
   private* emitSubtreeRefs(startNode: number, startLength: number): IterableIterator<PackedTermRef> {
     const frames: EmitRefFrame[] = []
     pushEmitRefFrame(frames, this, startNode, startLength)
@@ -164,6 +165,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     }
   }
 
+  // Zero-allocation visitor; keep frame walk in sync with emitSubtreeRefs.
   private visitSubtreeRefs(
     startNode: number,
     startLength: number,

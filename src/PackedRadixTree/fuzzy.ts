@@ -43,6 +43,7 @@ export function packedRadixVisitFuzzyRefs(
   )
 }
 
+// Iterable wrapper; allocates refs[]. Query engine uses packedRadixVisitFuzzyRefs instead.
 function* runFuzzy(
   tree: PackedRadixTree,
   query: string,

@@ -41,7 +41,7 @@ export class FrozenIndexBuilder<T> {
   private _storedFields: StoredFieldsLayout
   private readonly _fieldLengthData: number[]
   private readonly _avgFieldLength: number[]
-  private readonly _seenIds: Set<unknown>
+  private _seenIds: Set<unknown> | undefined
   private readonly _fieldTermFreqScratch = new Map<string, number>()
   private readonly _rawTokenScratch = new Set<string>()
   private readonly _tokenScratch: string[] = []
@@ -60,7 +60,6 @@ export class FrozenIndexBuilder<T> {
       estimatedTotalPostings: estimatedDocs > 0 ? estimatedDocs * perSlot : undefined,
     })
     this._avgFieldLength = []
-    this._seenIds = new Set()
     this._nextId = 0
     this._frozen = false
 
@@ -90,12 +89,9 @@ export class FrozenIndexBuilder<T> {
     if (id == null) {
       throw new Error(`FrozenMiniSearch: document does not have ID field "${idField}"`)
     }
-    if (this._seenIds.has(id)) {
-      throw new Error(`FrozenMiniSearch: duplicate ID ${id}`)
-    }
-    this._seenIds.add(id)
-
-    const shortId = this._nextId++
+    const shortId = this._nextId
+    this.claimDocumentId(id, shortId)
+    this._nextId = shortId + 1
     this._externalIds[shortId] = id
     writeStoredField(this._storedFields, shortId, storeFields, extractField, document)
 
@@ -132,6 +128,27 @@ export class FrozenIndexBuilder<T> {
         this._postings.append(ti, fieldId, shortId, freq)
       })
     }
+  }
+
+  private ensureSeenIds(upToShortId: number): Set<unknown> {
+    if (this._seenIds != null) return this._seenIds
+
+    const seenIds = new Set<unknown>()
+    for (let i = 0; i < upToShortId; i++) {
+      seenIds.add(this._externalIds[i])
+    }
+    this._seenIds = seenIds
+    return seenIds
+  }
+
+  private claimDocumentId(id: unknown, shortId: number): void {
+    if (this._seenIds == null && id === shortId) return
+
+    const seenIds = this.ensureSeenIds(shortId)
+    if (seenIds.has(id)) {
+      throw new Error(`FrozenMiniSearch: duplicate ID ${id}`)
+    }
+    seenIds.add(id)
   }
 
   /**
@@ -187,7 +204,8 @@ export class FrozenIndexBuilder<T> {
     this._storedFields = createStoredFieldsLayout(this._options.storeFields, 0)
     this._fieldLengthData.length = 0
     this._avgFieldLength.length = 0
-    this._seenIds.clear()
+    this._seenIds?.clear()
+    this._seenIds = undefined
     this._fieldTermFreqScratch.clear()
     this._rawTokenScratch.clear()
     this._tokenScratch.length = 0

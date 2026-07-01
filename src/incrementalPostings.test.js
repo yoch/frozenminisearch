@@ -139,6 +139,45 @@ describe('IncrementalPostingsAccumulator', () => {
     expect(searchSnapshot(fromDocuments, 'term2')).toEqual(searchSnapshot(fromMiniSearch, 'term2'))
   })
 
+  test('builder avoids duplicate-id Set while numeric ids stay dense', () => {
+    const builder = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] }, {
+      estimatedDocumentCount: 3,
+    })
+
+    builder.add({ id: 0, text: 'alpha' })
+    builder.add({ id: 1, text: 'beta' })
+    builder.add({ id: 2, text: 'gamma' })
+
+    expect(builder._seenIds).toBeUndefined()
+  })
+
+  test('builder switches to duplicate-id Set when ids stop being dense', () => {
+    const builder = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] })
+
+    builder.add({ id: 0, text: 'alpha' })
+    builder.add({ id: 1, text: 'beta' })
+    builder.add({ id: 'doc-2', text: 'gamma' })
+
+    expect(builder._seenIds).toBeInstanceOf(Set)
+    expect(builder._seenIds.size).toBe(3)
+    expect(builder._seenIds.has(0)).toBe(true)
+    expect(builder._seenIds.has(1)).toBe(true)
+    expect(builder._seenIds.has('doc-2')).toBe(true)
+  })
+
+  test('builder catches duplicate ids before and after dense-id switch', () => {
+    const duplicateDense = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] })
+    duplicateDense.add({ id: 0, text: 'alpha' })
+    expect(() => duplicateDense.add({ id: 0, text: 'beta' }))
+      .toThrow(/duplicate ID 0/)
+
+    const duplicateString = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] })
+    duplicateString.add({ id: 0, text: 'alpha' })
+    duplicateString.add({ id: 'doc-1', text: 'beta' })
+    expect(() => duplicateString.add({ id: 'doc-1', text: 'gamma' }))
+      .toThrow(/duplicate ID doc-1/)
+  })
+
   test('non-contiguous scratch ranges compact to one hot-path segment', () => {
     const acc = new IncrementalPostingsAccumulator(1)
     acc.append(0, 0, 1, 1)
@@ -267,7 +306,7 @@ function registerGoldenDatasetTests({ id, documents, options, query }) {
     expect(builder._fieldLengthData).toEqual([])
     expect(builder._avgFieldLength).toEqual([])
     expect(builder._terms).toEqual([])
-    expect(builder._seenIds.size).toBe(0)
+    expect(builder._seenIds).toBeUndefined()
     expect(builder._fieldTermFreqScratch.size).toBe(0)
     expect(builder._rawTokenScratch.size).toBe(0)
     expect(builder._tokenScratch).toEqual([])

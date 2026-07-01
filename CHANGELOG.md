@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v1.6.4 — `@yoch/frozenminisearch`
+
+Patch release: faster frozen builds and prefix/fuzzy search, with lower build-time scratch memory on common corpora. No public API, search semantics, or MSv5 wire-format changes.
+
+### Improved
+
+- **FrozenIndexBuilder** — skip the duplicate-id `Set` while numeric document ids stay dense (`id === shortId`); lazy backfill when a non-dense id appears.
+- **IncrementalPostingsAccumulator** — adaptive build scratch columns (doc ids start `Uint16Array`, promote to `Uint32Array` past 65535; freqs start `Uint8Array`, promote to `Uint16Array` past 255).
+- **Term index packing** — pack term lists from sorted terms instead of incremental scratch insertion; faster builds on large sparse vocabularies.
+- **Search** — route prefix/fuzzy match iteration through visitors to avoid per-match ref allocations on hot query paths.
+
+### Fixed
+
+- **Term index packing** — finalize sorted-topology packs through `finalizePackedRadixScratch` so `fromDocuments` retained heap matches the pre-direct-pack profile (identical MSv5 snapshots).
+
 ## v1.6.3 — `@yoch/frozenminisearch`
 
 Patch release: drop in-tree legacy MiniSearch internals, trim unused public TypeScript surface (`logger`), and simplify frozen/query/MSv5 internals. No search semantics or MSv5 wire-format changes. Removing `logger` is a type-surface cleanup only — the hook was never invoked at runtime.

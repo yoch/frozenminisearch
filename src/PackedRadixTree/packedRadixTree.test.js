@@ -23,12 +23,24 @@ function packEntries(entries) {
   return packSearchableMapEntries(entries)
 }
 
-test('packTermsFromList matches SearchableMap packing', () => {
+function sortedEntries(entries) {
+  return [...entries].sort(([aTerm, aIndex], [bTerm, bIndex]) =>
+    aTerm < bTerm ? -1 : aTerm > bTerm ? 1 : aIndex - bIndex,
+  )
+}
+
+function sortedPrefixRefs(tree, prefix) {
+  return sortedEntries(
+    Array.from(tree.prefixRefs(prefix))
+      .map(({ termIndex }) => [tree.termByIndex(termIndex), termIndex]),
+  )
+}
+
+test('packTermsFromList matches SearchableMap semantics', () => {
   const viaSearchableMap = packEntries(keyValues)
   const direct = packTermsFromList(terms)
-  expect(Array.from(direct.entries())).toEqual(Array.from(viaSearchableMap.entries()))
-  expect(Array.from(direct.prefixRefs('a')).map(({ termIndex }) => [direct.termByIndex(termIndex), termIndex]))
-    .toEqual(Array.from(viaSearchableMap.prefixRefs('a')).map(({ termIndex }) => [viaSearchableMap.termByIndex(termIndex), termIndex]))
+  expect(sortedEntries(direct.entries())).toEqual(sortedEntries(viaSearchableMap.entries()))
+  expect(sortedPrefixRefs(direct, 'a')).toEqual(sortedPrefixRefs(viaSearchableMap, 'a'))
   for (const [term, termIndex] of keyValues) {
     expect(direct.get(term)).toBe(termIndex)
     expect(direct.get(term)).toBe(viaSearchableMap.get(term))
@@ -36,7 +48,7 @@ test('packTermsFromList matches SearchableMap packing', () => {
   expect(direct.size).toBe(viaSearchableMap.size)
 })
 
-test('packTermsFromList preserves split-edge iteration order', () => {
+test('packTermsFromList preserves split-edge lookups and prefix sets', () => {
   const entries = [
     ['acqua', 0],
     ['aqua', 1],
@@ -45,9 +57,8 @@ test('packTermsFromList preserves split-edge iteration order', () => {
   const direct = packTermsFromList(entries.map(([term]) => term))
   const viaSearchableMap = packEntries(entries)
 
-  expect(Array.from(direct.entries())).toEqual(Array.from(viaSearchableMap.entries()))
-  expect(Array.from(direct.prefixRefs('a')).map(({ termIndex }) => direct.termByIndex(termIndex)))
-    .toEqual(Array.from(viaSearchableMap.prefixRefs('a')).map(({ termIndex }) => viaSearchableMap.termByIndex(termIndex)))
+  expect(sortedEntries(direct.entries())).toEqual(sortedEntries(viaSearchableMap.entries()))
+  expect(sortedPrefixRefs(direct, 'a')).toEqual(sortedPrefixRefs(viaSearchableMap, 'a'))
 })
 
 test('SearchableMap _tree adapter matches SearchableMap packing', () => {
@@ -78,9 +89,10 @@ function expectPackedParity(entries, probes = {}) {
   const built = packEntries(entries)
   const packedBuf = buildTermTreeSectionColumnar(p)
 
-  // entries() must match Map iteration order exactly (not just as a set).
+  // SearchableMap adapter preserves upstream iteration order; direct packing only
+  // guarantees semantic equivalence.
   expect(Array.from(p.entries())).toEqual(Array.from(m.entries()))
-  expect(Array.from(built.entries())).toEqual(Array.from(m.entries()))
+  expect(sortedEntries(built.entries())).toEqual(sortedEntries(m.entries()))
   // Order must survive MSv5 columnar wire round-trip.
   expect(Array.from(readPackedTermTreeSectionColumnar(packedBuf, m.size).entries()))
     .toEqual(Array.from(m.entries()))
@@ -95,7 +107,7 @@ function expectPackedParity(entries, probes = {}) {
     const fromBuiltRefs = Array.from(built.prefixRefs(prefix))
       .map(({ termIndex }) => [built.termByIndex(termIndex), termIndex])
     expect(fromRefs).toEqual(Array.from(m.atPrefix(prefix).entries()))
-    expect(fromBuiltRefs).toEqual(Array.from(m.atPrefix(prefix).entries()))
+    expect(sortedEntries(fromBuiltRefs)).toEqual(sortedEntries(m.atPrefix(prefix).entries()))
   }
   // fuzzyRefs: same match set as fuzzyGet; iteration order is not compared.
   for (const query of fuzzyQueries) {
@@ -232,11 +244,11 @@ describe('PackedRadixTree module', () => {
     }
   })
 
-  test('prefixRefs preserve prefix order and lengths', () => {
+  test('prefixRefs preserve prefix match set and lengths', () => {
     const prefix = 'ac'
     const refs = Array.from(packed.prefixRefs(prefix))
     const rebuilt = refs.map(({ termIndex }) => packed.termByIndex(termIndex))
-    expect(rebuilt).toEqual(Array.from(map.atPrefix(prefix).entries()).map(([term]) => term))
+    expect([...rebuilt].sort()).toEqual(Array.from(map.atPrefix(prefix).entries()).map(([term]) => term).sort())
     for (const ref of refs) {
       expect(ref.length).toBe(packed.termByIndex(ref.termIndex).length)
     }

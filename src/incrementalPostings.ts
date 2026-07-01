@@ -13,6 +13,9 @@ import {
 
 const DEFAULT_CAPACITY = 16
 
+type GrowableDocIdArray = Uint16Array | Uint32Array
+type GrowableFreqArray = Uint8Array | Uint16Array
+
 /** Growable unsigned 32-bit column (build scratch; narrowed to u16 at finalize when possible). */
 class GrowableUint32Column {
   private _buf: Uint32Array
@@ -52,9 +55,9 @@ class GrowableUint32Column {
   }
 }
 
-/** Growable frequency column (u16 cells; matches frozen clamp range). */
-class GrowableFreqColumn {
-  private _buf: Uint16Array
+/** Growable doc-id column; starts u16 and promotes to u32 only past the boundary. */
+class GrowableDocIdColumn {
+  private _buf: GrowableDocIdArray
   private _len = 0
 
   constructor(initialCapacity = DEFAULT_CAPACITY) {
@@ -69,15 +72,27 @@ class GrowableFreqColumn {
     return this._buf[index]!
   }
 
-  push(freq: number): number {
-    const v = clampFreq(freq)
+  private grow(minCapacity: number): void {
+    const grown = this._buf instanceof Uint16Array
+      ? new Uint16Array(minCapacity)
+      : new Uint32Array(minCapacity)
+    grown.set(this._buf)
+    this._buf = grown
+  }
+
+  private promote(): void {
+    if (this._buf instanceof Uint32Array) return
+    const promoted = new Uint32Array(this._buf.length)
+    promoted.set(this._buf)
+    this._buf = promoted
+  }
+
+  push(value: number): void {
+    if (value > 0xffff) this.promote()
     if (this._len >= this._buf.length) {
-      const grown = new Uint16Array(Math.max(1, this._buf.length * 2))
-      grown.set(this._buf)
-      this._buf = grown
+      this.grow(Math.max(1, this._buf.length * 2))
     }
-    this._buf[this._len++] = v
-    return v
+    this._buf[this._len++] = value
   }
 
   truncate(length: number): void {
@@ -93,6 +108,61 @@ class GrowableFreqColumn {
   }
 }
 
+/** Growable frequency column; starts u8 and promotes to u16 only when needed. */
+class GrowableFreqColumn {
+  private _buf: GrowableFreqArray
+  private _len = 0
+
+  constructor(initialCapacity = DEFAULT_CAPACITY) {
+    this._buf = new Uint8Array(Math.max(1, initialCapacity))
+  }
+
+  get length(): number {
+    return this._len
+  }
+
+  get(index: number): number {
+    return this._buf[index]!
+  }
+
+  private grow(minCapacity: number): void {
+    const grown = this._buf instanceof Uint8Array
+      ? new Uint8Array(minCapacity)
+      : new Uint16Array(minCapacity)
+    grown.set(this._buf)
+    this._buf = grown
+  }
+
+  private promote(): void {
+    if (this._buf instanceof Uint16Array) return
+    const promoted = new Uint16Array(this._buf.length)
+    promoted.set(this._buf)
+    this._buf = promoted
+  }
+
+  push(freq: number): number {
+    const v = clampFreq(freq)
+    if (v > 0xff) this.promote()
+    if (this._len >= this._buf.length) {
+      this.grow(Math.max(1, this._buf.length * 2))
+    }
+    this._buf[this._len++] = v
+    return v
+  }
+
+  truncate(length: number): void {
+    this._len = length
+    if (length > 0 && length < this._buf.length) {
+      this._buf = this._buf.slice(0, length)
+    }
+  }
+
+  release(): void {
+    this._buf = new Uint8Array(1)
+    this._len = 0
+  }
+}
+
 export type IncrementalPostingsHints = {
   /** Initial capacity for global posting buffers. */
   estimatedTotalPostings?: number
@@ -104,7 +174,7 @@ export type IncrementalPostingsHints = {
  */
 export class IncrementalPostingsAccumulator {
   private readonly _fieldCount: number
-  private readonly _docIds: GrowableUint32Column
+  private readonly _docIds: GrowableDocIdColumn
   private readonly _freqs: GrowableFreqColumn
   private readonly _slotIds: GrowableUint32Column
   private _totalPostings = 0
@@ -113,7 +183,7 @@ export class IncrementalPostingsAccumulator {
   constructor(fieldCount: number, hints?: IncrementalPostingsHints) {
     this._fieldCount = fieldCount
     const cap = Math.max(DEFAULT_CAPACITY, hints?.estimatedTotalPostings ?? 0)
-    this._docIds = new GrowableUint32Column(cap)
+    this._docIds = new GrowableDocIdColumn(cap)
     this._freqs = new GrowableFreqColumn(cap)
     this._slotIds = new GrowableUint32Column(cap)
   }

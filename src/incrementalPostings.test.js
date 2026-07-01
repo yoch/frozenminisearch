@@ -220,6 +220,28 @@ describe('IncrementalPostingsAccumulator', () => {
     expect(layout.docIdWidth).toBe(32)
   })
 
+  test('build scratch doc ids promote from uint16 to uint32 only past boundary', () => {
+    const acc = new IncrementalPostingsAccumulator(1)
+    acc.append(0, 0, 65535, 1)
+    expect(acc._docIds._buf).toBeInstanceOf(Uint16Array)
+
+    acc.append(0, 0, 65536, 1)
+    expect(acc._docIds._buf).toBeInstanceOf(Uint32Array)
+    expect(acc._docIds.get(0)).toBe(65535)
+    expect(acc._docIds.get(1)).toBe(65536)
+  })
+
+  test('build scratch freqs promote from uint8 to uint16 only past boundary', () => {
+    const acc = new IncrementalPostingsAccumulator(1)
+    acc.append(0, 0, 0, 255)
+    expect(acc._freqs._buf).toBeInstanceOf(Uint8Array)
+
+    acc.append(0, 0, 1, 256)
+    expect(acc._freqs._buf).toBeInstanceOf(Uint16Array)
+    expect(acc._freqs.get(0)).toBe(255)
+    expect(acc._freqs.get(1)).toBe(256)
+  })
+
   test('finalize releases growable scratch buffers', () => {
     const acc = new IncrementalPostingsAccumulator(1, { estimatedTotalPostings: 64 })
     acc.append(0, 0, 1, 1)
@@ -236,6 +258,8 @@ describe('IncrementalPostingsAccumulator', () => {
     expect(acc._docIds._buf.length).toBe(1)
     expect(acc._freqs._buf.length).toBe(1)
     expect(acc._slotIds._buf.length).toBe(1)
+    expect(acc._docIds._buf).toBeInstanceOf(Uint16Array)
+    expect(acc._freqs._buf).toBeInstanceOf(Uint8Array)
   })
 })
 

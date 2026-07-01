@@ -55,6 +55,7 @@ export interface AggregateContext {
   getFieldLength: (docId: number, fieldId: number) => number
   getExternalId: (docId: number) => unknown
   getStoredFields: (docId: number) => Record<string, unknown> | undefined
+  resolveTermByIndex?: (termIndex: number) => string
 }
 
 export const defaultBM25params: BM25Params = { k: 1.2, b: 0.7, d: 0.5 }
@@ -144,10 +145,10 @@ export const assignUniqueTerms = (target: string[], source: readonly string[]): 
 export type Scored = { score: number }
 export const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
-/** Eager materialized term, or lazy resolver for indexed derived matches. */
+/** Eager materialized term, or indexed term id resolved once per posting list. */
 export type AggregateDerivedTerm
   = | string
-    | { kind: 'lazy', resolve: () => string }
+    | number
 
 export type AggregateTermOptions = {
   /** When set, only score postings whose docId is in this gate. Does not affect matchingFields. */
@@ -157,9 +158,15 @@ export type AggregateTermOptions = {
 function getDerivedTerm(
   derivedTerm: AggregateDerivedTerm,
   cache: { value?: string },
+  context: AggregateContext,
 ): string {
   if (typeof derivedTerm === 'string') return derivedTerm
-  if (cache.value === undefined) cache.value = derivedTerm.resolve()
+  if (cache.value === undefined) {
+    if (context.resolveTermByIndex == null) {
+      throw new Error('FrozenMiniSearch: missing term resolver for indexed derived term')
+    }
+    cache.value = context.resolveTermByIndex(derivedTerm)
+  }
   return cache.value
 }
 
@@ -181,7 +188,7 @@ function scorePostingDoc(
   derivedTermCache: { value?: string },
   hoistedIdf?: number,
 ): void {
-  const resolvedDerivedTerm = getDerivedTerm(derivedTerm, derivedTermCache)
+  const resolvedDerivedTerm = getDerivedTerm(derivedTerm, derivedTermCache, context)
   const docBoost = boostDocumentFn
     ? boostDocumentFn(context.getExternalId(docId), resolvedDerivedTerm, context.getStoredFields(docId))
     : 1

@@ -4,13 +4,6 @@ import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout
 import type PackedRadixTree from './PackedRadixTree'
 import type { PackedFuzzyRef } from './types'
 
-/**
- * Lazy generator, same Iterable contract as `prefixRefs`. Matches are yielded as
- * found (no eager `PackedFuzzyRef[]`). Slightly slower than materializing an array
- * on micro-benches, but keeps the ref-first API uniform and leaves room for future
- * query push-down (term-level gate skip, early abort). Easy to revert to eager if
- * that never pays off.
- */
 export function packedRadixFuzzyRefs(
   tree: PackedRadixTree,
   query: string,
@@ -19,11 +12,12 @@ export function packedRadixFuzzyRefs(
   return runFuzzy(tree, query, maxDistance)
 }
 
-function* runFuzzy(
+export function packedRadixVisitFuzzyRefs(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
-): Generator<PackedFuzzyRef> {
+  visit: (termIndex: number, length: number, distance: number) => void,
+): void {
   if (maxDistance < 0) return
 
   const n = query.length + 1
@@ -36,7 +30,7 @@ function* runFuzzy(
   const queryCodes = new Uint16Array(n)
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
-  yield* recurse(
+  visitRecurse(
     tree,
     queryLen,
     queryCodes,
@@ -45,10 +39,23 @@ function* runFuzzy(
     1,
     0,
     0,
+    visit,
   )
 }
 
-function* recurse(
+function* runFuzzy(
+  tree: PackedRadixTree,
+  query: string,
+  maxDistance: number,
+): Generator<PackedFuzzyRef> {
+  const refs: PackedFuzzyRef[] = []
+  packedRadixVisitFuzzyRefs(tree, query, maxDistance, (termIndex, length, distance) => {
+    refs.push({ termIndex, length, distance })
+  })
+  yield* refs
+}
+
+function visitRecurse(
   tree: PackedRadixTree,
   queryLen: number,
   queryCodes: Uint16Array,
@@ -57,7 +64,8 @@ function* recurse(
   rowStart: number,
   node: number,
   termLength: number,
-): Generator<PackedFuzzyRef> {
+  visit: (termIndex: number, length: number, distance: number) => void,
+): void {
   const heap = tree.labelHeap
   const n = queryLen + 1
   const offset = rowStart * n
@@ -72,8 +80,7 @@ function* recurse(
     if (edgeOffset < 0) {
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {
-        const termIndex = tree.nodeValue[node]
-        yield { termIndex, distance, length: termLength }
+        visit(tree.nodeValue[node], termLength, distance)
       }
       continue
     }
@@ -117,7 +124,7 @@ function* recurse(
       }
     }
 
-    yield* recurse(
+    visitRecurse(
       tree,
       queryLen,
       queryCodes,
@@ -126,6 +133,7 @@ function* recurse(
       i,
       tree.edgeChild[ei],
       termLength + labelLen,
+      visit,
     )
   }
 }

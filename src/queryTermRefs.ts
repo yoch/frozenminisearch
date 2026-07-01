@@ -7,7 +7,7 @@ import type {
   QuerySpec,
 } from './scoring'
 import type { CombinationOperator, SearchOptionsWithDefaults } from './searchTypes'
-import type { QueryEngineParams, QueryIndexView } from './queryEngine'
+import type { QueryEngineParams } from './queryEngine'
 
 export type NormalizedStringQuery = {
   options: SearchOptionsWithDefaults & Pick<QueryEngineParams, 'tokenize' | 'processTerm'>
@@ -19,9 +19,7 @@ export type NormalizedStringQuery = {
 }
 
 type QuerySpecTermRef
-  = | { kind: 'exact', termIndex: number | undefined }
-    | { kind: 'prefix', termIndex: number, length: number, distance: number }
-    | { kind: 'fuzzy', termIndex: number, length: number, distance: number }
+  = 'exact' | 'prefix' | 'fuzzy'
 
 function maxFuzzyDistance(query: QuerySpec, maxFuzzy: number): number {
   if (!query.fuzzy) return 0
@@ -31,39 +29,37 @@ function maxFuzzyDistance(query: QuerySpec, maxFuzzy: number): number {
     : fuzzy
 }
 
-function lazyIndexedTerm(
-  indexView: QueryIndexView,
-  termIndex: number,
-): AggregateDerivedTerm {
-  return { kind: 'lazy', resolve: () => indexView.resolveTermByIndex(termIndex) }
-}
-
 export function forEachQuerySpecTermRef(
   query: QuerySpec,
   normalized: NormalizedStringQuery,
   params: QueryEngineParams,
-  visit: (ref: QuerySpecTermRef) => void,
+  visit: (
+    kind: QuerySpecTermRef,
+    termIndex: number | undefined,
+    length: number,
+    distance: number,
+  ) => void,
 ): void {
   const { indexView } = params
   const { options } = normalized
   const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
 
-  visit({ kind: 'exact', termIndex: indexView.resolveTermIndex(query.term) })
+  visit('exact', indexView.resolveTermIndex(query.term), query.term.length, 0)
 
   const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
   if (query.prefix) {
-    for (const { termIndex, length } of indexView.getPrefixMatchesByIndex(query.term)) {
+    indexView.visitPrefixMatchesByIndex(query.term, (termIndex, length) => {
       const distance = length - query.term.length
-      if (!distance) continue
+      if (!distance) return
       seenPrefix?.add(termIndex)
-      visit({ kind: 'prefix', termIndex, length, distance })
-    }
+      visit('prefix', termIndex, length, distance)
+    })
   }
   if (!maxDistance) return
-  for (const { termIndex, length, distance } of indexView.getFuzzyMatchesByIndex(query.term, maxDistance)) {
-    if (!distance || seenPrefix?.has(termIndex)) continue
-    visit({ kind: 'fuzzy', termIndex, length, distance })
-  }
+  indexView.visitFuzzyMatchesByIndex(query.term, maxDistance, (termIndex, length, distance) => {
+    if (!distance || seenPrefix?.has(termIndex)) return
+    visit('fuzzy', termIndex, length, distance)
+  })
 }
 
 export function visitQuerySpecForScoring(
@@ -76,30 +72,32 @@ export function visitQuerySpecForScoring(
     termWeight: number,
   ) => void,
 ): void {
-  const { indexView } = params
   const { fuzzyWeight, prefixWeight } = normalized
 
-  forEachQuerySpecTermRef(query, normalized, params, (ref) => {
-    if (ref.kind === 'exact') {
+  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex, length, distance) => {
+    const { indexView } = params
+    if (kind === 'exact') {
       visit(
-        ref.termIndex == null ? undefined : indexView.fieldTermData(ref.termIndex),
+        termIndex == null ? undefined : indexView.fieldTermData(termIndex),
         query.term,
         1,
       )
       return
     }
-    if (ref.kind === 'prefix') {
+    if (termIndex == null) return
+    const derivedTerm: AggregateDerivedTerm = termIndex
+    if (kind === 'prefix') {
       visit(
-        indexView.fieldTermData(ref.termIndex),
-        lazyIndexedTerm(indexView, ref.termIndex),
-        prefixWeight * ref.length / (ref.length + 0.3 * ref.distance),
+        indexView.fieldTermData(termIndex),
+        derivedTerm,
+        prefixWeight * length / (length + 0.3 * distance),
       )
       return
     }
     visit(
-      indexView.fieldTermData(ref.termIndex),
-      lazyIndexedTerm(indexView, ref.termIndex),
-      fuzzyWeight * ref.length / (ref.length + ref.distance),
+      indexView.fieldTermData(termIndex),
+      derivedTerm,
+      fuzzyWeight * length / (length + distance),
     )
   })
 }
@@ -135,12 +133,12 @@ export function estimateMaxPostingLengthForQuerySpec(
     maxLen = Math.max(maxLen, maxPostingLengthForFieldTermData(data, fieldBoosts, fieldIds))
   }
 
-  forEachQuerySpecTermRef(query, normalized, params, (ref) => {
-    if (ref.kind === 'exact') {
-      if (ref.termIndex != null) consider(indexView.fieldTermData(ref.termIndex))
+  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex) => {
+    if (kind === 'exact') {
+      if (termIndex != null) consider(indexView.fieldTermData(termIndex))
       return
     }
-    consider(indexView.fieldTermData(ref.termIndex))
+    if (termIndex != null) consider(indexView.fieldTermData(termIndex))
   })
   return maxLen
 }

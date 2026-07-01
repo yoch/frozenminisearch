@@ -25,7 +25,6 @@ import type {
   SearchOptionsWithDefaults,
 } from './searchTypes'
 import { isWildcardQuery } from './symbols'
-import type { PackedFuzzyRef, PackedTermRef } from './PackedRadixTree/types'
 import { type QueryEngineRunOptions } from './queryEngineGateLimits'
 import {
   collectCombinedDocIds,
@@ -42,7 +41,8 @@ import { defaultSearchOptions } from './searchDefaults'
 
 /**
  * Adapter exposing packed frozen index storage to the shared query engine.
- * Accessors are lazy: prefix/fuzzy results are iterated only once by the engine.
+ * Accessors push prefix/fuzzy matches through visitors to avoid per-match
+ * allocation on hot query paths.
  */
 export interface QueryIndexView {
   getTermData(term: string): FieldTermDataLike | undefined
@@ -61,9 +61,12 @@ export interface QueryIndexView {
     docIds: Set<number>,
     allowedDocs?: DocIdGate,
   ): void
-  getPrefixMatchesByIndex(term: string): Iterable<PackedTermRef>
-  getFuzzyMatchesByIndex(term: string, maxDistance: number): Iterable<PackedFuzzyRef>
-  resolveTermByIndex(termIndex: number): string
+  visitPrefixMatchesByIndex(term: string, visit: (termIndex: number, length: number) => void): void
+  visitFuzzyMatchesByIndex(
+    term: string,
+    maxDistance: number,
+    visit: (termIndex: number, length: number, distance: number) => void,
+  ): void
 }
 
 export interface QueryEngineParams {
@@ -223,14 +226,16 @@ function collectDocIdsForQuerySpec(
   const docIds = new Set<number>()
   const { indexView, aggregateContext } = params
 
-  forEachQuerySpecTermRef(query, normalized, params, (ref) => {
-    if (ref.kind === 'exact') {
-      if (ref.termIndex != null) {
-        indexView.collectDocIds(ref.termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex) => {
+    if (kind === 'exact') {
+      if (termIndex != null) {
+        indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
       }
       return
     }
-    indexView.collectDocIds(ref.termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+    if (termIndex != null) {
+      indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+    }
   })
   return docIds
 }
@@ -257,14 +262,11 @@ export function createFrozenQueryIndexView(
       const ti = index.get(term)
       return ti == null ? undefined : flyweight.bind(ti)
     },
-    * getPrefixMatchesByIndex(term) {
-      yield* index.prefixRefs(term)
+    visitPrefixMatchesByIndex(term, visit) {
+      index.visitPrefixRefs(term, visit)
     },
-    * getFuzzyMatchesByIndex(term, maxDistance) {
-      yield* index.fuzzyRefs(term, maxDistance)
-    },
-    resolveTermByIndex(termIndex) {
-      return index.termByIndex(termIndex)
+    visitFuzzyMatchesByIndex(term, maxDistance, visit) {
+      index.visitFuzzyRefs(term, maxDistance, visit)
     },
     forEachActiveDoc,
   }

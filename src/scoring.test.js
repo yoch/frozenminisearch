@@ -142,13 +142,21 @@ describe('aggregateTerm', () => {
     expect(results.size).toBe(0)
   })
 
-  test('resolves lazy derived terms once per posting list', () => {
+  test('resolves indexed derived terms once per posting list', () => {
     let resolves = 0
     const fieldTermData = mapPostings(0, [[0, 1], [1, 1]])
     const results = aggregateTerm(
-      'src', { kind: 'lazy', resolve: () => { resolves += 1; return 'derived' } },
+      'src', 42,
       1, 1,
-      fieldTermData, fieldBoosts, makeContext(),
+      fieldTermData,
+      fieldBoosts,
+      makeContext({
+        resolveTermByIndex: (termIndex) => {
+          resolves += 1
+          expect(termIndex).toBe(42)
+          return 'derived'
+        },
+      }),
       undefined, defaultBM25params,
     )
     expect(results.get(0)?.match.derived).toEqual(['text'])

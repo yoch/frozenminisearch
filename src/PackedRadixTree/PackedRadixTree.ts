@@ -1,4 +1,4 @@
-import { packedRadixFuzzyRefs } from './fuzzy'
+import { packedRadixFuzzyRefs, packedRadixVisitFuzzyRefs } from './fuzzy'
 import type { PackedFuzzyRef, PackedTermRef } from './types'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import {
@@ -89,6 +89,12 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     yield* this.emitSubtreeRefs(start.node, start.prefixLength)
   }
 
+  visitPrefixRefs(prefix: string, visit: (termIndex: number, length: number) => void): void {
+    const start = this.resolvePrefixWalkRef(prefix)
+    if (start == null) return
+    this.visitSubtreeRefs(start.node, start.prefixLength, visit)
+  }
+
   private resolvePrefixWalkRef(prefix: string): { node: number, prefixLength: number } | null {
     if (prefix.length === 0) {
       return { node: 0, prefixLength: 0 }
@@ -158,8 +164,44 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     }
   }
 
+  private visitSubtreeRefs(
+    startNode: number,
+    startLength: number,
+    visit: (termIndex: number, length: number) => void,
+  ): void {
+    const frames: EmitRefFrame[] = []
+    pushEmitRefFrame(frames, this, startNode, startLength)
+
+    while (frames.length) {
+      const frame = frames[frames.length - 1]
+      if (frame.slot < 0) {
+        frames.pop()
+        continue
+      }
+
+      const slot = frame.slot--
+      const edgeOffset = edgeOffsetAtSlot(slot, frame.leafSlot)
+      if (edgeOffset < 0) {
+        visit(this.nodeValue[frame.node], frame.length)
+        continue
+      }
+
+      const ei = frame.first + edgeOffset
+      const len = this.edgeLabelLength[ei]
+      pushEmitRefFrame(frames, this, this.edgeChild[ei], frame.length + len)
+    }
+  }
+
   fuzzyRefs(term: string, maxDistance: number): Iterable<PackedFuzzyRef> {
     return packedRadixFuzzyRefs(this, term, maxDistance)
+  }
+
+  visitFuzzyRefs(
+    term: string,
+    maxDistance: number,
+    visit: (termIndex: number, length: number, distance: number) => void,
+  ): void {
+    packedRadixVisitFuzzyRefs(this, term, maxDistance, visit)
   }
 
   lazyTermMetadata(): PackedLazyTermMetadata {

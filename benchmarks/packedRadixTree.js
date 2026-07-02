@@ -30,7 +30,6 @@ const LATEST_PATH = join(BASELINES_DIR, 'packed-radix-latest.json')
 const BENCH_OPTS = { minSamples: 12, minTime: 0.15 }
 const HEAP_RUNS = 3
 
-export { measureStructuredBytes } from './packedRadixMetrics.js'
 import { measureStructuredBytes } from './packedRadixMetrics.js'
 
 function buildTree (entries) {

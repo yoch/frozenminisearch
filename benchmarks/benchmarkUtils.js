@@ -193,8 +193,6 @@ export function medianTimed (fn, iters) {
   return median(samples)
 }
 
-export { mulberry32 } from '../testSupport/mulberry32.js'
-
 export function medianMeasureHeap (fn, runs = 1, { gcPasses = 1 } = {}) {
   if (runs <= 1) return measureRetainedHeap(fn, { gcPasses })
   const samples = []

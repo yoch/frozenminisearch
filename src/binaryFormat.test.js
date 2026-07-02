@@ -94,6 +94,74 @@ describe('binaryFormat MSv5', () => {
     expect(Array.from(loaded.postings.denseLengths)).toEqual([1, 1])
   })
 
+  test('round-trip preserves compact dense postings metadata widths', () => {
+    const snap = {
+      documentCount: 2,
+      nextId: 2,
+      fieldIds: { txt: 0 },
+      fieldCount: 1,
+      fieldNames: ['txt'],
+      avgFieldLength: new Float32Array([2]),
+      externalIds: [1, 2],
+      storedFields: [undefined, undefined],
+      fieldLengthMatrix: new Uint32Array([1, 2]),
+      packedTermIndex: packTermsFromList(['hello', 'world']),
+      postings: densePostings(
+        1, 2, 2,
+        new Uint8Array([0, 1]),
+        new Uint8Array([1, 1]),
+        new Uint32Array([0, 1]),
+        new Uint8Array([1, 1]),
+      ),
+    }
+
+    const buf = encodeFrozenSnapshot(snap)
+    const directory = readMsv5SectionDirectory(buf)
+    const sections = loadMsv5Sections(buf, directory)
+    expect(sections[Msv5SectionId.PostMeta].byteLength).toBe(2)
+    expect(sections[Msv5SectionId.PostFields].byteLength).toBe(2)
+
+    const loaded = decodeFrozenSnapshot(buf)
+    expect(loaded.postings.denseOffsets).toBeInstanceOf(Uint8Array)
+    expect(loaded.postings.denseLengths).toBeInstanceOf(Uint8Array)
+    expect(Array.from(loaded.postings.denseOffsets)).toEqual([0, 1])
+    expect(Array.from(loaded.postings.denseLengths)).toEqual([1, 1])
+  })
+
+  test('legacy u32 dense postings metadata still round-trips', () => {
+    const snap = {
+      documentCount: 2,
+      nextId: 2,
+      fieldIds: { txt: 0 },
+      fieldCount: 1,
+      fieldNames: ['txt'],
+      avgFieldLength: new Float32Array([2]),
+      externalIds: [1, 2],
+      storedFields: [undefined, undefined],
+      fieldLengthMatrix: new Uint32Array([1, 2]),
+      packedTermIndex: packTermsFromList(['hello', 'world']),
+      postings: densePostings(
+        1, 2, 2,
+        new Uint32Array([0, 1]),
+        new Uint32Array([1, 1]),
+        new Uint32Array([0, 1]),
+        new Uint8Array([1, 1]),
+      ),
+    }
+
+    const buf = encodeFrozenSnapshot(snap)
+    const directory = readMsv5SectionDirectory(buf)
+    const sections = loadMsv5Sections(buf, directory)
+    expect(sections[Msv5SectionId.PostMeta].byteLength).toBe(8)
+    expect(sections[Msv5SectionId.PostFields].byteLength).toBe(8)
+
+    const loaded = decodeFrozenSnapshot(buf)
+    expect(loaded.postings.denseOffsets).toBeInstanceOf(Uint32Array)
+    expect(loaded.postings.denseLengths).toBeInstanceOf(Uint32Array)
+    expect(Array.from(loaded.postings.denseOffsets)).toEqual([0, 1])
+    expect(Array.from(loaded.postings.denseLengths)).toEqual([1, 1])
+  })
+
   test('encodeFrozenSnapshot accepts explicit zlib compression', () => {
     const snap = buildSnapshotFromFrozen()
     const buf = encodeFrozenSnapshot(snap, 'zlib')

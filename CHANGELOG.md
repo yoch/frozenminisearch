@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Improved
+
+- **MSv5 binary snapshots** — write postings metadata columns (`denseOffsets`, `denseLengths`, `sparseTermStarts`, `sparseOffsets`, `sparseLengths`) at their native packed width (u8/u16/u32) instead of always expanding to u32 on disk. New readers load compact columns with zero-copy views; older snapshots remain readable when metadata was stored as u32.
+  Snapshots written with this change may require a 1.7.0+ reader.
+
 ## v1.6.4 — `@yoch/frozenminisearch`
 
 Patch release: faster frozen builds and prefix/fuzzy search, with lower build-time scratch memory on common corpora. No public API, search semantics, or MSv5 wire-format changes.

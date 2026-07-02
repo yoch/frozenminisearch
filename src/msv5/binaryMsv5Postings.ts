@@ -1,10 +1,12 @@
 import type { DocIdArray, FrozenPostingsLayout } from '../frozenPostings'
-import { allocBytes, bytesFromView, readU32LE, writeU32LE } from '../binaryBytes'
+import { allocBytes, bytesFromView, readU32LE, writeU32LE, type BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
+import type { PackedIndexArray } from '../PackedRadixTree/types'
 import {
   readFieldIdArray,
   readUint16Array,
   readUint32Array,
+  readUint8Array,
 } from '../binaryWireIo'
 import {
   FLAG_DOC_ID_16,
@@ -22,13 +24,33 @@ export interface Msv5PostingsWire {
   freqs: Uint8Array
 }
 
-function uint32WireBytes(values: ArrayLike<number>): Uint8Array {
-  if (values instanceof Uint32Array) return bytesFromView(values)
-  const out = allocBytes(values.length * 4)
-  for (let i = 0; i < values.length; i++) {
-    writeU32LE(out, i * 4, values[i] ?? 0)
+function postingsIndexBytes(values: PackedIndexArray): Uint8Array {
+  return bytesFromView(values)
+}
+
+function readPostingsIndexArray(
+  buf: BinaryBytes,
+  offset: number,
+  byteLength: number,
+  elementCount: number,
+  label: string,
+): PackedIndexArray {
+  if (elementCount === 0) {
+    if (byteLength !== 0) {
+      throw invalidFrozenIndex(`${label} size mismatch`)
+    }
+    return new Uint8Array(0)
   }
-  return out
+  if (byteLength === elementCount) {
+    return readUint8Array(buf, offset, byteLength)
+  }
+  if (byteLength === elementCount * 2) {
+    return readUint16Array(buf, offset, byteLength)
+  }
+  if (byteLength === elementCount * 4) {
+    return readUint32Array(buf, offset, byteLength)
+  }
+  throw invalidFrozenIndex(`${label} size mismatch`)
 }
 
 export function msv5PostingsFlags(postings: FrozenPostingsLayout): number {
@@ -45,16 +67,16 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
   if (postings.layout === 'dense') {
     return {
       flags: msv5PostingsFlags(postings),
-      meta: uint32WireBytes(postings.denseOffsets),
-      fields: uint32WireBytes(postings.denseLengths),
+      meta: postingsIndexBytes(postings.denseOffsets),
+      fields: postingsIndexBytes(postings.denseLengths),
       optional: allocBytes(0),
       docIds: bytesFromView(postings.allDocIds),
       freqs: bytesFromView(postings.allFreqs),
     }
   }
 
-  const offBuf = uint32WireBytes(postings.sparseOffsets)
-  const lenBuf = uint32WireBytes(postings.sparseLengths)
+  const offBuf = postingsIndexBytes(postings.sparseOffsets)
+  const lenBuf = postingsIndexBytes(postings.sparseLengths)
   const optional = allocBytes(4 + offBuf.length + lenBuf.length)
   writeU32LE(optional, 0, offBuf.length)
   optional.set(offBuf, 4)
@@ -62,7 +84,7 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
 
   return {
     flags: msv5PostingsFlags(postings),
-    meta: uint32WireBytes(postings.sparseTermStarts),
+    meta: postingsIndexBytes(postings.sparseTermStarts),
     fields: bytesFromView(postings.sparseFieldIds),
     optional,
     docIds: bytesFromView(postings.allDocIds),
@@ -100,10 +122,17 @@ export function decodeMsv5PostingsSections(
     if (4 + offLen > optional.length) {
       throw invalidFrozenIndex('sparse optional section truncated')
     }
-    const sparseOffsets = readUint32Array(optional, 4, offLen)
-    const sparseLengths = readUint32Array(optional, 4 + offLen, optional.length - 4 - offLen)
-    const sparseTermStarts = readUint32Array(meta, 0, meta.length)
     const sparseFieldIds = readFieldIdArray(fields, 0, fields.length, sparseFieldIdWidth)
+    const slotCount = sparseFieldIds.length
+    const sparseOffsets = readPostingsIndexArray(
+      optional, 4, offLen, slotCount, 'postings sparseOffsets',
+    )
+    const sparseLengths = readPostingsIndexArray(
+      optional, 4 + offLen, optional.length - 4 - offLen, slotCount, 'postings sparseLengths',
+    )
+    const sparseTermStarts = readPostingsIndexArray(
+      meta, 0, meta.length, termCount + 1, 'postings sparseTermStarts',
+    )
 
     return {
       fieldCount,
@@ -121,8 +150,13 @@ export function decodeMsv5PostingsSections(
     }
   }
 
-  const denseOffsets = readUint32Array(meta, 0, meta.length)
-  const denseLengths = readUint32Array(fields, 0, fields.length)
+  const slotCount = termCount * fieldCount
+  const denseOffsets = readPostingsIndexArray(
+    meta, 0, meta.length, slotCount, 'postings denseOffsets',
+  )
+  const denseLengths = readPostingsIndexArray(
+    fields, 0, fields.length, slotCount, 'postings denseLengths',
+  )
   return {
     fieldCount,
     termCount,

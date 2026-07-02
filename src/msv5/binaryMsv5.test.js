@@ -249,6 +249,18 @@ describe('binaryMsv5', () => {
     expect(buf.readUInt16LE(6) & FLAG_FREQ_U16).toBe(0)
   })
 
+  test('MSv5 preserves compact postings metadata bytes after binary round-trip', () => {
+    const mutable = new MiniSearch(options)
+    mutable.addAll(docs)
+    const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, {})
+    const before = frozenMemoryBreakdown(frozen).postings
+    const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
+    const after = frozenMemoryBreakdown(loaded).postings
+    expect(after.offsetsBytes).toBe(before.offsetsBytes)
+    expect(after.lengthsBytes).toBe(before.lengthsBytes)
+    expect(loaded.search('zen')).toEqual(frozen.search('zen'))
+  })
+
   test('MSv5 async stream load preserves search', async () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)

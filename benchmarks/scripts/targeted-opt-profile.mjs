@@ -9,8 +9,9 @@
  *     --out=/tmp/minisearch-opt-baseline/targeted-profile.json \
  *     --surfaces=search,search-levels,build,load
  */
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { appendFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { performance } from 'node:perf_hooks'
 import { buildBenchmarkScenarios, runScenario } from '../benchmarkSuite.js'
 import { runHeapSuite, mergeHeapIntoScenarios } from '../framework/runHeapSuite.mjs'
 import { collectRunMetadata } from '../benchmarkUtils.js'
@@ -43,6 +44,12 @@ function intArg(name, fallback) {
   const raw = argValue(name)
   const value = raw == null ? NaN : Number(raw)
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback
+}
+
+function boolArg(name, fallback = false) {
+  const raw = argValue(name)
+  if (raw == null) return process.argv.includes(`--${name}`) || fallback
+  return raw !== '0' && raw !== 'false'
 }
 
 function scenarioMap() {
@@ -120,10 +127,44 @@ function aggregateRuns(results) {
   return out
 }
 
+function emitProgress(eventFile, event) {
+  const line = JSON.stringify({ at: new Date().toISOString(), ...event })
+  console.error(line)
+  appendFileSync(eventFile, line + '\n')
+}
+
+function summarizeScenario(result) {
+  const summary = {}
+  if (result.search != null) {
+    summary.search = result.search.map(row => ({
+      label: row.label,
+      frozenP50: row.frozenP50,
+      frozenP95: row.frozenP95,
+    }))
+  }
+  if (result.searchLevels != null) {
+    summary.searchLevels = Object.fromEntries(
+      Object.entries(result.searchLevels).map(([label, levels]) => [
+        label,
+        {
+          L1: levels.L1?.frozenP50,
+          L2: levels.L2?.frozenP50,
+        },
+      ]),
+    )
+  }
+  if (result.indexing != null) summary.indexing = result.indexing
+  if (result.loadMs != null) summary.loadMs = result.loadMs
+  return summary
+}
+
 const out = argValue('out') ?? '/tmp/minisearch-opt-profile.json'
+const eventFile = argValue('events') ?? `${out}.events.ndjson`
+const partialOut = argValue('partial') ?? `${out}.partial.json`
 const scenarioIds = listArg('scenarios', DEFAULT_SCENARIOS)
 const surfaces = listArg('surfaces', ['search', 'search-levels', 'build', 'load'])
 const runs = intArg('runs', 1)
+const progress = boolArg('progress', true)
 const heap = process.argv.includes('--heap') || surfaces.includes('memory')
 const cpuSurfaces = surfaces.filter(s => s !== 'memory' && s !== 'breakdown')
 const scenarios = pickScenarios(scenarioIds)
@@ -137,23 +178,62 @@ const payload = {
   scenarios: [],
 }
 
+mkdirSync(dirname(out), { recursive: true })
+writeFileSync(eventFile, '')
+if (progress) {
+  emitProgress(eventFile, {
+    event: 'start',
+    out,
+    partialOut,
+    scenarioIds,
+    surfaces,
+    runs,
+  })
+}
+
 for (const scenario of scenarios) {
+  if (progress) emitProgress(eventFile, { event: 'scenario:start', scenarioId: scenario.id })
   const scenarioRuns = []
   for (let i = 0; i < runs; i++) {
-    scenarioRuns.push(runScenario(scenario, { surfaces: cpuSurfaces }))
+    const started = performance.now()
+    if (progress) emitProgress(eventFile, { event: 'run:start', scenarioId: scenario.id, run: i + 1, runs })
+    const result = runScenario(scenario, { surfaces: cpuSurfaces })
+    scenarioRuns.push(result)
+    if (progress) {
+      emitProgress(eventFile, {
+        event: 'run:done',
+        scenarioId: scenario.id,
+        run: i + 1,
+        runs,
+        elapsedMs: Number((performance.now() - started).toFixed(1)),
+        summary: summarizeScenario(result),
+      })
+    }
   }
-  payload.scenarios.push(aggregateRuns(scenarioRuns))
+  const aggregated = aggregateRuns(scenarioRuns)
+  payload.scenarios.push(aggregated)
+  writeFileSync(partialOut, JSON.stringify(payload, null, 2) + '\n')
+  if (progress) {
+    emitProgress(eventFile, {
+      event: 'scenario:done',
+      scenarioId: scenario.id,
+      summary: summarizeScenario(aggregated),
+    })
+  }
 }
 
 if (heap) {
+  if (progress) emitProgress(eventFile, { event: 'heap:start', scenarioIds })
   const heapSuite = runHeapSuite({
     scenarioIds,
     paths: ['mutable-addAll', 'frozen-fromDocuments'],
   })
   payload.heapBenchProtocol = heapSuite.heapBenchProtocol
   payload.scenarios = mergeHeapIntoScenarios(payload.scenarios, heapSuite)
+  writeFileSync(partialOut, JSON.stringify(payload, null, 2) + '\n')
+  if (progress) emitProgress(eventFile, { event: 'heap:done', scenarioIds })
 }
 
-mkdirSync(dirname(out), { recursive: true })
 writeFileSync(out, JSON.stringify(payload, null, 2) + '\n')
+if (progress) emitProgress(eventFile, { event: 'done', out })
 console.log(`Wrote ${out}`)

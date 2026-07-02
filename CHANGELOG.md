@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+## v1.7.0 — `@yoch/frozenminisearch`
+
+Minor release: lower retained memory for postings metadata in frozen indexes and on the MSv5 wire. Reading older u32 metadata snapshots remains supported; newly written compact snapshots require 1.7.0+.
+
 ### Improved
 
-- **MSv5 binary snapshots** — write postings metadata columns (`denseOffsets`, `denseLengths`, `sparseTermStarts`, `sparseOffsets`, `sparseLengths`) at their native packed width (u8/u16/u32) instead of always expanding to u32 on disk. New readers load compact columns with zero-copy views; older snapshots remain readable when metadata was stored as u32.
-  Snapshots written with this change may require a 1.7.0+ reader.
+- **Postings metadata** — store dense/sparse offset, length, and term-start columns at adaptive u8/u16/u32 widths in memory instead of always using u32.
+- **MSv5 binary snapshots** — write those metadata columns at their native packed width on disk and load them back with zero-copy views. Legacy snapshots that stored metadata as u32 remain readable.
 
 ## v1.6.4 — `@yoch/frozenminisearch`
 

@@ -36,15 +36,15 @@ Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
 
 | Scenario | Docs | Index RAM | Binary size | Load time | Search p50 |
 |----------|-----:|-----------|------------:|----------:|-----------:|
-| Divina, with stored text | 14,097 | 0.85 vs 16.1 MB total (~95% less) | ~71% less | ~50% faster | ~32% faster |
-| Divina, index only | 14,097 | 0.74 vs 14.9 MB total (~95% less) | ~75% less | ~79% faster | ~25% faster |
-| High-frequency terms | 10,000 | 0.40 vs 7.4 MB total (~95% less) | ~92% less | ~91% faster | ~46% faster |
-| Dense numeric ids | 100,000 | 4.91 vs 91.3 MB total (~95% less) | ~73% less | ~89% faster | ~35% faster |
-| Uint16 doc id boundary | 65,535 | 3.01 vs 58.6 MB total (~95% less) | ~77% less | ~89% faster | ~56% faster |
+| Divina, with stored text | 14,097 | 4.72 vs 16.1 MB total (~71% less) | ~71% less | ~60% faster | ~33% faster |
+| Divina, index only | 14,097 | 0.72 vs 14.9 MB total (~95% less) | ~75% less | ~84% faster | ~19% faster |
+| High-frequency terms | 10,000 | 0.40 vs 7.4 MB total (~95% less) | ~92% less | ~92% faster | ~43% faster |
+| Dense numeric ids | 100,000 | 4.91 vs 91.3 MB total (~95% less) | ~73% less | ~89% faster | ~32% faster |
+| Uint16 doc id boundary | 65,535 | 2.90 vs 58.6 MB total (~95% less) | ~77% less | ~88% faster | ~54% faster |
 
-Across this full run, frozen is faster on **27/27** search cases. Divina `inferno` (exact, paired p50): mutable 16.2 µs → frozen 10.7 µs (**-5 µs**, ratio 0.70).
+Across this full run, frozen is faster on **27/27** search cases. Divina `inferno` (exact, paired p50): mutable 14.0 µs → frozen 9.5 µs (**-5 µs**, ratio 0.69).
 
-Numbers are from `benchmarks/baselines/reference.json`, captured 2026-07-01 on Node v24.16.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
+Numbers are from `benchmarks/baselines/reference.json`, captured 2026-07-02 on Node v24.16.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
 <!-- vs-reference:end -->
 
 ---

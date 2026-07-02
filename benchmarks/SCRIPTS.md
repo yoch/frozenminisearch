@@ -126,11 +126,13 @@ make benchmark-record RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20
 
 The `Makefile` declares native dependencies:
 
-- **`dist/es/index.js`** (real file, freshness marker) — consumed by any target
-  that reads `dist/browser/index.js` or `dist/es/` (browser tests, benchmarks
-  that load the bundle, docs/demo). Make rebuilds automatically when any
+- **`dist/es/index.js`** (real file, freshness marker) — consumed by browser
+  tests and docs/demo targets. Make rebuilds automatically when any
   `src/**/*.ts`/`src/**/*.js` source or build config (`rollup.config.js`,
   `tsconfig.json`, `package.json`) changes.
+- **`build`** (PHONY, clean rebuild) — used by Makefile benchmark targets that
+  read `dist/es/` or `dist/browser/`. This avoids benchmark captures from a
+  stale untracked `dist/` after checkout or branch switches.
 - **`benchmarks/dist/packedRadixTree.cjs`** (real file marker) — consumed only
   by `benchmark-packed-*` targets; produces `benchmarks/dist/packedRadix*.cjs`
   and not `dist/`.
@@ -140,12 +142,12 @@ For a guaranteed clean rebuild: `make build` (PHONY, cleans `dist/` first).
 ## Source vs bundled imports
 
 Most low-level benchmark scripts load the published Node bundle from `dist/es/`
-so they measure the public package surface. The isolated CPU pipeline
-microbenchmarks (`benchmark:finalize`, `benchmark:autosuggest`,
-`benchmark:profile-giant-prefix`, and `benchmark:measure-scoring-steps`, via
-their Makefile targets) are exceptions: they run through `tsx` and import `src/`
-plus `benchmarks/harness/` because they time internal query phases that are
-intentionally not exported. For direct invocation, use the same contract:
+so they measure the public package surface. Their Makefile targets run a clean
+`make build` first. `tsx` remains appropriate for ad-hoc probes that import
+TypeScript internals from `src/`; those probes are diagnostics, not the primary
+baseline source. A few probes are hybrid (`dist/es` for the public constructor,
+`src/` for internals), so their Makefile targets also rebuild first. For direct
+invocation of scripts that import `dist/es/`, use the same contract:
 
 ```bash
 pnpm build

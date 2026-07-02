@@ -27,6 +27,10 @@ BENCH_TIMING_ARGS := $(if $(RUNS),--runs=$(RUNS)) $(if $(BENCH_WARMUP),--warmup=
 # Build freshness marker. Targets that consume dist/ depend on this real file.
 # The dependency list below makes make rebuild whenever any source or build
 # config changes, not only when the marker is missing.
+#
+# Benchmark targets that consume dist/ use the phony `build` target instead:
+# dist/ is untracked, so a clean git tree can still benchmark stale bundles
+# after a checkout or branch switch when mtimes make the marker look "fresh".
 DIST_MARKER := dist/es/index.js
 
 # Sources consumed by rollup when building dist/ (see rollup.config.js:
@@ -119,16 +123,16 @@ lint-fix:
 BENCH_CLI := benchmarks/framework/cli.mjs
 
 .PHONY: bench bench-run bench-record bench-memory bench-diff bench-history bench-micro bench-readme
-bench: $(DIST_MARKER)
+bench: build
 	$(NODE) $(EXPOSE) $(BENCH_CLI) run --profile=dev --quick
 
-bench-run: $(DIST_MARKER)
+bench-run: build
 	$(NODE) $(EXPOSE) $(BENCH_CLI) run
 
-bench-record: $(DIST_MARKER)
+bench-record: build
 	$(NODE) $(EXPOSE) $(BENCH_CLI) record
 
-bench-memory: $(DIST_MARKER)
+bench-memory: build
 	$(NODE) $(EXPOSE) benchmarks/framework/runHeapSuite.mjs
 
 bench-diff:
@@ -137,7 +141,7 @@ bench-diff:
 bench-history:
 	$(NODE) $(EXPOSE) $(BENCH_CLI) history
 
-bench-micro: $(DIST_MARKER)
+bench-micro: build
 	$(NODE) $(EXPOSE) $(BENCH_CLI) micro
 
 bench-readme:
@@ -148,13 +152,13 @@ bench-readme:
 # ----------------------------------------------------------------------------
 
 .PHONY: bench-build-peak bench-medicaments-build-peak bench-build-heap-profile
-bench-build-peak: $(DIST_MARKER)
+bench-build-peak: build
 	$(NODE) $(EXPOSE) benchmarks/scripts/build-peak-heap.mjs
 
-bench-medicaments-build-peak: $(DIST_MARKER)
+bench-medicaments-build-peak: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/medicaments-build-peak-heap.mjs
 
-bench-build-heap-profile: $(DIST_MARKER)
+bench-build-heap-profile: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/build-heap-profile.mjs
 
 # ----------------------------------------------------------------------------
@@ -162,7 +166,7 @@ bench-build-heap-profile: $(DIST_MARKER)
 # ----------------------------------------------------------------------------
 
 .PHONY: bench-reference-update
-bench-reference-update: $(DIST_MARKER)
+bench-reference-update: build
 	RUNS=3 $(NODE) $(EXPOSE) $(BENCH_CLI) record --profile=vs-reference
 	node benchmarks/scripts/promote-latest-to-reference.mjs
 	$(MAKE) bench-readme
@@ -174,10 +178,10 @@ bench-reference-update: $(DIST_MARKER)
 # See benchmarks/SCRIPTS.md for the boundary.
 
 .PHONY: benchmark-compare benchmark-record benchmark-diff
-benchmark-compare: $(DIST_MARKER)
+benchmark-compare: build
 	$(BENCH_TSX) benchmarks/compare.js
 
-benchmark-record: $(DIST_MARKER)
+benchmark-record: build
 	$(BENCH_TSX) benchmarks/captureBaseline.js
 
 benchmark-diff:
@@ -185,22 +189,22 @@ benchmark-diff:
 
 # Specialised variants of captureBaseline.js
 .PHONY: benchmark-record-quick benchmark-record-search benchmark-baseline-update
-benchmark-record-quick: $(DIST_MARKER)
+benchmark-record-quick: build
 	RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=20 $(BENCH_TSX) benchmarks/captureBaseline.js
 
-benchmark-record-search: $(DIST_MARKER)
+benchmark-record-search: build
 	BENCH_SEARCH_ONLY=1 $(BENCH_TSX) benchmarks/captureBaseline.js
 
-benchmark-baseline-update: $(DIST_MARKER)
+benchmark-baseline-update: build
 	$(BENCH_TSX) benchmarks/captureBaseline.js --reference
 
 # Variants of diffBaseline.js
 .PHONY: benchmark-diff-run benchmark-diff-search-run
-benchmark-diff-run: $(DIST_MARKER)
+benchmark-diff-run: build
 	$(BENCH_TSX) benchmarks/captureBaseline.js
 	$(NODE) $(EXPOSE) benchmarks/diffBaseline.js
 
-benchmark-diff-search-run: $(DIST_MARKER)
+benchmark-diff-search-run: build
 	BENCH_SEARCH_ONLY=1 $(BENCH_TSX) benchmarks/captureBaseline.js
 	BENCH_SEARCH_ONLY=1 $(NODE) $(EXPOSE) benchmarks/diffBaseline.js
 
@@ -208,25 +212,25 @@ benchmark-diff-search-run: $(DIST_MARKER)
 .PHONY: benchmark-calibrate-batches benchmark-validate-freq-adaptive benchmark-and-gate-tuning
 .PHONY: benchmark-gate-posting-ratio benchmark-targeted benchmark-profile-giant-prefix
 .PHONY: benchmark-measure-scoring-steps benchmark-finalize benchmark-autosuggest
-benchmark-calibrate-batches: $(DIST_MARKER)
+benchmark-calibrate-batches: build
 	$(NODE) $(EXPOSE) benchmarks/scripts/calibrate-search-batches.mjs
 
-benchmark-validate-freq-adaptive: $(DIST_MARKER)
+benchmark-validate-freq-adaptive: build
 	RUNS=1 SEARCH_ITERATIONS=10 BENCH_WARMUP=15 $(NODE) $(EXPOSE) benchmarks/scripts/freq-adaptive-validate.mjs
 
-benchmark-and-gate-tuning: $(DIST_MARKER)
+benchmark-and-gate-tuning: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/and-gate-tuning.mjs
 
-benchmark-gate-posting-ratio: $(DIST_MARKER)
+benchmark-gate-posting-ratio: build
 	$(PNPM) exec tsx benchmarks/scripts/calibrate-gate-posting-ratio.mjs
 
-benchmark-targeted: $(DIST_MARKER)
+benchmark-targeted: build
 	$(NODE) $(EXPOSE) benchmarks/scripts/targeted-failures.mjs
 
-benchmark-profile-giant-prefix: $(DIST_MARKER)
+benchmark-profile-giant-prefix: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/profile-giant-prefix.mjs
 
-benchmark-measure-scoring-steps: $(DIST_MARKER)
+benchmark-measure-scoring-steps: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/measure-scoring-steps.mjs
 
 benchmark-finalize:
@@ -245,7 +249,7 @@ benchmark-history-vs-mutable:
 
 # Targeted compare requires the build because it imports benchmarkSuite.js -> dist/
 .PHONY: benchmark-targeted-compare
-benchmark-targeted-compare: $(DIST_MARKER)
+benchmark-targeted-compare: build
 	node benchmarks/scripts/targeted-failures.mjs --compare
 
 # ----------------------------------------------------------------------------
@@ -287,7 +291,7 @@ benchmark-packed-radix-history:
 # ----------------------------------------------------------------------------
 
 .PHONY: benchmark-binary-format benchmark-medicaments-indexes
-benchmark-binary-format: $(DIST_MARKER)
+benchmark-binary-format: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/binaryFormatCompare.ts
 
 benchmark-medicaments-indexes:

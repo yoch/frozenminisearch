@@ -7,6 +7,7 @@ import {
   type FreqArray,
 } from './compactPostings'
 import type { AggregateContext, DocIdGate, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
+import type { PackedIndexArray } from './PackedRadixTree/types'
 
 export type { DocIdArray } from './compactPostings'
 
@@ -29,17 +30,17 @@ export interface FrozenPostingsLayoutBase {
 
 export interface DensePostingsLayout extends FrozenPostingsLayoutBase {
   layout: 'dense'
-  denseOffsets: Uint32Array
-  denseLengths: Uint32Array
+  denseOffsets: PackedIndexArray
+  denseLengths: PackedIndexArray
 }
 
 export interface SparsePostingsLayout extends FrozenPostingsLayoutBase {
   layout: 'sparse'
   sparseFieldIdWidth: 8 | 16
-  sparseTermStarts: Uint32Array
+  sparseTermStarts: PackedIndexArray
   sparseFieldIds: FieldIdArray
-  sparseOffsets: Uint32Array
-  sparseLengths: Uint32Array
+  sparseOffsets: PackedIndexArray
+  sparseLengths: PackedIndexArray
 }
 
 export type FrozenPostingsLayout = DensePostingsLayout | SparsePostingsLayout

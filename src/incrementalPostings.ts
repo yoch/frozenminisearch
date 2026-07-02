@@ -4,6 +4,7 @@ import {
   type DocIdArray,
   type FreqArray,
 } from './compactPostings'
+import { packedIndexArray } from './PackedRadixTree/layout'
 import {
   choosePostingsLayout,
   chooseSparseFieldIdWidth,
@@ -15,6 +16,18 @@ const DEFAULT_CAPACITY = 16
 
 type GrowableDocIdArray = Uint16Array | Uint32Array
 type GrowableFreqArray = Uint8Array | Uint16Array
+
+function packedColumnFromUint32(values: Uint32Array, maxValue: number): Uint8Array | Uint16Array | Uint32Array {
+  const out = packedIndexArray(values.length, maxValue)
+  out.set(values)
+  return out
+}
+
+function packedColumnFromNumbers(values: readonly number[], maxValue: number): Uint8Array | Uint16Array | Uint32Array {
+  const out = packedIndexArray(values.length, maxValue)
+  out.set(values)
+  return out
+}
 
 /** Growable unsigned 32-bit column (build scratch; narrowed to u16 at finalize when possible). */
 class GrowableUint32Column {
@@ -275,8 +288,8 @@ export class IncrementalPostingsAccumulator {
     const cursors = new Uint32Array(slotOffsets)
 
     if (layout === 'dense') {
-      const denseOffsets = slotOffsets
-      const denseLengths = counts
+      const denseOffsets = packedColumnFromUint32(slotOffsets, totalPostings)
+      const denseLengths = packedColumnFromUint32(counts, nextId)
 
       this.scatterPostings(allDocIds, allFreqs, cursors, docIdWidth)
       this.release()
@@ -330,10 +343,10 @@ export class IncrementalPostingsAccumulator {
       sparseFieldIdWidth,
       allDocIds,
       allFreqs,
-      sparseTermStarts: termStarts,
+      sparseTermStarts: packedColumnFromUint32(termStarts, nonEmptySlots),
       sparseFieldIds,
-      sparseOffsets: new Uint32Array(sparseOffsetsScratch),
-      sparseLengths: new Uint32Array(sparseLengthsScratch),
+      sparseOffsets: packedColumnFromNumbers(sparseOffsetsScratch, totalPostings),
+      sparseLengths: packedColumnFromNumbers(sparseLengthsScratch, nextId),
     }
   }
 }

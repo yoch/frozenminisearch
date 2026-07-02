@@ -51,8 +51,8 @@ function ownedPostingsLayout(postings: FrozenPostingsLayout): FrozenPostingsLayo
       ...postings,
       allDocIds,
       allFreqs,
-      denseOffsets: new Uint32Array(postings.denseOffsets),
-      denseLengths: new Uint32Array(postings.denseLengths),
+      denseOffsets: ownedIndexArray(postings.denseOffsets),
+      denseLengths: ownedIndexArray(postings.denseLengths),
     }
   }
 
@@ -64,10 +64,10 @@ function ownedPostingsLayout(postings: FrozenPostingsLayout): FrozenPostingsLayo
     ...postings,
     allDocIds,
     allFreqs,
-    sparseTermStarts: new Uint32Array(postings.sparseTermStarts),
+    sparseTermStarts: ownedIndexArray(postings.sparseTermStarts),
     sparseFieldIds,
-    sparseOffsets: new Uint32Array(postings.sparseOffsets),
-    sparseLengths: new Uint32Array(postings.sparseLengths),
+    sparseOffsets: ownedIndexArray(postings.sparseOffsets),
+    sparseLengths: ownedIndexArray(postings.sparseLengths),
   }
 }
 

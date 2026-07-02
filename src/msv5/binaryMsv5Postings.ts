@@ -22,6 +22,15 @@ export interface Msv5PostingsWire {
   freqs: Uint8Array
 }
 
+function uint32WireBytes(values: ArrayLike<number>): Uint8Array {
+  if (values instanceof Uint32Array) return bytesFromView(values)
+  const out = allocBytes(values.length * 4)
+  for (let i = 0; i < values.length; i++) {
+    writeU32LE(out, i * 4, values[i] ?? 0)
+  }
+  return out
+}
+
 export function msv5PostingsFlags(postings: FrozenPostingsLayout): number {
   let flags = 0
   if (postings.layout === 'sparse') {
@@ -36,16 +45,16 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
   if (postings.layout === 'dense') {
     return {
       flags: msv5PostingsFlags(postings),
-      meta: bytesFromView(postings.denseOffsets),
-      fields: bytesFromView(postings.denseLengths),
+      meta: uint32WireBytes(postings.denseOffsets),
+      fields: uint32WireBytes(postings.denseLengths),
       optional: allocBytes(0),
       docIds: bytesFromView(postings.allDocIds),
       freqs: bytesFromView(postings.allFreqs),
     }
   }
 
-  const offBuf = bytesFromView(postings.sparseOffsets)
-  const lenBuf = bytesFromView(postings.sparseLengths)
+  const offBuf = uint32WireBytes(postings.sparseOffsets)
+  const lenBuf = uint32WireBytes(postings.sparseLengths)
   const optional = allocBytes(4 + offBuf.length + lenBuf.length)
   writeU32LE(optional, 0, offBuf.length)
   optional.set(offBuf, 4)
@@ -53,7 +62,7 @@ export function buildMsv5PostingsSections(postings: FrozenPostingsLayout): Msv5P
 
   return {
     flags: msv5PostingsFlags(postings),
-    meta: bytesFromView(postings.sparseTermStarts),
+    meta: uint32WireBytes(postings.sparseTermStarts),
     fields: bytesFromView(postings.sparseFieldIds),
     optional,
     docIds: bytesFromView(postings.allDocIds),

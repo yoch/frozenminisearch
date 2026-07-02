@@ -100,6 +100,18 @@ describe('IncrementalPostingsAccumulator', () => {
     assertHotPathSequentialAccess(layout, 1, 2)
   })
 
+  test('dense metadata uses adaptive index widths', () => {
+    const layout = buildIncremental(1, [
+      { termIndex: 0, fieldId: 0, docId: 1, freq: 2 },
+      { termIndex: 1, fieldId: 0, docId: 2, freq: 3 },
+    ], 10)
+
+    expect(layout.layout).toBe('dense')
+    expect(layout.denseOffsets).toBeInstanceOf(Uint8Array)
+    expect(layout.denseLengths).toBeInstanceOf(Uint8Array)
+    assertSegmentsPartitionBuffers(layout)
+  })
+
   test('interleaved appends per slot preserve order', () => {
     const postings = [
       { termIndex: 0, fieldId: 1, docId: 0, freq: 1 },
@@ -208,6 +220,20 @@ describe('IncrementalPostingsAccumulator', () => {
     assertSegmentsPartitionBuffers(layout)
     assertHotPathSequentialAccess(layout, 0, 1)
     assertHotPathSequentialAccess(layout, 5, 0)
+  })
+
+  test('sparse metadata uses adaptive index widths', () => {
+    const layout = buildIncremental(20, [
+      { termIndex: 0, fieldId: 1, docId: 0, freq: 1 },
+      { termIndex: 1, fieldId: 3, docId: 1, freq: 1 },
+      { termIndex: 2, fieldId: 5, docId: 2, freq: 1 },
+    ], 10)
+
+    expect(layout.layout).toBe('sparse')
+    expect(layout.sparseTermStarts).toBeInstanceOf(Uint8Array)
+    expect(layout.sparseOffsets).toBeInstanceOf(Uint8Array)
+    expect(layout.sparseLengths).toBeInstanceOf(Uint8Array)
+    assertSegmentsPartitionBuffers(layout)
   })
 
   test('uint16 doc ids when nextId fits', () => {

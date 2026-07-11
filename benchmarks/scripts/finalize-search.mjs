@@ -33,11 +33,19 @@ function withMultiStored(docs) {
 
 function caseSpecs() {
   const highFreq = highFrequencyTerms(10000)
+  const highFreq65k = highFrequencyTerms(65536)
   const giant = giantVocabulary(50000)
   return [
     {
       id: 'many-results-no-stored',
       docs: highFreq,
+      options: { fields: ['txt'], storeFields: [] },
+      query: 'alpha',
+      searchOptions: {},
+    },
+    {
+      id: 'many-results-65k-no-stored',
+      docs: highFreq65k,
       options: { fields: ['txt'], storeFields: [] },
       query: 'alpha',
       searchOptions: {},

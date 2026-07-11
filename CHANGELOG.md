@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Fuzzy DP workspace** — optional `FuzzyScratch` on `packedRadixVisitFuzzyRefs` / `PackedRadixTree.visitFuzzyRefs` so callers can reuse matrix buffers across sequential visits. Not wired into the default query path (no demonstrated neutral win Node/Bun).
+
 ## v1.8.0 — `@yoch/frozenminisearch`
 
 Minor release: faster MiniSearch JSON import, tighter snapshot validation at the import boundary, and internal query-engine cleanup. No public API or MSv5 wire-format changes.

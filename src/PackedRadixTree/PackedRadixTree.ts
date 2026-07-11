@@ -1,4 +1,4 @@
-import { packedRadixFuzzyRefs, packedRadixVisitFuzzyRefs } from './fuzzy'
+import { packedRadixFuzzyRefs, packedRadixVisitFuzzyRefs, type FuzzyScratch } from './fuzzy'
 import type { PackedFuzzyRef, PackedTermRef } from './types'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import {
@@ -202,8 +202,9 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     term: string,
     maxDistance: number,
     visit: (termIndex: number, length: number, distance: number) => void,
+    scratch?: FuzzyScratch,
   ): void {
-    packedRadixVisitFuzzyRefs(this, term, maxDistance, visit)
+    packedRadixVisitFuzzyRefs(this, term, maxDistance, visit, scratch)
   }
 
   lazyTermMetadata(): PackedLazyTermMetadata {

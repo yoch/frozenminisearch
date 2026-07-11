@@ -4,6 +4,16 @@ import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout
 import type PackedRadixTree from './PackedRadixTree'
 import type { PackedFuzzyRef } from './types'
 
+/**
+ * Optional per-call workspace for fuzzy DP. Callers may reuse one scratch across
+ * sequential visits (same thread) to avoid matrix/queryCodes reallocations.
+ * Not module-global — safe for reentrancy when each call stack owns its scratch.
+ */
+export type FuzzyScratch = {
+  matrix?: Uint8Array
+  queryCodes?: Uint16Array
+}
+
 export function packedRadixFuzzyRefs(
   tree: PackedRadixTree,
   query: string,
@@ -17,17 +27,28 @@ export function packedRadixVisitFuzzyRefs(
   query: string,
   maxDistance: number,
   visit: (termIndex: number, length: number, distance: number) => void,
+  scratch?: FuzzyScratch,
 ): void {
   if (maxDistance < 0) return
 
   const n = query.length + 1
   const m = n + maxDistance
-  const matrix = new Uint8Array(m * n).fill(maxDistance + 1)
+  const needed = m * n
+  let matrix = scratch?.matrix
+  if (matrix == null || matrix.length < needed) {
+    matrix = new Uint8Array(needed)
+    if (scratch != null) scratch.matrix = matrix
+  }
+  matrix.fill(maxDistance + 1, 0, needed)
   for (let j = 0; j < n; ++j) matrix[j] = j
   for (let i = 1; i < m; ++i) matrix[i * n] = i
 
   const queryLen = query.length
-  const queryCodes = new Uint16Array(n)
+  let queryCodes = scratch?.queryCodes
+  if (queryCodes == null || queryCodes.length < n) {
+    queryCodes = new Uint16Array(n)
+    if (scratch != null) scratch.queryCodes = queryCodes
+  }
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
   visitRecurse(

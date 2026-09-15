@@ -37,5 +37,21 @@
     "cache_policy": "score full BM25 top-100 once per dataset; reuse for all truncation policies"
   },
   "noninferiority_ndcg10": [-0.005, -0.01],
-  "bootstrap_resamples": 10000
+  "query_slice": {
+    "max_queries": 400,
+    "corpus": "full — documents are never dropped",
+    "policy": "if n_judged_queries > 400, sample 400 qids with seed 20260915 after sorting; otherwise keep all",
+    "label": "results on a capped query set are not the official full-query BEIR split"
+  },
+  "skipped_methods": [
+    "saddlepoint_lugannani_rice",
+    "chernoff_mgf",
+    "independence_mc_tail",
+    "exact_convolution",
+    "pairwise_covariance_z_full",
+    "supervised_rlt_choppy_attncut",
+    "cosine_tmp_adapters"
+  ],
+  "skipped_datasets": ["trec-dl-2019", "trec-dl-2020"],
+  "skipped_datasets_reason": "MS MARCO passage dump not local this round; large BEIR sets are kept with full corpus + query cap"
 }

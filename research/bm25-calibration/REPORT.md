@@ -102,8 +102,10 @@ Let S_q(D) be BM25 for a uniform corpus document.
 ## 2. Protocol (RLT-first)
 
 - BM25: Lucene-like, k1=1.2, b=0.75, unique query terms, tokenizer `(?u)\b\w\w+\b`, no stemming/stopwords, no zero padding.
+- **Corpus: always full.** If a split has more than 400 judged queries, a seeded sample of 400 is used (`SEED=20260915`). That slice is labeled in `meta.query_slice` and is not the official BEIR query set.
 - Primary K=100. Nested query CV. Seed 20260915.
-- Document scores: raw, paper/power-α (diagnostic), ceiling, local z/minmax/sum/top, Z_diag, Z_full, I_saddle, I_gauss, Surprise, I_joint (negative control).
+- Document scores (this round): raw, paper/power-α (diagnostic), ceiling, local z/minmax/sum/top, Z_diag, I_gauss_diag, Surprise, I_joint (negative control).
+- **Skipped this round** (see `SKIPPED.md`): saddlepoint, Chernoff, MC tails, Z_full covariance, Choppy/AttnCut, adapters, TREC DL 19/20.
 - **Primary endpoint:** nDCG@10 of frozen `cross-encoder/ms-marco-MiniLM-L-6-v2` on retained candidates vs rerank-all-100. Cache CE scores once.
 - **Mandatory baselines:** fixed k ∈ {5,10,20,30,50,75,100}; Surprise; local list z; raw global threshold.
 - Non-inferiority: ΔnDCG@10 ≥ −0.005 and −0.01, paired bootstrap ≥ 10k.

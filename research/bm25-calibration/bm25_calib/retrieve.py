@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import pickle
 from collections import defaultdict
 from pathlib import Path
@@ -11,9 +10,8 @@ import numpy as np
 
 from .bm25 import idf_lucene, length_norm, term_contributions
 from .config import B, HIGH_DF_DROP_FRACTION, K1, PRIMARY_K
-from .data import iter_corpus_jsonl
-from .data import query_vocab
-from .null import query_term_xs, tails_for_scores
+from .data import iter_corpus_jsonl, query_vocab
+from .null import cheap_gaussian_rank_tails
 from .surprise import nqc, surprise_scores, wig_like
 from .text import tokenize
 from .theory import query_null
@@ -27,6 +25,8 @@ def build_index(bundle: dict, k1: float = K1, b: float = B) -> dict:
     docids: list[str] = []
     dls: list[int] = []
     for i, (doc_id, text) in enumerate(bundle['corpus_iter']):
+        if i and i % 50_000 == 0:
+            print(f'  index {i} docs', flush=True)
         toks = tokenize(text)
         dls.append(len(toks))
         docids.append(doc_id)
@@ -130,7 +130,8 @@ def retrieve_all(index: dict, k: int = PRIMARY_K, k1: float = K1, b: float = B) 
     out: dict[str, dict] = {}
     qrels = index['qrels']
     docids = index['docids']
-    for qid, terms in index['q_terms'].items():
+    n_q = len(index['q_terms'])
+    for qi, (qid, terms) in enumerate(index['q_terms'].items(), start=1):
         inds, scores = retrieve_query(terms, index, k=k, k1=k1, b=b)
         relmap = qrels.get(qid, {})
         rel = np.array([int(relmap.get(docids[i], 0)) for i in inds], dtype=np.int32)
@@ -138,12 +139,11 @@ def retrieve_all(index: dict, k: int = PRIMARY_K, k1: float = K1, b: float = B) 
         qlen_tok = max(len(tokens), 1)
         qlen_uniq = max(len(terms), 1)
         sum_idf = float(sum(index['idf'].get(t, 0.0) for t in terms))
-        null = query_null(terms, index['idf'], index['postings'], dl_norm, index['n_docs'], k1=k1)
-        xs = query_term_xs(terms, index['idf'], index['postings'], dl_norm, k1=k1)
-        tails = tails_for_scores(
-            scores, xs, index['n_docs'], null['mu_q'], null['v_diag'], null['v_full'],
-            n_mc=1500, seed=int(hashlib.md5(qid.encode('utf8')).hexdigest()[:8], 16),
+        null = query_null(
+            terms, index['idf'], index['postings'], dl_norm, index['n_docs'],
+            k1=k1, compute_cov=False,
         )
+        tails = cheap_gaussian_rank_tails(scores, index['n_docs'], null['mu_q'], null['v_diag'])
         out[qid] = {
             'inds': inds,
             'scores': scores,
@@ -158,6 +158,8 @@ def retrieve_all(index: dict, k: int = PRIMARY_K, k1: float = K1, b: float = B) 
             **null,
             **tails,
         }
+        if qi % 100 == 0 or qi == n_q:
+            print(f'  retrieve {qi}/{n_q}', flush=True)
     return out
 
 

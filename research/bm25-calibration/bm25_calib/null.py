@@ -147,6 +147,24 @@ def information(p0: float) -> float:
     return -math.log(max(float(p0), 1e-300))
 
 
+def cheap_gaussian_rank_tails(scores: np.ndarray, n_docs: int, mu: float, var_diag: float) -> dict[str, np.ndarray]:
+    """Online tails that stay O(K): Gaussian factorized-null + joint rank control.
+
+    Saddlepoint, Chernoff, and independence MC are intentionally not computed.
+    """
+    scores = np.asarray(scores, dtype=np.float64)
+    p_g = np.array([gaussian_tail(mu, var_diag, s) for s in scores])
+    ranks = np.arange(1, len(scores) + 1, dtype=np.float64)
+    p_joint = ranks / max(int(n_docs), 1)
+    return {
+        'p0_gauss_diag': p_g,
+        'p0_joint_rank': p_joint,
+        'I_gauss_diag': np.array([information(p) for p in p_g]),
+        'I_joint_rank': np.array([information(p) for p in p_joint]),
+        'tails_mode': 'cheap_gaussian_rank',
+    }
+
+
 def independence_mc_tail(
     term_xs: list[np.ndarray],
     n_docs: int,

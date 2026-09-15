@@ -19,6 +19,9 @@ See `PROTOCOL.json`. Primary BM25:
 - IDF = log(1 + (N-df+0.5)/(df+0.5))
 - unique query terms scored once
 - top-K never padded with zero-score documents
+- **full corpus**; at most 400 judged queries (seeded sample if the split is larger)
+
+Expensive tail methods (saddlepoint, Chernoff, MC, pairwise covariance) are skipped; see `SKIPPED.md`.
 
 ## Run
 

@@ -6,12 +6,13 @@ import csv
 import gzip
 import hashlib
 import json
+import random
 import time
 import urllib.request
 import zipfile
 from pathlib import Path
 
-from .config import BEIR_BASE, TREC_DL19_QRELS, TREC_DL19_QUERIES, TREC_DL20_QRELS, TREC_DL20_QUERIES
+from .config import BEIR_BASE, MAX_QUERIES, SEED, TREC_DL19_QRELS, TREC_DL19_QUERIES, TREC_DL20_QRELS, TREC_DL20_QUERIES
 from .text import tokenize, unique_terms
 
 
@@ -147,6 +148,52 @@ def iter_corpus_jsonl(path: Path):
             yield str(row['_id']), body
 
 
+def subsample_queries(
+    queries: dict[str, str],
+    qrels: dict[str, dict[str, int]],
+    n_max: int = MAX_QUERIES,
+    seed: int = SEED,
+) -> tuple[dict[str, str], dict[str, dict[str, int]], dict]:
+    """Keep every document; draw at most n_max queries with a seeded RNG.
+
+    Query ids are sorted first so the draw does not depend on dict order.
+    """
+    qids = sorted(qid for qid in queries if qid in qrels and qrels[qid])
+    n_full = len(qids)
+    if n_full <= n_max:
+        kept_q = {qid: queries[qid] for qid in qids}
+        kept_r = {qid: qrels[qid] for qid in qids}
+        return kept_q, kept_r, {
+            'subsampled': False,
+            'n_queries_full': n_full,
+            'n_queries_used': n_full,
+            'max_queries': n_max,
+            'seed': seed,
+            'policy': 'all-judged-queries',
+        }
+    rng = random.Random(seed)
+    chosen = sorted(rng.sample(qids, n_max))
+    kept_q = {qid: queries[qid] for qid in chosen}
+    kept_r = {qid: qrels[qid] for qid in chosen}
+    return kept_q, kept_r, {
+        'subsampled': True,
+        'n_queries_full': n_full,
+        'n_queries_used': n_max,
+        'max_queries': n_max,
+        'seed': seed,
+        'policy': 'sorted-qid sample without replacement; full corpus retained',
+        'chosen_qids': chosen,
+    }
+
+
+def _apply_query_cap(meta: dict, queries: dict[str, str], qrels: dict[str, dict[str, int]]) -> tuple[dict, dict[str, str], dict[str, dict[str, int]]]:
+    queries, qrels, slice_meta = subsample_queries(queries, qrels)
+    meta = {**meta, 'query_slice': {k: v for k, v in slice_meta.items() if k != 'chosen_qids'}}
+    if slice_meta.get('subsampled'):
+        meta['query_slice']['n_chosen'] = len(slice_meta['chosen_qids'])
+    return meta, queries, qrels
+
+
 def query_vocab(queries: dict[str, str]) -> tuple[dict[str, list[str]], dict[str, list[str]], set[str]]:
     q_tokens: dict[str, list[str]] = {}
     q_terms: dict[str, list[str]] = {}
@@ -186,6 +233,7 @@ def prepare_beir(name: str, data_root: Path) -> dict:
             for qid, rels in r.items():
                 qrels[f'{forum}:{qid}'] = {f'{forum}:{did}': g for did, g in rels.items()}
         meta['forums'] = forums
+        meta, queries, qrels = _apply_query_cap(meta, queries, qrels)
         return {
             'meta': meta,
             'queries': queries,
@@ -194,6 +242,7 @@ def prepare_beir(name: str, data_root: Path) -> dict:
         }
     corpus_path, queries_path, qrels_path = beir_paths(data_root, name)
     queries, qrels = load_queries_qrels(queries_path, qrels_path)
+    meta, queries, qrels = _apply_query_cap(meta, queries, qrels)
     return {
         'meta': meta,
         'queries': queries,
@@ -248,16 +297,18 @@ def prepare_trec_dl(year: str, data_root: Path, msmarco_corpus_path: str | None)
     qrels = _read_trec_qrels(qrels_path)
     queries = _read_tsv_queries(queries_path)
     queries = {qid: text for qid, text in queries.items() if qid in qrels}
+    meta = {
+        'name': f'trec-dl-{year}',
+        'qrels_url': qrels_url,
+        'queries_url': query_url,
+        'qrels_sha256': sha256_file(qrels_path),
+        'queries_sha256': sha256_file(queries_path),
+    }
+    meta, queries, qrels = _apply_query_cap(meta, queries, qrels)
     if not msmarco_corpus_path:
         raise FileNotFoundError('MS MARCO corpus is required for TREC DL')
     return {
-        'meta': {
-            'name': f'trec-dl-{year}',
-            'qrels_url': qrels_url,
-            'queries_url': query_url,
-            'qrels_sha256': sha256_file(qrels_path),
-            'queries_sha256': sha256_file(queries_path),
-        },
+        'meta': meta,
         'queries': queries,
         'qrels': qrels,
         'corpus_iter': iter_corpus_jsonl(Path(msmarco_corpus_path)),

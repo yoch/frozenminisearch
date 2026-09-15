@@ -10,7 +10,8 @@ from pathlib import Path
 
 from .config import B, K1, PRIMARY_K, SEED
 from .phase_a import write_json
-from .run_phase_a import ROOT
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def git_sha() -> str:

@@ -18,10 +18,7 @@ GLOBAL_VARIANTS = [
     'paper',
     'ceiling',
     'z_diag',
-    'z_full',
-    'I_saddle',
     'I_gauss_diag',
-    'I_gauss_full',
     'I_joint_rank',
     'surprise',
     'power_0',
@@ -177,9 +174,9 @@ def aggregate_folds(cal: dict) -> dict:
         for fold in cal['folds']:
             names.update(fold['gate'][target].keys())
         for name in sorted(names):
-            rec = [fold['gate'][target][name]['recall'] for fold in cal['folds']]
-            ret = [fold['gate'][target][name]['retained'] for fold in cal['folds']]
-            suc = [fold['gate'][target][name]['success'] for fold in cal['folds']]
+            rec = [fold['gate'][target][name]['recall'] for fold in cal['folds'] if name in fold['gate'][target]]
+            ret = [fold['gate'][target][name]['retained'] for fold in cal['folds'] if name in fold['gate'][target]]
+            suc = [fold['gate'][target][name]['success'] for fold in cal['folds'] if name in fold['gate'][target]]
             gate[target][name] = {
                 'recall_mean': float(np.mean(rec)),
                 'recall_std': float(np.std(rec)),

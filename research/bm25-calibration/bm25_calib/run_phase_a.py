@@ -11,9 +11,10 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import PHASE_A_ORDER, PRIMARY_K, SEED
+from .config import MAX_QUERIES, PHASE_A_ORDER, PRIMARY_K, SEED, SKIPPED_DATASET_REASONS, SKIPPED_DATASETS, SKIPPED_METHODS
 from .data import prepare_beir
 from .phase_a import aggregate_folds, evaluate_calibration, flatten_candidates, write_json
+from .provenance import write_provenance
 from .retrieve import build_index, load_index, retrieve_all, save_index
 
 
@@ -57,7 +58,7 @@ def run_one(name: str, k: int, force: bool) -> dict:
     if res_path.exists() and not force:
         return json.loads(res_path.read_text(encoding='utf8'))
     t0 = time.time()
-    idx_path = ART / 'indexes' / f'{name}.pkl'
+    idx_path = ART / 'indexes' / f'{name}_qcap{MAX_QUERIES}.pkl'
     if idx_path.exists() and not force:
         index = load_index(idx_path)
     else:
@@ -98,7 +99,8 @@ def run_one(name: str, k: int, force: bool) -> dict:
             'top_paper': float(row['variants']['paper'][0]) if len(row['scores']) else 0.0,
             'top_ceiling': float(row['variants']['ceiling'][0]) if len(row['scores']) else 0.0,
             'top_z_diag': float(row['variants']['z_diag'][0]) if len(row['scores']) else 0.0,
-            'top_z_full': float(row['variants']['z_full'][0]) if len(row['scores']) else 0.0,
+            'top_I_gauss': float(row['variants']['I_gauss_diag'][0]) if len(row['scores']) else 0.0,
+            'top_surprise': float(row['variants']['surprise'][0]) if len(row['scores']) else 0.0,
         })
     write_json(RES / f'phase_a_{name}_k{k}_queries.json', qrows)
     return out
@@ -114,8 +116,23 @@ def main(argv: list[str] | None = None) -> int:
     names = args.datasets or list(PHASE_A_ORDER)
     if args.limit:
         names = names[: args.limit]
+    skipped = {
+        'methods': list(SKIPPED_METHODS),
+        'datasets': [
+            {'id': name, 'reason': SKIPPED_DATASET_REASONS.get(name, 'cost')}
+            for name in SKIPPED_DATASETS
+        ],
+        'query_slice': {
+            'max_queries': MAX_QUERIES,
+            'corpus': 'full',
+            'policy': 'seeded query sample without replacement when n_queries > MAX_QUERIES',
+        },
+        'note': 'Skipped items are methods or TREC DL (missing MS MARCO dump). Large BEIR sets keep all documents and subsample queries.',
+    }
     ART.mkdir(parents=True, exist_ok=True)
     RES.mkdir(parents=True, exist_ok=True)
+    write_json(RES / 'skipped.json', skipped)
+    write_provenance({'phase': 'A', 'datasets': names, 'k': args.k, 'skipped': skipped})
     summary = []
     failures = []
     for name in names:

@@ -73,7 +73,7 @@ class NormalizeTests(unittest.TestCase):
         order = np.argsort(-raw)
         monotone = [
             'raw', 'paper', 'ceiling', 'top_ratio', 'minmax', 'sumnorm',
-            'z_emp', 'z_robust', 'z_diag', 'z_full', 'power_0', 'power_1',
+            'z_emp', 'z_robust', 'z_diag', 'power_0', 'power_1',
         ]
         for name in monotone:
             arr = variants[name]
@@ -110,6 +110,36 @@ class SurpriseSmokeTests(unittest.TestCase):
         s = surprise_scores(raw)
         self.assertEqual(len(s), 80)
         self.assertGreaterEqual(float(s[0]), float(s[-1]) - 1e-9)
+
+
+class QuerySliceTests(unittest.TestCase):
+    def test_keeps_all_when_under_cap_and_samples_deterministically(self):
+        from bm25_calib.data import subsample_queries
+        queries = {f'q{i:03d}': 'text' for i in range(10)}
+        qrels = {f'q{i:03d}': {'d1': 1} for i in range(10)}
+        q1, r1, m1 = subsample_queries(queries, qrels, n_max=20, seed=1)
+        self.assertFalse(m1['subsampled'])
+        self.assertEqual(len(q1), 10)
+        q2, r2, m2 = subsample_queries(queries, qrels, n_max=4, seed=20260915)
+        q3, r3, m3 = subsample_queries(queries, qrels, n_max=4, seed=20260915)
+        self.assertTrue(m2['subsampled'])
+        self.assertEqual(len(q2), 4)
+        self.assertEqual(sorted(q2), sorted(q3))
+        self.assertEqual(set(q2), set(r2))
+        q4, _, m4 = subsample_queries(queries, qrels, n_max=4, seed=7)
+        self.assertTrue(m4['subsampled'])
+        self.assertNotEqual(sorted(q2), sorted(q4))
+
+
+class CheapTailTests(unittest.TestCase):
+    def test_cheap_tails_match_gaussian_and_rank(self):
+        from bm25_calib.null import cheap_gaussian_rank_tails, gaussian_tail, information
+        scores = np.array([5.0, 2.0, 1.0])
+        tails = cheap_gaussian_rank_tails(scores, n_docs=100, mu=0.0, var_diag=1.0)
+        self.assertEqual(tails['tails_mode'], 'cheap_gaussian_rank')
+        self.assertAlmostEqual(tails['p0_gauss_diag'][0], gaussian_tail(0.0, 1.0, 5.0))
+        np.testing.assert_allclose(tails['p0_joint_rank'], np.array([1, 2, 3]) / 100.0)
+        self.assertAlmostEqual(tails['I_joint_rank'][0], information(0.01))
 
 
 if __name__ == '__main__':

@@ -36,10 +36,7 @@ def variant_names() -> list[str]:
         'z_emp',
         'z_robust',
         'z_diag',
-        'z_full',
-        'I_saddle',
         'I_gauss_diag',
-        'I_gauss_full',
         'I_joint_rank',
         'surprise',
     ]
@@ -64,7 +61,6 @@ def candidate_variants(raw: np.ndarray, qrow: dict, k1: float = K1) -> dict[str,
     mad = _mad(raw)
     mu_q = float(qrow['mu_q'])
     sd_diag = max(float(qrow['sd_diag']), 1e-12)
-    sd_full = max(float(qrow['sd_full']), 1e-12)
     out = {
         'raw': raw,
         'paper': raw / (qlen * (k1 + 1.0)),
@@ -76,10 +72,7 @@ def candidate_variants(raw: np.ndarray, qrow: dict, k1: float = K1) -> dict[str,
         'z_emp': (raw - mu_emp) / sd_emp,
         'z_robust': (raw - med) / mad,
         'z_diag': (raw - mu_q) / sd_diag,
-        'z_full': (raw - mu_q) / sd_full,
-        'I_saddle': np.asarray(qrow.get('I_saddle', (raw - mu_q) / sd_diag), dtype=float),
         'I_gauss_diag': np.asarray(qrow.get('I_gauss_diag', (raw - mu_q) / sd_diag), dtype=float),
-        'I_gauss_full': np.asarray(qrow.get('I_gauss_full', (raw - mu_q) / sd_full), dtype=float),
         'surprise': np.asarray(qrow.get('surprise', np.zeros(len(raw))), dtype=float),
         'I_joint_rank': np.asarray(qrow.get('I_joint_rank', np.zeros(len(raw))), dtype=float),
     }

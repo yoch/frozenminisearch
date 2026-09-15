@@ -132,6 +132,7 @@ def query_null(
     n_docs: int,
     k1: float = K1,
     term_cap: int = Z_FULL_TERM_CAP,
+    compute_cov: bool = False,
 ) -> dict[str, float]:
     mus = []
     vars_ = []
@@ -152,12 +153,16 @@ def query_null(
     mean_corr = 0.0
     n_pairs = 0
     cov_terms = usable
-    if len(usable) > term_cap:
+    if not compute_cov:
+        cov_terms = []
+    elif len(usable) > term_cap:
         cov_terms = sorted(usable, key=lambda row: -row[4])[:term_cap]
     for i in range(len(cov_terms)):
         t_i, idx_i, u_i, mu_i, idf_i, var_i = cov_terms[i]
+        del t_i
         for j in range(i + 1, len(cov_terms)):
             t_j, idx_j, u_j, mu_j, idf_j, var_j = cov_terms[j]
+            del t_j
             cov = pairwise_cov(idx_i, u_i, mu_i, idx_j, u_j, mu_j, idf_i, idf_j, n_docs, k1=k1)
             v_full += 2.0 * cov
             denom = math.sqrt(max(var_i, 0.0) * max(var_j, 0.0))
@@ -177,4 +182,5 @@ def query_null(
         'mean_term_corr': mean_corr,
         'n_cov_terms': len(cov_terms),
         'n_cov_pairs': n_pairs,
+        'cov_skipped': not compute_cov,
     }

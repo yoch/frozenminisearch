@@ -10,19 +10,20 @@
 
 - Remote: `github.com/yoch/frozenminisearch`
 - Default branch: `master` @ `e06eca31874c30071bee4cbccf4814a40bec8b5f`
-- Research branch: `cursor/bm25-score-normalization-study-fb5b`
-- Do not merge, do not open a PR, do not touch `master`.
+- Research branch: `cursor/bm25-score-normalization-study-fb5b` @ `ace100d5beee9cd2aee72307aeb942866bd6f076`
+- Tracking PR (do not merge): https://github.com/yoch/frozenminisearch/pull/15
+- Do not merge, do not touch `master`.
 
 ## Verdict (filled only from JSON produced by the cited SHA)
 
-Pending re-runs after the RLT/null pivot. Allowed labels:
+**Phase A only (SHA `ace100d`): B, leaning A.** Index-null Z_diag destandardizes query length and sometimes tightens a global gate (SciFact, ArguAna), but list-local Surprise/minmax match or beat it, the gate does not transfer, and there is **no** end-to-end nDCG vs fixed-k yet. D is not on the table.
+
+Allowed labels:
 
 - **A.** Already known; no interesting remainder
 - **B.** Useful engineering heuristic
 - **C.** Clean method, limited scientific novelty
 - **D.** Beats modern RLT baselines, preserves downstream quality, original enough for a paper
-
-D requires stronger evidence than query-length calibration anecdotes.
 
 ---
 
@@ -116,21 +117,89 @@ Let S_q(D) be BM25 for a uniform corpus document.
 
 ## 3. Empirical results
 
-Filled from `research/bm25-calibration/results/*.json` after jobs on the **same** SHA. Missing datasets are failures, not silent drops.
+**SHA of this Phase A sweep:** `ace100d5beee9cd2aee72307aeb942866bd6f076`  
+**Job:** `run_phase_a --force` on 7 collections, ~290 s wall.  
+**Tails:** cheap Gaussian factorized-null + joint rank + Surprise (greedy CvM capped). Saddlepoint / MC / covariance **not** computed.
+
+Corpus is always full. Query cap 400 (seed 20260915). Candidate recall at the 0.95 relevant-score quantile is **intermediate only**: the threshold is fit on train relevant scores, so recall ≈ 0.95 is nearly tautological. The useful number is **retained fraction**.
+
+### 3.1 Collections
+
+| dataset | docs | queries used / full | sliced | mean \|q\| | pool recall@100 | α* nested | sec |
+|---|---:|---:|:---:|---:|---:|---:|---:|
+| scifact | 5183 | 300 / 300 | no | 12.6 | 0.879 | 0.50 | 30 |
+| nfcorpus | 3633 | 323 / 323 | no | 3.3 | 0.153 | 0.65 | 31 |
+| fiqa | 57638 | 400 / 648 | yes | 10.4 | 0.470 | 0.50 | 38 |
+| arguana | 8674 | 400 / 1406 | yes | 194 | 0.920 | 0.65 | 45 |
+| scidocs | 25657 | 400 / 1000 | yes | 9.8 | 0.343 | 0.25 | 62 |
+| trec-covid | 171332 | 50 / 50 | no | 11.5 | 0.087 | 0.45 | 21 |
+| webis-touche2020 | 382545 | 49 / 49 | no | 6.5 | 0.518 | 0.55 | 62 |
+
+`mean_term_corr` is 0 everywhere: pairwise covariance was skipped.
+
+### 3.2 Pooled candidate AUROC and ρ(top-score, \|q\|)
+
+`I_gauss_diag` is −log of the Gaussian survival. Within a query it is monotone in `Z_diag`; pooled AUROC is therefore almost identical. `I_joint_rank` is rank/N (negative control). `minmax` / `z_emp` / Surprise are **list-local**.
+
+| dataset | raw AUROC (ρ_qlen) | Z_diag / I_gauss | Surprise | minmax | power_0.5 | paper α=1 |
+|---|---|---|---|---|---|---|
+| scifact | 0.919 (0.52) | **0.946** (0.05) | 0.955 | 0.958 | 0.939 | 0.921 |
+| nfcorpus | 0.685 (0.52) | 0.786 (−0.55) | 0.648† | 0.762 | **0.815** | 0.803 |
+| fiqa | 0.749 (0.63) | 0.753 (−0.15) | **0.807** | 0.805 | 0.780 | 0.711 |
+| arguana | 0.793 (0.88) | 0.888 (0.44 / I: 0.07) | **0.899** | 0.894 | 0.882 | 0.840 |
+| scidocs | 0.746 (0.60) | **0.762** (0.11) | 0.762 | 0.760 | 0.756 | 0.706 |
+| trec-covid | 0.650 (0.61) | **0.684** (0.05) | 0.616 | 0.633 | 0.671 | 0.637 |
+| touche | 0.666 (0.66) | 0.684 (0.08) | **0.747** | 0.747 | 0.696 | 0.656 |
+
+† NFCorpus Surprise gating retained 100 % of candidates (degenerate GPD fit on short lists / weak score dynamic range). Treat as a failure mode, not a win.
+
+### 3.3 Gating @ 0.95 relevant-score quantile (retained fraction; recall ≈ 0.95 by construction)
+
+Lower retained at matched recall would be the only interesting Phase A cost signal.
+
+| dataset | raw ret | Z_diag ret | Surprise ret | power_0.5 ret |
+|---|---:|---:|---:|---:|
+| scifact | 0.54 | **0.35** | 0.28 | 0.42 |
+| nfcorpus | 0.85 | 0.78 | 1.00† | **0.75** |
+| fiqa | 0.82 | 0.86 | **0.78** | 0.79 |
+| arguana | 0.81 | 0.49 | **0.47** | 0.56 |
+| scidocs | **0.81** | 0.83 | 0.86 | 0.81 |
+| trec-covid | 0.90 | **0.88** | 0.93 | 0.89 |
+| touche | **0.80** | 0.85 | 0.87 | 0.80 |
+
+Index-null **helps** as a global gate on SciFact and ArguAna (long queries). It **does not** help on FiQA, SCIDOCS, Touché (keeps more than raw). List-local Surprise/minmax often match or beat it. `I_joint_rank` on SciFact retains 0.28 ≈ fixed-k 28, as expected for a pure rank statistic.
+
+### 3.4 What this does *not* show
+
+- No end-to-end nDCG@10 (Phase B not in this SHA’s JSON yet).
+- No comparison to fixed-k rerank (the method to beat).
+- No saddlepoint vs Gaussian (skipped).
+- No independence check (covariance skipped). Nested α* ranges 0.25–0.65; without `mean_term_corr` we **cannot** test the “optimal α tracks term dependence” story. Drop that interpretation until covariance is cheap enough to revisit.
+- BEIR qrels are sparse except TREC-COVID; candidate AUROC is not the primary claim.
+
+### 3.5 Phase B
+
+Pending: frozen MiniLM on SciFact, NFCorpus, FiQA, TREC-COVID, Touché. ArguAna rerank skipped (document-length queries).
 
 ## 4. Answers demanded by the recast
 
-1. Does an index-derived null already exist? **Yes, in essence (Kanoulas 2010; WIG collection baseline).**
-2. Best P0 approximation? *pending*
-3. Is independence OK? *pending (var_full vs var_diag, MC vs Gaussian)*
-4. Is Z enough vs saddlepoint/EVT? *pending*
-5. Is the tail better calibrated across queries? *pending*
-6. Beat Surprise? *pending*
-7. Beat fixed-k? *pending — Meng suggests this is hard*
-8. Cut rerank cost without nDCG loss? *pending*
-9. Transfer across collections? *pending*
-10. Paper-worthy? Default **no** until 6–8 are clearly yes.
+1. Index-derived null already in the literature? **Yes, in essence (Kanoulas 2010; WIG collection baseline).**
+2. Best P0 approximation? **Unevaluated beyond Gaussian.** Saddlepoint/MC skipped on cost.
+3. Independence OK? **Not measured this round.**
+4. Z enough vs saddlepoint/EVT? **Z_diag ≈ I_gauss. List EVT (Surprise) wins pooled AUROC on FiQA/ArguAna/Touché; collapses on NFCorpus.**
+5. Tail better calibrated across queries? **Z_diag reduces ρ with \|q\| vs raw BM25 on every set. That is cross-query scale, not downstream utility.**
+6. Beat Surprise? **Not on Phase A AUROC. Mixed on gating retained.**
+7. Beat fixed-k? **Not tested (needs Phase B).**
+8. Cut rerank cost without nDCG loss? **Pending Phase B.**
+9. Transfer? **Gating benefit of Z_diag does not transfer (helps SciFact/ArguAna, hurts or null on FiQA/SCIDOCS/Touché).**
+10. Paper-worthy? **Not on Phase A evidence. Default remains no until 6–8 are yes.**
+
+**Working verdict after Phase A only: B (engineering heuristic) leaning A**, unless Phase B shows a Pareto win vs fixed-k **and** Surprise on nDCG@10. D is not supported.
 
 ## Provenance
 
-See `results/provenance.json`.
+- Remote: `github.com/yoch/frozenminisearch`
+- `master` @ `e06eca31874c30071bee4cbccf4814a40bec8b5f`
+- Research HEAD for these JSON files: `ace100d5beee9cd2aee72307aeb942866bd6f076`
+- `results/provenance.json`, `results/skipped.json`
+

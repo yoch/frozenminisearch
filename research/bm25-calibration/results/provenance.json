@@ -4,14 +4,71 @@
   "branch": "cursor/bm25-score-normalization-study-fb5b",
   "cwd": "/workspace",
   "extra": {
-    "harness_sha": "cbd1e4357da0307f2c300bb3d674f1010a5b1d73",
-    "stage": "pre-phase-a"
+    "datasets": [
+      "scifact",
+      "nfcorpus",
+      "fiqa",
+      "arguana",
+      "scidocs",
+      "trec-covid",
+      "webis-touche2020"
+    ],
+    "k": 100,
+    "phase": "A",
+    "skipped": {
+      "datasets": [
+        {
+          "id": "trec-dl-2019",
+          "reason": "needs the full MS MARCO passage corpus; revisit when that dump is local"
+        },
+        {
+          "id": "trec-dl-2020",
+          "reason": "needs the full MS MARCO passage corpus; revisit when that dump is local"
+        }
+      ],
+      "methods": [
+        {
+          "id": "saddlepoint_lugannani_rice",
+          "reason": "per-query posting MGF + Newton is too slow on long queries (ArguAna hung)"
+        },
+        {
+          "id": "chernoff_mgf",
+          "reason": "same MGF cost as saddlepoint"
+        },
+        {
+          "id": "independence_mc_tail",
+          "reason": "sampling all term postings per query is too slow"
+        },
+        {
+          "id": "exact_convolution",
+          "reason": "intractable except on tiny synthetic indexes"
+        },
+        {
+          "id": "pairwise_covariance_z_full",
+          "reason": "O(T^2) posting intersections; skipped in the cheap path"
+        },
+        {
+          "id": "supervised_rlt_choppy_attncut",
+          "reason": "reproduction cost; Meng 2024 already vs fixed-k"
+        },
+        {
+          "id": "cosine_tmp_adapters",
+          "reason": "trained methods, out of scope for a training-free index null"
+        }
+      ],
+      "note": "Skipped items are methods or TREC DL (missing MS MARCO dump). Large BEIR sets keep all documents and subsample queries.",
+      "query_slice": {
+        "corpus": "full",
+        "max_queries": 400,
+        "policy": "seeded query sample without replacement when n_queries > MAX_QUERIES"
+      }
+    }
   },
-  "git_sha": "cbd1e4357da0307f2c300bb3d674f1010a5b1d73",
+  "git_sha": "ace100d5beee9cd2aee72307aeb942866bd6f076",
   "k1": 1.2,
   "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
   "primary_k": 100,
-  "protocol_sha256": "5880a8052a4f353b4f33b2d5c758790cd85b953acf2ca48c2f06a0a0fc5dea00",
+  "protocol_sha256": "25c933f15e2e054aa07efbcecf786df9587b4d632bf323086930859b4bb0551d",
   "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
   "seed": 20260915
 }

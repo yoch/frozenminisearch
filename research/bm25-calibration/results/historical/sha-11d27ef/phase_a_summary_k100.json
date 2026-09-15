@@ -1,0 +1,50 @@
+{
+  "failures": [],
+  "k": 100,
+  "ok": [
+    {
+      "dataset": "quora",
+      "mean_chosen_alpha": 0.25,
+      "seconds": 57.98967170715332,
+      "stats": {
+        "mean_candidates": 100.0,
+        "mean_n_relevant": 1.7425,
+        "mean_qlen": 9.0775,
+        "mean_qlen_unique": 8.8775,
+        "mean_term_corr": 0.0,
+        "median_term_corr": 0.0,
+        "meta": {
+          "avgdl": 10.886017799377441,
+          "b": 0.75,
+          "bytes": 15853968,
+          "dropped_high_df_terms": [],
+          "k1": 1.2,
+          "kept_terms": 1320,
+          "n_docs": 522931,
+          "n_qrels": 697,
+          "n_queries": 400,
+          "name": "quora",
+          "query_slice": {
+            "max_queries": 400,
+            "n_chosen": 400,
+            "n_queries_full": 10000,
+            "n_queries_used": 400,
+            "policy": "sorted-qid sample without replacement; full corpus retained",
+            "seed": 20260915,
+            "subsampled": true
+          },
+          "sha256": "56aacd9dcc4d9c093b63f175afdda0e21cbc8442ecf6c717d09de7b358d77531",
+          "url": "https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/quora.zip",
+          "vocab": 1320,
+          "zip_path": "/workspace/research/bm25-calibration/artifacts/datasets/quora.zip"
+        },
+        "n_docs": 522931,
+        "n_qrels": 697,
+        "n_queries": 400,
+        "pool_recall": 0.8651362984218077,
+        "query_success_at_k": 0.98,
+        "std_qlen": 3.7876765635412957
+      }
+    }
+  ]
+}

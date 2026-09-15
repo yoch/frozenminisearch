@@ -40,3 +40,10 @@ scripts/minisearch*
 examples/plain_js_frozen/frozenminisearch.js
 FrozenMiniSearch-v2.png
 FrozenMiniSearch-v2 (1).png
+# BM25 calibration study: downloaded corpora, indexes, reranker caches
+research/bm25-calibration/artifacts/datasets/
+research/bm25-calibration/artifacts/indexes/
+research/bm25-calibration/artifacts/cache/
+research/bm25-calibration/artifacts/rerank/
+research/bm25-calibration/**/__pycache__/
+research/bm25-calibration/.venv/

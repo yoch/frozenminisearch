@@ -1,0 +1,315 @@
+name: BM25 KL normalization experiment
+
+on:
+  push:
+    branches:
+      - research/bm25-kl-calibration-20260915
+
+permissions:
+  contents: read
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check numpy scipy scikit-learn
+      - name: Run experiment
+        shell: bash
+        run: |
+          python - <<'PY'
+          import urllib.request, zipfile, os, json, csv, re, math, collections, tempfile, statistics
+          from pathlib import Path
+          import numpy as np
+          from sklearn.metrics import roc_auc_score, average_precision_score
+          from scipy.stats import spearmanr
+
+          DATASETS = ['scifact', 'nfcorpus', 'arguana', 'fiqa']
+          K = 100
+          K1 = 1.2
+          B = 0.75
+          SEED = 20260915
+          TOKEN_RE = re.compile(r'(?u)\b\w\w+\b')
+
+
+          def tok(s: str):
+              return TOKEN_RE.findall((s or '').lower())
+
+
+          def download_beir(ds: str, root: Path):
+              url = f'https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{ds}.zip'
+              zp = root / f'{ds}.zip'
+              urllib.request.urlretrieve(url, zp)
+              with zipfile.ZipFile(zp) as z:
+                  z.extractall(root)
+              base = root / ds
+
+              corpus = []
+              with (base / 'corpus.jsonl').open(encoding='utf8') as f:
+                  for line in f:
+                      x = json.loads(line)
+                      corpus.append((str(x['_id']), ((x.get('title') or '') + ' ' + (x.get('text') or '')).strip()))
+
+              queries = {}
+              with (base / 'queries.jsonl').open(encoding='utf8') as f:
+                  for line in f:
+                      x = json.loads(line)
+                      queries[str(x['_id'])] = x['text']
+
+              qrels = collections.defaultdict(dict)
+              with (base / 'qrels' / 'test.tsv').open(encoding='utf8') as f:
+                  r = csv.DictReader(f, delimiter='\t')
+                  for row in r:
+                      score = int(row['score'])
+                      if score > 0:
+                          qrels[str(row['query-id'])][str(row['corpus-id'])] = score
+
+              queries = {qid: text for qid, text in queries.items() if qid in qrels}
+              return corpus, queries, qrels
+
+
+          def make_folds(qids, n=5):
+              qids = list(qids)
+              rng = np.random.default_rng(SEED)
+              rng.shuffle(qids)
+              return [set(x.tolist()) for x in np.array_split(np.array(qids, dtype=object), n)]
+
+
+          def threshold_for_target(scores, target):
+              s = np.sort(np.asarray(scores, dtype=float))[::-1]
+              if len(s) == 0:
+                  return math.inf
+              idx = min(len(s)-1, max(0, math.ceil(target * len(s)) - 1))
+              return float(s[idx])
+
+
+          def auc_safe(y, s):
+              if len(set(map(int, y))) < 2:
+                  return float('nan')
+              return float(roc_auc_score(y, s))
+
+
+          def evaluate_dataset(ds: str, root: Path):
+              corpus, queries, qrels = download_beir(ds, root)
+              N = len(corpus)
+              qtoks = {qid: tok(q) for qid, q in queries.items()}
+              vocab = set(t for ts in qtoks.values() for t in ts)
+
+              postings = {t: [] for t in vocab}
+              dls = np.empty(N, dtype=np.float32)
+              docids = []
+              for i, (did, text) in enumerate(corpus):
+                  ts = tok(text)
+                  dls[i] = len(ts)
+                  docids.append(did)
+                  counts = collections.Counter(t for t in ts if t in vocab)
+                  for t, tf in counts.items():
+                      postings[t].append((i, tf))
+
+              avgdl = float(dls.mean())
+              arrpost = {}
+              idf = {}
+              for t, p in postings.items():
+                  idx = np.fromiter((x[0] for x in p), dtype=np.int32, count=len(p))
+                  tf = np.fromiter((x[1] for x in p), dtype=np.float32, count=len(p))
+                  arrpost[t] = (idx, tf)
+                  df = len(p)
+                  idf[t] = math.log(1.0 + (N - df + 0.5) / (df + 0.5))
+
+              rows = []
+              tops = []
+              total_qrels = sum(len(v) for v in qrels.values())
+              baseline_rel = 0
+              baseline_success = 0
+
+              for qid, ts in qtoks.items():
+                  scores = np.zeros(N, dtype=np.float32)
+                  for t in ts:
+                      p = arrpost.get(t)
+                      if p is None:
+                          continue
+                      idx, tf = p
+                      denom = tf + K1 * (1.0 - B + B * dls[idx] / avgdl)
+                      scores[idx] += idf[t] * tf * (K1 + 1.0) / denom
+
+                  kk = min(K, N)
+                  inds = np.argpartition(scores, -kk)[-kk:]
+                  inds = inds[np.argsort(scores[inds])[::-1]]
+                  relset = qrels[qid]
+                  rel_flags = np.fromiter((1 if docids[i] in relset else 0 for i in inds), dtype=np.int8, count=len(inds))
+                  nrel = int(rel_flags.sum())
+                  baseline_rel += nrel
+                  baseline_success += int(nrel > 0)
+
+                  qlen = max(1, len(ts))
+                  sumidf = sum(idf.get(t, 0.0) for t in ts)
+                  ceiling = (K1 + 1.0) * sumidf if sumidf > 0 else 1.0
+                  top_raw = max(float(scores[inds[0]]), 1e-12)
+                  top_rel = int(rel_flags[0])
+                  top_vals = {
+                      'raw': top_raw,
+                      'paper_kl': top_raw / (qlen * (K1 + 1.0)),
+                      'ceiling_ratio': top_raw / ceiling,
+                      'top_ratio': 1.0,
+                  }
+                  tops.append({'qid': qid, 'label': top_rel, 'qlen': qlen, 'sumidf': sumidf, **top_vals})
+
+                  for rank, (i, rel) in enumerate(zip(inds, rel_flags), 1):
+                      raw = float(scores[i])
+                      rows.append({
+                          'qid': qid,
+                          'rank': rank,
+                          'rel': int(rel),
+                          'raw': raw,
+                          'paper_kl': raw / (qlen * (K1 + 1.0)),
+                          'ceiling_ratio': raw / ceiling,
+                          'top_ratio': raw / top_raw,
+                      })
+
+              variants = ['raw', 'paper_kl', 'ceiling_ratio', 'top_ratio']
+              top_metrics = {}
+              y = np.array([x['label'] for x in tops], dtype=int)
+              for name in variants:
+                  s = np.array([x[name] for x in tops], dtype=float)
+                  top_metrics[name] = {
+                      'auc': auc_safe(y, s),
+                      'ap': float(average_precision_score(y, s)),
+                      'rho_qlen': float(spearmanr(s, [x['qlen'] for x in tops]).statistic),
+                      'rho_sumidf': float(spearmanr(s, [x['sumidf'] for x in tops]).statistic),
+                  }
+
+              folds = make_folds(queries.keys())
+              gate = {}
+              for target in (0.95, 0.99):
+                  gate[str(target)] = {}
+                  for name in variants:
+                      fold_stats = []
+                      for testq in folds:
+                          train_rows = [r for r in rows if r['qid'] not in testq]
+                          test_rows = [r for r in rows if r['qid'] in testq]
+                          train_rel_scores = [r[name] for r in train_rows if r['rel']]
+                          thr = threshold_for_target(train_rel_scores, target)
+                          kept = [r for r in test_rows if r[name] >= thr]
+                          rel_total = sum(r['rel'] for r in test_rows)
+                          rel_kept = sum(r['rel'] for r in kept)
+                          retained = len(kept) / max(1, len(test_rows))
+                          held_recall = rel_kept / max(1, rel_total)
+                          successful_q = {r['qid'] for r in test_rows if r['rel']}
+                          successful_after = {r['qid'] for r in kept if r['rel']}
+                          success_survival = len(successful_after) / max(1, len(successful_q))
+                          fold_stats.append((held_recall, retained, success_survival, thr))
+                      gate[str(target)][name] = {
+                          'held_recall_mean': float(np.mean([x[0] for x in fold_stats])),
+                          'held_recall_std': float(np.std([x[0] for x in fold_stats])),
+                          'retained_mean': float(np.mean([x[1] for x in fold_stats])),
+                          'retained_std': float(np.std([x[1] for x in fold_stats])),
+                          'success_survival_mean': float(np.mean([x[2] for x in fold_stats])),
+                          'thresholds': [float(x[3]) for x in fold_stats],
+                      }
+
+              alpha_grid = [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5]
+              alpha_cv = {}
+              qlen_map = {x['qid']: x['qlen'] for x in tops}
+              for target in (0.95, 0.99):
+                  fs = []
+                  for testq in folds:
+                      train = [r for r in rows if r['qid'] not in testq]
+                      test = [r for r in rows if r['qid'] in testq]
+                      best = None
+                      for alpha in alpha_grid:
+                          rel_scores = [r['raw'] / (qlen_map[r['qid']] ** alpha) for r in train if r['rel']]
+                          thr = threshold_for_target(rel_scores, target)
+                          kept_train = [r for r in train if r['raw'] / (qlen_map[r['qid']] ** alpha) >= thr]
+                          retained_train = len(kept_train) / max(1, len(train))
+                          if best is None or retained_train < best[0]:
+                              best = (retained_train, alpha, thr)
+                      _, alpha, thr = best
+                      kept = [r for r in test if r['raw'] / (qlen_map[r['qid']] ** alpha) >= thr]
+                      rel_total = sum(r['rel'] for r in test)
+                      rel_kept = sum(r['rel'] for r in kept)
+                      successful_q = {r['qid'] for r in test if r['rel']}
+                      successful_after = {r['qid'] for r in kept if r['rel']}
+                      fs.append({
+                          'alpha': alpha,
+                          'held_recall': rel_kept / max(1, rel_total),
+                          'retained': len(kept) / max(1, len(test)),
+                          'success_survival': len(successful_after) / max(1, len(successful_q)),
+                      })
+                  alpha_cv[str(target)] = {
+                      'selected_alphas': [x['alpha'] for x in fs],
+                      'held_recall_mean': float(np.mean([x['held_recall'] for x in fs])),
+                      'retained_mean': float(np.mean([x['retained'] for x in fs])),
+                      'success_survival_mean': float(np.mean([x['success_survival'] for x in fs])),
+                  }
+
+              return {
+                  'dataset': ds,
+                  'docs': N,
+                  'queries': len(queries),
+                  'qrels': total_qrels,
+                  'baseline_relevant_at_100': baseline_rel,
+                  'baseline_abs_recall_at_100': baseline_rel / max(1, total_qrels),
+                  'baseline_query_success_at_100': baseline_success / max(1, len(queries)),
+                  'top_metrics': top_metrics,
+                  'gate': gate,
+                  'alpha_cv': alpha_cv,
+              }
+
+
+          def fmt(x):
+              return 'nan' if x is None or (isinstance(x, float) and math.isnan(x)) else f'{x:.4f}'
+
+
+          def markdown(results):
+              out = ['# BM25 KL-normalization experiment', '', f'k1={K1}, b={B}, topK={K}, 5-fold query CV, seed={SEED}.', '']
+              out += ['## Dataset baselines', '', '| dataset | docs | queries | qrels | BM25 recall@100 | queries with >=1 relevant@100 |', '|---|---:|---:|---:|---:|---:|']
+              for r in results:
+                  out.append(f"| {r['dataset']} | {r['docs']} | {r['queries']} | {r['qrels']} | {r['baseline_abs_recall_at_100']:.3f} | {r['baseline_query_success_at_100']:.3f} |")
+              out += ['', '## Top-1 score as a cross-query confidence signal', '', '| dataset | score | AUROC(top1 relevant) | AP | rho(query length) | rho(sum IDF) |', '|---|---|---:|---:|---:|---:|']
+              for r in results:
+                  for n, m in r['top_metrics'].items():
+                      out.append(f"| {r['dataset']} | {n} | {fmt(m['auc'])} | {fmt(m['ap'])} | {fmt(m['rho_qlen'])} | {fmt(m['rho_sumidf'])} |")
+              for target in ('0.95','0.99'):
+                  out += ['', f'## Global threshold gating, target train recall={target}', '', '| dataset | score | held-out relevant recall | candidates retained | query-success survival |', '|---|---|---:|---:|---:|']
+                  for r in results:
+                      for n, m in r['gate'][target].items():
+                          out.append(f"| {r['dataset']} | {n} | {m['held_recall_mean']:.3f}±{m['held_recall_std']:.3f} | {m['retained_mean']:.3f}±{m['retained_std']:.3f} | {m['success_survival_mean']:.3f} |")
+                  out += ['', '### Learned query-length exponent control', '', '| dataset | selected alpha per fold | held-out recall | retained | query-success survival |', '|---|---|---:|---:|---:|']
+                  for r in results:
+                      m = r['alpha_cv'][target]
+                      out.append(f"| {r['dataset']} | {m['selected_alphas']} | {m['held_recall_mean']:.3f} | {m['retained_mean']:.3f} | {m['success_survival_mean']:.3f} |")
+              out += ['', 'Notes:', '- `paper_kl = raw_BM25 / (|q| * (k1+1))`; with fixed k1 this is exactly query-length normalization up to one global constant.', '- `ceiling_ratio = raw_BM25 / ((k1+1) * sum_query_IDF)`, the fraction of the query-specific BM25 asymptotic ceiling attained.', '- `top_ratio = score / top_score(query)` is a relative-score control; its top-1 confidence is constant by construction.', '- Gating recall is relative to relevant documents already present in BM25 top-100; baseline absolute recall@100 is reported separately.']
+              return '\n'.join(out) + '\n'
+
+
+          def main():
+              results = []
+              with tempfile.TemporaryDirectory() as td:
+                  root = Path(td)
+                  for ds in DATASETS:
+                      print(f'=== {ds} ===', flush=True)
+                      r = evaluate_dataset(ds, root)
+                      results.append(r)
+                      print(json.dumps(r, sort_keys=True), flush=True)
+              Path('bm25-kl-results.json').write_text(json.dumps(results, indent=2, sort_keys=True), encoding='utf8')
+              report = markdown(results)
+              Path('bm25-kl-report.md').write_text(report, encoding='utf8')
+              print('\n' + report, flush=True)
+
+
+          if __name__ == '__main__':
+              main()
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bm25-kl-results
+          path: |
+            bm25-kl-results.json
+            bm25-kl-report.md
+          if-no-files-found: warn

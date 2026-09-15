@@ -12,7 +12,8 @@ ALPHAS = (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5)
 OUTER_FOLDS = 5
 INNER_FOLDS = 4
 BOOTSTRAP_RESAMPLES = 10_000
-NONINFERIORITY = (-0.005, -0.01)
+# Operating-point constraint: mean ΔnDCG@10 >= -δ. Positive δ, not the signed bound.
+NONINFERIORITY = (0.005, 0.01)
 Z_FULL_TERM_CAP = 12
 # Factorized tail / MGF uses the highest-IDF query terms only. Retrieval still
 # scores every unique query term. This is an explicit approximation, not a claim
@@ -20,7 +21,7 @@ Z_FULL_TERM_CAP = 12
 NULL_TAIL_TERM_CAP = 16
 NULL_MC_TERM_CAP = 8
 NULL_MC_DRAWS = 250
-HIGH_DF_DROP_FRACTION = 0.95
+HIGH_DF_DROP_FRACTION = 0.95  # unused: reference BM25 never drops terms
 TOKEN_PATTERN = r'(?u)\b\w\w+\b'
 # Full corpus always. If a collection has more queries than this, draw a
 # seeded subset and keep every document. Results on a capped set are labeled

@@ -15,15 +15,16 @@ from .normalize import candidate_variants, variant_names
 
 GLOBAL_VARIANTS = [
     'raw',
-    'paper',
+    'power_token_len',
+    'power_unique_len',
     'ceiling',
     'z_diag',
     'I_gauss_diag',
     'I_joint_rank',
     'surprise',
-    'power_0',
-    'power_0.5',
-    'power_1',
+    'power_token_0',
+    'power_token_0.5',
+    'power_token_1',
 ]
 
 LOCAL_VARIANTS = ['top_ratio', 'minmax', 'sumnorm', 'z_emp', 'z_robust']
@@ -40,16 +41,25 @@ def flatten_candidates(retrieved: dict[str, dict]) -> dict[str, dict]:
     return packed
 
 
-def _gather(packed, qids, name, rel_only=False):
+def _gather(packed, qids, name, rel_only=False, judged_only=False):
     y = []
     s = []
     for qid in qids:
         row = packed[qid]
         flags = np.asarray(row['rel']) > 0
         vals = np.asarray(row['variants'][name], dtype=float)
+        if len(vals) == 0:
+            continue
+        mask = np.ones(len(vals), dtype=bool)
+        if judged_only and 'judged_mask' in row:
+            mask = np.asarray(row['judged_mask'], dtype=bool)
         if rel_only:
-            vals = vals[flags]
+            mask = mask & flags
+            vals = vals[mask]
             flags = np.ones(len(vals), dtype=bool)
+        else:
+            vals = vals[mask]
+            flags = flags[mask]
         y.extend(flags.astype(int).tolist())
         s.extend(vals.tolist())
     return np.array(y, dtype=int), np.array(s, dtype=float)
@@ -60,15 +70,19 @@ def _top_gather(packed, qids, name):
     s = []
     qlen = []
     sidf = []
+    n_no_match = 0
     for qid in qids:
         row = packed[qid]
+        qlen.append(float(row['qlen_tok']))
+        sidf.append(float(row['sum_idf']))
         if len(row['scores']) == 0:
+            n_no_match += 1
+            y.append(0)
+            s.append(float('-inf'))
             continue
         y.append(int(row['rel'][0] > 0))
         s.append(float(row['variants'][name][0]))
-        qlen.append(float(row['qlen_tok']))
-        sidf.append(float(row['sum_idf']))
-    return np.array(y), np.array(s), np.array(qlen), np.array(sidf)
+    return np.array(y), np.array(s), np.array(qlen), np.array(sidf), n_no_match
 
 
 def evaluate_calibration(packed: dict[str, dict], seed: int = SEED) -> dict:
@@ -87,8 +101,9 @@ def evaluate_calibration(packed: dict[str, dict], seed: int = SEED) -> dict:
         chosen_alphas.append(alpha)
         fold_res = {'fold': fold_i, 'n_train': len(train), 'n_test': len(test), 'chosen_alpha': alpha}
         available = packed[train[0]]['variants']
-        for name in list(methods) + [f'power_{alpha:g}']:
-            key = name if name in available else f'power_{alpha:g}'
+        power_key = f'power_token_{alpha:g}'
+        for name in list(methods) + [power_key]:
+            key = name if name in available else power_key
             if key not in available:
                 continue
             y_tr, s_tr = _gather(packed, train, key)
@@ -96,26 +111,28 @@ def evaluate_calibration(packed: dict[str, dict], seed: int = SEED) -> dict:
             model = fit_platt(s_tr, y_tr)
             p_te = predict_proba(model, s_te)
             ece_val, curve = ece(y_te, p_te)
-            yt, st, ql, si = _top_gather(packed, test, key)
+            yt, st, ql, si, n_miss = _top_gather(packed, test, key)
             fold_res[name] = {
                 'candidate_auroc': safe_auroc(y_te, s_te),
                 'candidate_ap': safe_ap(y_te, s_te),
                 'brier': brier(y_te, p_te),
                 'ece': ece_val,
                 'reliability': curve,
+                'calibration_task': 'qrel-positive vs all-other-retrieved',
                 'top1_auroc': safe_auroc(yt, st),
                 'top1_ap': safe_ap(yt, st),
                 'rho_qlen': spearman(st, ql),
                 'rho_sumidf': spearman(st, si),
+                'n_no_match': n_miss,
             }
         # gating transfer at relevant-score quantiles 0.95 and 0.99
         fold_res['gate'] = {}
         for target in (0.95, 0.99):
             fold_res['gate'][str(target)] = {}
-            for name in GLOBAL_VARIANTS + LOCAL_VARIANTS + [f'cv_power_{alpha:g}']:
+            for name in GLOBAL_VARIANTS + LOCAL_VARIANTS + [f'cv_power_token_{alpha:g}']:
                 key = name
-                if name.startswith('cv_power_'):
-                    key = f'power_{alpha:g}'
+                if name.startswith('cv_power_token_'):
+                    key = f'power_token_{alpha:g}'
                 y_tr, s_tr = _gather(packed, train, key, rel_only=True)
                 th = relevant_quantile_threshold(s_tr, target)
                 keep_rel = 0
@@ -144,11 +161,19 @@ def evaluate_calibration(packed: dict[str, dict], seed: int = SEED) -> dict:
                     'success': succ_num / max(succ_den, 1),
                 }
         outer.append(fold_res)
+    n_no_match = sum(1 for row in packed.values() if row.get('no_match') or len(row['scores']) == 0)
     return {
         'n_queries': len(qids),
+        'no_match_rate': n_no_match / max(len(qids), 1),
         'chosen_alphas': chosen_alphas,
         'mean_chosen_alpha': float(np.mean(chosen_alphas)) if chosen_alphas else None,
         'folds': outer,
+        'calibration_task': 'qrel-positive vs all-other-retrieved',
+        'judged_note': (
+            'IR metrics use the usual qrel convention (unjudged = 0). '
+            'Calibration AUROC/AP/Brier/ECE on retrieved lists is not P(relevance); '
+            'set judged_only=True to restrict to explicitly judged documents.'
+        ),
     }
 
 

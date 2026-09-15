@@ -57,3 +57,10 @@ class TinyCorpusTests(unittest.TestCase):
         cal = evaluate_calibration(packed)
         self.assertIn('folds', cal)
         self.assertGreater(len(cal['folds']), 0)
+        self.assertIn('no_match_rate', cal)
+        self.assertEqual(cal['calibration_task'], 'qrel-positive vs all-other-retrieved')
+        for row in retrieved.values():
+            self.assertIn('variance_ratio', row)
+            self.assertIn('no_match', row)
+            self.assertIn('ideal_rels', row)
+

@@ -14,7 +14,7 @@ Absence is not a negative result. Revisit later.
 | Choppy / AttnCut | supervised RLT; Meng 2024 already vs fixed-k |
 | Cosine Adapter / TMP Adapter | trained calibration, out of scope |
 
-Online tails are **Gaussian factorized-null** (`Z_diag`, `I_gauss_diag`) plus the joint-rank negative control and Surprise-lite (GPD on the returned list, greedy CvM capped at 8 steps/side).
+Online tails are **index-derived z-normalization** (`Z_diag`; `I_gauss_diag` is a monotone map of the same quantity, not a validated `P0`) plus the joint-rank negative control and Surprise (GPD on the returned list, greedy CvM until no improvement; hyperparameters in `PROTOCOL.json`). Pairwise covariance is skipped; `var_joint` from touched scores is kept.
 
 ## Datasets
 

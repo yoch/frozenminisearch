@@ -12,12 +12,12 @@ from .cv import fold_splits, relevant_quantile_threshold
 from .metrics import safe_auroc
 from .phase_a import flatten_candidates, write_json
 from .retrieve import load_index, retrieve_all
-from .run_phase_a import ART, RES, run_one
+from .run_phase_a import ART, RES, index_cache_path, run_one
 
 
 def load_packed(name: str, k: int = PRIMARY_K) -> dict:
     run_one(name, k, force=False)
-    index = load_index(ART / 'indexes' / f'{name}.pkl')
+    index = load_index(index_cache_path(name))
     retrieved = retrieve_all(index, k=k)
     return flatten_candidates(retrieved)
 

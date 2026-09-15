@@ -50,24 +50,25 @@ def surprise_scores(raw: np.ndarray) -> np.ndarray:
     i = 0
     j = n
     prev = _cvm(scores[i:j] - scores[i])
-    for _ in range(8):
-        if j - i <= 12:
-            break
-        trial = _cvm(scores[i:j - 1] - scores[i])
-        if trial < prev:
-            j -= 1
-            prev = trial
-        else:
-            break
-    for _ in range(8):
-        if j - i <= 12:
-            break
-        trial = _cvm(scores[i + 1:j] - scores[i + 1])
-        if trial < prev:
-            i += 1
-            prev = trial
-        else:
-            break
+    improved = True
+    while improved and j - i > 12:
+        improved = False
+        while j - i > 12:
+            trial = _cvm(scores[i:j - 1] - scores[i])
+            if trial < prev:
+                j -= 1
+                prev = trial
+                improved = True
+            else:
+                break
+        while j - i > 12:
+            trial = _cvm(scores[i + 1:j] - scores[i + 1])
+            if trial < prev:
+                i += 1
+                prev = trial
+                improved = True
+            else:
+                break
     u = float(scores[i])
     excess = scores[i:] - u
     if len(excess) < 8 or float(np.std(excess)) <= 1e-12:

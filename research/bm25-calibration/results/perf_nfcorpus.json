@@ -1,0 +1,11 @@
+{
+  "dataset": "nfcorpus",
+  "n_docs": 3633,
+  "n_vocab": 632,
+  "rss_mb_start_after_prepare": 108.01953125,
+  "typed_build_s": 0.2147707169997375,
+  "rss_mb_after_typed_build": 110.53515625,
+  "list_postings_s": 0.24335715300003358,
+  "rss_mb_after_list_plus_typed": 112.91015625,
+  "note": "list path runs after typed in the same process so RSS is cumulative high-water; times are comparable, RSS peak is not a clean A/B."
+}

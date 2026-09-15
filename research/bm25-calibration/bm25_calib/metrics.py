@@ -1,10 +1,18 @@
-"""IR and calibration metrics. Raw BM25 is never treated as a probability."""
+"""IR and calibration metrics.
+
+nDCG IDCG is always taken from the full query qrels, never from the
+truncated or retrieved list. Precision@k divides by k, not by the
+number of returned documents.
+
+Calibration AUROC/AP/Brier/ECE on retrieved lists is the task
+`qrel-positive vs all-other-retrieved` unless a judged-nonrelevant mask
+is supplied. That is not P(relevance).
+"""
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
+from scipy.stats import spearmanr
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, roc_auc_score
 
@@ -18,10 +26,10 @@ def dcg_at(rels: np.ndarray, k: int) -> float:
     return float(np.sum(gains / discounts))
 
 
-def ndcg_at(rels: np.ndarray, k: int) -> float:
-    rels = np.asarray(rels, dtype=np.float64)
-    actual = dcg_at(rels, k)
-    ideal = dcg_at(np.sort(rels)[::-1], k)
+def ndcg_at(ranked_rels: np.ndarray, ideal_rels: np.ndarray, k: int = 10) -> float:
+    """nDCG@k with IDCG from the full graded qrels, independent of the ranking."""
+    actual = dcg_at(np.asarray(ranked_rels, dtype=np.float64), k)
+    ideal = dcg_at(np.sort(np.asarray(ideal_rels, dtype=np.float64))[::-1], k)
     return 0.0 if ideal <= 0 else actual / ideal
 
 
@@ -32,10 +40,10 @@ def mrr_at(rels: np.ndarray, k: int) -> float:
 
 
 def precision_at(rels: np.ndarray, k: int) -> float:
-    rels = np.asarray(rels)[:k]
     if k <= 0:
         return 0.0
-    return float(np.mean(rels > 0)) if len(rels) else 0.0
+    rels = np.asarray(rels)[:k]
+    return float(np.sum(rels > 0)) / float(k)
 
 
 def recall_at(rels: np.ndarray, n_relevant: int, k: int) -> float:
@@ -49,6 +57,7 @@ def success_at(rels: np.ndarray, k: int) -> float:
 
 
 def average_precision(rels: np.ndarray, n_relevant: int) -> float:
+    """MAP-style AP: hits/rank accumulated over the ranking, divided by n_relevant from qrels."""
     rels = np.asarray(rels) > 0
     if n_relevant <= 0:
         return 0.0
@@ -61,15 +70,17 @@ def average_precision(rels: np.ndarray, n_relevant: int) -> float:
     return acc / n_relevant
 
 
-def ranking_metrics(rels: np.ndarray, n_relevant: int, k: int = 10) -> dict[str, float]:
-    rels = np.asarray(rels)
+def ranking_metrics(ranked_rels: np.ndarray, ideal_rels: np.ndarray, k: int = 10) -> dict[str, float]:
+    ranked_rels = np.asarray(ranked_rels)
+    ideal_rels = np.asarray(ideal_rels)
+    n_relevant = int(np.sum(ideal_rels > 0))
     return {
-        'ndcg@10': ndcg_at(rels, k),
-        'mrr@10': mrr_at(rels, k),
-        'p@10': precision_at(rels, k),
-        'map': average_precision(rels, n_relevant),
-        'recall@10': recall_at(rels, n_relevant, k),
-        'success@10': success_at(rels, k),
+        'ndcg@10': ndcg_at(ranked_rels, ideal_rels, k),
+        'mrr@10': mrr_at(ranked_rels, k),
+        'p@10': precision_at(ranked_rels, k),
+        'map': average_precision(ranked_rels, n_relevant),
+        'recall@10': recall_at(ranked_rels, n_relevant, k),
+        'success@10': success_at(ranked_rels, k),
     }
 
 
@@ -90,18 +101,14 @@ def safe_ap(y: np.ndarray, s: np.ndarray) -> float | None:
 def spearman(x, y) -> float | None:
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
-    if len(x) < 3 or len(set(x.tolist())) < 2 or len(set(y.tolist())) < 2:
+    if len(x) != len(y) or len(x) < 3:
         return None
-    rx = np.argsort(np.argsort(x))
-    ry = np.argsort(np.argsort(y))
-    rx = rx.astype(float)
-    ry = ry.astype(float)
-    rx -= rx.mean()
-    ry -= ry.mean()
-    den = math.sqrt(float(np.sum(rx * rx)) * float(np.sum(ry * ry)))
-    if den <= 0:
+    if np.unique(x).size < 2 or np.unique(y).size < 2:
         return None
-    return float(np.sum(rx * ry) / den)
+    rho, _ = spearmanr(x, y)
+    if rho is None or not np.isfinite(rho):
+        return None
+    return float(rho)
 
 
 def fit_platt(scores: np.ndarray, y: np.ndarray) -> LogisticRegression | None:
@@ -117,7 +124,6 @@ def fit_platt(scores: np.ndarray, y: np.ndarray) -> LogisticRegression | None:
 def predict_proba(model: LogisticRegression | None, scores: np.ndarray) -> np.ndarray:
     scores = np.asarray(scores, dtype=float)
     if model is None:
-        # rank-based fallback, not a probability claim
         if len(scores) == 0:
             return scores
         lo, hi = float(scores.min()), float(scores.max())
@@ -141,7 +147,6 @@ def ece(y: np.ndarray, p: np.ndarray, n_bins: int = 15) -> tuple[float, list[dic
     bins = np.linspace(0.0, 1.0, n_bins + 1)
     ece_val = 0.0
     curve = []
-    n = len(y)
     for i in range(n_bins):
         lo, hi = bins[i], bins[i + 1]
         mask = (p >= lo) & (p < hi) if i < n_bins - 1 else (p >= lo) & (p <= hi)

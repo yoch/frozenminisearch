@@ -24,7 +24,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scipy.special import logsumexp
+from scipy.special import log_ndtr, logsumexp
 from scipy.stats import norm
 
 from .bm25 import u_component
@@ -140,29 +140,39 @@ def saddlepoint_tail(term_xs: list[np.ndarray], n_docs: int, s: float) -> float:
 def gaussian_tail(mu: float, var: float, s: float) -> float:
     if var <= 1e-18:
         return 1.0 if s <= mu else 0.0
-    return float(norm.sf((s - mu) / math.sqrt(var)))
+    z = (s - mu) / math.sqrt(var)
+    return float(math.exp(log_ndtr(-z)))
+
+
+def gaussian_rank_tails(scores: np.ndarray, n_docs: int, mu: float, var_diag: float) -> dict[str, np.ndarray]:
+    """Vectorized Gaussian factorized-null information plus joint rank control.
+
+    I_gauss_diag = -log survival(Z_diag) is strictly monotone in Z_diag, so it
+    is the same gating signal as index-derived z-normalization. It is not by
+    itself a validated tail probability.
+    """
+    scores = np.asarray(scores, dtype=np.float64)
+    if var_diag <= 1e-18:
+        z = np.where(scores > mu, np.inf, 0.0)
+        log_sf = np.where(scores > mu, -np.inf, 0.0)
+    else:
+        z = (scores - mu) / math.sqrt(var_diag)
+        log_sf = log_ndtr(-z)
+    p_g = np.exp(log_sf)
+    ranks = np.arange(1, len(scores) + 1, dtype=np.float64)
+    p_joint = ranks / max(int(n_docs), 1)
+    return {
+        'z_scores': z,
+        'p0_gauss_diag': p_g,
+        'p0_joint_rank': p_joint,
+        'I_gauss_diag': -log_sf,
+        'I_joint_rank': -np.log(np.clip(p_joint, 1e-300, 1.0)),
+        'tails_mode': 'gaussian_z_normalization',
+    }
 
 
 def information(p0: float) -> float:
     return -math.log(max(float(p0), 1e-300))
-
-
-def cheap_gaussian_rank_tails(scores: np.ndarray, n_docs: int, mu: float, var_diag: float) -> dict[str, np.ndarray]:
-    """Online tails that stay O(K): Gaussian factorized-null + joint rank control.
-
-    Saddlepoint, Chernoff, and independence MC are intentionally not computed.
-    """
-    scores = np.asarray(scores, dtype=np.float64)
-    p_g = np.array([gaussian_tail(mu, var_diag, s) for s in scores])
-    ranks = np.arange(1, len(scores) + 1, dtype=np.float64)
-    p_joint = ranks / max(int(n_docs), 1)
-    return {
-        'p0_gauss_diag': p_g,
-        'p0_joint_rank': p_joint,
-        'I_gauss_diag': np.array([information(p) for p in p_g]),
-        'I_joint_rank': np.array([information(p) for p in p_joint]),
-        'tails_mode': 'cheap_gaussian_rank',
-    }
 
 
 def independence_mc_tail(
@@ -192,12 +202,17 @@ def query_term_xs(
     dl_norm: np.ndarray,
     k1: float = K1,
 ) -> list[np.ndarray]:
+    # Format-2 postings already store X_t; idf/dl_norm/k1 are kept for call-site compatibility.
+    del idf, dl_norm, k1
     xs = []
     for t in terms:
         if t not in postings:
             continue
-        idx, tf = postings[t]
-        xs.append(posting_x(tf, idx, dl_norm, idf[t], k1=k1))
+        posting = postings[t]
+        if len(posting) != 2:
+            raise ValueError(f'unexpected posting tuple for {t}')
+        _idx, x = posting
+        xs.append(np.asarray(x, dtype=np.float64))
     return xs
 
 

@@ -1,4 +1,4 @@
-"""Paired query-level bootstrap confidence intervals."""
+"""Paired query-level bootstrap confidence intervals on OOF predictions."""
 
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ def paired_ci(
     if len(a) != len(b) or len(a) == 0:
         return {'mean_delta': float('nan'), 'lo': float('nan'), 'hi': float('nan'), 'n': int(len(a))}
     delta = a - b
-    mean = float(delta.mean())
     rng = np.random.default_rng(seed)
     n = len(delta)
     idx = rng.integers(0, n, size=(n_resamples, n))
@@ -27,11 +26,34 @@ def paired_ci(
     lo = float(np.quantile(boot, alpha / 2))
     hi = float(np.quantile(boot, 1.0 - alpha / 2))
     return {
-        'mean_delta': mean,
+        'mean_delta': float(delta.mean()),
         'lo': lo,
         'hi': hi,
         'n': n,
-        'p_positive': float(np.mean(boot > 0)),
-        'p_noninferior_005': float(np.mean(boot >= -0.005)),
-        'p_noninferior_01': float(np.mean(boot >= -0.01)),
+    }
+
+
+def oof_paired_report(
+    treatment: np.ndarray,
+    baseline: np.ndarray,
+    n_resamples: int = BOOTSTRAP_RESAMPLES,
+    seed: int = SEED,
+) -> dict:
+    treatment = np.asarray(treatment, dtype=float)
+    baseline = np.asarray(baseline, dtype=float)
+    ci = paired_ci(treatment, baseline, n_resamples=n_resamples, seed=seed)
+    delta = treatment - baseline
+    if len(delta) == 0:
+        return {**ci, 'median_delta': float('nan'), 'worst_delta': float('nan')}
+    return {
+        **ci,
+        'median_delta': float(np.median(delta)),
+        'worst_delta': float(delta.min()),
+        'q01_delta': float(np.quantile(delta, 0.01)),
+        'q05_delta': float(np.quantile(delta, 0.05)),
+        'q10_delta': float(np.quantile(delta, 0.10)),
+        'frac_loss_gt_005': float(np.mean(delta < -0.005)),
+        'frac_loss_gt_01': float(np.mean(delta < -0.01)),
+        'noninferior_005': bool(ci['lo'] > -0.005),
+        'noninferior_01': bool(ci['lo'] > -0.01),
     }

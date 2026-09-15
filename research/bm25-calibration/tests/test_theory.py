@@ -7,7 +7,7 @@ import unittest
 
 import numpy as np
 
-from bm25_calib.bm25 import idf_lucene, length_norm, term_contributions, u_component
+from bm25_calib.bm25 import idf_lucene, u_component
 from bm25_calib.normalize import candidate_variants
 from bm25_calib.theory import kl_binary_from_score, paper_score, term_moments_from_posting
 
@@ -57,7 +57,7 @@ class MomentTests(unittest.TestCase):
 
 
 class NormalizeTests(unittest.TestCase):
-    def test_within_query_monotone(self):
+    def test_within_query_monotone_and_no_ambiguous_paper_name(self):
         raw = np.array([1.0, 4.0, 2.5, 0.2])
         qrow = {
             'qlen_tok': 3,
@@ -65,15 +65,18 @@ class NormalizeTests(unittest.TestCase):
             'sum_idf': 5.0,
             'mu_q': 0.4,
             'sd_diag': 1.1,
-            'sd_full': 1.4,
-            'mean_term_corr': 0.2,
             'rel': np.array([0, 1, 0, 0]),
+            'I_gauss_diag': (raw - 0.4) / 1.1,
+            'I_joint_rank': np.array([4.0, 3.0, 2.0, 1.0]),
+            'surprise': raw.copy(),
         }
         variants = candidate_variants(raw, qrow)
+        self.assertNotIn('paper', variants)
         order = np.argsort(-raw)
         monotone = [
-            'raw', 'paper', 'ceiling', 'top_ratio', 'minmax', 'sumnorm',
-            'z_emp', 'z_robust', 'z_diag', 'power_0', 'power_1',
+            'raw', 'power_token_len', 'power_unique_len', 'ceiling', 'top_ratio',
+            'minmax', 'sumnorm', 'z_emp', 'z_robust', 'z_diag', 'power_token_0',
+            'power_token_1', 'I_gauss_diag',
         ]
         for name in monotone:
             arr = variants[name]
@@ -82,11 +85,12 @@ class NormalizeTests(unittest.TestCase):
 
 class NullTailTests(unittest.TestCase):
     def test_joint_rank_is_rank_over_n(self):
-        from bm25_calib.null import information, tails_for_scores
+        from bm25_calib.null import gaussian_rank_tails, information
         scores = np.array([9.0, 4.0, 1.0])
-        tails = tails_for_scores(scores, [], n_docs=1000, mu=0.0, var_diag=1.0, var_full=1.0, n_mc=10)
+        tails = gaussian_rank_tails(scores, n_docs=1000, mu=0.0, var_diag=1.0)
         np.testing.assert_allclose(tails['p0_joint_rank'], np.array([1, 2, 3]) / 1000.0)
         self.assertAlmostEqual(tails['I_joint_rank'][0], information(0.001), places=10)
+        self.assertEqual(tails['tails_mode'], 'gaussian_z_normalization')
 
     def test_independence_mc_near_gaussian_for_many_terms(self):
         from bm25_calib.null import gaussian_tail, independence_mc_tail
@@ -129,17 +133,6 @@ class QuerySliceTests(unittest.TestCase):
         q4, _, m4 = subsample_queries(queries, qrels, n_max=4, seed=7)
         self.assertTrue(m4['subsampled'])
         self.assertNotEqual(sorted(q2), sorted(q4))
-
-
-class CheapTailTests(unittest.TestCase):
-    def test_cheap_tails_match_gaussian_and_rank(self):
-        from bm25_calib.null import cheap_gaussian_rank_tails, gaussian_tail, information
-        scores = np.array([5.0, 2.0, 1.0])
-        tails = cheap_gaussian_rank_tails(scores, n_docs=100, mu=0.0, var_diag=1.0)
-        self.assertEqual(tails['tails_mode'], 'cheap_gaussian_rank')
-        self.assertAlmostEqual(tails['p0_gauss_diag'][0], gaussian_tail(0.0, 1.0, 5.0))
-        np.testing.assert_allclose(tails['p0_joint_rank'], np.array([1, 2, 3]) / 100.0)
-        self.assertAlmostEqual(tails['I_joint_rank'][0], information(0.01))
 
 
 if __name__ == '__main__':

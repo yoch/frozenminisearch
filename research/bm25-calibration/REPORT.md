@@ -10,13 +10,14 @@
 
 - Remote: `github.com/yoch/frozenminisearch`
 - Default branch: `master` @ `e06eca31874c30071bee4cbccf4814a40bec8b5f`
-- Research branch: `cursor/bm25-score-normalization-study-fb5b` @ `ace100d5beee9cd2aee72307aeb942866bd6f076`
+- Research branch: `cursor/bm25-score-normalization-study-fb5b` (HEAD cited in git after each harness/result commit)
 - Tracking PR (do not merge): https://github.com/yoch/frozenminisearch/pull/15
 - Do not merge, do not touch `master`.
+- Historical Phase A JSON: `results/historical/sha-11d27ef/` (obsolete; nDCG IDCG, P@k, Spearman, cache, retrieval).
 
 ## Verdict (filled only from JSON produced by the cited SHA)
 
-**Phase A only (SHA `ace100d`): B, leaning A.** Index-null Z_diag destandardizes query length and sometimes tightens a global gate (SciFact, ArguAna), but list-local Surprise/minmax match or beat it, the gate does not transfer, and there is **no** end-to-end nDCG vs fixed-k yet. D is not on the table.
+**VOID.** The previous Phase A label (SHA `ace100d` / `11d27ef`) was produced by a harness whose IR metrics, cache, and retrieval path are not trustworthy. No new scientific verdict until a rerun on a corrected SHA.
 
 Allowed labels:
 

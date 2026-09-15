@@ -15,12 +15,16 @@ from .config import MAX_QUERIES, PHASE_A_ORDER, PRIMARY_K, SEED, SKIPPED_DATASET
 from .data import prepare_beir
 from .phase_a import aggregate_folds, evaluate_calibration, flatten_candidates, write_json
 from .provenance import write_provenance
-from .retrieve import build_index, load_index, retrieve_all, save_index
+from .retrieve import INDEX_FORMAT, build_index, load_index, retrieve_all, save_index
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ART = ROOT / 'artifacts'
 RES = ROOT / 'results'
+
+
+def index_cache_path(name: str) -> Path:
+    return ART / 'indexes' / f'{name}_qcap{MAX_QUERIES}_fmt{INDEX_FORMAT}.pkl'
 
 
 def dataset_stats(index: dict, retrieved: dict) -> dict:
@@ -35,7 +39,7 @@ def dataset_stats(index: dict, retrieved: dict) -> dict:
         n_rel_all += len(index['qrels'].get(qid, {}))
         n_rel_pool += int(np.sum(np.asarray(row['rel']) > 0))
         success += int(np.any(np.asarray(row['rel']) > 0))
-    corrs = [row['mean_term_corr'] for row in retrieved.values()]
+    corrs = [row.get('mean_term_corr', 0.0) for row in retrieved.values()]
     return {
         'n_docs': index['n_docs'],
         'n_queries': len(retrieved),
@@ -47,8 +51,10 @@ def dataset_stats(index: dict, retrieved: dict) -> dict:
         'mean_candidates': float(np.mean(ncand)) if ncand else 0,
         'pool_recall': n_rel_pool / max(n_rel_all, 1),
         'query_success_at_k': success / max(len(retrieved), 1),
+        'no_match_rate': sum(1 for row in retrieved.values() if row.get('no_match')) / max(len(retrieved), 1),
         'mean_term_corr': float(np.mean(corrs)) if corrs else 0,
         'median_term_corr': float(np.median(corrs)) if corrs else 0,
+        'mean_variance_ratio': float(np.nanmean([row.get('variance_ratio', np.nan) for row in retrieved.values()])),
         'meta': index['meta'],
     }
 
@@ -58,10 +64,13 @@ def run_one(name: str, k: int, force: bool) -> dict:
     if res_path.exists() and not force:
         return json.loads(res_path.read_text(encoding='utf8'))
     t0 = time.time()
-    idx_path = ART / 'indexes' / f'{name}_qcap{MAX_QUERIES}.pkl'
+    idx_path = index_cache_path(name)
+    index = None
     if idx_path.exists() and not force:
         index = load_index(idx_path)
-    else:
+        if index.get('format') != INDEX_FORMAT:
+            index = None
+    if index is None:
         bundle = prepare_beir(name, ART / 'datasets')
         index = build_index(bundle)
         save_index(index, idx_path)
@@ -88,19 +97,21 @@ def run_one(name: str, k: int, force: bool) -> dict:
             'qlen_tok': row['qlen_tok'],
             'qlen_uniq': row['qlen_uniq'],
             'sum_idf': row['sum_idf'],
-            'mean_term_corr': row['mean_term_corr'],
+            'mean_term_corr': row.get('mean_term_corr', 0.0),
             'mu_q': row['mu_q'],
             'sd_diag': row['sd_diag'],
-            'sd_full': row['sd_full'],
+            'variance_ratio': row.get('variance_ratio'),
             'n_cand': int(len(row['scores'])),
             'n_rel': int(np.sum(np.asarray(row['rel']) > 0)),
             'top_rel': int(row['rel'][0] > 0) if len(row['rel']) else 0,
-            'top_raw': float(row['scores'][0]) if len(row['scores']) else 0.0,
-            'top_paper': float(row['variants']['paper'][0]) if len(row['scores']) else 0.0,
-            'top_ceiling': float(row['variants']['ceiling'][0]) if len(row['scores']) else 0.0,
-            'top_z_diag': float(row['variants']['z_diag'][0]) if len(row['scores']) else 0.0,
-            'top_I_gauss': float(row['variants']['I_gauss_diag'][0]) if len(row['scores']) else 0.0,
-            'top_surprise': float(row['variants']['surprise'][0]) if len(row['scores']) else 0.0,
+            'top_raw': float(row['scores'][0]) if len(row['scores']) else float('-inf'),
+            'top_power_token_len': float(row['variants']['power_token_len'][0]) if len(row['scores']) else float('-inf'),
+            'top_ceiling': float(row['variants']['ceiling'][0]) if len(row['scores']) else float('-inf'),
+            'top_z_diag': float(row['variants']['z_diag'][0]) if len(row['scores']) else float('-inf'),
+            'top_I_gauss': float(row['variants']['I_gauss_diag'][0]) if len(row['scores']) else float('-inf'),
+            'top_surprise': float(row['variants']['surprise'][0]) if len(row['scores']) else float('-inf'),
+            'variance_ratio': row.get('variance_ratio'),
+            'no_match': bool(row.get('no_match')),
         })
     write_json(RES / f'phase_a_{name}_k{k}_queries.json', qrows)
     return out

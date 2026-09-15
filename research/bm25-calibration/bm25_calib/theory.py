@@ -124,6 +124,38 @@ def pairwise_cov(
     return e_prod - mu_xa * mu_xb
 
 
+def pairwise_cov_x(
+    idx_a: np.ndarray,
+    x_a: np.ndarray,
+    mu_a: float,
+    idx_b: np.ndarray,
+    x_b: np.ndarray,
+    mu_b: float,
+    n_docs: int,
+) -> float:
+    """Cov(X_a, X_b) from precomputed BM25 contributions (same weights as scoring)."""
+    if len(idx_a) == 0 or len(idx_b) == 0:
+        return -mu_a * mu_b
+    i = 0
+    j = 0
+    acc = 0.0
+    na = len(idx_a)
+    nb = len(idx_b)
+    while i < na and j < nb:
+        da = int(idx_a[i])
+        db = int(idx_b[j])
+        if da == db:
+            acc += float(x_a[i]) * float(x_b[j])
+            i += 1
+            j += 1
+        elif da < db:
+            i += 1
+        else:
+            j += 1
+    e_prod = acc / max(int(n_docs), 1)
+    return e_prod - mu_a * mu_b
+
+
 def query_null(
     terms: list[str],
     idf: dict[str, float],
@@ -137,16 +169,20 @@ def query_null(
     mus = []
     vars_ = []
     usable = []
+    del dl_norm, k1
     for t in terms:
         if t not in postings:
             mus.append(0.0)
             vars_.append(0.0)
             continue
-        idx, tf = postings[t]
-        mu, var, u = term_moments_from_posting(tf, idx, dl_norm, idf[t], n_docs, k1=k1)
+        idx, x = postings[t]
+        x = np.asarray(x, dtype=np.float64)
+        n = max(int(n_docs), 1)
+        mu = float(x.sum()) / n
+        var = max(float(np.square(x).sum()) / n - mu * mu, 0.0)
         mus.append(mu)
         vars_.append(var)
-        usable.append((t, idx, u, mu, idf[t], var))
+        usable.append((t, idx, x, mu, idf[t], var))
     mu_q = float(sum(mus))
     v_diag = float(sum(vars_))
     v_full = v_diag
@@ -163,7 +199,7 @@ def query_null(
         for j in range(i + 1, len(cov_terms)):
             t_j, idx_j, u_j, mu_j, idf_j, var_j = cov_terms[j]
             del t_j
-            cov = pairwise_cov(idx_i, u_i, mu_i, idx_j, u_j, mu_j, idf_i, idf_j, n_docs, k1=k1)
+            cov = pairwise_cov_x(idx_i, u_i, mu_i, idx_j, u_j, mu_j, n_docs)
             v_full += 2.0 * cov
             denom = math.sqrt(max(var_i, 0.0) * max(var_j, 0.0))
             if denom > 0:

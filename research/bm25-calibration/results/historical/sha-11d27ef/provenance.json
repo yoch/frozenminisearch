@@ -1,0 +1,68 @@
+{
+  "b": 0.75,
+  "base_attempted": "origin/master",
+  "branch": "cursor/bm25-score-normalization-study-fb5b",
+  "cwd": "/workspace",
+  "extra": {
+    "datasets": [
+      "quora"
+    ],
+    "k": 100,
+    "phase": "A",
+    "skipped": {
+      "datasets": [
+        {
+          "id": "trec-dl-2019",
+          "reason": "needs the full MS MARCO passage corpus; revisit when that dump is local"
+        },
+        {
+          "id": "trec-dl-2020",
+          "reason": "needs the full MS MARCO passage corpus; revisit when that dump is local"
+        }
+      ],
+      "methods": [
+        {
+          "id": "saddlepoint_lugannani_rice",
+          "reason": "per-query posting MGF + Newton is too slow on long queries (ArguAna hung)"
+        },
+        {
+          "id": "chernoff_mgf",
+          "reason": "same MGF cost as saddlepoint"
+        },
+        {
+          "id": "independence_mc_tail",
+          "reason": "sampling all term postings per query is too slow"
+        },
+        {
+          "id": "exact_convolution",
+          "reason": "intractable except on tiny synthetic indexes"
+        },
+        {
+          "id": "pairwise_covariance_z_full",
+          "reason": "O(T^2) posting intersections; skipped in the cheap path"
+        },
+        {
+          "id": "supervised_rlt_choppy_attncut",
+          "reason": "reproduction cost; Meng 2024 already vs fixed-k"
+        },
+        {
+          "id": "cosine_tmp_adapters",
+          "reason": "trained methods, out of scope for a training-free index null"
+        }
+      ],
+      "note": "Skipped items are methods or TREC DL (missing MS MARCO dump). Large BEIR sets keep all documents and subsample queries.",
+      "query_slice": {
+        "corpus": "full",
+        "max_queries": 400,
+        "policy": "seeded query sample without replacement when n_queries > MAX_QUERIES"
+      }
+    }
+  },
+  "git_sha": "11d27ef00f42704090fd329050b20388a0ddff6b",
+  "k1": 1.2,
+  "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
+  "primary_k": 100,
+  "protocol_sha256": "25c933f15e2e054aa07efbcecf786df9587b4d632bf323086930859b4bb0551d",
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "seed": 20260915
+}

@@ -43,3 +43,17 @@ def write_provenance(extra: dict | None = None) -> dict:
     }
     write_json(ROOT / 'results' / 'provenance.json', blob)
     return blob
+
+
+def record_unittest(output: str, extra: dict | None = None) -> dict:
+    blob = {
+        'git_sha': git_sha(),
+        'command': (
+            'PYTHONPATH=research/bm25-calibration '
+            'python -m unittest discover -s research/bm25-calibration/tests -v'
+        ),
+        'output': output[-20000:],
+        **(extra or {}),
+    }
+    write_json(ROOT / 'results' / 'unittest-harness.json', blob)
+    return blob

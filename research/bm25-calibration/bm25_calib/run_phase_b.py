@@ -47,6 +47,9 @@ def main(argv: list[str] | None = None) -> int:
     summary = []
     failures = []
     for name in names:
+        if name in PHASE_B_SKIP:
+            print('SKIP', name, 'PHASE_B_SKIP', flush=True)
+            continue
         print(f'=== phase B {name} ===', flush=True)
         try:
             if backend is None:

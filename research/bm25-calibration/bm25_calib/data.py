@@ -73,17 +73,21 @@ def _read_jsonl_map(path: Path, key: str, fields: tuple[str, ...]) -> dict[str, 
     return out
 
 
-def _read_qrels(path: Path) -> dict[str, dict[str, int]]:
-    qrels: dict[str, dict[str, int]] = {}
+def _read_qrels(path: Path) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
+    judged: dict[str, dict[str, int]] = {}
     with path.open(encoding='utf8') as f:
         reader = csv.DictReader(f, delimiter='\t')
         for row in reader:
             qid = str(row['query-id'])
             did = str(row['corpus-id'])
             score = int(float(row['score']))
-            if score > 0:
-                qrels.setdefault(qid, {})[did] = score
-    return qrels
+            judged.setdefault(qid, {})[did] = score
+    qrels = {
+        qid: {did: g for did, g in grades.items() if g > 0}
+        for qid, grades in judged.items()
+    }
+    qrels = {qid: grades for qid, grades in qrels.items() if grades}
+    return qrels, judged
 
 
 def beir_paths(root: Path, name: str) -> tuple[Path, Path, Path]:
@@ -108,15 +112,16 @@ def beir_paths(root: Path, name: str) -> tuple[Path, Path, Path]:
     return base / 'corpus.jsonl', base / 'queries.jsonl', qrels
 
 
-def load_queries_qrels(queries_path: Path, qrels_path: Path) -> tuple[dict[str, str], dict[str, dict[str, int]]]:
+def load_queries_qrels(queries_path: Path, qrels_path: Path) -> tuple[dict[str, str], dict[str, dict[str, int]], dict[str, dict[str, int]]]:
     queries: dict[str, str] = {}
     with queries_path.open(encoding='utf8') as f:
         for line in f:
             row = json.loads(line)
             queries[str(row['_id'])] = str(row.get('text') or '')
-    qrels = _read_qrels(qrels_path)
+    qrels, judged = _read_qrels(qrels_path)
     queries = {qid: text for qid, text in queries.items() if qid in qrels}
-    return queries, qrels
+    judged = {qid: judged.get(qid, qrels[qid]) for qid in queries}
+    return queries, qrels, judged
 
 
 def pool_cqadupstack(extracted: Path) -> tuple[list[Path], list[Path], list[Path], list[str]]:
@@ -186,12 +191,20 @@ def subsample_queries(
     }
 
 
-def _apply_query_cap(meta: dict, queries: dict[str, str], qrels: dict[str, dict[str, int]]) -> tuple[dict, dict[str, str], dict[str, dict[str, int]]]:
+def _apply_query_cap(
+    meta: dict,
+    queries: dict[str, str],
+    qrels: dict[str, dict[str, int]],
+    judged: dict[str, dict[str, int]] | None = None,
+) -> tuple[dict, dict[str, str], dict[str, dict[str, int]], dict[str, dict[str, int]]]:
     queries, qrels, slice_meta = subsample_queries(queries, qrels)
     meta = {**meta, 'query_slice': {k: v for k, v in slice_meta.items() if k != 'chosen_qids'}}
     if slice_meta.get('subsampled'):
         meta['query_slice']['n_chosen'] = len(slice_meta['chosen_qids'])
-    return meta, queries, qrels
+    if judged is None:
+        judged = qrels
+    judged = {qid: judged.get(qid, qrels[qid]) for qid in queries}
+    return meta, queries, qrels, judged
 
 
 def query_vocab(queries: dict[str, str]) -> tuple[dict[str, list[str]], dict[str, list[str]], set[str]]:
@@ -226,27 +239,32 @@ def prepare_beir(name: str, data_root: Path) -> dict:
         corpora, queries_paths, qrels_paths, forums = pool_cqadupstack(extracted)
         queries: dict[str, str] = {}
         qrels: dict[str, dict[str, int]] = {}
+        judged: dict[str, dict[str, int]] = {}
         for forum, qp, rp in zip(forums, queries_paths, qrels_paths):
-            q, r = load_queries_qrels(qp, rp)
+            q, r, j = load_queries_qrels(qp, rp)
             for qid, text in q.items():
                 queries[f'{forum}:{qid}'] = text
             for qid, rels in r.items():
                 qrels[f'{forum}:{qid}'] = {f'{forum}:{did}': g for did, g in rels.items()}
+            for qid, rels in j.items():
+                judged[f'{forum}:{qid}'] = {f'{forum}:{did}': g for did, g in rels.items()}
         meta['forums'] = forums
-        meta, queries, qrels = _apply_query_cap(meta, queries, qrels)
+        meta, queries, qrels, judged = _apply_query_cap(meta, queries, qrels, judged)
         return {
             'meta': meta,
             'queries': queries,
             'qrels': qrels,
+            'judged': judged,
             'corpus_iter': _iter_many(corpora, forums),
         }
     corpus_path, queries_path, qrels_path = beir_paths(data_root, name)
-    queries, qrels = load_queries_qrels(queries_path, qrels_path)
-    meta, queries, qrels = _apply_query_cap(meta, queries, qrels)
+    queries, qrels, judged = load_queries_qrels(queries_path, qrels_path)
+    meta, queries, qrels, judged = _apply_query_cap(meta, queries, qrels, judged)
     return {
         'meta': meta,
         'queries': queries,
         'qrels': qrels,
+        'judged': judged,
         'corpus_iter': iter_corpus_jsonl(corpus_path),
         'corpus_path': str(corpus_path),
     }
@@ -269,17 +287,21 @@ def _read_tsv_queries(path: Path) -> dict[str, str]:
     return queries
 
 
-def _read_trec_qrels(path: Path) -> dict[str, dict[str, int]]:
-    qrels: dict[str, dict[str, int]] = {}
+def _read_trec_qrels(path: Path) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
+    judged: dict[str, dict[str, int]] = {}
     with path.open(encoding='utf8') as f:
         for line in f:
             parts = line.split()
             if len(parts) < 4:
                 continue
             qid, _, did, rel = parts[0], parts[1], parts[2], int(parts[3])
-            if rel > 0:
-                qrels.setdefault(qid, {})[did] = rel
-    return qrels
+            judged.setdefault(qid, {})[did] = rel
+    qrels = {
+        qid: {did: g for did, g in grades.items() if g > 0}
+        for qid, grades in judged.items()
+    }
+    qrels = {qid: grades for qid, grades in qrels.items() if grades}
+    return qrels, judged
 
 
 def prepare_trec_dl(year: str, data_root: Path, msmarco_corpus_path: str | None) -> dict:
@@ -294,7 +316,7 @@ def prepare_trec_dl(year: str, data_root: Path, msmarco_corpus_path: str | None)
     queries_path = data_root / f'trec-dl-{year}-queries.tsv.gz'
     download(qrels_url, qrels_path)
     download(query_url, queries_path)
-    qrels = _read_trec_qrels(qrels_path)
+    qrels, judged = _read_trec_qrels(qrels_path)
     queries = _read_tsv_queries(queries_path)
     queries = {qid: text for qid, text in queries.items() if qid in qrels}
     meta = {
@@ -304,13 +326,14 @@ def prepare_trec_dl(year: str, data_root: Path, msmarco_corpus_path: str | None)
         'qrels_sha256': sha256_file(qrels_path),
         'queries_sha256': sha256_file(queries_path),
     }
-    meta, queries, qrels = _apply_query_cap(meta, queries, qrels)
+    meta, queries, qrels, judged = _apply_query_cap(meta, queries, qrels, judged)
     if not msmarco_corpus_path:
         raise FileNotFoundError('MS MARCO corpus is required for TREC DL')
     return {
         'meta': meta,
         'queries': queries,
         'qrels': qrels,
+        'judged': judged,
         'corpus_iter': iter_corpus_jsonl(Path(msmarco_corpus_path)),
         'corpus_path': msmarco_corpus_path,
     }

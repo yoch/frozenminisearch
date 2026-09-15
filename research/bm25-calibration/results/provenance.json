@@ -1,0 +1,17 @@
+{
+  "b": 0.75,
+  "base_attempted": "origin/master",
+  "branch": "cursor/bm25-score-normalization-study-fb5b",
+  "cwd": "/workspace",
+  "extra": {
+    "harness_sha": "cbd1e4357da0307f2c300bb3d674f1010a5b1d73",
+    "stage": "pre-phase-a"
+  },
+  "git_sha": "cbd1e4357da0307f2c300bb3d674f1010a5b1d73",
+  "k1": 1.2,
+  "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
+  "primary_k": 100,
+  "protocol_sha256": "5880a8052a4f353b4f33b2d5c758790cd85b953acf2ca48c2f06a0a0fc5dea00",
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "seed": 20260915
+}

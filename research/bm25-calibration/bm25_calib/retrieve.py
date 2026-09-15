@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import pickle
 from collections import defaultdict
 from pathlib import Path
@@ -12,6 +13,8 @@ from .bm25 import idf_lucene, length_norm, term_contributions
 from .config import B, HIGH_DF_DROP_FRACTION, K1, PRIMARY_K
 from .data import iter_corpus_jsonl
 from .data import query_vocab
+from .null import query_term_xs, tails_for_scores
+from .surprise import nqc, surprise_scores, wig_like
 from .text import tokenize
 from .theory import query_null
 
@@ -136,6 +139,11 @@ def retrieve_all(index: dict, k: int = PRIMARY_K, k1: float = K1, b: float = B) 
         qlen_uniq = max(len(terms), 1)
         sum_idf = float(sum(index['idf'].get(t, 0.0) for t in terms))
         null = query_null(terms, index['idf'], index['postings'], dl_norm, index['n_docs'], k1=k1)
+        xs = query_term_xs(terms, index['idf'], index['postings'], dl_norm, k1=k1)
+        tails = tails_for_scores(
+            scores, xs, index['n_docs'], null['mu_q'], null['v_diag'], null['v_full'],
+            n_mc=1500, seed=int(hashlib.md5(qid.encode('utf8')).hexdigest()[:8], 16),
+        )
         out[qid] = {
             'inds': inds,
             'scores': scores,
@@ -144,7 +152,11 @@ def retrieve_all(index: dict, k: int = PRIMARY_K, k1: float = K1, b: float = B) 
             'qlen_uniq': qlen_uniq,
             'sum_idf': sum_idf,
             'n_terms_in_vocab': sum(1 for t in terms if t in index['idf']),
+            'surprise': surprise_scores(scores),
+            'nqc': nqc(scores),
+            'wig': wig_like(scores, null['mu_q'], qlen_tok),
             **null,
+            **tails,
         }
     return out
 

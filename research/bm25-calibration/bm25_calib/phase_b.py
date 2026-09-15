@@ -21,8 +21,8 @@ except ImportError:  # optional Phase B dependency
     AutoTokenizer = None
 
 from .bootstrap import paired_ci
-from .config import BOOTSTRAP_RESAMPLES, OUTER_FOLDS, PRIMARY_K, RERANKER_MODEL, SEED
-from .cv import fold_splits, nested_alpha_choice, relevant_quantile_threshold
+from .config import OUTER_FOLDS, PRIMARY_K, RERANKER_MODEL, SEED
+from .cv import fold_splits
 from .metrics import ranking_metrics
 from .phase_a import GLOBAL_VARIANTS, LOCAL_VARIANTS, _json_default
 
@@ -142,6 +142,41 @@ def query_rerank(
     return metrics
 
 
+FIXED_KS = (5, 10, 20, 30, 50, 75, 100)
+
+
+def baseline_top_docs(qid: str, row: dict, index: dict, ce_by_doc: dict[str, float], n: int = 10) -> list[str]:
+    docids = index['docids']
+    inds = np.asarray(row['inds'])
+    ce = np.array([ce_by_doc.get(docids[int(i)], -1e9) for i in inds], dtype=float)
+    if len(inds) == 0:
+        return []
+    order = np.argsort(ce)[::-1][:n]
+    return [docids[int(inds[j])] for j in order]
+
+
+def _summarize_queries(ndcgs, bases, ns, recs, dropped, mrrs, maps, succs, r10s):
+    ndcgs = np.asarray(ndcgs, dtype=float)
+    bases = np.asarray(bases, dtype=float)
+    ns = np.asarray(ns, dtype=float)
+    return {
+        'ndcg@10': float(ndcgs.mean()) if len(ndcgs) else 0.0,
+        'mrr@10': float(np.mean(mrrs)) if mrrs else 0.0,
+        'map': float(np.mean(maps)) if maps else 0.0,
+        'success@10': float(np.mean(succs)) if succs else 0.0,
+        'recall@10': float(np.mean(r10s)) if r10s else 0.0,
+        'n_candidates_mean': float(ns.mean()) if len(ns) else 0.0,
+        'n_candidates_median': float(np.median(ns)) if len(ns) else 0.0,
+        'n_candidates_p95': float(np.quantile(ns, 0.95)) if len(ns) else 0.0,
+        'candidate_recall': float(np.mean(recs)) if recs else 0.0,
+        'frac_drop_baseline_top10': float(np.mean(dropped)) if dropped else 0.0,
+        'delta_ndcg_ci': paired_ci(ndcgs, bases),
+        'n_queries_loss_gt_005': int(np.sum((ndcgs - bases) < -0.005)),
+        'n_queries_loss_gt_01': int(np.sum((ndcgs - bases) < -0.01)),
+        'worst_delta': float((ndcgs - bases).min()) if len(ndcgs) else 0.0,
+    }
+
+
 def pareto_and_end_to_end(
     packed: dict[str, dict],
     index: dict,
@@ -153,80 +188,46 @@ def pareto_and_end_to_end(
     retain_grid = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1]
     outer = []
     for fold_i, train, test in fold_splits(qids, n_folds=min(OUTER_FOLDS, max(2, len(qids))), seed=seed):
-        alpha = nested_alpha_choice(train, packed, (0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5), seed=seed)
-        methods_fold = methods + [f'power_{alpha:g}']
-        fold = {'fold': fold_i, 'chosen_alpha': alpha, 'methods': {}}
-        # baseline: keep all
-        base_ndcg = []
+        if not train or not test:
+            continue
+        fold = {'fold': fold_i, 'n_train': len(train), 'n_test': len(test), 'methods': {}, 'fixed_k': {}}
+        top10 = {}
         for qid in test:
             m = query_rerank(qid, packed[qid], index, ce_cache.get(qid, {}), None)
-            packed[qid].setdefault('_base', m)
-            base_ndcg.append(m['ndcg@10'])
-        for name in methods_fold:
-            key = name
-            # train thresholds from global score quantiles of ALL train candidates
+            packed[qid]['_base'] = m
+            top10[qid] = baseline_top_docs(qid, packed[qid], index, ce_cache.get(qid, {}), n=10)
+        for kfix in FIXED_KS:
+            ndcgs, bases, ns, recs, dropped, mrrs, maps, succs, r10s = [], [], [], [], [], [], [], [], []
+            for qid in test:
+                row = packed[qid]
+                mask = np.zeros(len(row['inds']), dtype=bool)
+                mask[: min(kfix, len(mask))] = True
+                if not np.any(mask) and len(mask):
+                    mask[0] = True
+                m = query_rerank(qid, row, index, ce_cache.get(qid, {}), mask)
+                ndcgs.append(m['ndcg@10'])
+                bases.append(packed[qid]['_base']['ndcg@10'])
+                ns.append(m['n_candidates'])
+                mrrs.append(m['mrr@10'])
+                maps.append(m['map'])
+                succs.append(m['success@10'])
+                r10s.append(m['recall@10'])
+                flags = np.asarray(row['rel']) > 0
+                recs.append(float(flags[mask].sum() / flags.sum()) if flags.any() else 1.0)
+                kept = {index['docids'][int(i)] for i, keep in zip(row['inds'], mask) if keep}
+                dropped.append(0.0 if set(top10[qid]).issubset(kept) else 1.0)
+            fold['fixed_k'][str(kfix)] = _summarize_queries(ndcgs, bases, ns, recs, dropped, mrrs, maps, succs, r10s)
+        for name in methods:
+            if name not in packed[train[0]]['variants']:
+                continue
             train_scores = []
             for qid in train:
-                train_scores.extend(np.asarray(packed[qid]['variants'][key], dtype=float).tolist())
+                train_scores.extend(np.asarray(packed[qid]['variants'][name], dtype=float).tolist())
             train_scores = np.asarray(train_scores, dtype=float)
             method_res = {'grid': []}
-            test_base = []
-            test_treat = []
-            test_n = []
             for retain in retain_grid:
-                if retain >= 1.0:
-                    th = -np.inf
-                else:
-                    th = float(np.quantile(train_scores, 1.0 - retain))
-                ndcgs = []
-                ns = []
-                recs = []
-                for qid in test:
-                    row = packed[qid]
-                    vals = np.asarray(row['variants'][key], dtype=float)
-                    mask = vals >= th
-                    if not np.any(mask) and len(vals):
-                        mask[0] = True  # never emit an empty ranking; keep BM25 top-1
-                    m = query_rerank(qid, row, index, ce_cache.get(qid, {}), mask)
-                    ndcgs.append(m['ndcg@10'])
-                    ns.append(m['n_candidates'])
-                    flags = np.asarray(row['rel']) > 0
-                    recs.append(float(flags[mask].sum() / flags.sum()) if flags.any() else 1.0)
-                method_res['grid'].append({
-                    'retain_target': retain,
-                    'threshold': th if np.isfinite(th) else None,
-                    'ndcg@10': float(np.mean(ndcgs)),
-                    'n_candidates_mean': float(np.mean(ns)),
-                    'n_candidates_p95': float(np.quantile(ns, 0.95)) if ns else 0.0,
-                    'candidate_recall': float(np.mean(recs)),
-                })
-                if abs(retain - 0.5) < 1e-9:
-                    test_base = [packed[qid]['_base']['ndcg@10'] for qid in test]
-                    test_treat = ndcgs
-                    test_n = ns
-            if test_base:
-                method_res['retain50_vs_baseline'] = paired_ci(
-                    np.array(test_treat), np.array(test_base), n_resamples=min(BOOTSTRAP_RESAMPLES, 20000),
-                )
-                method_res['retain50_n_mean'] = float(np.mean(test_n))
-            fold['methods'][name] = method_res
-        # also relevant-quantile gates 0.95/0.99
-        fold['rel_quantile_gate'] = {}
-        for target in (0.95, 0.99):
-            fold['rel_quantile_gate'][str(target)] = {}
-            for name in methods_fold:
-                rel_scores = []
-                for qid in train:
-                    flags = np.asarray(packed[qid]['rel']) > 0
-                    vals = np.asarray(packed[qid]['variants'][name], dtype=float)
-                    rel_scores.extend(vals[flags].tolist())
-                th = relevant_quantile_threshold(rel_scores, target)
-                ndcgs = []
-                bases = []
-                ns = []
-                recs = []
-                maps = []
-                mrrs = []
+                th = -np.inf if retain >= 1.0 else float(np.quantile(train_scores, 1.0 - retain))
+                ndcgs, bases, ns, recs, dropped, mrrs, maps, succs, r10s = [], [], [], [], [], [], [], [], []
                 for qid in test:
                     row = packed[qid]
                     vals = np.asarray(row['variants'][name], dtype=float)
@@ -237,22 +238,22 @@ def pareto_and_end_to_end(
                     ndcgs.append(m['ndcg@10'])
                     bases.append(packed[qid]['_base']['ndcg@10'])
                     ns.append(m['n_candidates'])
+                    mrrs.append(m['mrr@10'])
+                    maps.append(m['map'])
+                    succs.append(m['success@10'])
+                    r10s.append(m['recall@10'])
                     flags = np.asarray(row['rel']) > 0
                     recs.append(float(flags[mask].sum() / flags.sum()) if flags.any() else 1.0)
-                    maps.append(m['map'])
-                    mrrs.append(m['mrr@10'])
-                fold['rel_quantile_gate'][str(target)][name] = {
-                    'threshold': th if np.isfinite(th) else None,
-                    'ndcg@10': float(np.mean(ndcgs)),
-                    'mrr@10': float(np.mean(mrrs)),
-                    'map': float(np.mean(maps)),
-                    'n_candidates_mean': float(np.mean(ns)),
-                    'n_candidates_p95': float(np.quantile(ns, 0.95)) if ns else 0.0,
-                    'candidate_recall': float(np.mean(recs)),
-                    'delta_ndcg_ci': paired_ci(np.array(ndcgs), np.array(bases)),
-                }
+                    kept = {index['docids'][int(i)] for i, keep in zip(row['inds'], mask) if keep}
+                    dropped.append(0.0 if set(top10[qid]).issubset(kept) else 1.0)
+                method_res['grid'].append({
+                    'retain_target': retain,
+                    'threshold': None if not np.isfinite(th) else th,
+                    **_summarize_queries(ndcgs, bases, ns, recs, dropped, mrrs, maps, succs, r10s),
+                })
+            fold['methods'][name] = method_res
         outer.append(fold)
-    return {'folds': outer, 'model': RERANKER_MODEL}
+    return {'folds': outer, 'model': RERANKER_MODEL, 'fixed_ks': list(FIXED_KS)}
 
 
 def write_json(path: Path, obj) -> None:

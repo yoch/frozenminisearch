@@ -7,7 +7,6 @@ import math
 import numpy as np
 
 from .config import ALPHAS, K1
-from .config import ALPHAS, K1
 
 
 def _safe_std(x: np.ndarray) -> float:
@@ -38,6 +37,11 @@ def variant_names() -> list[str]:
         'z_robust',
         'z_diag',
         'z_full',
+        'I_saddle',
+        'I_gauss_diag',
+        'I_gauss_full',
+        'I_joint_rank',
+        'surprise',
     ]
     names.extend(f'power_{a:g}' for a in ALPHAS)
     return names
@@ -73,6 +77,11 @@ def candidate_variants(raw: np.ndarray, qrow: dict, k1: float = K1) -> dict[str,
         'z_robust': (raw - med) / mad,
         'z_diag': (raw - mu_q) / sd_diag,
         'z_full': (raw - mu_q) / sd_full,
+        'I_saddle': np.asarray(qrow.get('I_saddle', (raw - mu_q) / sd_diag), dtype=float),
+        'I_gauss_diag': np.asarray(qrow.get('I_gauss_diag', (raw - mu_q) / sd_diag), dtype=float),
+        'I_gauss_full': np.asarray(qrow.get('I_gauss_full', (raw - mu_q) / sd_full), dtype=float),
+        'surprise': np.asarray(qrow.get('surprise', np.zeros(len(raw))), dtype=float),
+        'I_joint_rank': np.asarray(qrow.get('I_joint_rank', np.zeros(len(raw))), dtype=float),
     }
     for a in ALPHAS:
         out[f'power_{a:g}'] = raw / (qlen ** a)

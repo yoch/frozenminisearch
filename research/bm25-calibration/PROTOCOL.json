@@ -1,6 +1,7 @@
 {
-  "study_id": "bm25-score-normalization-20260915",
-  "inspired_by": "arXiv:2609.14016v1",
+  "study_id": "bm25-index-null-rlt-20260915",
+  "inspired_by_secondary": "arXiv:2609.14016v1",
+  "central_question": "factorized index-derived BM25 tail probability as training-free RLT before a frozen reranker",
   "base_branch": "master",
   "seed": 20260915,
   "bm25": {
@@ -9,7 +10,7 @@
     "b": 0.75,
     "delta": 0.0,
     "idf": "log(1 + (N - df + 0.5) / (df + 0.5))",
-    "repeated_query_terms": "unique-terms-once (query TF = 1); token multiplicity recorded separately for |q|",
+    "repeated_query_terms": "unique-terms-once (query TF = 1)",
     "zero_score": "never padded into top-K",
     "analyzer": {
       "pattern": "(?u)\\b\\w\\w+\\b",
@@ -20,16 +21,20 @@
   },
   "candidate_k": [50, 100, 200],
   "primary_k": 100,
-  "alphas": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
+  "fixed_k_baselines": [5, 10, 20, 30, 50, 75, 100],
+  "alphas_diagnostic_only": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
+  "primary_endpoint": "nDCG@10 after frozen MiniLM rerank of retained BM25 candidates",
+  "mandatory_rlt_baselines": ["fixed-k", "surprise-EVT", "raw-global-threshold", "list-z"],
+  "not_reimplemented": ["Choppy", "AttnCut", "TMP-Adapter", "Cosine-Adapter"],
+  "not_reimplemented_reason": "Meng et al. SIGIR 2024 already compared them to fixed-k on TREC DL; we treat fixed-k as the method to beat",
   "cv": {
     "outer_folds": 5,
     "inner_folds": 4,
-    "split_unit": "query",
-    "alpha_selection": "inner-fold maximize candidate AUROC; ties break toward more pruning at recall>=0.95"
+    "split_unit": "query"
   },
   "reranker": {
     "primary": "cross-encoder/ms-marco-MiniLM-L-6-v2",
-    "cache_policy": "score full BM25 top-100 once per dataset; reuse for all gating methods"
+    "cache_policy": "score full BM25 top-100 once per dataset; reuse for all truncation policies"
   },
   "noninferiority_ndcg10": [-0.005, -0.01],
   "bootstrap_resamples": 10000

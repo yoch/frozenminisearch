@@ -3,8 +3,12 @@
 Isolated research code. It does **not** change FrozenMiniSearch runtime behavior.
 
 Inspired by Silajev, *TF-IDF and BM25 Are Exact KL Divergences*, arXiv:2609.14016.
-The study is designed to **falsify** the claim that BM25 / (|q|(k1+1)) is a
-theoretically justified, well-calibrated, collection-robust candidate gate.
+The study is designed to **falsify** the claim that a posting-derived
+factorized BM25 tail probability is a useful training-free Ranked List
+Truncation signal in front of a frozen reranker. `BM25/|q|^α` is a
+diagnostic baseline only. Surprise (Bahri et al., SIGIR 2023) and fixed-k
+are mandatory RLT baselines. Choppy/AttnCut are not reimplemented;
+Meng et al. (SIGIR 2024) already showed they rarely beat fixed-k.
 
 ## Protocol
 

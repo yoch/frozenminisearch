@@ -71,8 +71,45 @@ class NormalizeTests(unittest.TestCase):
         }
         variants = candidate_variants(raw, qrow)
         order = np.argsort(-raw)
-        for name, arr in variants.items():
+        monotone = [
+            'raw', 'paper', 'ceiling', 'top_ratio', 'minmax', 'sumnorm',
+            'z_emp', 'z_robust', 'z_diag', 'z_full', 'power_0', 'power_1',
+        ]
+        for name in monotone:
+            arr = variants[name]
             self.assertEqual(np.argsort(-arr).tolist(), order.tolist(), name)
+
+
+class NullTailTests(unittest.TestCase):
+    def test_joint_rank_is_rank_over_n(self):
+        from bm25_calib.null import information, tails_for_scores
+        scores = np.array([9.0, 4.0, 1.0])
+        tails = tails_for_scores(scores, [], n_docs=1000, mu=0.0, var_diag=1.0, var_full=1.0, n_mc=10)
+        np.testing.assert_allclose(tails['p0_joint_rank'], np.array([1, 2, 3]) / 1000.0)
+        self.assertAlmostEqual(tails['I_joint_rank'][0], information(0.001), places=10)
+
+    def test_independence_mc_near_gaussian_for_many_terms(self):
+        from bm25_calib.null import gaussian_tail, independence_mc_tail
+        rng = np.random.default_rng(0)
+        xs = [rng.normal(0.3, 0.2, size=80).clip(0) for _ in range(12)]
+        s = 8.0
+        p_mc = independence_mc_tail(xs, n_docs=500, s=s, n_draw=3000, seed=1)
+        mu = sum(float(x.sum()) / 500 for x in xs)
+        var = sum(float(np.square(x).sum()) / 500 - (float(x.sum()) / 500) ** 2 for x in xs)
+        p_g = gaussian_tail(mu, var, s)
+        self.assertLess(abs(p_mc - p_g), 0.15)
+
+
+class SurpriseSmokeTests(unittest.TestCase):
+    def test_surprise_preserves_weak_order_and_zeros_tiny_lists(self):
+        from bm25_calib.surprise import surprise_scores
+        tiny = np.array([3.0, 2.0, 1.0])
+        self.assertTrue(np.all(surprise_scores(tiny) == 0))
+        rng = np.random.default_rng(0)
+        raw = np.sort(rng.lognormal(0, 0.5, size=80))[::-1]
+        s = surprise_scores(raw)
+        self.assertEqual(len(s), 80)
+        self.assertGreaterEqual(float(s[0]), float(s[-1]) - 1e-9)
 
 
 if __name__ == '__main__':

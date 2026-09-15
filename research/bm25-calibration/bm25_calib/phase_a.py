@@ -19,13 +19,14 @@ GLOBAL_VARIANTS = [
     'ceiling',
     'z_diag',
     'z_full',
+    'I_saddle',
+    'I_gauss_diag',
+    'I_gauss_full',
+    'I_joint_rank',
+    'surprise',
     'power_0',
-    'power_0.25',
     'power_0.5',
-    'power_0.75',
     'power_1',
-    'power_1.25',
-    'power_1.5',
 ]
 
 LOCAL_VARIANTS = ['top_ratio', 'minmax', 'sumnorm', 'z_emp', 'z_robust']

@@ -1,133 +1,134 @@
-# BM25 Cross-Query Score Normalization: A Falsification Study
+# BM25 Index-Derived Null / Ranked List Truncation Study
 
-**Status:** code and protocol frozen on this branch; empirical tables are filled only from JSON artifacts produced by the same commit SHA.  
-**Inspiration:** Ivan Silajev, *TF-IDF and BM25 Are Exact KL Divergences*, arXiv:2609.14016v1 (12 Sep 2026).  
-**This document is not a paper submission.** It records a retrieval study designed to *fail* the hypothesis if the evidence is weak.
+**Recast 2026-09-15.** Query-length powers `BM25/|q|^α` are diagnostic baselines, not the claim.
 
-## Verdict (filled after experiments)
+**Inspiration (secondary):** Silajev, arXiv:2609.14016 — kept only for the KL-representability caveat.
 
-Pending empirical runs on this SHA. Allowed labels:
+**Question:** can a *factorized* background model of BM25, built from posting statistics, produce a cross-query tail probability that truncates the BM25 candidate list before a frozen reranker without a material nDCG@10 loss, and does that beat Surprise and fixed-K?
 
-- **A.** no useful effect
-- **B.** useful heuristic but collection-specific
-- **C.** theoretically supported and robust calibration method
-- **D.** sufficiently novel/strong to justify a dedicated paper or upstream FrozenMiniSearch feature
+## Git provenance (this file is updated after each result commit)
 
-Do not read a positive verdict into the KL representation alone.
+- Remote: `github.com/yoch/frozenminisearch`
+- Default branch: `master` @ `e06eca31874c30071bee4cbccf4814a40bec8b5f`
+- Research branch: `cursor/bm25-score-normalization-study-fb5b`
+- Do not merge, do not open a PR, do not touch `master`.
 
-## 1. Literature and novelty
+## Verdict (filled only from JSON produced by the cited SHA)
 
-### 1.1 What arXiv:2609.14016 actually claims
+Pending re-runs after the RLT/null pivot. Allowed labels:
 
-Silajev shows that the usual TF-IDF term score and the Lucene-style BM25 term score (IDF with the `+1` inside the logarithm) can be *written as* a Kullback–Leibler divergence after one defines events “key token” / “common token” / “verbose document” and sets their probabilities equal to the TF, DF, `k1`, and `b` statistics. The query-level score is the mixture over the empirical query-term distribution:
+- **A.** Already known; no interesting remainder
+- **B.** Useful engineering heuristic
+- **C.** Clean method, limited scientific novelty
+- **D.** Beats modern RLT baselines, preserves downstream quality, original enough for a paper
 
-```
-Score(q, d) = sum_t (q(t)/|q|) * BM25(t, d) / (k1 + 1)
-```
+D requires stronger evidence than query-length calibration anecdotes.
 
-which is `BM25(q, d) / (|q| * (k1+1))` when BM25 is the corresponding weighted sum. The paper contains **no retrieval experiments**, **no calibration study**, and **no reranking cutoff**. Events X, Y, W are acknowledged as *arbitrarily labelled* to match the algebra (Section 3.2).
+---
 
-### 1.2 The representation is not a generative identification
+## 1. Literature (primary sources actually read)
 
-For any finite `s ≥ 0`, set `Q = (1, 0)` and `P = (e^{-s}, 1-e^{-s})`. Then `KL(Q || P) = s` under the `0 log 0 = 0` convention. Proof: the second atom of `Q` has mass 0, and
+### 1.1 Score distributions
 
-```
-KL(Q || P) = 1 * log(1 / e^{-s}) = s.
-```
+**Manmatha, Rath & Feng, SIGIR 2001.** Mixture models (typically Gaussian relevant + exponential non-relevant) fitted to *retrieved* scores for metasearch. Not an index-derived generative model.
 
-Therefore “score s is a KL divergence” is true of **every** non-negative score, including raw BM25, BM25/`|q|`, cosine, and a random positive number. A KL writing becomes a probabilistic *model* only if P and Q are independently meaningful. In the paper they are reverse-engineered from TF/IDF. That is a useful mnemonic, not a uniqueness theorem, and it does **not** by itself justify using `BM25 / |q|` as a probability or as a cross-query threshold.
+**Manmatha & Sever, 2002.** Score normalization via those fitted distributions.
 
-This KL is also **not** the Lafferty–Zhai language-model retrieval model (KL between query and document unigrams with a collection background). Primary sources: Lafferty & Zhai, SIGIR 2001; Zhai & Lafferty, TOIS 2004; the KL-as-bits interpretation in MacKay (2003), cited by Silajev.
+**Nottelmann & Fuhr, 2003.** Map retrieval status values to P(relevance) (logistic/linear calibration). Training/mapping, not a posting-level null.
 
-### 1.3 Prior work that already covers pieces of the hypothesis
+**Arampatzis, Kamps & Robertson, SIGIR 2009, “Where to Stop Reading a Ranked List?”** Rank cutoff as score-distributional thresholding. Truncated normal–exponential mixtures; F1@K on TREC Legal. Null/relevant densities are fitted on the **output list**, not computed from inverted-index postings.
 
-**BM25 itself.** Robertson, Walker, Jones, Hancock-Beaulieu, Gatford, *Okapi at TREC-3* (1994). Robertson & Zaragoza, *The Probabilistic Relevance Framework: BM25 and Beyond* (FnTIR 2009). IDF with the 0.5 correction and the `k1` saturation come from the 2-Poisson / RSJ programme. Query-length averaging is **not** part of the classical RSJ derivation: BM25 is a sum of term weights, i.e. a log-odds *sum*, not a per-token mean.
+**Kanoulas, Dai, Pavlu & Aslam, SIGIR 2010.** *This is the closest ancestor.* They start from a Poisson-process assumption on term occurrences, transform TF/DL through BM25 (and LM), and **derive an analytical score distribution** for retrieved documents; Gamma is a workable approximation; term independence is used when summing. Purpose: describe relevant vs non-relevant score *shapes*, not a training-free p-value for neural rerank truncation.
 
-**Document-length (not query-length) normalization.** Singhal, Buckley, Mitra, *Pivoted document length normalization* (SIGIR 1996). BM25’s `b` already implements a document-length pivot. Query length is a different axis.
+**Arampatzis & van Hameren:** CLT → Gaussian for relevant scores as |q| grows; not for non-relevant.
 
-**TF-IDF as information / PMI-like quantity.** Aizawa, *An information-theoretic perspective of tf-idf measures* (IP&M 2003). Church & Hanks, *Word association norms, mutual information, and lexicography* (Computational Linguistics 1990) for PMI. IDF is (approximately) self-information of document occurrence, `-log DF/N`. That interpretation predates Silajev and does not require a KL-of-reverse-engineered-events construction.
+### 1.2 QPP / 1/sqrt(|q|) / variance
 
-**Cross-query / inter-system score calibration.** Raw engine scores are not probabilities and are not comparable across queries or systems. Standard fusion normalizers: min-max, sum, z-score (Montague & Aslam, *Relevance score normalization for metasearch*, CIKM 2001; see also Lee 1997 on combining results). These local transforms are ranking-equivalent *within* a query and exist specifically to make scores comparable *across* lists. Using them as BM25 candidate gates is an application of an old idea.
+**Zhou & Croft, SIGIR 2007 (WIG).** Weighted information gain: average top-document LM score minus collection score, with **λ ∝ 1/sqrt(|features|)** so that the predictor is comparable across query lengths. Collection-background comparison + query-length scaling is **already standard QPP**, not a 2026 idea.
 
-**Query performance prediction from score distributions.** Cronen-Townsend, Zhou, Croft, *Predicting query performance* (SIGIR 2002, Clarity). Shtok, Kurland, Carmel, *Query performance prediction using reference lists* / NQC (normalized query commitment: variance of retrieval scores). WIG (weighted information gain, Zhou & Croft). These methods already treat the shape of BM25/LM score lists as a calibration / hardness signal. Empirical z-scores and top-ratio in this study are close relatives of NQC-style features.
+**NQC (Shtok, Kurland, Carmel, …).** Normalized standard deviation of retrieval scores as a post-retrieval QPP signal. Local list variance, not a corpus MGF.
 
-**Candidate pruning before neural reranking.** Production pipelines are BM25/SPLADE top-k → cross-encoder (Nogueira & Cho, *Passage Re-ranking with BERT*, 2019; Nogueira, Yang, Cho, Lin, *Document ranking with a pretrained sequence-to-sequence model*). Dynamic pruning of the *inverted-index traversal* (WAND, Block-Max WAND) is a different problem (Ding & Suel 2011; Dimopoulos, Ntoulas, etc.). Adaptive cutoffs / rank-list truncation: work on “how many documents to rerank” and cutoff prediction (e.g. Culpepper/Mackenzie-style efficiency papers; Lien, Zamani, and others on truncation). A global BM25 threshold as a rerank gate is the cheap special case of cutoff prediction with a one-dimensional score.
+Clarity (Cronen-Townsend, Zhou, Croft, SIGIR 2002) is a different KL: query LM vs collection LM.
 
-**Novelty assessment.** The algebraic KL writing for Lucene BM25 appears to be Silajev’s contribution and, as a *representation*, is not claimed as new retrieval effectiveness. Using `BM25 / |q|^α` or a corpus-null Z-score as a **cross-query gate in front of a frozen reranker** is an empirical question. Close ancestors exist (score fusion z-scores, QPP, cutoff prediction). We do **not** treat the idea as unpublished physics. If experiments fail, the right report is “the representation does not yield a robust gate,” not “KL theory was refuted.”
+### 1.3 Ranked list truncation / reranking cost
 
-## 2. Theoretical derivation used in the experiments
+**BiCut (Lien et al., 2019), Choppy (Bahri et al., 2020), AttnCut (Wu et al., 2021), MtCut, LeCut.** Supervised cutoff predictors (BiLSTM / Transformer) on list features. Need labels.
 
-### 2.1 Paper normalization
+**Bahri, Zheng, Tay, Metzler, Tomkins, SIGIR 2023 / arXiv:2010.09797, Surprise.** GPD on the **returned list’s excesses** (Pickands–Balkema–de Haan). Score `−log(1−GPD.cdf)` is a p-value-like *surprise under the list tail*, not under a random corpus document. Greedy Cramér–von Mises chooses the GPD sample. Two settings: local neighborhood vs global threshold on surprise. **Mandatory baseline.**
 
-With unique query terms scored once (documented protocol; query TF = 1):
+**Meng, Arabzadeh, Askari, Aliannejadi, de Rijke, SIGIR 2024.** RLT for retrieve-then-rerank (BM25/SPLADE/RepLLaMA × RankLLaMA/monoT5) on **TREC DL 19/20**. Central empirical finding we take as given unless we contradict it on our SHA: **fixed-k often matches supervised RLT on the cost/nDCG frontier**; Surprise on BM25→RankLLaMA kept ~700 of 1000 candidates (barely truncates). We therefore treat **fixed-k as the method to beat**, and we do **not** reimplement Choppy/AttnCut (Meng already did; they rarely dominate fixed-k).
 
-```
-paper(q, d) = BM25(q, d) / (|q|_tokens * (k1 + 1))
-```
+**Rossi et al., 2024, Cosine Adapter (arXiv:2408.04887).** Learned query-dependent map from cosine to a calibrated score, then a **global threshold**. Trained, embedding-specific.
 
-`k1+1` is constant across documents and queries in a run, so threshold orderings coincide with `BM25 / |q|` (`α = 1` in the power family). We still report the paper scaling so numbers match the formula.
+**TMP Adapter, ACL Findings 2025.** Threshold-margin penalty on top of adapter-style calibration. Trained.
 
-Power family, **not** tuned on the evaluation fold:
+Recent downstream-QPP / ECIR 2026 work is noted as context: QPP that does not improve a *downstream* decision is not a success. Our downstream decision is rerank truncation.
 
-```
-power_α = BM25 / |q|^α,   α ∈ {0, 0.25, 0.5, 0.75, 1, 1.25, 1.5}
-```
+### 1.4 Metasearch z-scores
 
-`α = 0` is raw BM25. Nested CV selects α on inner query folds.
+Montague & Aslam, CIKM 2001: min-max / z-score / sum normalization for fusion. Ranking-equivalent within a list.
 
-### 2.2 Ceiling ratio
+### 1.5 Silajev KL (now secondary)
 
-Each term contribution is at most `(k1+1) IDF_t` (saturation → 1, no BM25+ delta). Hence
+Any s ≥ 0 is KL(Q||P) for Q=(1,0), P=(e^{-s}, 1−e^{-s}). Representability is not identification. We stop testing “the paper’s KL” as a retrieval hypothesis.
 
-```
-ceiling(q, d) = BM25(q, d) / ((k1+1) * sum_t IDF_t)
-```
+### 1.6 What is already known vs what might remain
 
-is a [0, 1]-valued “fraction of a query-specific upper bound”. Unlike `|q|`, it tracks information mass rather than token count.
+| Idea | Status |
+|---|---|
+| BM25 / \|q\| or / \|q\|^α | Old; WIG already uses 1/sqrt(\|q\|) |
+| Z-score of a list | Metasearch / NQC |
+| Score-distribution cutoff | Manmatha, Arampatzis 2009 |
+| Analytical BM25 score law from TF/DL | **Kanoulas et al. 2010** |
+| Dynamic cutoff / RLT | Large 2019–2025 literature |
+| EVT p-value on the **result list** | **Surprise 2023** |
+| Learned global threshold | Cosine/TMP adapters |
+| Exact corpus CDF p0 = rank/N | Rank statistic; **cannot** cross-calibrate top-k |
 
-### 2.3 Corpus-null standardization
+**Not already packaged as a 2026 “new IR model”:** posting-empirical **factorized** tail `P_indep(sum X_t ≥ s)` (Gaussian / Chernoff / saddlepoint / MC) used as a **training-free RLT signal** in front of a frozen cross-encoder, compared to Surprise and fixed-k, with non-inferiority on nDCG@10.
 
-Let `X_t(D) = (k1+1) IDF_t u_t(D)` with `u_t = tf / (tf + k1(1-b+b dl/avgdl))` on the posting and `0` elsewhere. For `D` uniform on the collection:
+That is an **engineering combination**. Kanoulas already assumed independence and derived BM25 laws; Surprise already produces list-tail p-values. If we do not beat fixed-k **and** remain competitive with Surprise on the Pareto curve, the honest verdict is **A or B**.
 
-```
-μ_t = E[X_t],   v_t = Var(X_t)
-μ_q = sum_t μ_t
-v_q^diag = sum_t v_t
-Z_diag(q, d) = (BM25(q, d) − μ_q) / sqrt(v_q^diag)
-```
+### 1.7 Critical modeling distinction (must not be fudged)
 
-Pairwise `Cov(X_t, X_u)` from posting intersections (documents lacking a term contribute 0). If `|q| > 12` unique terms, covariance is computed on the 12 highest-IDF terms (documented approximation; needed for ArguAna-length queries).
+Let S_q(D) be BM25 for a uniform corpus document.
 
-**Scaling prediction.** If term contributions are i.i.d. with finite variance, `sd(BM25) ∼ sqrt(|q|)`. Positive dependence pushes the effective exponent toward 1. We test whether nested-CV α tracks mean pairwise term correlation, rather than assuming α = 1/2 or α = 1.
+- **Joint empirical null:** p0 = |{d' : S(d') ≥ s}| / N. For the r-th unique top-k hit, p0 = r/N. Every query’s top-1 has the same p0. **Negative control.**
+- **Factorized null:** X_t iid from empirical term marginals (zeros + postings). S_ind is **not** the BM25 histogram. Gaussian/saddlepoint p-values can differ across queries. This is the only index-derived tail that *could* be a cross-query signal.
+- **Surprise null:** tail of the returned list (conditional excess). Different reference measure, typically cheaper, no postings required.
 
-**Local nulls.** Per-query min-max, sum, top-ratio, empirical z-score, and median/MAD robust z use only the retrieved candidate list (or that list’s top score). They are ranking-equivalent within a query. Comparing them to `Z_diag` asks whether the *whole-corpus* null is the right reference, or whether a match-conditioned / retrieved-set null is enough (NQC-like).
+---
 
-**All listed transforms are ranking-equivalent within a query** (query-level scale/shift). They cannot improve in-query BM25 ranking. They can only change *cross-query* comparability and therefore global thresholds. That is the only mechanism by which they could reduce rerank cost.
+## 2. Protocol (RLT-first)
 
-### 2.4 FrozenMiniSearch vs this scorer
+- BM25: Lucene-like, k1=1.2, b=0.75, unique query terms, tokenizer `(?u)\b\w\w+\b`, no stemming/stopwords, no zero padding.
+- Primary K=100. Nested query CV. Seed 20260915.
+- Document scores: raw, paper/power-α (diagnostic), ceiling, local z/minmax/sum/top, Z_diag, Z_full, I_saddle, I_gauss, Surprise, I_joint (negative control).
+- **Primary endpoint:** nDCG@10 of frozen `cross-encoder/ms-marco-MiniLM-L-6-v2` on retained candidates vs rerank-all-100. Cache CE scores once.
+- **Mandatory baselines:** fixed k ∈ {5,10,20,30,50,75,100}; Surprise; local list z; raw global threshold.
+- Non-inferiority: ΔnDCG@10 ≥ −0.005 and −0.01, paired bootstrap ≥ 10k.
+- Candidate recall is intermediate only.
+- Choppy/AttnCut: not reimplemented; Meng 2024 is the reference.
 
-FrozenMiniSearch / MiniSearch 7 uses BM25+ with default `{k: 1.2, b: 0.7, d: 0.5}`. This study’s primary scorer is Lucene-like BM25 with `k1=1.2, b=0.75, d=0` so that BEIR/Pyserini comparisons remain meaningful. Sensitivity runs (documented in results JSON when executed) vary `k1/b` on cheap collections.
+---
 
-## 3. Data and protocol
+## 3. Empirical results
 
-Public BEIR dumps from
-`https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{name}.zip`
-with SHA-256 of each zip recorded at download time. Qrels: `test.tsv` (or `dev.tsv` for MS MARCO). CQADupStack is pooled across forums with `forum:` prefixes. TREC DL 2019/2020, if the MS MARCO corpus is obtained, use NIST qrels.
+Filled from `research/bm25-calibration/results/*.json` after jobs on the **same** SHA. Missing datasets are failures, not silent drops.
 
-Tokenizer: `(?u)\b\w\w+\b`, lowercase, no stemming, no stoplist. Top-K ∈ {50,100,200}; primary K=100; **no zero-score padding**. Nested 5×4 query CV; seed `20260915`. α, thresholds, and Platt scaling are fit on training queries only. Leave-one-dataset-out tests any “universal α”.
+## 4. Answers demanded by the recast
 
-Reranker: `cross-encoder/ms-marco-MiniLM-L-6-v2`. Scores for the full BM25 top-100 are cached once; gating reuses them. Primary endpoint: nDCG@10 vs the “rerank all 100” baseline, paired bootstrap (≥10k resamples when cheap), non-inferiority margins −0.005 and −0.01. Candidate recall is secondary.
-
-Phase B collections (planned): SciFact, NFCorpus, FiQA, ArguAna, TREC-COVID, Touché-2020, plus TREC DL if feasible. ArguAna is retained on purpose as a semantic/adversarial counterexample (counter-argument relevance).
-
-## 4–7. Empirical sections
-
-Filled from `research/bm25-calibration/results/*.json` after the corresponding jobs actually finish on this SHA. If a dataset is missing, the failure is recorded rather than dropped.
-
-## 8. Preliminary branch (not evidence)
-
-`research/bm25-kl-calibration-20260915` @ `8aaf0a9671234a4fd3debb41239e103b8d1bd6bf` ran four BEIR sets in GitHub Actions with a single 5-fold gate and no reranker. Useful as a smoke test of the BEIR download path; **not** used as a result in the verdict.
+1. Does an index-derived null already exist? **Yes, in essence (Kanoulas 2010; WIG collection baseline).**
+2. Best P0 approximation? *pending*
+3. Is independence OK? *pending (var_full vs var_diag, MC vs Gaussian)*
+4. Is Z enough vs saddlepoint/EVT? *pending*
+5. Is the tail better calibrated across queries? *pending*
+6. Beat Surprise? *pending*
+7. Beat fixed-k? *pending — Meng suggests this is hard*
+8. Cut rerank cost without nDCG loss? *pending*
+9. Transfer across collections? *pending*
+10. Paper-worthy? Default **no** until 6–8 are clearly yes.
 
 ## Provenance
 
-See `results/provenance.json` (written by the experiment runner).
+See `results/provenance.json`.

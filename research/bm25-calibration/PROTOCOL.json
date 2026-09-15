@@ -1,0 +1,36 @@
+{
+  "study_id": "bm25-score-normalization-20260915",
+  "inspired_by": "arXiv:2609.14016v1",
+  "base_branch": "master",
+  "seed": 20260915,
+  "bm25": {
+    "variant": "lucene-like-positive-idf",
+    "k1": 1.2,
+    "b": 0.75,
+    "delta": 0.0,
+    "idf": "log(1 + (N - df + 0.5) / (df + 0.5))",
+    "repeated_query_terms": "unique-terms-once (query TF = 1); token multiplicity recorded separately for |q|",
+    "zero_score": "never padded into top-K",
+    "analyzer": {
+      "pattern": "(?u)\\b\\w\\w+\\b",
+      "lowercase": true,
+      "stemming": false,
+      "stopwords": false
+    }
+  },
+  "candidate_k": [50, 100, 200],
+  "primary_k": 100,
+  "alphas": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
+  "cv": {
+    "outer_folds": 5,
+    "inner_folds": 4,
+    "split_unit": "query",
+    "alpha_selection": "inner-fold maximize candidate AUROC; ties break toward more pruning at recall>=0.95"
+  },
+  "reranker": {
+    "primary": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "cache_policy": "score full BM25 top-100 once per dataset; reuse for all gating methods"
+  },
+  "noninferiority_ndcg10": [-0.005, -0.01],
+  "bootstrap_resamples": 10000
+}

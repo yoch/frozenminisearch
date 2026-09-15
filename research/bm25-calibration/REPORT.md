@@ -10,16 +10,18 @@
 
 - Remote: `github.com/yoch/frozenminisearch`
 - Default branch: `master` @ `e06eca31874c30071bee4cbccf4814a40bec8b5f`
-- Research branch: `cursor/bm25-score-normalization-study-fb5b` @ `bdae3468e9b214d06d8edfe5156ff8c5eb9d89c2`
+- Research branch: `cursor/bm25-score-normalization-study-fb5b` @ `526215bb6a113deeea74642d33bcfe1f8151cad2`
 - Tracking PR (do not merge): https://github.com/yoch/frozenminisearch/pull/15
 - Do not merge, do not touch `master`.
-- Historical Phase A JSON: `results/historical/sha-11d27ef/` (obsolete; nDCG IDCG, P@k, Spearman, cache, retrieval).
+- Historical Phase A JSON: `results/historical/sha-11d27ef/` (obsolete).
 
-## Verdict (filled only from JSON produced by the cited SHA)
+## Verdict (SHA `526215b`)
 
-**VOID.** The previous Phase A label (SHA `ace100d` / `11d27ef`) was produced by a harness whose IR metrics, cache, and retrieval path are not trustworthy. No new scientific verdict until a rerun on a corrected SHA.
+**STOP.** Corrected-harness Phase A reproduces the old qualitative picture (`Z_diag` destandardizes `|q|`; SciFact/ArguAna gates look tighter). Phase B on TREC-COVID / SciFact / FiQA does **not** show a practical downstream win vs **fixed-K**. Official nested-CV `Z_diag` never satisfies `lo_95CI(ΔnDCG@10) > -0.005` (nor `> -0.01`). Surprise truncates more; fixed-K is the policy to keep if anything. Do not invest in NFCorpus / TREC DL / more methods.
 
-Allowed labels:
+Campaign JSON: `results/phase_a_*_k100.json`, `results/phase_b_{trec-covid,scifact,fiqa}.json`.
+
+Allowed labels (not used; investigation closed):
 
 - **A.** Already known; no interesting remainder
 - **B.** Useful engineering heuristic

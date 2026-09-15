@@ -1,0 +1,26 @@
+{
+  "failures": [],
+  "ok": [
+    {
+      "dataset": "trec-covid",
+      "folds": 5,
+      "seconds": 136.48975801467896
+    },
+    {
+      "dataset": "scifact",
+      "folds": 5,
+      "seconds": 804.5202140808105
+    },
+    {
+      "dataset": "fiqa",
+      "folds": 5,
+      "seconds": 1028.0430283546448
+    }
+  ],
+  "skipped": [
+    {
+      "id": "arguana",
+      "reason": "document-length queries; MiniLM CPU cost"
+    }
+  ]
+}

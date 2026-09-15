@@ -10,7 +10,7 @@
 
 - Remote: `github.com/yoch/frozenminisearch`
 - Default branch: `master` @ `e06eca31874c30071bee4cbccf4814a40bec8b5f`
-- Research branch: `cursor/bm25-score-normalization-study-fb5b` (HEAD cited in git after each harness/result commit)
+- Research branch: `cursor/bm25-score-normalization-study-fb5b` @ `bdae3468e9b214d06d8edfe5156ff8c5eb9d89c2`
 - Tracking PR (do not merge): https://github.com/yoch/frozenminisearch/pull/15
 - Do not merge, do not touch `master`.
 - Historical Phase A JSON: `results/historical/sha-11d27ef/` (obsolete; nDCG IDCG, P@k, Spearman, cache, retrieval).

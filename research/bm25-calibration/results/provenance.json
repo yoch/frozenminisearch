@@ -7,9 +7,10 @@
     "historical": "results/historical/sha-11d27ef",
     "note": "No new Phase A/B campaign. Previous JSON is obsolete.",
     "phase": "harness-correction",
+    "smoke": "results/harness_smoke.json",
     "unittest": "research/bm25-calibration/results/unittest-harness.json"
   },
-  "git_sha": "11d27ef00f42704090fd329050b20388a0ddff6b",
+  "git_sha": "bdae3468e9b214d06d8edfe5156ff8c5eb9d89c2",
   "k1": 1.2,
   "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
   "primary_k": 100,

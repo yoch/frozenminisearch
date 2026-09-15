@@ -84,23 +84,31 @@ def ranking_metrics(ranked_rels: np.ndarray, ideal_rels: np.ndarray, k: int = 10
     }
 
 
+def _finite_scores(s: np.ndarray) -> np.ndarray:
+    """sklearn rejects ±inf; no-match top-1 uses -inf as an explicit miss."""
+    s = np.asarray(s, dtype=float)
+    return np.clip(s, -1e300, 1e300)
+
+
 def safe_auroc(y: np.ndarray, s: np.ndarray) -> float | None:
     y = np.asarray(y).astype(int)
     if len(set(y.tolist())) < 2:
         return None
-    return float(roc_auc_score(y, s))
+    return float(roc_auc_score(y, _finite_scores(s)))
 
 
 def safe_ap(y: np.ndarray, s: np.ndarray) -> float | None:
     y = np.asarray(y).astype(int)
     if int(y.sum()) == 0:
         return None
-    return float(average_precision_score(y, s))
+    return float(average_precision_score(y, _finite_scores(s)))
 
 
 def spearman(x, y) -> float | None:
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
+    x = np.clip(x, -1e300, 1e300)
+    y = np.clip(y, -1e300, 1e300)
     if len(x) != len(y) or len(x) < 3:
         return None
     if np.unique(x).size < 2 or np.unique(y).size < 2:

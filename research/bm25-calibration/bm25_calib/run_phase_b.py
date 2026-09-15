@@ -13,7 +13,7 @@ from .config import MAX_QUERIES, PHASE_B_DATASETS, PHASE_B_SKIP, PRIMARY_K, RERA
 from .phase_a import flatten_candidates, write_json
 from .phase_b import load_cross_encoder, pareto_and_end_to_end, score_and_cache
 from .retrieve import load_candidate_texts, load_index, retrieve_all
-from .run_phase_a import ART, RES, run_one
+from .run_phase_a import ART, RES, index_cache_path, run_one
 
 
 def run_one_b(name: str, force: bool, backend=None) -> dict:
@@ -22,8 +22,7 @@ def run_one_b(name: str, force: bool, backend=None) -> dict:
         return json.loads(out_path.read_text(encoding='utf8'))
     t0 = time.time()
     run_one(name, PRIMARY_K, force=False)
-    idx_path = ART / 'indexes' / f'{name}_qcap{MAX_QUERIES}.pkl'
-    index = load_index(idx_path)
+    index = load_index(index_cache_path(name))
     retrieved = retrieve_all(index, k=PRIMARY_K)
     packed = flatten_candidates(retrieved)
     texts = load_candidate_texts(index, retrieved)

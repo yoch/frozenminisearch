@@ -173,6 +173,26 @@ describe('aggregateTerm', () => {
     expect(resolves).toBe(1)
   })
 
+  test.each([0, 1024, 5000])('builds identical match objects at derived term ordinal %i', (ordinal) => {
+    const fieldTermData = mapPostings(0, [[0, 1], [1, 1]])
+    const run = derivedTerm => aggregateTerm(
+      'src', derivedTerm, 1, 1,
+      fieldTermData, fieldBoosts, makeContext(),
+      undefined, defaultBM25params, new Map(), undefined, ordinal,
+    )
+    for (const term of ['derived', '42', 'constructor', 'toString']) {
+      const match = run(term).get(0).match
+      expect(Object.getPrototypeOf(match)).toBe(Object.prototype)
+      expect(Object.keys(match)).toEqual([term])
+      expect(Object.hasOwn(match, term)).toBe(true)
+      expect(match[term]).toEqual(['text'])
+    }
+    const protoMatch = run('__proto__').get(0).match
+    expect(Object.getPrototypeOf(protoMatch)).toBe(Object.prototype)
+    expect(Object.keys(protoMatch)).toEqual(['__proto__'])
+    expect(Object.getOwnPropertyDescriptor(protoMatch, '__proto__').value).toEqual(['text'])
+  })
+
   test('scores segment postings via allowed-docs seek path', () => {
     const docIds = new Uint32Array(10_000)
     const freqs = new Uint8Array(10_000)

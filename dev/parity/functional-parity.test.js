@@ -235,6 +235,37 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expectSameResults(mutable, frozen, 'neur', { prefix: true, fuzzy: 0.3 })
   })
 
+  test('prefix and fuzzy queries with thousands of derived terms', () => {
+    const wideDocs = Array.from({ length: 1500 }, (_, i) => ({
+      id: i,
+      title: `pre${i} pre${(i * 7) % 3000}`,
+      text: `pre${i + 1500} pro${i % 40} pre${i}`,
+    }))
+    const wideOptions = { fields: ['title', 'text'] }
+    const wideMutable = new MiniSearch(wideOptions)
+    wideMutable.addAll(wideDocs)
+    const wideFrozen = frozenFromMiniSearch(FrozenMiniSearch, wideMutable, wideOptions)
+    // Near-tied scores (Float32 avgFieldLength) may swap places, so compare per document.
+    const expectSameResultsById = (query, searchOptions) => {
+      const byId = results => new Map(results.map(r => [r.id, r]))
+      const a = byId(wideMutable.search(query, searchOptions))
+      const b = byId(wideFrozen.search(query, searchOptions))
+      expect([...b.keys()].sort()).toEqual([...a.keys()].sort())
+      for (const [id, expected] of a) {
+        const actual = b.get(id)
+        expect(actual.score).toBeCloseTo(expected.score, 6)
+        expect(actual.match).toEqual(expected.match)
+        expect([...actual.terms].sort()).toEqual([...expected.terms].sort())
+        expect(actual.queryTerms).toEqual(expected.queryTerms)
+      }
+      return a.size
+    }
+    expect(expectSameResultsById('pre', { prefix: true })).toBe(1500)
+    expectSameResultsById('pre pro', { prefix: true })
+    expectSameResultsById('pre1 pro', { prefix: true, combineWith: 'AND' })
+    expectSameResultsById('pre12', { fuzzy: 2 })
+  })
+
   test('explicit weights parity', () => {
     expectSameResults(mutable, frozen, 'neur', {
       prefix: true,

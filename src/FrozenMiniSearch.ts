@@ -14,6 +14,10 @@ import FrozenMiniSearchCore, {
 } from './FrozenMiniSearchCore'
 import { type FrozenIndexBuilder } from './frozenBuild'
 
+function asBuffer(bytes: Buffer | Uint8Array): Buffer {
+  return Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+}
+
 /** Build a read-only Node index in one pass from documents. */
 export function buildFrozenFromDocuments<T>(documents: readonly T[], options: Options<T>): FrozenMiniSearch<T> {
   return frozenFromDocumentsWithCtor(FrozenMiniSearch, documents, options)
@@ -36,7 +40,8 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   }
 
   /** Load a frozen binary snapshot. */
-  static loadBinarySync<T>(buffer: Buffer, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
+  static loadBinarySync<T>(bytes: Buffer | Uint8Array, options: Options<T> = {} as Options<T>): FrozenMiniSearch<T> {
+    const buffer = asBuffer(bytes)
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = decodeFrozenSnapshot(buffer, { storeFields })
     return FrozenMiniSearch._fromBinarySnapshot(snap, options, buffer)
@@ -44,9 +49,10 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
 
   /** Load a frozen binary snapshot with streaming decompression when needed (bounded memory). */
   static async loadBinaryAsync<T>(
-    buffer: Buffer,
+    bytes: Buffer | Uint8Array,
     options: Options<T> = {} as Options<T>,
   ): Promise<FrozenMiniSearch<T>> {
+    const buffer = asBuffer(bytes)
     const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = await decodeFrozenSnapshotAsync(buffer, { storeFields })
     return FrozenMiniSearch._fromBinarySnapshot(snap, options, buffer)

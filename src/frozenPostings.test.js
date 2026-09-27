@@ -183,7 +183,6 @@ function makeCollectContext(fieldIds, documentCount = 10) {
     fieldIds,
     getFieldLength: () => 5,
     getExternalId: docId => docId,
-    resolveTermByIndex: () => '',
     getStoredFields: () => undefined,
   }
 }

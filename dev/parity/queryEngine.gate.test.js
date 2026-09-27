@@ -25,6 +25,23 @@ function buildEngines() {
   return { mutable, frozen }
 }
 
+/** Count prefix/fuzzy derived-term materializations (cursor `term()` calls) during search. */
+function countDerivedTermResolves(index, onResolve) {
+  const wrapCursor = cursor => ({
+    term() {
+      onResolve()
+      return cursor.term()
+    },
+  })
+  const visitPrefixRefs = index.visitPrefixRefs.bind(index)
+  index.visitPrefixRefs = (prefix, visit) =>
+    visitPrefixRefs(prefix, (termIndex, length, cursor) => visit(termIndex, length, wrapCursor(cursor)))
+  const visitFuzzyRefs = index.visitFuzzyRefs.bind(index)
+  index.visitFuzzyRefs = (term, maxDistance, visit) =>
+    visitFuzzyRefs(term, maxDistance, (termIndex, length, distance, cursor) =>
+      visit(termIndex, length, distance, wrapCursor(cursor)))
+}
+
 function sortedIds(results) {
   return results.map(r => r.id).sort((a, b) => a - b)
 }
@@ -323,12 +340,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
 
       const patchCounter = (frozen) => {
         let count = 0
-        const index = frozenTermIndex(frozen)
-        const original = index.termByIndex.bind(index)
-        index.termByIndex = (termIndex) => {
-          count++
-          return original(termIndex)
-        }
+        countDerivedTermResolves(frozenTermIndex(frozen), () => { count++ })
         return () => count
       }
 
@@ -358,12 +370,7 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: true } })
 
       let resolveCount = 0
-      const index = frozenTermIndex(frozen)
-      const original = index.termByIndex.bind(index)
-      index.termByIndex = (termIndex) => {
-        resolveCount++
-        return original(termIndex)
-      }
+      countDerivedTermResolves(frozenTermIndex(frozen), () => { resolveCount++ })
 
       frozen.search('zen exclude', { combineWith: 'AND_NOT', prefix: true })
 

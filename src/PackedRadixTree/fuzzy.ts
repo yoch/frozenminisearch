@@ -2,7 +2,8 @@
 import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import type PackedRadixTree from './PackedRadixTree'
-import type { PackedFuzzyRef } from './types'
+import type { PackedTermPath } from './termPath'
+import type { PackedFuzzyRef, PackedTermCursor } from './types'
 
 export function packedRadixFuzzyRefs(
   tree: PackedRadixTree,
@@ -16,7 +17,7 @@ export function packedRadixVisitFuzzyRefs(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
-  visit: (termIndex: number, length: number, distance: number) => void,
+  visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
 ): void {
   if (maxDistance < 0) return
 
@@ -30,17 +31,24 @@ export function packedRadixVisitFuzzyRefs(
   const queryCodes = new Uint16Array(n)
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
-  visitRecurse(
-    tree,
-    queryLen,
-    queryCodes,
-    maxDistance,
-    matrix,
-    1,
-    0,
-    0,
-    visit,
-  )
+  const path = tree.termPaths.acquire('')
+  try {
+    visitRecurse(
+      tree,
+      queryLen,
+      queryCodes,
+      maxDistance,
+      matrix,
+      1,
+      0,
+      0,
+      0,
+      path,
+      visit,
+    )
+  } finally {
+    tree.termPaths.release(path)
+  }
 }
 
 // Iterable wrapper; allocates refs[]. Query engine uses packedRadixVisitFuzzyRefs instead.
@@ -65,7 +73,9 @@ function visitRecurse(
   rowStart: number,
   node: number,
   termLength: number,
-  visit: (termIndex: number, length: number, distance: number) => void,
+  depth: number,
+  path: PackedTermPath,
+  visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
 ): void {
   const heap = tree.labelHeap
   const n = queryLen + 1
@@ -81,7 +91,8 @@ function visitRecurse(
     if (edgeOffset < 0) {
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {
-        visit(tree.nodeValue[node], termLength, distance)
+        path.depth = depth
+        visit(tree.nodeValue[node], termLength, distance, path)
       }
       continue
     }
@@ -125,6 +136,7 @@ function visitRecurse(
       }
     }
 
+    path.edges[depth] = ei
     visitRecurse(
       tree,
       queryLen,
@@ -134,6 +146,8 @@ function visitRecurse(
       i,
       tree.edgeChild[ei],
       termLength + labelLen,
+      depth + 1,
+      path,
       visit,
     )
   }

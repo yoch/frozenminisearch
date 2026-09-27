@@ -1,4 +1,5 @@
 import FrozenMiniSearch from './FrozenMiniSearch'
+import { frozenTermIndex } from './internal/frozenInternals'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea', category: 'fiction' },
@@ -48,5 +49,17 @@ describe('queryEngine error handling', () => {
   test('single-term string still validates combineWith from searchOptions', () => {
     expect(() => frozen.search('zen', { combineWith: 'bogus' }))
       .toThrow(/invalid combination operator/)
+  })
+})
+
+describe('queryEngine derived terms', () => {
+  test('prefix and fuzzy match keys come from the traversal, not term-index metadata', () => {
+    const index = FrozenMiniSearch.fromDocuments(docs, options)
+    const prefixHit = index.search('motor', { prefix: true, fuzzy: false }).find(r => r.id === 2)
+    expect(prefixHit.match).toEqual({ motorcycle: ['title', 'text'] })
+    const fuzzyHit = index.search('archeri', { prefix: false, fuzzy: 1 }).find(r => r.id === 4)
+    expect(fuzzyHit.match).toEqual({ archery: ['title', 'text'] })
+    expect(index.autoSuggest('zen ar').map(s => s.suggestion)).toContain('zen art')
+    expect(frozenTermIndex(index)._lazyTermMetadata).toBeUndefined()
   })
 })

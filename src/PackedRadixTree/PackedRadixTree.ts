@@ -1,5 +1,5 @@
 import { packedRadixFuzzyRefs, packedRadixVisitFuzzyRefs } from './fuzzy'
-import type { PackedFuzzyRef, PackedTermRef } from './types'
+import type { PackedFuzzyRef, PackedTermCursor, PackedTermRef } from './types'
 import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
 import {
   buildLazyTermMetadata,
@@ -8,6 +8,8 @@ import {
   type PackedLazyTermMetadata,
 } from './lazyMetadata'
 import { emitSubtree } from './stringEmit'
+import { labelSlice } from './strings'
+import { type PackedTermPath, PackedTermPathPool } from './termPath'
 import type { PackedIndexArray, PackedRadixTreeData, PackedStringRadixMap } from './types'
 
 function labelsMatch(heap: string, start: number, len: number, key: string, keyOff: number): boolean {
@@ -44,6 +46,8 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   readonly edgeLabelStart: PackedIndexArray
   readonly edgeLabelLength: PackedIndexArray
   readonly edgeChild: PackedIndexArray
+  /** Reusable traversal paths for `visitPrefixRefs` / `visitFuzzyRefs` cursors. */
+  readonly termPaths: PackedTermPathPool
   private _lazyTermMetadata: PackedLazyTermMetadata | undefined
 
   private constructor(data: PackedRadixTreeData) {
@@ -57,6 +61,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     this.edgeLabelStart = data.edgeLabelStart
     this.edgeLabelLength = data.edgeLabelLength
     this.edgeChild = data.edgeChild
+    this.termPaths = new PackedTermPathPool(this)
   }
 
   static fromData(data: PackedRadixTreeData): PackedRadixTree {
@@ -89,19 +94,29 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
     yield* this.emitSubtreeRefs(start.node, start.prefixLength)
   }
 
-  visitPrefixRefs(prefix: string, visit: (termIndex: number, length: number) => void): void {
+  visitPrefixRefs(
+    prefix: string,
+    visit: (termIndex: number, length: number, cursor: PackedTermCursor) => void,
+  ): void {
     const start = this.resolvePrefixWalkRef(prefix)
     if (start == null) return
-    this.visitSubtreeRefs(start.node, start.prefixLength, visit)
+    const path = this.termPaths.acquire(start.tailLength === 0
+      ? prefix
+      : prefix + labelSlice(this.labelHeap, start.tailStart, start.tailLength))
+    try {
+      this.visitSubtreeRefs(start.node, start.prefixLength, path, visit)
+    } finally {
+      this.termPaths.release(path)
+    }
   }
 
-  private resolvePrefixWalkRef(prefix: string): { node: number, prefixLength: number } | null {
+  private resolvePrefixWalkRef(
+    prefix: string,
+  ): { node: number, prefixLength: number, tailStart: number, tailLength: number } | null {
     if (prefix.length === 0) {
-      return { node: 0, prefixLength: 0 }
+      return { node: 0, prefixLength: 0, tailStart: 0, tailLength: 0 }
     }
-    const walk = this.walkKey(prefix)
-    if (walk == null) return null
-    return { node: walk.node, prefixLength: walk.prefixLength }
+    return this.walkKey(prefix)
   }
 
   /**
@@ -110,7 +125,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
    */
   private walkKey(
     key: string,
-  ): { node: number, prefixLength: number, keyFullyConsumed: boolean } | null {
+  ): { node: number, prefixLength: number, keyFullyConsumed: boolean, tailStart: number, tailLength: number } | null {
     let node = 0
     let prefixLength = 0
     let pos = 0
@@ -128,7 +143,13 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
       if (remaining < len) {
         if (!labelsMatch(heap, start, remaining, key, pos)) return null
         prefixLength += len
-        return { node: this.edgeChild[ei], prefixLength, keyFullyConsumed: false }
+        return {
+          node: this.edgeChild[ei],
+          prefixLength,
+          keyFullyConsumed: false,
+          tailStart: start + remaining,
+          tailLength: len - remaining,
+        }
       }
 
       if (!labelsMatch(heap, start, len, key, pos)) return null
@@ -137,7 +158,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
       node = this.edgeChild[ei]
     }
 
-    return { node, prefixLength, keyFullyConsumed: true }
+    return { node, prefixLength, keyFullyConsumed: true, tailStart: 0, tailLength: 0 }
   }
 
   // Iterable API; keep frame walk in sync with visitSubtreeRefs (query hot path).
@@ -169,7 +190,8 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   private visitSubtreeRefs(
     startNode: number,
     startLength: number,
-    visit: (termIndex: number, length: number) => void,
+    path: PackedTermPath,
+    visit: (termIndex: number, length: number, cursor: PackedTermCursor) => void,
   ): void {
     const frames: EmitRefFrame[] = []
     pushEmitRefFrame(frames, this, startNode, startLength)
@@ -184,12 +206,14 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
       const slot = frame.slot--
       const edgeOffset = edgeOffsetAtSlot(slot, frame.leafSlot)
       if (edgeOffset < 0) {
-        visit(this.nodeValue[frame.node], frame.length)
+        path.depth = frames.length - 1
+        visit(this.nodeValue[frame.node], frame.length, path)
         continue
       }
 
       const ei = frame.first + edgeOffset
       const len = this.edgeLabelLength[ei]
+      path.edges[frames.length - 1] = ei
       pushEmitRefFrame(frames, this, this.edgeChild[ei], frame.length + len)
     }
   }
@@ -201,7 +225,7 @@ export default class PackedRadixTree implements PackedStringRadixMap<number>, Pa
   visitFuzzyRefs(
     term: string,
     maxDistance: number,
-    visit: (termIndex: number, length: number, distance: number) => void,
+    visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
   ): void {
     packedRadixVisitFuzzyRefs(this, term, maxDistance, visit)
   }

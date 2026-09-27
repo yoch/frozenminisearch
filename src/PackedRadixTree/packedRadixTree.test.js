@@ -270,6 +270,52 @@ describe('PackedRadixTree module', () => {
     const p = packSearchableMap(m)
     expect(Array.from(p.prefixRefs('acq')).map(({ termIndex }) => [p.termByIndex(termIndex), termIndex]))
       .toEqual([['acquire', 0]])
+    const visited = []
+    p.visitPrefixRefs('acq', (termIndex, length, cursor) => visited.push([cursor.term(), termIndex, length]))
+    expect(visited).toEqual([['acquire', 0, 7]])
+  })
+
+  test('visit cursors spell the visited term without lazy metadata', () => {
+    const tree = packSearchableMap(map)
+    for (const prefix of ['', 'a', 'ac', 'acq', 'sum', 'xyz']) {
+      const visited = []
+      tree.visitPrefixRefs(prefix, (termIndex, length, cursor) => {
+        const term = cursor.term()
+        expect(term.length).toBe(length)
+        visited.push([term, termIndex])
+      })
+      expect(visited).toEqual(Array.from(map.atPrefix(prefix).entries()))
+    }
+    for (const distance of [0, 1, 2, 3]) {
+      const visited = []
+      tree.visitFuzzyRefs('acqua', distance, (termIndex, length, d, cursor) => {
+        const term = cursor.term()
+        expect(term.length).toBe(length)
+        visited.push([term, termIndex, d])
+      })
+      const expected = Array.from(map.fuzzyGet('acqua', distance)).map(([term, [value, d]]) => [term, value, d])
+      expect(visited.sort()).toEqual(expected.sort())
+    }
+    expect(tree._lazyTermMetadata).toBeUndefined()
+  })
+
+  test('nested traversals from a visitor keep the outer cursor intact', () => {
+    const tree = packSearchableMap(map)
+    const outer = []
+    tree.visitPrefixRefs('a', (termIndex, length, cursor) => {
+      tree.visitPrefixRefs('s', (_ti, _len, inner) => inner.term())
+      tree.visitFuzzyRefs('acqua', 2, (_ti, _len, _d, inner) => inner.term())
+      outer.push([cursor.term(), termIndex])
+    })
+    expect(outer).toEqual(Array.from(map.atPrefix('a').entries()))
+
+    const fuzzy = []
+    tree.visitFuzzyRefs('acqua', 2, (termIndex, length, distance, cursor) => {
+      tree.visitPrefixRefs('', (_ti, _len, inner) => inner.term())
+      fuzzy.push([cursor.term(), termIndex, distance])
+    })
+    const expected = Array.from(map.fuzzyGet('acqua', 2)).map(([term, [value, d]]) => [term, value, d])
+    expect(fuzzy.sort()).toEqual(expected.sort())
   })
 
   test('validateFrozenTermIndexLeaves rejects wrong leaf count', () => {

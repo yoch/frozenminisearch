@@ -8,6 +8,7 @@ import type {
 } from './scoring'
 import type { CombinationOperator, SearchOptionsWithDefaults } from './searchTypes'
 import type { QueryEngineParams } from './queryEngine'
+import type { PackedTermCursor } from './PackedRadixTree/types'
 
 export type NormalizedStringQuery = {
   options: SearchOptionsWithDefaults & Pick<QueryEngineParams, 'tokenize' | 'processTerm'>
@@ -38,27 +39,28 @@ export function forEachQuerySpecTermRef(
     termIndex: number | undefined,
     length: number,
     distance: number,
+    cursor: PackedTermCursor | undefined,
   ) => void,
 ): void {
   const { indexView } = params
   const { options } = normalized
   const maxDistance = maxFuzzyDistance(query, options.maxFuzzy)
 
-  visit('exact', indexView.resolveTermIndex(query.term), query.term.length, 0)
+  visit('exact', indexView.resolveTermIndex(query.term), query.term.length, 0, undefined)
 
   const seenPrefix = query.prefix && maxDistance ? new Set<number>() : undefined
   if (query.prefix) {
-    indexView.visitPrefixMatchesByIndex(query.term, (termIndex, length) => {
+    indexView.visitPrefixMatchesByIndex(query.term, (termIndex, length, cursor) => {
       const distance = length - query.term.length
       if (!distance) return
       seenPrefix?.add(termIndex)
-      visit('prefix', termIndex, length, distance)
+      visit('prefix', termIndex, length, distance, cursor)
     })
   }
   if (!maxDistance) return
-  indexView.visitFuzzyMatchesByIndex(query.term, maxDistance, (termIndex, length, distance) => {
+  indexView.visitFuzzyMatchesByIndex(query.term, maxDistance, (termIndex, length, distance, cursor) => {
     if (!distance || seenPrefix?.has(termIndex)) return
-    visit('fuzzy', termIndex, length, distance)
+    visit('fuzzy', termIndex, length, distance, cursor)
   })
 }
 
@@ -74,7 +76,7 @@ export function visitQuerySpecForScoring(
 ): void {
   const { fuzzyWeight, prefixWeight } = normalized
 
-  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex, length, distance) => {
+  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex, length, distance, cursor) => {
     const { indexView } = params
     if (kind === 'exact') {
       visit(
@@ -84,8 +86,8 @@ export function visitQuerySpecForScoring(
       )
       return
     }
-    if (termIndex == null) return
-    const derivedTerm: AggregateDerivedTerm = termIndex
+    if (termIndex == null || cursor == null) return
+    const derivedTerm: AggregateDerivedTerm = cursor
     if (kind === 'prefix') {
       visit(
         indexView.fieldTermData(termIndex),

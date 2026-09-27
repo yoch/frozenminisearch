@@ -38,6 +38,7 @@ import {
   visitQuerySpecForScoring,
 } from './queryTermRefs'
 import { defaultSearchOptions } from './searchDefaults'
+import type { PackedTermCursor } from './PackedRadixTree/types'
 
 /**
  * Adapter exposing packed frozen index storage to the shared query engine.
@@ -61,11 +62,14 @@ export interface QueryIndexView {
     docIds: Set<number>,
     allowedDocs?: DocIdGate,
   ): void
-  visitPrefixMatchesByIndex(term: string, visit: (termIndex: number, length: number) => void): void
+  visitPrefixMatchesByIndex(
+    term: string,
+    visit: (termIndex: number, length: number, cursor: PackedTermCursor) => void,
+  ): void
   visitFuzzyMatchesByIndex(
     term: string,
     maxDistance: number,
-    visit: (termIndex: number, length: number, distance: number) => void,
+    visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
   ): void
 }
 

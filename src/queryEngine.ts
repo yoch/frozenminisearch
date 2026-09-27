@@ -225,13 +225,27 @@ function collectDocIdsForQuerySpec(
   params: QueryEngineParams,
   allowedDocs?: DocIdGate,
 ): Set<number> {
-  const { fieldBoosts } = normalized
+  const { fieldBoosts, options: { boostDocument } } = normalized
   const docIds = new Set<number>()
   const { indexView, aggregateContext } = params
 
-  forEachQuerySpecTermRef(query, normalized, params, (_kind, termIndex) => {
-    if (termIndex != null) {
+  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex, _length, _distance, cursor) => {
+    if (termIndex == null) return
+    if (boostDocument == null) {
       indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
+      return
+    }
+    // Scoring drops docs whose boostDocument is 0 for this term, so membership must too.
+    const termDocIds = new Set<number>()
+    indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, termDocIds, allowedDocs)
+    if (termDocIds.size === 0) return
+    const term = kind === 'exact' ? query.term : cursor?.term()
+    if (term == null) return
+    for (const docId of termDocIds) {
+      if (docIds.has(docId)) continue
+      if (boostDocument(aggregateContext.getExternalId(docId), term, aggregateContext.getStoredFields(docId))) {
+        docIds.add(docId)
+      }
     }
   })
   return docIds

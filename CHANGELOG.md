@@ -27,6 +27,7 @@
 - **Emoji and other astral-plane terms in binary snapshots** — the term tree splits labels on UTF-16 code units, so two terms sharing a leading surrogate (e.g. `😀` and `😁`) produced labels that UTF-8 turned into U+FFFD, and those terms were lost after `loadBinarySync()`. Such label heaps are now stored as UTF-16LE under a new flag and **MSv5 format revision 2**; older readers reject these files with `unsupported format revision 2`. All other snapshots are written byte-for-byte as before (revision 1).
 - **`combineWith: undefined`** — `search()` and `autoSuggest()` threw `Cannot read properties of undefined (reading 'toLowerCase')`; they now fall back to `OR` like MiniSearch.
 - **`QueryCombination` without `combineWith`** — now combines with `OR` (or the operator inherited from an enclosing combination), as in MiniSearch. It previously picked up the constructor's global `searchOptions.combineWith`, which does not apply to query combinations.
+- **`AND_NOT` with `boostDocument`** — a document for which `boostDocument` returns `0` on a negated term no longer counts as matching that term, so it is not excluded (MiniSearch parity). Previously the negated branch ignored `boostDocument` and could drop such documents.
 
 ## v1.8.0 — `@yoch/frozenminisearch`
 

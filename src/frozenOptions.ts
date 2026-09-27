@@ -30,6 +30,7 @@ export function resolveFrozenOptions<T>(
     ...defaultFrozenLoadOptions,
     ...options,
     fields,
+    storeFields: options.storeFields ?? defaultFrozenLoadOptions.storeFields,
     searchOptions: { ...defaultSearchOptions, ...(options.searchOptions || {}) },
     autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
   } as OptionsWithDefaults<T>

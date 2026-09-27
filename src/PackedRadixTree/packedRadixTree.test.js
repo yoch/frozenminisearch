@@ -428,4 +428,12 @@ describe('PackedRadixTree module', () => {
     const buf = buildTermTreeSectionColumnar(packed)
     expect(() => readPackedTermTreeSectionColumnar(buf, map.size + 1)).toThrow(/termCount mismatch/)
   })
+
+  test('columnar decoder round-trips UTF-16 labels and rejects an odd-length heap', () => {
+    const buf = buildTermTreeSectionColumnar(packed, true)
+    const back = readPackedTermTreeSectionColumnar(buf, map.size, true)
+    expect(Array.from(back.entries())).toEqual(Array.from(packed.entries()))
+    expect(() => readPackedTermTreeSectionColumnar(buf.subarray(0, buf.length - 1), map.size, true))
+      .toThrow(/UTF-16 label heap has odd length/)
+  })
 })

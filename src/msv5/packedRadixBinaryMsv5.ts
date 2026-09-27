@@ -1,4 +1,13 @@
-import { allocBytes, bytesFromView, readU32LE, readUtf8, utf8Bytes, writeU32LE } from '../binaryBytes'
+import {
+  allocBytes,
+  bytesFromView,
+  readU32LE,
+  readUtf16LE,
+  readUtf8,
+  utf16LeBytes,
+  utf8Bytes,
+  writeU32LE,
+} from '../binaryBytes'
 import type { BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import PackedRadixTree from '../PackedRadixTree'
@@ -55,9 +64,13 @@ function termTreeColumnarPayloadLength(columns: PackedIndexArray[], labelBytes: 
   return total + labelBytes.length
 }
 
-export function buildTermTreeSectionColumnar(tree: PackedRadixTree): Uint8Array {
+/**
+ * Edges split terms on UTF-16 code units, so the heap can hold halves of a surrogate pair;
+ * pass `utf16Labels` then, since UTF-8 would replace them with U+FFFD.
+ */
+export function buildTermTreeSectionColumnar(tree: PackedRadixTree, utf16Labels = false): Uint8Array {
   const columns = termTreeColumns(tree)
-  const labelBytes = utf8Bytes(tree.labelHeap)
+  const labelBytes = utf16Labels ? utf16LeBytes(tree.labelHeap) : utf8Bytes(tree.labelHeap)
   const out = allocBytes(termTreeColumnarPayloadLength(columns, labelBytes))
 
   writeU32LE(out, 0, tree.size)
@@ -129,6 +142,7 @@ function readColumn(
 export function readPackedTermTreeSectionColumnar(
   buf: BinaryBytes,
   termCount: number,
+  utf16Labels = false,
 ): PackedRadixTree {
   if (buf.length < TREE_SECTION_HEADER_BYTES) {
     throw invalidFrozenIndex('term tree section too short')
@@ -160,7 +174,12 @@ export function readPackedTermTreeSectionColumnar(
   if (o > buf.length) {
     throw invalidFrozenIndex('term tree label heap out of bounds')
   }
-  const labelHeap = o === buf.length ? '' : readUtf8(buf, o, buf.length)
+  if (utf16Labels && (buf.length - o) % 2 !== 0) {
+    throw invalidFrozenIndex('term tree UTF-16 label heap has odd length')
+  }
+  const labelHeap = o === buf.length
+    ? ''
+    : utf16Labels ? readUtf16LE(buf, o, buf.length) : readUtf8(buf, o, buf.length)
 
   const data: PackedRadixTreeData = {
     size,

@@ -502,6 +502,45 @@ describe('binaryFormat string fidelity', () => {
     expect(loaded.search('\uFEFFhello')[0].id).toBe('\uFEFFdoc1')
     expect(loaded.search('zebra')).toEqual(index.search('zebra'))
   })
+
+  const surrogateDocs = [
+    { id: 1, text: '😀 smile' },
+    { id: 2, text: '😁 grin' },
+    { id: 3, text: '𠀀 𠀁 plain' },
+    { id: 4, text: 'lone\uD83D tail' },
+  ]
+  const surrogateOptions = { fields: ['text'], tokenize: text => text.split(' ') }
+  const surrogateQueries = [
+    ['😀', {}],
+    ['😁', {}],
+    ['𠀁', {}],
+    ['lone\uD83D', {}],
+    ['\uD83D', { prefix: true }],
+    ['😂', { fuzzy: 1 }],
+    ['plain', {}],
+  ]
+
+  test.each(['raw', 'zlib'])('keeps labels that split surrogate pairs (%s)', (compression) => {
+    const index = FrozenMiniSearch.fromDocuments(surrogateDocs, surrogateOptions)
+    const loaded = roundTrip(index, surrogateOptions, compression)
+    for (const [query, searchOptions] of surrogateQueries) {
+      const expected = index.search(query, searchOptions)
+      expect(expected.length).toBeGreaterThan(0)
+      expect(loaded.search(query, searchOptions)).toEqual(expected)
+    }
+  })
+
+  test('only snapshots with unpaired surrogates in labels use format revision 2', () => {
+    const plain = FrozenMiniSearch.fromDocuments(docs, options).saveBinarySync({ compression: 'raw' })
+    expect(plain.readUInt16LE(10)).toBe(1)
+
+    const emoji = FrozenMiniSearch.fromDocuments(surrogateDocs, surrogateOptions).saveBinarySync({ compression: 'raw' })
+    expect(emoji.readUInt16LE(10)).toBe(2)
+    const asOldRevision = Buffer.from(emoji)
+    asOldRevision.writeUInt16LE(1, 10)
+    expect(() => FrozenMiniSearch.loadBinarySync(asOldRevision, surrogateOptions))
+      .toThrow(/unsupported format revision 1/)
+  })
 })
 
 describe('crc32Buffer verification', () => {

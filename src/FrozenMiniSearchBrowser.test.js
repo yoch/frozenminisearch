@@ -62,6 +62,21 @@ describe('FrozenMiniSearchBrowser', () => {
     expect(loaded.search('archery', { prefix: true }).map(hit => hit.id)).toEqual([2])
   })
 
+  test('emoji terms round-trip between browser and Node loaders', async () => {
+    const emojiDocs = [{ id: 1, text: '😀 smile' }, { id: 2, text: '😁 grin' }]
+    const emojiOptions = { fields: ['text'], tokenize: text => text.split(' ') }
+    const browserBuf = await FrozenMiniSearchBrowser.fromDocuments(emojiDocs, emojiOptions)
+      .saveBinaryAsync({ compression: 'zlib' })
+    const nodeBuf = new Uint8Array(FrozenMiniSearch.fromDocuments(emojiDocs, emojiOptions)
+      .saveBinarySync({ compression: 'zlib' }))
+    const fromBrowser = FrozenMiniSearch.loadBinarySync(Buffer.from(browserBuf), emojiOptions)
+    const fromNode = await FrozenMiniSearchBrowser.loadBinaryAsync(nodeBuf, emojiOptions)
+    for (const loaded of [fromBrowser, fromNode]) {
+      expect(loaded.search('😀').map(hit => hit.id)).toEqual([1])
+      expect(loaded.search('😁').map(hit => hit.id)).toEqual([2])
+    }
+  })
+
   test('saveBinaryAsync rejects zstd', async () => {
     const index = FrozenMiniSearchBrowser.fromDocuments(docs, options)
     await expect(index.saveBinaryAsync({ compression: 'zstd' }))

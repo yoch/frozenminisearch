@@ -374,6 +374,20 @@ describe('binaryMsv5', () => {
     expect(Buffer.from(native.uncompressed)).toEqual(Buffer.from(portable.uncompressed))
   })
 
+  test('native CRC-32 keeps the seed for empty views over zero-length buffers', () => {
+    const empty = new Uint8Array(new ArrayBuffer(0))
+    expect(crc32Update(0x1234abcd, empty)).toBe(0x1234abcd)
+    expect(crc32Update(0x1234abcd, empty)).toBe(crc32UpdateWire(0x1234abcd, empty))
+  })
+
+  test.each(['raw', 'zlib'])('%s snapshot with empty trailing sections round-trips', (compression) => {
+    const opts = { fields: ['text'], storeFields: ['text'] }
+    const index = FrozenMiniSearch.fromDocuments([{ id: 1, txt: 'a' }, { id: 2, txt: 'b' }], opts)
+    const loaded = FrozenMiniSearch.loadBinarySync(index.saveBinarySync({ compression }), opts)
+    expect(loaded.documentCount).toBe(2)
+    expect(loaded.has(2)).toBe(true)
+  })
+
   test('loaded raw snapshot copies caller wire buffer', () => {
     const buf = bigCompressibleIndex().saveBinarySync({ compression: 'raw' })
     const loaded = FrozenMiniSearch.loadBinarySync(buf, { fields: ['text'] })

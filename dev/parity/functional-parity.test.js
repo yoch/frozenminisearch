@@ -168,6 +168,23 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     })
   })
 
+  test('AND_NOT applies boostDocument to each prefix-derived negated term', () => {
+    const corpus = [
+      { id: 1, text: 'apple crumble crumpet' },
+      { id: 2, text: 'apple crumble' },
+      { id: 3, text: 'apple crumble crumpet' },
+      { id: 4, text: 'apple pie' },
+    ]
+    const opts = { fields: ['text'] }
+    const ms = new MiniSearch(opts)
+    ms.addAll(corpus)
+    const fr = frozenFromMiniSearch(FrozenMiniSearch, ms, opts)
+    const boostDocument = (id, term) => (id === 1 && term === 'crumble') || (id === 2 && term.startsWith('crum')) ? 0 : 1
+    const query = { combineWith: 'AND_NOT', queries: ['apple', { queries: ['crum'], prefix: true }] }
+    expectSameResults(ms, fr, query, { boostDocument })
+    expect(fr.search(query, { boostDocument }).map(r => r.id).sort()).toEqual([2, 4])
+  })
+
   test('AND_NOT with boostDocument matches MiniSearch on the two-phase path', () => {
     const corpus = Array.from({ length: 6000 }, (_, id) => ({ id, text: id % 2 === 0 ? 'common half' : 'common' }))
     const opts = { fields: ['text'] }

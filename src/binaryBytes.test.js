@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 import {
   allocBytes,
   readFloatLE,
@@ -49,11 +48,10 @@ describe('binaryBytes float32 LE wire', () => {
   })
 
   test('readFloatLE reads bytes independent of buffer aliasing', () => {
-    const source = randomBytes(8)
     const buf = allocBytes(8)
-    buf.set(source)
+    writeFloatLE(buf, 1, 1.25)
     const at1 = readFloatLE(buf, 1)
-    buf[1] = source[1] ^ 0xff
+    buf[1] ^= 0xff
     expect(readFloatLE(buf, 1)).not.toBe(at1)
   })
 })

@@ -32,7 +32,8 @@ import {
   readMsv5GlobalFlags,
   readMsv5SectionDirectory,
 } from './binaryMsv5Compression'
-import { computeSectionDirectory } from './binaryMsv5PayloadAssembly'
+import { computeSectionDirectory, concatRawSectionsWithCrc } from './binaryMsv5PayloadAssembly'
+import { crc32Update as crc32UpdateWire } from '../crc32Wire'
 import { buildMsv5EncodePrepared } from './binaryMsv5EncodeSections'
 import PackedRadixTree from '../PackedRadixTree'
 
@@ -360,6 +361,17 @@ describe('binaryMsv5', () => {
     for (let i = 0; i < rawSections.length; i++) {
       expect(Buffer.from(loaded[i])).toEqual(Buffer.from(rawSections[i]))
     }
+  })
+
+  test('native and portable CRC-32 produce the same section directory and payload CRC', () => {
+    const seed = bigCompressibleIndex().saveBinarySync({ compression: 'raw' })
+    const rawSections = loadMsv5Sections(seed, readMsv5SectionDirectory(seed))
+      .map((section, i) => i < 3 ? Buffer.from(section.subarray(0, i + 1)) : section)
+    const portable = concatRawSectionsWithCrc(rawSections, size => Buffer.alloc(size), crc32UpdateWire)
+    const native = concatRawSectionsWithCrc(rawSections, size => Buffer.alloc(size), crc32Update)
+    expect(native.entries).toEqual(portable.entries)
+    expect(native.payloadCrc32).toBe(portable.payloadCrc32)
+    expect(Buffer.from(native.uncompressed)).toEqual(Buffer.from(portable.uncompressed))
   })
 
   test('loaded raw snapshot copies caller wire buffer', () => {

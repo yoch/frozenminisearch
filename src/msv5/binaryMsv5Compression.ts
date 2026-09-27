@@ -87,6 +87,7 @@ function concatAndValidateSections(rawSections: Array<Buffer | Uint8Array>): {
   const { uncompressed, entries, payloadCrc32 } = concatRawSectionsWithCrc(
     rawSections,
     size => Buffer.alloc(size),
+    crc32Update,
   )
   if (uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
     throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
@@ -100,13 +101,13 @@ function assembleMsv5FileRawDirect(
   rawSections: Array<Buffer | Uint8Array>,
 ): Msv5AssembledFile {
   assertRawSectionCount(rawSections)
-  const { entries, uncompressedLength } = computeSectionDirectory(rawSections)
+  const { entries, uncompressedLength } = computeSectionDirectory(rawSections, crc32Update)
   if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
     throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
   }
 
   const out = Buffer.alloc(MSV5_HEADER_SIZE + uncompressedLength)
-  const payloadCrc32 = writeRawSectionsIntoPayload(out, MSV5_HEADER_SIZE, rawSections, entries)
+  const payloadCrc32 = writeRawSectionsIntoPayload(out, MSV5_HEADER_SIZE, rawSections, entries, crc32Update)
   writeMsv5FileHeader(
     out,
     globalFlags,

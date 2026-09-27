@@ -17,7 +17,7 @@ export function assertBufferLength(buf: Buffer, min: number): void {
 }
 
 /** Incremental CRC-32 IEEE update; pass the previous return value as `seed`. */
-export function crc32Update(seed: number, buf: Buffer, start = 0, end = buf.length): number {
+export function crc32Update(seed: number, buf: Uint8Array, start = 0, end = buf.length): number {
   if (typeof zlibCrc32 === 'function') {
     const slice = start === 0 && end === buf.length ? buf : buf.subarray(start, end)
     return zlibCrc32(slice, seed) >>> 0
@@ -26,6 +26,6 @@ export function crc32Update(seed: number, buf: Buffer, start = 0, end = buf.leng
 }
 
 /** CRC-32 IEEE (zlib polynomial); uses `zlib.crc32` when available. */
-export function crc32Buffer(buf: Buffer, start = 0, end = buf.length): number {
+export function crc32Buffer(buf: Uint8Array, start = 0, end = buf.length): number {
   return crc32Update(0, buf, start, end)
 }

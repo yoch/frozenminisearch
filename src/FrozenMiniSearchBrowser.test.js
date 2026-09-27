@@ -77,6 +77,12 @@ describe('FrozenMiniSearchBrowser', () => {
     }
   })
 
+  test('saveBinaryAsync rejects unknown compression', async () => {
+    const index = FrozenMiniSearchBrowser.fromDocuments(docs, options)
+    await expect(index.saveBinaryAsync({ compression: 'gzip' }))
+      .rejects.toThrow(/unsupported compression "gzip"/)
+  })
+
   test('saveBinaryAsync rejects zstd', async () => {
     const index = FrozenMiniSearchBrowser.fromDocuments(docs, options)
     await expect(index.saveBinaryAsync({ compression: 'zstd' }))

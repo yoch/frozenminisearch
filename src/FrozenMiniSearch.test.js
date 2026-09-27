@@ -48,6 +48,12 @@ describe('FrozenMiniSearch core', () => {
     }
   })
 
+  test.each(['gzip', 'ZLIB', null])('saveBinary rejects unsupported compression %j', async (compression) => {
+    const frozen = FrozenMiniSearch.fromDocuments(docs, options)
+    expect(() => frozen.saveBinarySync({ compression })).toThrow(/unsupported compression/)
+    await expect(frozen.saveBinaryAsync({ compression })).rejects.toThrow(/unsupported compression/)
+  })
+
   test.each([undefined, null])('storeFields: %s behaves like no stored fields', (storeFields) => {
     const opts = { fields: ['title', 'text'], storeFields }
     const direct = FrozenMiniSearch.fromDocuments(docs, opts)

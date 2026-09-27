@@ -33,8 +33,51 @@ function accumulateProcessedTerm(
   }
 }
 
-/** Global delimiter pattern for incremental `exec` (must not reuse {@link SPACE_OR_PUNCTUATION} — no `g` flag). */
-const DEFAULT_TOKENIZE_DELIMITERS = /[\n\r\p{Z}\p{P}]+/gu
+/** Single-code-point form of the default `split` pattern; the source of truth for delimiter classes. */
+const DEFAULT_DELIMITER_CODE_POINT = /^[\n\r\p{Z}\p{P}]$/u
+
+const LATIN1_DELIMITER = new Uint8Array(256)
+for (let c = 0; c < 256; c++) {
+  LATIN1_DELIMITER[c] = DEFAULT_DELIMITER_CODE_POINT.test(String.fromCharCode(c)) ? 1 : 0
+}
+
+const BMP_UNKNOWN = 0
+const BMP_DELIMITER = 1
+const BMP_TOKEN = 2
+/** Per-code-unit memo for U+0100..U+FFFF in 256-unit blocks, allocated only for blocks seen in text. */
+const bmpDelimiterMemo: (Uint8Array | undefined)[] = new Array(256)
+
+function isBmpDelimiter(c: number): boolean {
+  const block = bmpDelimiterMemo[c >>> 8] ??= new Uint8Array(256)
+  const low = c & 0xff
+  let state = block[low]
+  if (state === BMP_UNKNOWN) {
+    state = DEFAULT_DELIMITER_CODE_POINT.test(String.fromCharCode(c)) ? BMP_DELIMITER : BMP_TOKEN
+    block[low] = state
+  }
+  return state === BMP_DELIMITER
+}
+
+/** Code units of the delimiter code point at `i`, or 0 when it belongs to a token. */
+function delimiterWidthAt(text: string, i: number): number {
+  const c = text.charCodeAt(i)
+  if (c < 256) return LATIN1_DELIMITER[c]
+  if (c >= 0xd800 && c <= 0xdbff) {
+    const next = text.charCodeAt(i + 1)
+    if (next >= 0xdc00 && next <= 0xdfff) {
+      return DEFAULT_DELIMITER_CODE_POINT.test(text.slice(i, i + 2)) ? 2 : 0
+    }
+    return 0
+  }
+  return isBmpDelimiter(c) ? 1 : 0
+}
+
+function isSurrogatePairAt(text: string, i: number): boolean {
+  const c = text.charCodeAt(i)
+  if (c < 0xd800 || c > 0xdbff) return false
+  const next = text.charCodeAt(i + 1)
+  return next >= 0xdc00 && next <= 0xdfff
+}
 
 /**
  * True only for the library default tokenizer reference. Custom tokenizers — including
@@ -46,28 +89,25 @@ export function isDefaultTokenize(
   return tokenize === getFrozenDefault('tokenize')
 }
 
+/** Same tokens as `text.split(/[\n\r\p{Z}\p{P}]+/u)`, including empty leading/trailing tokens. */
 function forEachDefaultToken(text: string, onToken: (token: string) => void): void {
-  if (text.length === 0) {
-    onToken('')
-    return
-  }
+  const n = text.length
   let start = 0
-  const re = DEFAULT_TOKENIZE_DELIMITERS
-  re.lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > start) {
-      onToken(text.slice(start, match.index))
-    } else if (match.index === start) {
-      onToken('')
+  let i = 0
+  while (i < n) {
+    let width = delimiterWidthAt(text, i)
+    if (width === 0) {
+      i += isSurrogatePairAt(text, i) ? 2 : 1
+      continue
     }
-    start = match.index + match[0].length
+    const runStart = i
+    do {
+      i += width
+    } while (i < n && (width = delimiterWidthAt(text, i)) !== 0)
+    onToken(text.slice(start, runStart))
+    start = i
   }
-  if (start < text.length) {
-    onToken(text.slice(start))
-  } else if (start === text.length) {
-    onToken('')
-  }
+  onToken(text.slice(start))
 }
 
 /** Default tokenizer into a reusable buffer (avoids `text.split()` array allocation). */

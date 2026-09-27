@@ -75,21 +75,30 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
 /** Every node is reached exactly once from the root, so traversals and parent climbs terminate. */
 function assertTreeShape(tree: PackedRadixTree): void {
   const { nodeCount, nodeEdgeOffset, edgeChild } = tree
-  const visited = new Uint8Array(nodeCount)
-  const stack = new Uint32Array(nodeCount)
+  // 1 bit per node; the DFS stack only holds pending siblings along one path.
+  const visited = new Uint32Array((nodeCount + 31) >>> 5)
+  let stack = new Uint32Array(256)
   let top = 0
   stack[top++] = 0
   visited[0] = 1
   let reached = 1
   while (top > 0) {
     const node = stack[--top]
+    const first = nodeEdgeOffset[node]
     const end = nodeEdgeOffset[node + 1]
-    for (let edge = nodeEdgeOffset[node]; edge < end; edge++) {
+    if (top + end - first > stack.length) {
+      const grown = new Uint32Array(Math.max(stack.length * 2, top + end - first))
+      grown.set(stack.subarray(0, top))
+      stack = grown
+    }
+    for (let edge = first; edge < end; edge++) {
       const child = edgeChild[edge]
-      if (visited[child] !== 0) {
+      const word = child >>> 5
+      const bit = 1 << (child & 31)
+      if ((visited[word] & bit) !== 0) {
         throw new Error(`FrozenTermIndex: node ${child} is reached more than once`)
       }
-      visited[child] = 1
+      visited[word] |= bit
       reached++
       stack[top++] = child
     }

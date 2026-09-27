@@ -141,6 +141,23 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expectSameResults(extendedMutable, extendedFrozen, query)
   })
 
+  test('combineWith: undefined falls back to OR', () => {
+    expectSameResults(mutable, frozen, 'zen whale', { combineWith: undefined })
+    expectSameResults(mutable, frozen, { combineWith: undefined, queries: ['zen', 'whale'] })
+    expectSameSuggestions(frozen.autoSuggest('zen ar', { combineWith: undefined }),
+      mutable.autoSuggest('zen ar', { combineWith: undefined }))
+  })
+
+  test('QueryCombination without combineWith ignores global combineWith', () => {
+    const andOptions = { ...options, searchOptions: { combineWith: 'AND' } }
+    const ms = new MiniSearch(andOptions)
+    ms.addAll(docs)
+    const fr = frozenFromMiniSearch(FrozenMiniSearch, ms, andOptions)
+    expectSameResults(ms, fr, { queries: ['zen', 'whale'] })
+    expectSameResults(ms, fr, { queries: ['zen', { queries: ['art', 'whale'] }] })
+    expectSameResults(ms, fr, 'zen whale')
+  })
+
   test('field boost', () => {
     expectSameResults(mutable, frozen, 'zen', { boost: { title: 2 } })
   })

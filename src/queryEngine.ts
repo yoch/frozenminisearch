@@ -13,6 +13,7 @@ import {
   type DocIdGate,
   type FieldBoostsForQuery,
   type FieldTermDataLike,
+  OR,
   type QuerySpec,
   type RawResult,
   termToQuerySpec,
@@ -148,7 +149,7 @@ function normalizeStringQuery(
   return {
     options,
     specs,
-    operator: options.combineWith as CombinationOperator,
+    operator: options.combineWith ?? OR,
     fieldBoosts: fieldBoostsForQuery(options, params.fields),
     fuzzyWeight,
     prefixWeight,
@@ -279,7 +280,7 @@ function collectDocIdsForQueryInternal(
 
   if (isQueryCombination(query)) {
     const options = { ...searchOptions, ...query, queries: undefined }
-    const operator = (options.combineWith ?? params.globalSearchOptions.combineWith) as CombinationOperator
+    const operator = options.combineWith ?? OR
     return collectCombinedDocIds(
       query.queries,
       operator,
@@ -337,9 +338,9 @@ function executeQueryInternal(
   }
 
   if (isQueryCombination(query)) {
-    // Spread inherits parent combineWith into child branches (MiniSearch 7.2 behavior).
+    // Spread inherits parent combineWith into child branches; global searchOptions do not apply (MiniSearch 7.2).
     const options = { ...searchOptions, ...query, queries: undefined }
-    const operator = (options.combineWith ?? params.globalSearchOptions.combineWith) as CombinationOperator
+    const operator = options.combineWith ?? OR
 
     if (useGatedEvaluation(run, query.queries.length, operator, combinationHasWildcard(query))) {
       return executeCombinedBranches(

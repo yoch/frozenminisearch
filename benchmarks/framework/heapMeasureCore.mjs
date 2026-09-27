@@ -35,8 +35,30 @@ export function heapFactoryForKind (kind, scenario, artifacts = {}) {
     case 'loadBinary':
       if (artifacts.binaryBuf == null) throw new Error('loadBinary heap path requires binaryBuf artifact')
       return () => FrozenMiniSearch.loadBinarySync(artifacts.binaryBuf, options)
+    case 'loadBinary-steady': {
+      if (artifacts.binaryBuf == null) throw new Error('loadBinary-steady heap path requires binaryBuf artifact')
+      const probe = steadyStateProbe(scenario)
+      return () => {
+        const index = FrozenMiniSearch.loadBinarySync(artifacts.binaryBuf, options)
+        index.search(probe.query, { prefix: true, fuzzy: 0.2 })
+        index.has(probe.id)
+        return index
+      }
+    }
     default:
       throw new Error(`Unknown heap path kind: ${kind}`)
+  }
+}
+
+/**
+ * Serving-state probe: one prefix+fuzzy query and one id lookup, so structures that
+ * are built lazily on first use are included in the retained measurement.
+ */
+function steadyStateProbe (scenario) {
+  const idField = scenario.options.idField ?? 'id'
+  return {
+    query: scenario.queries?.[0]?.q ?? 'a',
+    id: scenario.corpus[scenario.corpus.length - 1]?.[idField],
   }
 }
 
@@ -44,7 +66,7 @@ export function warmupHeapFactory (factory, warmup) {
   for (let i = 0; i < warmup; i++) factory()
 }
 
-const LOAD_PATH_KINDS = new Set(['loadJSON', 'fromJson', 'loadBinary'])
+const LOAD_PATH_KINDS = new Set(['loadJSON', 'fromJson', 'loadBinary', 'loadBinary-steady'])
 
 export function pathNeedsArtifacts (kind) {
   return LOAD_PATH_KINDS.has(kind)

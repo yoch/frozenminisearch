@@ -78,7 +78,15 @@ export function runHeapScenario (scenarioId, opts = {}) {
       },
       ...(pathResults['loadJSON'] ? { loadJson: pathResults['loadJSON'].heapMb } : {}),
       ...(pathResults['fromJson'] ? { fromJson: pathResults['fromJson'].heapMb } : {}),
-      ...(pathResults['loadBinary'] ? { loadBinary: pathResults['loadBinary'].heapMb } : {}),
+      ...(pathResults['loadBinary']
+        ? {
+            loadBinary: pathResults['loadBinary'].heapMb,
+            loadBinaryTotalResident: pathResults['loadBinary'].totalResidentApproxMb,
+          }
+        : {}),
+      ...(pathResults['loadBinary-steady']
+        ? { loadBinarySteadyTotalResident: pathResults['loadBinary-steady'].totalResidentApproxMb }
+        : {}),
     },
     heapSkipped: null,
     heapStability: {

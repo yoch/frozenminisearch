@@ -19,6 +19,8 @@ export const DEFAULT_HEAP_SCENARIO_IDS = [
 export const DEFAULT_HEAP_PATHS = [
   'mutable-addAll',
   'frozen-fromDocuments',
+  'loadBinary',
+  'loadBinary-steady',
 ]
 
 export const HEAP_PATHS_FULL = [
@@ -27,6 +29,8 @@ export const HEAP_PATHS_FULL = [
   'frozen-fromMiniSearch',
   'loadJSON',
   'fromJson',
+  'loadBinary',
+  'loadBinary-steady',
 ]
 
 export function parseHeapScenarioIds (args = process.argv) {

@@ -1,8 +1,14 @@
 import type { BinaryBytes } from '../binaryBytes'
-import { crc32Bytes, crc32Update } from '../crc32Wire'
+import { crc32Update as crc32UpdateWire } from '../crc32Wire'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 
-export function computeSectionDirectory(rawSections: BinaryBytes[]): {
+/** Incremental CRC-32 IEEE update; Node passes the native `zlib.crc32` wrapper, browsers the JS table. */
+export type Crc32UpdateFn = (seed: number, buf: BinaryBytes, start?: number, end?: number) => number
+
+export function computeSectionDirectory(
+  rawSections: BinaryBytes[],
+  crc32Update: Crc32UpdateFn = crc32UpdateWire,
+): {
   entries: Msv5SectionEntry[]
   uncompressedLength: number
 } {
@@ -14,7 +20,7 @@ export function computeSectionDirectory(rawSections: BinaryBytes[]): {
     entries.push({
       fileOffset: uncompressedLength,
       uncompressedLength: raw.length,
-      sectionCrc32: crc32Bytes(raw),
+      sectionCrc32: crc32Update(0, raw),
     })
     uncompressedLength += raw.length
   }
@@ -29,6 +35,7 @@ export function writeRawSectionsIntoPayload(
   payloadStart: number,
   rawSections: BinaryBytes[],
   entries: Msv5SectionEntry[],
+  crc32Update: Crc32UpdateFn = crc32UpdateWire,
 ): number {
   let payloadCrc32 = 0
   let coveredEnd = 0
@@ -51,13 +58,14 @@ export function writeRawSectionsIntoPayload(
 export function concatRawSectionsWithCrc(
   rawSections: BinaryBytes[],
   alloc: (size: number) => BinaryBytes,
+  crc32Update: Crc32UpdateFn = crc32UpdateWire,
 ): {
   uncompressed: BinaryBytes
   entries: Msv5SectionEntry[]
   payloadCrc32: number
 } {
-  const { entries, uncompressedLength } = computeSectionDirectory(rawSections)
+  const { entries, uncompressedLength } = computeSectionDirectory(rawSections, crc32Update)
   const uncompressed = alloc(uncompressedLength)
-  const payloadCrc32 = writeRawSectionsIntoPayload(uncompressed, 0, rawSections, entries)
+  const payloadCrc32 = writeRawSectionsIntoPayload(uncompressed, 0, rawSections, entries, crc32Update)
   return { uncompressed, entries, payloadCrc32 }
 }

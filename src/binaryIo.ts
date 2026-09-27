@@ -19,6 +19,9 @@ export function assertBufferLength(buf: Buffer, min: number): void {
 /** Incremental CRC-32 IEEE update; pass the previous return value as `seed`. */
 export function crc32Update(seed: number, buf: Uint8Array, start = 0, end = buf.length): number {
   if (typeof zlibCrc32 === 'function') {
+    // `zlib.crc32` returns 0 instead of `seed` for an empty view over a zero-length
+    // ArrayBuffer (Node 22.14), which the encoder produces for empty sections.
+    if (start >= end) return seed >>> 0
     const slice = start === 0 && end === buf.length ? buf : buf.subarray(start, end)
     return zlibCrc32(slice, seed) >>> 0
   }

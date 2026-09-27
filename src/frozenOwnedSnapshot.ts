@@ -105,14 +105,12 @@ export function materializeOwnedSnapshot<T>(
     case 'minisearch-json':
       return { ...params, ...shallowCopyJsSnapshotFields(params) }
 
+    // Raw MSv5 sections alias the caller's wire buffer. Compressed sections are views
+    // on the decoded payload, which also holds stored fields, ids and label bytes
+    // already materialized as JS values. Copying the typed arrays in both cases lets
+    // the source allocation be collected.
     case 'binary-load':
-      // Compressed MSv5 sections are views on an owned decoded allocation, not
-      // the caller's wire buffer.
-      return params
-
     case 'binary-load-wire':
-      // Raw MSv5 sections alias the caller's wire buffer, so the loaded index
-      // must copy typed arrays before returning.
       return {
         ...params,
         index: ownedPackedRadixTree(params.index),

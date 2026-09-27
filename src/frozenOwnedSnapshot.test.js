@@ -31,3 +31,27 @@ describe('frozenOwnedSnapshot wire buffer isolation', () => {
     expect(loaded.search(query, options.searchOptions)).toEqual(expected)
   })
 })
+
+describe('frozenOwnedSnapshot decoded payload release', () => {
+  const storedDocs = Array.from({ length: 200 }, (_, id) => ({ id, text: `document ${id} ${'x'.repeat(200)}` }))
+  const storedOptions = { fields: ['text'], storeFields: ['text'] }
+
+  test.each([
+    ['sync', buf => FrozenMiniSearch.loadBinarySync(buf, storedOptions)],
+    ['async', buf => FrozenMiniSearch.loadBinaryAsync(buf, storedOptions)],
+  ])('compressed %s load owns compact typed arrays', async (_mode, load) => {
+    const buf = FrozenMiniSearch.fromDocuments(storedDocs, storedOptions).saveBinarySync({ compression: 'zlib' })
+    const loaded = await load(buf)
+    const arrays = [
+      loaded._postings.allDocIds,
+      loaded._postings.allFreqs,
+      loaded._fieldLengthMatrix,
+      loaded._index.nodeEdgeOffset,
+      loaded._index.edgeChild,
+    ]
+    for (const array of arrays) {
+      expect(array.buffer.byteLength).toBe(array.byteLength)
+    }
+    expect(loaded.getStoredFields(7)).toEqual({ text: storedDocs[7].text })
+  })
+})

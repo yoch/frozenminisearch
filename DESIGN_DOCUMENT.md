@@ -388,10 +388,12 @@ This split is part of the design. The project tries to validate untrusted
 external representations aggressively, while avoiding needless repeated checks
 inside trusted internal pipelines.
 
-Ownership also differs by path. Direct builds own their runtime arrays.
-Compressed binary loads decode into an owned payload that can often be kept as
-the backing storage. Raw binary loads may alias the caller-provided wire buffer,
-so the load path materializes ownership where needed before exposing the index.
+Ownership also differs by path. Direct builds own their runtime arrays. Binary
+loads decode sections as views over a payload buffer: the caller's wire buffer
+for raw snapshots, or the decoded allocation for compressed ones. That buffer
+also holds sections already turned into JS values (stored fields, ids, label
+bytes), so the load path copies the typed arrays into owned storage before
+exposing the index, letting the payload be collected.
 
 ## Binary snapshot design
 

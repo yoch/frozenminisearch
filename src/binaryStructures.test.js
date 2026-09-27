@@ -2,9 +2,9 @@ import {
   validateFrozenSnapshot,
   validateFrozenSnapshotNumeric,
 } from './binaryStructures'
-import { buildStoredFieldsSectionWire } from './binaryWireIo'
+import { buildStoredFieldsSectionWire, readExternalId, writeExternalId } from './binaryWireIo'
 import { readStoredFieldsRowsSection } from './storedFieldsWire'
-import { allocBytes, writeU32LE } from './binaryBytes'
+import { allocBytes, concatBytes, writeU32LE } from './binaryBytes'
 import { packTermsFromList } from './PackedRadixTree/packTermList'
 
 function densePostings(termCount, nextId) {
@@ -114,5 +114,27 @@ describe('readStoredFieldsRowsSection', () => {
     writeU32LE(badJsonLen, 4, 99)
     expect(() => readStoredFieldsRowsSection(badJsonLen, 0, 1, 8))
       .toThrow(/stored fields JSON out of bounds/)
+  })
+
+  test.each([
+    ['{"txt"', /Invalid frozen index: stored fields row is not valid JSON/],
+    ['null', /Invalid frozen index: stored fields row is null/],
+  ])('rejects stored row %s', (json, error) => {
+    const body = new TextEncoder().encode(json)
+    const section = allocBytes(8 + body.length)
+    writeU32LE(section, 0, 1)
+    writeU32LE(section, 4, body.length)
+    section.set(body, 8)
+    expect(() => readStoredFieldsRowsSection(section, 0, 1, section.length)).toThrow(error)
+  })
+})
+
+describe('readExternalId', () => {
+  test('rejects malformed JSON ids', () => {
+    const chunks = []
+    writeExternalId(chunks, { a: 1 })
+    const buf = concatBytes(chunks)
+    buf[buf.length - 1] = 0x20
+    expect(() => readExternalId(buf, 0)).toThrow(/Invalid frozen index: external id is not valid JSON/)
   })
 })

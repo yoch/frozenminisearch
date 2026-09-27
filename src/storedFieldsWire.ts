@@ -7,7 +7,7 @@ import {
   writeU32LE,
   type BinaryBytes,
 } from './binaryBytes'
-import { invalidFrozenIndex } from './frozenErrors'
+import { invalidFrozenIndex, parseSnapshotJson } from './frozenErrors'
 import {
   storedFieldsFromRows,
   type StoredFieldsLayout,
@@ -94,7 +94,11 @@ function readStoredFieldJsonAt(
   if (jsonEnd > sectionEnd) {
     throw invalidFrozenIndex('stored fields JSON out of bounds')
   }
-  return JSON.parse(readUtf8(buf, jsonStart, jsonEnd)) as Record<string, unknown>
+  const row = parseSnapshotJson(readUtf8(buf, jsonStart, jsonEnd), 'stored fields row')
+  if (row === null) {
+    throw invalidFrozenIndex('stored fields row is null')
+  }
+  return row as Record<string, unknown>
 }
 
 /** MSv5 StoredFields section → layout (skips row materialization when storeFields hint allows). */

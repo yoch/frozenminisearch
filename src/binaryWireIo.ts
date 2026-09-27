@@ -19,7 +19,7 @@ import {
   writeU32LE,
   type BinaryBytes,
 } from './binaryBytes'
-import { invalidFrozenIndex } from './frozenErrors'
+import { invalidFrozenIndex, parseSnapshotJson } from './frozenErrors'
 import { buildStoredFieldsRowsWireSection } from './storedFieldsWire'
 
 export function readLengthPrefixedUtf8(buf: BinaryBytes, offset: number): { value: string, next: number } {
@@ -88,7 +88,7 @@ export function readExternalId(buf: BinaryBytes, offset: number): { value: unkno
   }
   if (tag === ID_TAG_JSON) {
     const { value, next } = readLengthPrefixedUtf8(buf, offset + 1)
-    return { value: JSON.parse(value), next }
+    return { value: parseSnapshotJson(value, 'external id'), next }
   }
   throw invalidFrozenIndex(`unknown external id tag ${tag}`)
 }

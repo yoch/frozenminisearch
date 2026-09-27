@@ -36,6 +36,7 @@ import {
   pickAutoPayloadCodec,
   rawPayloadChoice,
   type Msv5PayloadCodecChoice,
+  unsupportedCompressionError,
 } from './binaryMsv5CompressionShared'
 export type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
 
@@ -299,10 +300,8 @@ function choosePayloadCodecSync(
       return zlibPayloadChoiceSync(uncompressed)
     case 'auto':
       return autoPayloadChoice(uncompressed, autoSyncCompressors)
-    default: {
-      const _exhaustive: never = compression
-      return _exhaustive
-    }
+    default:
+      throw unsupportedCompressionError(compression)
   }
 }
 
@@ -319,10 +318,8 @@ async function choosePayloadCodecAsync(
       return await zlibPayloadChoiceAsync(uncompressed)
     case 'auto':
       return await autoPayloadChoiceAsync(uncompressed, autoAsyncCompressors)
-    default: {
-      const _exhaustive: never = compression
-      return _exhaustive
-    }
+    default:
+      throw unsupportedCompressionError(compression)
   }
 }
 

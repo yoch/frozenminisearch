@@ -85,7 +85,7 @@ export function miniSearchSnapshotFromFrozen(
     documentCount,
     nextId,
     documentIds,
-    fieldIds,
+    fieldIds: { ...fieldIds },
     fieldLength,
     averageFieldLength: Array.from(avgFieldLength),
     storedFields: storedFieldsOut,

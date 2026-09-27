@@ -12,6 +12,7 @@
 - **`autoSuggest()` and the global `searchOptions.filter`** — a `filter` set in the constructor's `searchOptions` was ignored by `autoSuggest()` unless also passed per call; it now applies, as in MiniSearch.
 - **`storeFields: undefined` / `null`** — `fromDocuments()`, `createFrozenIndexBuilder()` and `fromJSON()` threw a `TypeError`; they now treat it as no stored fields, like MiniSearch.
 - **`fromJSON()` rejected valid MiniSearch snapshots** — it now accepts an `averageFieldLength` that is shorter than the field list or holds `null` (fields no document has, including an empty index), a negative average (MiniSearch's running average after `discard()`), and documents with no `fieldLength` row (no indexed text in any field).
+- **`toJSON()` exposed internal `fieldIds`** — the returned snapshot shared the index's `fieldIds` object, so editing the export changed which field later search results reported. It is now a copy.
 - **Large custom tokenizer output** — a custom `tokenize` returning a very large token array (≈100k+ tokens for one field) crashed indexing with `Maximum call stack size exceeded`.
 - **`fromJSON()` validation** — the number of `documentIds` must now equal `documentCount`, as MiniSearch always writes. A smaller count previously produced `null` result ids, or allocated memory proportional to a forged `documentCount`.
 

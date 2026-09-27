@@ -2,6 +2,7 @@ import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
 import { frozenFromMiniSearch } from '../testSupport/frozenImportHelpers'
 import { MSV5_HEADER_SIZE } from './msv5/binaryMsv5Constants'
+import { frozenPostings, frozenTermIndex } from './internal/frozenInternals'
 
 const docs = [
   { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea' },
@@ -42,12 +43,13 @@ describe('frozenOwnedSnapshot decoded payload release', () => {
   ])('compressed %s load owns compact typed arrays', async (_mode, load) => {
     const buf = FrozenMiniSearch.fromDocuments(storedDocs, storedOptions).saveBinarySync({ compression: 'zlib' })
     const loaded = await load(buf)
+    const postings = frozenPostings(loaded)
+    const index = frozenTermIndex(loaded)
     const arrays = [
-      loaded._postings.allDocIds,
-      loaded._postings.allFreqs,
-      loaded._fieldLengthMatrix,
-      loaded._index.nodeEdgeOffset,
-      loaded._index.edgeChild,
+      postings.allDocIds,
+      postings.allFreqs,
+      index.nodeEdgeOffset,
+      index.edgeChild,
     ]
     for (const array of arrays) {
       expect(array.buffer.byteLength).toBe(array.byteLength)

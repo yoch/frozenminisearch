@@ -129,7 +129,7 @@ export function tokenizeFieldInto(
   }
   const tokens = tokenize(text, fieldName)
   out.length = 0
-  out.push(...tokens)
+  for (const token of tokens) out.push(token)
 }
 
 export type FieldTermCollectResult = {

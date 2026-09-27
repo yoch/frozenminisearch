@@ -34,6 +34,12 @@ import type {
   OptionsWithDefaults,
 } from './frozenTypes'
 import { forEachLiveShortId } from './forEachLiveShortId'
+import {
+  compactExternalIds,
+  externalIdResolver,
+  materializeExternalIds,
+  type FrozenExternalIds,
+} from './frozenExternalIds'
 import { miniSearchSnapshotFromFrozen } from './toMiniSearch'
 import {
   binaryLoadOwnershipModeFromCodec,
@@ -139,7 +145,8 @@ export default class FrozenMiniSearchCore<T = any> {
   protected readonly _index: FrozenTermIndex
   protected readonly _documentCount: number
   protected readonly _nextId: number
-  protected readonly _externalIds: unknown[]
+  protected readonly _externalIds: FrozenExternalIds
+  protected readonly _getExternalId: (docId: number) => unknown
   protected readonly _idLookup: IdToShortIdLookup
   protected readonly _fieldIds: { [field: string]: number }
   protected readonly _fieldCount: number
@@ -156,7 +163,8 @@ export default class FrozenMiniSearchCore<T = any> {
     this._options = params.options
     this._documentCount = params.documentCount
     this._nextId = params.nextId
-    this._externalIds = params.externalIds
+    this._externalIds = compactExternalIds(params.externalIds, params.idLookup)
+    this._getExternalId = externalIdResolver(this._externalIds)
     this._idLookup = params.idLookup
     this._fieldIds = params.fieldIds
     this._fieldCount = params.fieldCount
@@ -174,7 +182,7 @@ export default class FrozenMiniSearchCore<T = any> {
       avgFieldLength: this._avgFieldLength,
       fieldIds: this._fieldIds,
       getFieldLength: (docId, fieldId) => this._getFieldLength(docId, fieldId),
-      getExternalId: docId => this._externalIds[docId],
+      getExternalId: this._getExternalId,
       resolveTermByIndex: termIndex => this._index.termByIndex(termIndex),
       getStoredFields: this._hasStoredFields
         ? docId => readStoredFields(this._storedFields, docId)
@@ -238,7 +246,7 @@ export default class FrozenMiniSearchCore<T = any> {
       query,
       searchOptions,
       this._options.searchOptions,
-      docId => this._externalIds[docId],
+      this._getExternalId,
       undefined,
       this._storedFields,
     )
@@ -288,7 +296,7 @@ export default class FrozenMiniSearchCore<T = any> {
       nextId: this._nextId,
       fieldIds: this._fieldIds,
       fieldCount: this._fieldCount,
-      externalIds: this._externalIds,
+      externalIds: materializeExternalIds(this._externalIds, this._nextId),
       fieldLengthMatrix: this._fieldLengthMatrix,
       avgFieldLength: this._avgFieldLength,
       storedFields: this._storedFields,
@@ -342,7 +350,7 @@ export default class FrozenMiniSearchCore<T = any> {
       fieldIds: this._fieldIds,
       fieldCount: this._fieldCount,
       avgFieldLength: this._avgFieldLength,
-      externalIds: this._externalIds,
+      externalIds: materializeExternalIds(this._externalIds, this._nextId),
       storedFieldsLayout: this._storedFields,
       fieldLengthMatrix: this._fieldLengthMatrix,
       postings: this._postings,

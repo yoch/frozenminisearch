@@ -15,7 +15,7 @@ import type { QueryEngineRunOptions } from '../queryEngineGateLimits'
 type FrozenInternalView<T = any> = {
   _options: OptionsWithDefaults<T>
   _index: FrozenTermIndex
-  _externalIds: unknown[]
+  _getExternalId: (docId: number) => unknown
   _storedFields: StoredFieldsLayout
   _postings: FrozenPostingsLayout
   _queryEngineParams: QueryEngineParams
@@ -66,7 +66,7 @@ export function finalizeRaw<T>(
     query,
     searchOptions,
     view._options.searchOptions,
-    docId => view._externalIds[docId],
+    view._getExternalId,
     undefined,
     view._storedFields,
   )
@@ -92,7 +92,7 @@ export function searchWithRunOptions<T>(
     query,
     searchOptions,
     view._options.searchOptions,
-    docId => view._externalIds[docId],
+    view._getExternalId,
     docId => readStoredFields(view._storedFields, docId),
   )
 }

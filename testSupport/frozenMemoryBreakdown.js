@@ -64,7 +64,7 @@ export function frozenMemoryBreakdown(frozen) {
       estimatedBytes: radixEst,
     },
     documents: {
-      externalIdsSlots: frozen._externalIds.length,
+      externalIdsSlots: frozen._externalIds?.length ?? 0,
       storedFieldsSlots: storedFieldsSlotCount(frozen._storedFields),
       idLookupMode: frozen._idLookup.mode,
       idToShortIdEntries: frozen._idLookup.mapEntryCount,

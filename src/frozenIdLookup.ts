@@ -9,6 +9,8 @@ export interface IdToShortIdLookup {
 
 function detectIdentityNumericIds(externalIds: readonly unknown[], nextId: number): boolean {
   if (nextId === 0) return true
+  // Identity mode drops the id array and returns shortIds, which would turn `-0` into `0`.
+  if (Object.is(externalIds[0], -0)) return false
   for (let i = 0; i < nextId; i++) {
     if (externalIds[i] !== i) return false
   }
@@ -24,26 +26,25 @@ function buildLazyMap(externalIds: readonly unknown[], nextId: number): Map<unkn
   return map
 }
 
-export function createIdToShortIdLookup(
-  externalIds: readonly unknown[],
-  nextId: number,
-): IdToShortIdLookup {
-  if (detectIdentityNumericIds(externalIds, nextId)) {
-    return {
-      mode: 'identity',
-      mapEntryCount: 0,
-      has(id) {
-        return typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId
-      },
-      get(id) {
-        if (typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId) {
-          return id
-        }
-        return undefined
-      },
-    }
+// Separate factories: closures created in one function share a V8 context, so identity
+// methods would otherwise retain `externalIds` through the lazy-map branch.
+function identityLookup(nextId: number): IdToShortIdLookup {
+  return {
+    mode: 'identity',
+    mapEntryCount: 0,
+    has(id) {
+      return typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId
+    },
+    get(id) {
+      if (typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId) {
+        return id
+      }
+      return undefined
+    },
   }
+}
 
+function lazyMapLookup(externalIds: readonly unknown[], nextId: number): IdToShortIdLookup {
   let map: Map<unknown, number> | undefined
   const ensureMap = (): Map<unknown, number> => {
     if (map == null) map = buildLazyMap(externalIds, nextId)
@@ -62,4 +63,13 @@ export function createIdToShortIdLookup(
       return ensureMap().get(id)
     },
   }
+}
+
+export function createIdToShortIdLookup(
+  externalIds: readonly unknown[],
+  nextId: number,
+): IdToShortIdLookup {
+  return detectIdentityNumericIds(externalIds, nextId)
+    ? identityLookup(nextId)
+    : lazyMapLookup(externalIds, nextId)
 }

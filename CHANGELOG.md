@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.9.0 — `@yoch/frozenminisearch`
+
+Minor release: opt-in `limit` (top-K) search option, lower CPU and memory on indexing, save, load and search, and a round of MiniSearch parity and snapshot robustness fixes. Snapshots whose term labels contain unpaired surrogates (e.g. two emoji sharing a leading surrogate) are now written as **MSv5 format revision 2**, which older versions reject; every other snapshot is byte-for-byte unchanged (revision 1). `fromJSON()` now requires as many `documentIds` as `documentCount`.
+
 ### Added
 
 - **`limit` search option** (FrozenMiniSearch extension) — `search(query, { limit })` returns the same results as `search(query).slice(0, limit)` but only materializes and orders the returned results (top-K selection). On broad queries with `limit: 10`: ~6–53% less CPU and ~16–61% fewer bytes allocated per search. With `filter`, the predicate runs in descending score order and stops once `limit` results are kept. Accepts non-negative integers or `Infinity`; ignored by `autoSuggest()`.

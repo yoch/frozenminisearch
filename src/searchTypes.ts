@@ -97,6 +97,15 @@ export type SearchOptions = {
    * BM25+ algorithm parameters. Customizing these is almost never necessary.
    */
   bm25?: BM25Params
+
+  /**
+   * FrozenMiniSearch extension (not in MiniSearch): return at most `limit` results.
+   * The result equals `search(query, options).slice(0, limit)`, but only the returned
+   * results are materialized and ordered. With `filter`, the predicate runs in
+   * descending score order and stops once `limit` results are kept, so it may not see
+   * every candidate. Must be a non-negative integer or `Infinity`; ignored by `autoSuggest`.
+   */
+  limit?: number
 }
 
 /**

@@ -260,7 +260,7 @@ export default class FrozenMiniSearchCore<T = any> {
     if (merged.filter == null) {
       return suggestFromRawResults(runQuery(queryString, merged, this._queryEngineParams))
     }
-    return suggestFromSearchResults(this.search(queryString, merged))
+    return suggestFromSearchResults(this.search(queryString, { ...merged, limit: undefined }))
   }
 
   /** Built-in default for indexing / load options (`tokenize`, `processTerm`, `extractField`, …). */

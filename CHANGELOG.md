@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **`limit` search option** (FrozenMiniSearch extension) — `search(query, { limit })` returns the same results as `search(query).slice(0, limit)` but only materializes and orders the returned results (top-K selection). On broad queries with `limit: 10`: ~6–53% less CPU and ~16–61% fewer bytes allocated per search. With `filter`, the predicate runs in descending score order and stops once `limit` results are kept. Accepts non-negative integers or `Infinity`; ignored by `autoSuggest()`.
+
 ### Improved
 
 - **Compressed binary load memory** — `loadBinarySync()` / `loadBinaryAsync()` on zlib/zstd snapshots (the `'auto'` default) no longer keep the whole decoded payload alive behind typed-array views. Resident memory after load drops by ~25–50% on typical indexes (e.g. 5k × 5 KB stored documents: ~48 MB → ~24 MB), at the cost of a sub-millisecond typed-array copy.

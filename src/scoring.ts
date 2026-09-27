@@ -429,6 +429,16 @@ export interface FinalizeSearchParams {
   storedFieldsLayout?: StoredFieldsLayout
   filter?: (result: SearchResult) => boolean
   skipSort?: boolean
+  /** Keep only the first `limit` results of the unbounded, sorted list. */
+  limit?: number
+}
+
+function resolveResultLimit(limit: unknown): number | undefined {
+  if (limit === undefined || limit === Infinity) return undefined
+  if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0) {
+    throw new Error('FrozenMiniSearch: limit must be a non-negative integer or Infinity')
+  }
+  return limit
 }
 
 function writeStoredFieldsOntoResult(
@@ -469,11 +479,127 @@ export function finalizeRawSearchResults(
     storedFieldsLayout,
     filter: searchOptionsWithDefaults.filter,
     skipSort,
+    limit: resolveResultLimit(searchOptionsWithDefaults.limit),
   })
 }
 
+function materializeSearchResult(
+  docId: number,
+  value: RawResultValue,
+  params: FinalizeSearchParams,
+): SearchResult {
+  const { score, terms, match } = value
+  const result: SearchResult = {
+    id: params.getExternalId(docId),
+    score: score * (terms.length || 1),
+    terms: Object.keys(match),
+    queryTerms: terms,
+    match,
+  }
+  writeStoredFieldsOntoResult(docId, result, params.storedFieldsLayout, params.getStoredFields)
+  return result
+}
+
+/** Rank order of the unbounded list: higher score first, then insertion order (stable sort). */
+function ranksBefore(scores: Float64Array, a: number, b: number): boolean {
+  return scores[a] > scores[b] || (scores[a] === scores[b] && a < b)
+}
+
+/** Indices of the `k` best entries (k < scores.length), in rank order; min-heap on the worst kept. */
+function topRankIndices(scores: Float64Array, k: number): Int32Array {
+  const heap = new Int32Array(k)
+  let size = 0
+  const siftDown = (from: number): void => {
+    let i = from
+    for (;;) {
+      const left = 2 * i + 1
+      if (left >= size) return
+      const right = left + 1
+      let worst = left
+      if (right < size && ranksBefore(scores, heap[left], heap[right])) worst = right
+      if (!ranksBefore(scores, heap[i], heap[worst])) return
+      const tmp = heap[i]
+      heap[i] = heap[worst]
+      heap[worst] = tmp
+      i = worst
+    }
+  }
+  for (let entry = 0; entry < scores.length; entry++) {
+    if (size < k) {
+      let i = size++
+      heap[i] = entry
+      while (i > 0) {
+        const parent = (i - 1) >> 1
+        if (!ranksBefore(scores, heap[parent], heap[i])) break
+        const tmp = heap[i]
+        heap[i] = heap[parent]
+        heap[parent] = tmp
+        i = parent
+      }
+    } else if (ranksBefore(scores, entry, heap[0])) {
+      heap[0] = entry
+      siftDown(0)
+    }
+  }
+  return heap.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+}
+
+function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
+  const { rawResults, filter, skipSort } = params
+  if (limit === 0) return []
+
+  if (skipSort) {
+    const results: SearchResult[] = []
+    for (const [docId, value] of rawResults) {
+      const result = materializeSearchResult(docId, value, params)
+      if (filter != null && !filter(result)) continue
+      results.push(result)
+      if (results.length === limit) break
+    }
+    return results
+  }
+
+  const scores = new Float64Array(rawResults.size)
+  let entry = 0
+  for (const { score, terms } of rawResults.values()) {
+    scores[entry++] = score * (terms.length || 1)
+  }
+
+  if (filter != null) {
+    const docIds = Array.from(rawResults.keys())
+    const values = Array.from(rawResults.values())
+    const order = new Int32Array(scores.length)
+    for (let i = 0; i < order.length; i++) order[i] = i
+    order.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+    const results: SearchResult[] = []
+    for (let i = 0; i < order.length && results.length < limit; i++) {
+      const result = materializeSearchResult(docIds[order[i]], values[order[i]], params)
+      if (filter(result)) results.push(result)
+    }
+    return results
+  }
+
+  const top = topRankIndices(scores, limit)
+  const byEntry = Array.from(top.keys()).sort((a, b) => top[a] - top[b])
+  const results = new Array<SearchResult>(top.length)
+  let next = 0
+  entry = 0
+  for (const [docId, value] of rawResults) {
+    const rank = byEntry[next]
+    if (top[rank] === entry) {
+      results[rank] = materializeSearchResult(docId, value, params)
+      if (++next === byEntry.length) break
+    }
+    entry++
+  }
+  return results
+}
+
 export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {
-  const { rawResults, getExternalId, getStoredFields, storedFieldsLayout, filter, skipSort } = params
+  const { rawResults, getExternalId, getStoredFields, storedFieldsLayout, filter, skipSort, limit } = params
+  if (limit !== undefined && limit < rawResults.size) {
+    return finalizeLimitedSearchResults(params, limit)
+  }
   let allScoresEqual = true
   let firstScore: number | undefined
 

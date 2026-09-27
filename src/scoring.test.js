@@ -8,7 +8,10 @@ import {
   collectDocIdsFromFieldTermData,
   combineResults,
   defaultBM25params,
+  finalizeRawSearchResults,
+  finalizeSearchResults,
 } from './scoring'
+import { defaultSearchOptions } from './searchDefaults'
 
 function mapPostingList(freqs) {
   return {
@@ -226,5 +229,71 @@ describe('collectDocIdsFromFieldTermData', () => {
       new Set([4, 16, 99]),
     )
     expect(Array.from(docIds).sort((a, b) => a - b)).toEqual([4, 16])
+  })
+})
+
+describe('finalizeSearchResults limit', () => {
+  function randomRawResults(size, seed) {
+    let state = seed
+    const rand = () => {
+      state = (state * 1103515245 + 12345) >>> 0
+      return state / 0x100000000
+    }
+    const raw = new Map()
+    for (let i = 0; i < size; i++) {
+      const docId = Math.floor(rand() * 1_000_000)
+      if (raw.has(docId)) continue
+      // Few distinct scores, so ties are frequent.
+      const terms = rand() < 0.3 ? ['a', 'b'] : ['a']
+      raw.set(docId, { score: Math.floor(rand() * 5) / 2, terms, match: { [`t${docId % 3}`]: ['text'] } })
+    }
+    return raw
+  }
+
+  const base = {
+    getExternalId: docId => `doc-${docId}`,
+    getStoredFields: docId => ({ bucket: docId % 4 }),
+  }
+
+  test.each([
+    ['sorted', {}],
+    ['sorted + filter', { filter: r => r.bucket !== 1 }],
+    ['skipSort', { skipSort: true }],
+    ['skipSort + filter', { skipSort: true, filter: r => r.bucket === 2 }],
+  ])('%s equals slicing the unbounded results', (_name, extra) => {
+    for (const size of [0, 1, 2, 7, 50, 300]) {
+      for (const seed of [1, 2, 3]) {
+        const full = finalizeSearchResults({ ...base, ...extra, rawResults: randomRawResults(size, seed) })
+        for (const limit of [0, 1, 2, 5, size - 1, size, size + 3]) {
+          if (limit < 0) continue
+          const limited = finalizeSearchResults({ ...base, ...extra, limit, rawResults: randomRawResults(size, seed) })
+          expect(limited).toEqual(full.slice(0, limit))
+        }
+      }
+    }
+  })
+
+  test('all-equal scores keep insertion order', () => {
+    const raw = new Map([[5, { score: 1, terms: ['a'], match: { a: ['t'] } }], [1, { score: 1, terms: ['a'], match: { a: ['t'] } }], [9, { score: 1, terms: ['a'], match: { a: ['t'] } }]])
+    expect(finalizeSearchResults({ ...base, rawResults: raw, limit: 2 }).map(r => r.id)).toEqual(['doc-5', 'doc-1'])
+  })
+
+  test('filter stops once the limit is reached', () => {
+    let calls = 0
+    const raw = randomRawResults(200, 9)
+    const results = finalizeSearchResults({ ...base, rawResults: raw, limit: 3, filter: () => { calls++; return true } })
+    expect(results).toHaveLength(3)
+    expect(calls).toBe(3)
+  })
+
+  test.each([-1, 1.5, NaN, '3', null])('rejects invalid limit %s', (limit) => {
+    expect(() => finalizeRawSearchResults(new Map(), 'q', { limit }, defaultSearchOptions, id => id))
+      .toThrow('limit must be a non-negative integer or Infinity')
+  })
+
+  test('Infinity means no limit', () => {
+    const raw = randomRawResults(20, 4)
+    const full = finalizeRawSearchResults(randomRawResults(20, 4), 'q', {}, defaultSearchOptions, id => id)
+    expect(finalizeRawSearchResults(raw, 'q', { limit: Infinity }, defaultSearchOptions, id => id)).toEqual(full)
   })
 })

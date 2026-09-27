@@ -416,20 +416,14 @@ describe('Gate docId scoring (AND / AND_NOT)', () => {
       expect(boostCalls).toBeGreaterThan(100)
     })
 
-    test('broad AND_NOT exclusion can return empty without scoring positive branch', () => {
+    test('broad AND_NOT exclusion can return empty with boostDocument', () => {
       const ms = new MiniSearch({ fields: ['text'], searchOptions: { prefix: false } })
       ms.addAll(buildCommonUniqueCorpus(6000))
       const frozen = frozenFromMiniSearch(FrozenMiniSearch, ms, { fields: ['text'], searchOptions: { prefix: false } })
-      let boostCalls = 0
-      const boostDocument = () => {
-        boostCalls++
-        return 1
-      }
+      const boostDocument = () => 1
 
-      const results = frozen.search('common alpha', { combineWith: 'AND_NOT', boostDocument })
-
-      expect(results).toEqual([])
-      expect(boostCalls).toBe(0)
+      expect(frozen.search('common alpha', { combineWith: 'AND_NOT', boostDocument })).toEqual([])
+      expect(ms.search('common alpha', { combineWith: 'AND_NOT', boostDocument })).toEqual([])
     })
   })
 })

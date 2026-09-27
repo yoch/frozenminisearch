@@ -65,8 +65,8 @@ function validateActiveShortIds(
     assertShortIdInRange(shortId, nextId, 'documentIds')
     return shortId
   })
-  if (shortIds.length > documentCount) {
-    throw snapshotError(`documentIds count ${shortIds.length} must be <= documentCount ${documentCount}`)
+  if (shortIds.length !== documentCount) {
+    throw snapshotError(`documentIds count ${shortIds.length} must equal documentCount ${documentCount}`)
   }
   shortIds.sort((a, b) => a - b)
   return shortIds
@@ -122,14 +122,19 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
       throw snapshotError(`storedFields shortId ${shortId} is missing from documentIds`)
     }
   }
-  if (snapshot.averageFieldLength.length !== fieldCount) {
-    throw snapshotError(`averageFieldLength length must equal field count ${fieldCount}`)
+  if (snapshot.averageFieldLength.length > fieldCount) {
+    throw snapshotError(`averageFieldLength length must be <= field count ${fieldCount}`)
   }
-  for (let f = 0; f < fieldCount; f++) {
+  // MiniSearch leaves entries unset for fields no document has, and its running average can drift
+  // below zero after discards; both load fine there, so only non-numbers are rejected.
+  const avgFieldLength = new Float32Array(fieldCount)
+  for (let f = 0; f < snapshot.averageFieldLength.length; f++) {
     const avg = snapshot.averageFieldLength[f]
-    if (!Number.isFinite(avg) || avg < 0) {
-      throw snapshotError(`averageFieldLength field ${f} must be a non-negative number`)
+    if (avg == null) continue
+    if (!Number.isFinite(avg)) {
+      throw snapshotError(`averageFieldLength field ${f} must be a finite number`)
     }
+    avgFieldLength[f] = avg
   }
   const useDense = documentCount < nextId
 
@@ -163,9 +168,7 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   const matrixRows = useDense ? documentCount : nextId
   const matrixCells = matrixRows * fieldCount
   const fieldLengthScratch: number[] = new Array(matrixCells).fill(0)
-  // Single pass over fieldLength: validate keys/rows + fill the matrix + track
-  // coverage (every active document must carry a fieldLength row).
-  let fieldLengthCovered = 0
+  // Documents without a fieldLength row (no indexed text in any field) keep all-zero lengths, as in MiniSearch.
   for (const [shortIdStr, lengths] of Object.entries(fieldLength)) {
     const shortId = parseCanonicalIntegerKey(shortIdStr, 'fieldLength')
     assertShortIdInRange(shortId, nextId, 'fieldLength')
@@ -184,17 +187,8 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
       }
       fieldLengthScratch[rowBase + f] = length
     }
-    fieldLengthCovered++
-  }
-  if (fieldLengthCovered !== activeShortIds.length) {
-    throw snapshotError(`fieldLength must cover all ${activeShortIds.length} active documents (got ${fieldLengthCovered})`)
   }
   const fieldLengthMatrix = materializeFieldLengthMatrix(fieldLengthScratch)
-
-  const avgFieldLength = new Float32Array(snapshot.averageFieldLength.length)
-  for (let i = 0; i < snapshot.averageFieldLength.length; i++) {
-    avgFieldLength[i] = snapshot.averageFieldLength[i]
-  }
 
   const parsedIndex = parseSnapshotIndex(snapshot, fieldCount, nextId, shortIdRemap)
   const postings = parsedIndex.accumulator.finalize(parsedIndex.termCount, resolvedNextId)

@@ -452,10 +452,12 @@ describe('FrozenMiniSearch binary round-trip', () => {
 
   test('Uint32 doc ids when document count exceeds 65535', () => {
     // Synthetic snapshot keeps nextId > 65535 without indexing 65k docs.
+    const documentIds = Object.fromEntries(Array.from({ length: 65536 }, (_, i) => [i, `doc${i}`]))
+    documentIds[65535] = 'max'
     const snapshot = {
       documentCount: 65536,
       nextId: 65536,
-      documentIds: { 65535: 'max' },
+      documentIds,
       fieldIds: { txt: 0 },
       fieldLength: { 65535: [1] },
       averageFieldLength: [1],

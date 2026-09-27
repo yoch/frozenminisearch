@@ -30,6 +30,8 @@
 - **`AND_NOT` with `boostDocument`** — a document for which `boostDocument` returns `0` on a negated term no longer counts as matching that term, so it is not excluded (MiniSearch parity). Previously the negated branch ignored `boostDocument` and could drop such documents.
 - **`autoSuggest()` and the global `searchOptions.filter`** — a `filter` set in the constructor's `searchOptions` was ignored by `autoSuggest()` unless also passed per call; it now applies, as in MiniSearch.
 - **`storeFields: undefined` / `null`** — `fromDocuments()`, `createFrozenIndexBuilder()` and `fromJSON()` threw a `TypeError`; they now treat it as no stored fields, like MiniSearch.
+- **`fromJSON()` rejected valid MiniSearch snapshots** — it now accepts an `averageFieldLength` that is shorter than the field list or holds `null` (fields no document has, including an empty index), a negative average (MiniSearch's running average after `discard()`), and documents with no `fieldLength` row (no indexed text in any field).
+- **`fromJSON()` validation** — the number of `documentIds` must now equal `documentCount`, as MiniSearch always writes. A smaller count previously produced `null` result ids, or allocated memory proportional to a forged `documentCount`.
 
 ## v1.8.0 — `@yoch/frozenminisearch`
 

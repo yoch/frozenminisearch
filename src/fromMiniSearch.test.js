@@ -316,15 +316,21 @@ describe('fromMiniSearch loaders', () => {
       .toThrow(/invalid MiniSearch snapshot: documentCount 2 must be <= nextId 1/)
   })
 
-  test('fromJSON rejects documentIds count greater than documentCount', () => {
-    const snapshot = validSnapshot({
+  test('fromJSON rejects documentIds count different from documentCount', () => {
+    const more = validSnapshot({
       documentCount: 1,
       nextId: 3,
       documentIds: { 0: 'a', 1: 'b' },
       fieldLength: { 0: [1], 1: [1] },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds count 2 must be <= documentCount 1/)
+    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(more), { fields: ['text'] }))
+      .toThrow(/invalid MiniSearch snapshot: documentIds count 2 must equal documentCount 1/)
+    const fewer = validSnapshot({ documentCount: 2, nextId: 2, index: [['hello', { 0: { 0: 1, 1: 1 } }]] })
+    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(fewer), { fields: ['text'] }))
+      .toThrow(/invalid MiniSearch snapshot: documentIds count 1 must equal documentCount 2/)
+    const huge = validSnapshot({ documentCount: 2e8, nextId: 2e8, documentIds: {}, fieldLength: {}, index: [] })
+    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(huge), { fields: ['text'] }))
+      .toThrow(/invalid MiniSearch snapshot: documentIds count 0 must equal documentCount 200000000/)
   })
 
   test('fromJSON rejects duplicate and incomplete fieldIds', () => {
@@ -361,20 +367,46 @@ describe('fromMiniSearch loaders', () => {
     expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({
       averageFieldLength: [1, 1],
     })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: averageFieldLength length must equal field count 1/)
+      .toThrow(/invalid MiniSearch snapshot: averageFieldLength length must be <= field count 1/)
     expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({
-      averageFieldLength: [-1],
+      averageFieldLength: ['1'],
     })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: averageFieldLength field 0 must be a non-negative number/)
+      .toThrow(/invalid MiniSearch snapshot: averageFieldLength field 0 must be a finite number/)
     expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({ index: 'bad' })), { fields: ['text'] }))
       .toThrow(/invalid MiniSearch snapshot: index must be an array/)
   })
 
-  test('fromJSON rejects incomplete fieldLength coverage and invalid frequencies', () => {
-    const snapshot = validSnapshot({ fieldLength: {} })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: fieldLength must cover all 1 active documents/)
+  test.each([
+    ['an empty index', [], { fields: ['title', 'text'] }],
+    ['a field no document has', [{ id: 1, title: 'hello' }], { fields: ['title', 'text'] }],
+    ['a leading field no document has', [{ id: 1, text: 'hello' }], { fields: ['title', 'text'] }],
+    ['a document without indexed text', [{ id: 1, title: 'hello world' }, { id: 2, title: null }], { fields: ['title'] }],
+  ])('fromJSON loads MiniSearch snapshots of %s', (_label, corpus, opts) => {
+    const reference = new MiniSearch(opts)
+    reference.addAll(corpus)
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(reference), opts)
+    expect(frozen.documentCount).toBe(reference.documentCount)
+    for (const doc of corpus) expect(frozen.has(doc.id)).toBe(true)
+    expect(frozen.search('hello')).toEqual(reference.search('hello'))
+  })
 
+  test('fromJSON loads a MiniSearch snapshot with a negative averageFieldLength', () => {
+    const opts = { fields: ['t'] }
+    const reference = new MiniSearch(opts)
+    reference.add({ id: 1 })
+    reference.add({ id: 2, t: 'a b c' })
+    reference.discard(1)
+    reference.add({ id: 3, t: 'x' })
+    reference.discard(2)
+    const json = JSON.stringify(reference)
+    expect(JSON.parse(json).averageFieldLength[0]).toBeLessThan(0)
+    const expected = MiniSearch.loadJSON(json, opts).search('x')
+    const actual = FrozenMiniSearch.fromJSON(json, opts).search('x')
+    expect(actual.map(r => r.id)).toEqual(expected.map(r => r.id))
+    expect(actual[0].score).toBeCloseTo(expected[0].score, 5)
+  })
+
+  test('fromJSON rejects invalid frequencies', () => {
     const badFreq = validSnapshot({
       index: [['hello', { 0: { 0: 0 } }]],
     })

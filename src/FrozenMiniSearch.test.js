@@ -37,6 +37,17 @@ describe('FrozenMiniSearch core', () => {
     expect(loaded.search('zen').map(r => r.id)).toEqual(frozen.search('zen').map(r => r.id))
   })
 
+  test.each(['raw', 'zlib'])('loadBinarySync / loadBinaryAsync accept a plain Uint8Array (%s)', async (compression) => {
+    const frozen = FrozenMiniSearch.fromDocuments(docs, options)
+    const bytes = frozen.saveBinarySync({ compression })
+    const padded = new Uint8Array(bytes.length + 3)
+    padded.set(bytes, 3)
+    for (const view of [new Uint8Array(bytes), padded.subarray(3)]) {
+      expect(FrozenMiniSearch.loadBinarySync(view, options).search('zen')).toEqual(frozen.search('zen'))
+      expect((await FrozenMiniSearch.loadBinaryAsync(view, options)).search('zen')).toEqual(frozen.search('zen'))
+    }
+  })
+
   test.each([undefined, null])('storeFields: %s behaves like no stored fields', (storeFields) => {
     const opts = { fields: ['title', 'text'], storeFields }
     const direct = FrozenMiniSearch.fromDocuments(docs, opts)

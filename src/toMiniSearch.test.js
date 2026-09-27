@@ -38,11 +38,10 @@ describe('toJSON MiniSearch wire export', () => {
 
   test('mutating the exported fieldIds leaves the index unchanged', () => {
     const frozen = FrozenMiniSearch.fromDocuments(docs, options)
-    const before = frozen.search('zen')
     const snapshot = frozen.toJSON()
     snapshot.fieldIds.title = 1
     snapshot.fieldIds.text = 0
-    expect(frozen.search('zen')).toEqual(before)
+    expect(frozen.search('moby')[0].match).toEqual({ moby: ['title'] })
   })
 
   test('exported snapshot loads in MiniSearch with equivalent scores', () => {

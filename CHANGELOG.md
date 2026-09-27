@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Leading U+FEFF in binary snapshots** — string decoding no longer strips a leading U+FEFF as a byte-order mark. A term starting with U+FEFF (e.g. the first word of a text file with a BOM) made `loadBinarySync()` reject a snapshot written by `saveBinarySync()`, and string ids lost their leading U+FEFF.
+
 ## v1.8.0 — `@yoch/frozenminisearch`
 
 Minor release: faster MiniSearch JSON import, tighter snapshot validation at the import boundary, and internal query-engine cleanup. No public API or MSv5 wire-format changes.

@@ -1,7 +1,7 @@
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
-import { type AggregateContext, finalizeRawSearchResults } from './scoring'
+import { type AggregateContext, finalizeRawSearchResults, type RawResult } from './scoring'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import {
   createFrozenFieldTermFlyweight,
@@ -19,6 +19,7 @@ import {
   createFrozenQueryIndexView,
   executeQuery as runQuery,
   type QueryEngineParams,
+  type QueryIndexView,
 } from './queryEngine'
 import { suggestFromRawResults, suggestFromSearchResults } from './suggestions'
 import type {
@@ -151,6 +152,8 @@ export default class FrozenMiniSearchCore<T = any> {
   protected readonly _fieldTermFlyweight: FrozenFieldTermFlyweight
   private readonly _queryEngineParams: QueryEngineParams
   private readonly _hasStoredFields: boolean
+  /** Searches in progress on this instance (> 1 when re-entered from `boostDocument`). */
+  private _activeQueries = 0
 
   constructor(params: FrozenAssembleParams<T>) {
     this._options = params.options
@@ -185,21 +188,44 @@ export default class FrozenMiniSearchCore<T = any> {
       globalSearchOptions: this._options.searchOptions,
       tokenize: this._options.tokenize,
       processTerm: this._options.processTerm,
-      indexView: createFrozenQueryIndexView(
-        this._index,
-        this._postings,
-        this._fieldTermFlyweight,
-        this._hasStoredFields
-          ? (callback) => {
-              forEachLiveShortId(this._nextId, this._externalIds, (shortId, id) => {
-                callback(shortId, id, readStoredFields(this._storedFields, shortId))
-              })
-            }
-          : (callback) => {
-              forEachLiveShortId(this._nextId, this._externalIds, callback)
-            },
-      ),
+      indexView: this._createQueryIndexView(this._fieldTermFlyweight),
       aggregateContext,
+    }
+  }
+
+  private _createQueryIndexView(flyweight: FrozenFieldTermFlyweight): QueryIndexView {
+    return createFrozenQueryIndexView(
+      this._index,
+      this._postings,
+      flyweight,
+      this._hasStoredFields
+        ? (callback) => {
+            forEachLiveShortId(this._nextId, this._externalIds, (shortId, id) => {
+              callback(shortId, id, readStoredFields(this._storedFields, shortId))
+            })
+          }
+        : (callback) => {
+            forEachLiveShortId(this._nextId, this._externalIds, callback)
+          },
+    )
+  }
+
+  /**
+   * The shared posting flyweight is rebound per term and read again per field while scoring,
+   * so a search started from `boostDocument` gets its own view instead of rebinding the outer one.
+   */
+  private _runQuery(query: Query, searchOptions: SearchOptions): RawResult {
+    const params = this._activeQueries === 0
+      ? this._queryEngineParams
+      : {
+          ...this._queryEngineParams,
+          indexView: this._createQueryIndexView(createFrozenFieldTermFlyweight(this._postings)),
+        }
+    this._activeQueries++
+    try {
+      return runQuery(query, searchOptions, params)
+    } finally {
+      this._activeQueries--
     }
   }
 
@@ -234,7 +260,7 @@ export default class FrozenMiniSearchCore<T = any> {
    */
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
     return finalizeRawSearchResults(
-      runQuery(query, searchOptions, this._queryEngineParams),
+      this._runQuery(query, searchOptions),
       query,
       searchOptions,
       this._options.searchOptions,
@@ -251,7 +277,7 @@ export default class FrozenMiniSearchCore<T = any> {
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
     const merged = { ...this._options.autoSuggestOptions, ...options }
     if (merged.filter == null) {
-      return suggestFromRawResults(runQuery(queryString, merged, this._queryEngineParams))
+      return suggestFromRawResults(this._runQuery(queryString, merged))
     }
     return suggestFromSearchResults(this.search(queryString, merged))
   }
@@ -293,7 +319,7 @@ export default class FrozenMiniSearchCore<T = any> {
       avgFieldLength: this._avgFieldLength,
       storedFields: this._storedFields,
       index: this._index,
-      fieldTermFlyweight: this._fieldTermFlyweight,
+      fieldTermFlyweight: createFrozenFieldTermFlyweight(this._postings),
     })
   }
 

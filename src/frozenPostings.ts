@@ -151,8 +151,9 @@ function findSparseSlotByFieldId(
  * Module-level scratch for {@link resolvePostingSlice} (zero allocation on hot paths).
  *
  * **Threading / reentrancy:** query execution is synchronous and single-threaded today.
- * Safe while `search()` does not yield and callers do not re-enter the engine from
- * callbacks (`filter`, `boostDocument`) on the same index instance.
+ * Each read consumes the scratch before returning, so no user callback can run in between;
+ * searches re-entered from `boostDocument` use their own flyweight (the flyweight binding,
+ * unlike this scratch, is read again across callbacks).
  * If the engine becomes async, concurrent, or shared across Workers without copying
  * the index, pass a per-query scratch (or move scratch onto the flyweight instance).
  */

@@ -32,3 +32,11 @@ Add or update colocated vitest tests for behavior changes. For search semantics,
 ## Commit & Pull Request Guidelines
 
 Recent commits use concise imperative subjects, for example `Fix lint failures blocking CI.` and `Add toJSON export and deprecate fromJson alias.` Keep commits focused and mention user-visible changes in `CHANGELOG.md`. PRs should describe the change, list tests or benchmarks run, link related issues, and call out compatibility, binary format, or parity impacts. Do not commit generated `docs/` HTML; published docs are produced by the release/docs workflows.
+
+## Cursor Cloud specific instructions
+
+Cloud Agent `install` puts the latest Node.js Current and Bun on `/usr/local/bin` (`/usr/local/bin/node`, `/usr/local/bin/bun`) and installs CPU/memory profilers: `strace`, `ltrace`, `perf`, `valgrind`, `heaptrack`, `bpftrace`, `gdb`, and `elfutils` (`eu-stack`). Dependencies stay on the pinned pnpm from `packageManager` via `pnpm install --frozen-lockfile`.
+
+The agent PATH lists `/exec-daemon` before `/usr/local/bin`, so a bare `node` can be the older agent binary. Export `PATH="/usr/local/bin:$PATH"` before `pnpm lint`, `pnpm test`, `pnpm build`, and profiling. There is no dev server. Hello-world is `FrozenMiniSearch.fromDocuments`, `search` / `autoSuggest`, then `saveBinarySync` / `loadBinarySync`. The browser bundle check is `make test-browser` after `pnpm build`.
+
+`/usr/bin/perf` refuses to start when Ubuntu's `linux-tools` package does not match `uname -r`. Install links the packaged `perf` binary at `/usr/local/bin/perf`. This VM does not expose hardware counters (`cycles`, `instructions`) or kernel BTF, so `bpftrace` cannot attach. Use `perf stat` for software counters, `node --cpu-prof` or `valgrind --tool=callgrind` for CPU, and `node --heap-prof`, `heaptrack`, or `valgrind --tool=massif` for memory. `strace -c` and `ltrace -c` remain available.

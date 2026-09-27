@@ -8,6 +8,7 @@ import {
 import {
   allocBytes,
   concatBytes,
+  isWellFormedUtf16,
   readDoubleLE,
   readFloatLE,
   readU8,
@@ -46,20 +47,25 @@ export function writeExternalId(chunks: BinaryBytes[], id: unknown): void {
     chunks.push(new Uint8Array([ID_TAG_EMPTY]))
     return
   }
-  if (typeof id === 'number' && Number.isFinite(id)) {
+  if (typeof id === 'number') {
     const header = allocBytes(9)
     header[0] = ID_TAG_NUMBER
     writeDoubleLE(header, 1, id)
     chunks.push(header)
     return
   }
-  if (typeof id === 'string') {
+  // UTF-8 cannot hold unpaired surrogates; JSON escapes them, so such strings take the JSON tag.
+  if (typeof id === 'string' && isWellFormedUtf16(id)) {
     chunks.push(new Uint8Array([ID_TAG_STRING]))
     writeLengthPrefixedUtf8(chunks, id)
     return
   }
+  const json = typeof id === 'bigint' ? undefined : JSON.stringify(id)
+  if (json === undefined) {
+    throw new Error(`FrozenMiniSearch: a document id of type ${typeof id} cannot be saved in a binary snapshot`)
+  }
   chunks.push(new Uint8Array([ID_TAG_JSON]))
-  writeLengthPrefixedUtf8(chunks, JSON.stringify(id))
+  writeLengthPrefixedUtf8(chunks, json)
 }
 
 export function readExternalId(buf: BinaryBytes, offset: number): { value: unknown | undefined, next: number } {

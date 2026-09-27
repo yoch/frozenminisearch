@@ -503,6 +503,24 @@ describe('binaryFormat string fidelity', () => {
     expect(loaded.search('zebra')).toEqual(index.search('zebra'))
   })
 
+  test('keeps non-finite number ids and strings with unpaired surrogates', () => {
+    const ids = [NaN, Infinity, -Infinity, -0, 'doc\uD800', '\uDC00', 'ok😀']
+    const opts = { fields: ['text'] }
+    const index = FrozenMiniSearch.fromDocuments(ids.map(id => ({ id, text: 'hello' })), opts)
+    const loaded = roundTrip(index, opts)
+    for (const id of ids) expect(loaded.has(id)).toBe(true)
+    expect(loaded.search('hello').map(r => r.id)).toEqual(index.search('hello').map(r => r.id))
+  })
+
+  test.each([
+    ['bigint', 10n],
+    ['symbol', Symbol('s')],
+    ['function', () => {}],
+  ])('rejects %s ids at save time', (type, id) => {
+    const index = FrozenMiniSearch.fromDocuments([{ id, text: 'hello' }], { fields: ['text'] })
+    expect(() => index.saveBinarySync()).toThrow(`a document id of type ${type} cannot be saved in a binary snapshot`)
+  })
+
   const surrogateDocs = [
     { id: 1, text: '😀 smile' },
     { id: 2, text: '😁 grin' },

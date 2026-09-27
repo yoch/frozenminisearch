@@ -485,6 +485,25 @@ describe('FrozenMiniSearch loadBinary fields', () => {
   })
 })
 
+describe('binaryFormat string fidelity', () => {
+  const roundTrip = (index, opts, compression = 'raw') =>
+    FrozenMiniSearch.loadBinarySync(index.saveBinarySync({ compression }), opts)
+
+  test.each(['raw', 'zlib'])('keeps a leading U+FEFF in terms and ids (%s)', (compression) => {
+    const bomDocs = [
+      { id: '\uFEFFdoc1', text: '\uFEFFhello world' },
+      { id: 'doc2', text: 'zebra yak' },
+    ]
+    const opts = { fields: ['text'] }
+    const index = FrozenMiniSearch.fromDocuments(bomDocs, opts)
+    const loaded = roundTrip(index, opts, compression)
+    expect(loaded.has('\uFEFFdoc1')).toBe(true)
+    expect(loaded.search('\uFEFFhello')).toEqual(index.search('\uFEFFhello'))
+    expect(loaded.search('\uFEFFhello')[0].id).toBe('\uFEFFdoc1')
+    expect(loaded.search('zebra')).toEqual(index.search('zebra'))
+  })
+})
+
 describe('crc32Buffer verification', () => {
   test('matches crc-32 npm library on various inputs', () => {
     const inputs = [

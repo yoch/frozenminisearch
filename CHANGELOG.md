@@ -23,6 +23,7 @@
 ### Fixed
 
 - **Searches re-entered from `boostDocument`** — calling `search()`, `autoSuggest()` or `toJSON()` on the same index from inside a `boostDocument` callback no longer corrupts the outer search (wrong `match` fields, scores and order on multi-field indexes). Nested searches get their own posting view; the outermost search keeps the shared one, so query cost is unchanged.
+- **Leading U+FEFF in binary snapshots** — string decoding no longer strips a leading U+FEFF as a byte-order mark. A term starting with U+FEFF (e.g. the first word of a text file with a BOM) made `loadBinarySync()` reject a snapshot written by `saveBinarySync()`, and string ids lost their leading U+FEFF.
 
 ## v1.8.0 — `@yoch/frozenminisearch`
 

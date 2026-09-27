@@ -2,7 +2,8 @@
 export type BinaryBytes = Uint8Array
 
 const textEncoder = new TextEncoder()
-const textDecoder = new TextDecoder()
+// Strings are raw UTF-8 slices: a leading U+FEFF is data (a term, id or label), not a BOM.
+const textDecoder = new TextDecoder('utf-8', { ignoreBOM: true })
 
 export function allocBytes(length: number): Uint8Array {
   return new Uint8Array(length)

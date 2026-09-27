@@ -36,19 +36,19 @@ Same corpora, same BM25-style queries, MiniSearch 7.2.0 as the reference.
 
 | Scenario | Docs | Index RAM | Binary size | Load JSON | Load binary | Freeze import | Search p50 |
 |----------|-----:|-----------|------------:|----------:|------------:|--------------:|-----------:|
-| Divina, with stored text | 14,097 | 0.82 vs 16.1 MB (~95% less) | ~71% less | 92 ms | 41 ms | 96 ms | ~30% faster |
-| Divina, index only | 14,097 | 0.71 vs 14.9 MB (~95% less) | ~75% less | 115 ms | 19 ms | 112 ms | ~30% faster |
-| Giant vocabulary (50k terms) | 50,000 | 1.82 vs 47.2 MB (~96% less) | ~81% less | 264 ms | 49 ms | 245 ms | ~46% faster |
-| Dense numeric ids | 100,000 | 4.91 vs 91.3 MB (~95% less) | ~73% less | 524 ms | 55 ms | 398 ms | ~30% faster |
-| Generic string ids | 100,000 | 4.90 vs 91.3 MB (~95% less) | ~74% less | 569 ms | 75 ms | 403 ms | ~27% faster |
-| Uint16 doc id boundary | 65,535 | 2.89 vs 58.6 MB (~95% less) | ~77% less | 356 ms | 45 ms | 269 ms | ~55% faster |
-| Uint32 doc id boundary | 65,536 | 3.51 vs 58.6 MB (~94% less) | ~74% less | 390 ms | 44 ms | 283 ms | ~54% faster |
+| Divina, with stored text | 14,097 | 4.73 vs 16.1 MB (~71% less) | ~71% less | 92 ms | 41 ms | 97 ms | ~41% faster |
+| Divina, index only | 14,097 | 4.62 vs 14.9 MB (~69% less) | ~75% less | 90 ms | 19 ms | 101 ms | ~43% faster |
+| Giant vocabulary (50k terms) | 50,000 | 1.44 vs 47.2 MB (~97% less) | ~81% less | 222 ms | 45 ms | 228 ms | ~57% faster |
+| Dense numeric ids | 100,000 | 4.14 vs 91.3 MB (~96% less) | ~73% less | 540 ms | 68 ms | 429 ms | ~57% faster |
+| Generic string ids | 100,000 | 4.90 vs 91.3 MB (~95% less) | ~74% less | 585 ms | 89 ms | 408 ms | ~46% faster |
+| Uint16 doc id boundary | 65,535 | 2.39 vs 58.6 MB (~96% less) | ~77% less | 377 ms | 51 ms | 350 ms | ~66% faster |
+| Uint32 doc id boundary | 65,536 | 3.01 vs 58.6 MB (~95% less) | ~74% less | 397 ms | 49 ms | 280 ms | ~71% faster |
 
 Load JSON = `MiniSearch.loadJSON` on the same `toJSON` snapshot. Load binary = `loadBinarySync` after `saveBinarySync`. Freeze import = one-time `FrozenMiniSearch.fromJSON` (not the hot reload path).
 
-Across this full run, frozen is faster on **27/27** search cases. Divina `inferno` (exact, paired p50): mutable 17.2 µs → frozen 13.1 µs (**-4 µs**, ratio 0.69).
+Across this full run, frozen is faster on **27/27** search cases. Divina `inferno` (exact, paired p50): mutable 15.0 µs → frozen 8.9 µs (**-6 µs**, ratio 0.56).
 
-Numbers are from `benchmarks/baselines/reference.json` @ `1cdc405`, captured 2026-07-04 on Node v24.16.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
+Numbers are from `benchmarks/baselines/reference.json` @ `6b43b15`, captured 2026-09-27 on Node v24.18.0, 3 runs per scenario. Heap protocol v4 (isolated scenario processes, in-process trials, median+MAD; totalResident = heapUsed + external on both sides) — trend, not exact accounting. Index RAM column shows — for scenarios outside the heap allowlist.
 
 Detailed tables for all 13 scenarios (search, load, migrate, heap, drift, …): **[benchmarks/VS_REFERENCE.md](benchmarks/VS_REFERENCE.md)**.
 <!-- vs-reference:end -->

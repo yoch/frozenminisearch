@@ -129,6 +129,7 @@ function assembleMsv5FileRawDirect(
       payloadCrc32,
       CODEC_RAW,
       0,
+      globalFlags,
     ),
   }
 }
@@ -166,6 +167,7 @@ function buildMsv5AssembledFile(
       payloadCrc32,
       codec,
       zstdLevel,
+      globalFlags,
     ),
   }
 }

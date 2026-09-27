@@ -24,6 +24,7 @@
 
 - **Searches re-entered from `boostDocument`** — calling `search()`, `autoSuggest()` or `toJSON()` on the same index from inside a `boostDocument` callback no longer corrupts the outer search (wrong `match` fields, scores and order on multi-field indexes). Nested searches get their own posting view; the outermost search keeps the shared one, so query cost is unchanged.
 - **Leading U+FEFF in binary snapshots** — string decoding no longer strips a leading U+FEFF as a byte-order mark. A term starting with U+FEFF (e.g. the first word of a text file with a BOM) made `loadBinarySync()` reject a snapshot written by `saveBinarySync()`, and string ids lost their leading U+FEFF.
+- **Emoji and other astral-plane terms in binary snapshots** — the term tree splits labels on UTF-16 code units, so two terms sharing a leading surrogate (e.g. `😀` and `😁`) produced labels that UTF-8 turned into U+FFFD, and those terms were lost after `loadBinarySync()`. Such label heaps are now stored as UTF-16LE under a new flag and **MSv5 format revision 2**; older readers reject these files with `unsupported format revision 2`. All other snapshots are written byte-for-byte as before (revision 1).
 
 ## v1.8.0 — `@yoch/frozenminisearch`
 

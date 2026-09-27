@@ -11,6 +11,7 @@ import { readFloat32Array } from '../binaryWireIo'
 import { readStoredFieldsRowsSection, readStoredFieldsWireSection } from '../storedFieldsWire'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 import {
+  FLAG_LABEL_HEAP_UTF16,
   MSV5_HEADER_SIZE,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
@@ -111,6 +112,7 @@ export function decodeMsv5Sections(
   const packedTermIndex = readPackedTermTreeSectionColumnar(
     sections[Msv5SectionId.TermTree],
     termCount,
+    (globalFlags & FLAG_LABEL_HEAP_UTF16) !== 0,
   )
 
   const avgBuf = sections[Msv5SectionId.AvgFieldLength]

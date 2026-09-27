@@ -126,3 +126,37 @@ export function readAscii(buf: BinaryBytes, offset: number, length: number): str
 export function readUtf8(buf: BinaryBytes, start: number, end: number): string {
   return textDecoder.decode(buf.subarray(start, end))
 }
+
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+
+/** False when `str` has an unpaired surrogate, which UTF-8 cannot represent. */
+export function isWellFormedUtf16(str: string): boolean {
+  return !LONE_SURROGATE.test(str)
+}
+
+export function utf16LeBytes(str: string): Uint8Array {
+  const out = new Uint8Array(str.length * 2)
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i)
+    out[i * 2] = code & 0xff
+    out[i * 2 + 1] = code >>> 8
+  }
+  return out
+}
+
+const UTF16_DECODE_CHUNK = 0x2000
+
+export function readUtf16LE(buf: BinaryBytes, start: number, end: number): string {
+  const length = (end - start) >>> 1
+  const codes = new Uint16Array(Math.min(length, UTF16_DECODE_CHUNK))
+  let out = ''
+  for (let i = 0; i < length; i += UTF16_DECODE_CHUNK) {
+    const count = Math.min(UTF16_DECODE_CHUNK, length - i)
+    for (let k = 0; k < count; k++) {
+      const at = start + (i + k) * 2
+      codes[k] = buf[at] | (buf[at + 1] << 8)
+    }
+    out += String.fromCharCode(...codes.subarray(0, count))
+  }
+  return out
+}

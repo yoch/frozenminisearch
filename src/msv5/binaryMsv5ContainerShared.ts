@@ -11,6 +11,7 @@ import {
 } from '../binaryBytes'
 import {
   CODEC_RAW,
+  FLAG_LABEL_HEAP_UTF16,
   MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER,
   MSV5_ERR_PAYLOAD_EXCEEDS_1GIB,
   MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS,
@@ -21,6 +22,7 @@ import {
   MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH,
   MSV5_FORMAT_REV_OFFSET,
   MSV5_FORMAT_REV_PAYLOAD,
+  MSV5_FORMAT_REV_UTF16_LABELS,
   MSV5_HEADER_SIZE,
   MSV5_PAYLOAD_CODEC_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
@@ -44,9 +46,13 @@ export interface PreparedMsv5Payload {
   payloadCrc32: number
 }
 
+function formatRevForFlags(globalFlags: number): number {
+  return (globalFlags & FLAG_LABEL_HEAP_UTF16) !== 0 ? MSV5_FORMAT_REV_UTF16_LABELS : MSV5_FORMAT_REV_PAYLOAD
+}
+
 export function assertPayloadFormatRev(buf: BinaryBytes): void {
   const rev = readU16LE(buf, MSV5_FORMAT_REV_OFFSET)
-  if (rev !== MSV5_FORMAT_REV_PAYLOAD) {
+  if (rev !== formatRevForFlags(readMsv5GlobalFlags(buf))) {
     throw new Error(`MSv5 unsupported format revision ${rev}`)
   }
 }
@@ -64,9 +70,10 @@ export function buildMsv5CompressionMeta(
   payloadCrc32: number,
   codec: number,
   zstdLevel: number,
+  globalFlags: number,
 ): Msv5SnapshotCompressionMeta {
   return {
-    formatRev: MSV5_FORMAT_REV_PAYLOAD,
+    formatRev: formatRevForFlags(globalFlags),
     payloadCodec: codec,
     zstdLevel,
     uncompressedLength,
@@ -96,7 +103,7 @@ export function writeMsv5FileHeader(
   writeU16LE(out, 6, globalFlags & 0xffff)
   writeU8(out, MSV5_PAYLOAD_CODEC_OFFSET, codec)
   writeU8(out, MSV5_ZSTD_LEVEL_OFFSET, zstdLevel)
-  writeU16LE(out, MSV5_FORMAT_REV_OFFSET, MSV5_FORMAT_REV_PAYLOAD)
+  writeU16LE(out, MSV5_FORMAT_REV_OFFSET, formatRevForFlags(globalFlags))
   writeU32LE(out, MSV5_SECTION_COUNT_OFFSET, MSV5_SECTION_COUNT)
   writeU32LE(out, MSV5_PAYLOAD_COMPRESSED_OFFSET, MSV5_HEADER_SIZE)
   writeU32LE(out, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET, compressedLength)
@@ -137,7 +144,7 @@ export function readMsv5SectionDirectory(buf: BinaryBytes): Msv5SectionEntry[] {
 export function readMsv5SnapshotCompressionMeta(buf: BinaryBytes): Msv5SnapshotCompressionMeta {
   const directory = readMsv5SectionDirectory(buf)
   return {
-    formatRev: MSV5_FORMAT_REV_PAYLOAD,
+    formatRev: readU16LE(buf, MSV5_FORMAT_REV_OFFSET),
     payloadCodec: readU8(buf, MSV5_PAYLOAD_CODEC_OFFSET),
     zstdLevel: readU8(buf, MSV5_ZSTD_LEVEL_OFFSET),
     uncompressedLength: readU32LE(buf, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET),

@@ -1,4 +1,4 @@
-import { bytesFromView, type BinaryBytes } from '../binaryBytes'
+import { bytesFromView, isWellFormedUtf16, type BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import {
   buildCoreSectionWithTermCountWire,
@@ -22,6 +22,7 @@ import { freqWireFlags } from '../freqPostings'
 import { buildStoredFieldsWireSection } from '../storedFieldsWire'
 import { buildMsv5PostingsSections } from './binaryMsv5Postings'
 import { buildTermTreeSectionColumnar } from './packedRadixBinaryMsv5'
+import { FLAG_LABEL_HEAP_UTF16 } from './binaryMsv5Constants'
 
 export interface Msv5EncodePrepared {
   globalFlags: number
@@ -45,7 +46,8 @@ export function buildMsv5EncodePrepared(
   const postingsWire = buildMsv5PostingsSections(snap.postings)
   const flFlags = fieldLengthMatrixWireFlags(snap.fieldLengthMatrix)
   const freqFlags = freqWireFlags(snap.postings.allFreqs)
-  const globalFlags = postingsWire.flags | flFlags | freqFlags
+  const utf16Labels = !isWellFormedUtf16(packedTermIndex.labelHeap)
+  const globalFlags = postingsWire.flags | flFlags | freqFlags | (utf16Labels ? FLAG_LABEL_HEAP_UTF16 : 0)
 
   const storedFieldsSection = snap.storedFieldsLayout != null
     ? buildStoredFieldsWireSection(snap.storedFieldsLayout, snap.nextId)
@@ -56,7 +58,7 @@ export function buildMsv5EncodePrepared(
     buildFieldNamesSectionWire(fieldNames),
     buildExternalIdsSectionWire(snap.externalIds, snap.nextId),
     storedFieldsSection,
-    buildTermTreeSectionColumnar(packedTermIndex),
+    buildTermTreeSectionColumnar(packedTermIndex, utf16Labels),
     bytesFromView(snap.avgFieldLength),
     buildFieldLengthMatrixSection(snap.fieldLengthMatrix),
     postingsWire.meta,

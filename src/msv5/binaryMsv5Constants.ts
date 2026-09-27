@@ -9,6 +9,8 @@ export const FLAG_FIELD_ID_16 = 4
 export const FLAG_FL_U8 = 8
 export const FLAG_FL_U16 = 16
 export const FLAG_FREQ_U16 = 32
+/** Term tree label heap stored as UTF-16LE code units because it holds unpaired surrogates. */
+export const FLAG_LABEL_HEAP_UTF16 = 64
 
 export const CODEC_RAW = 0
 /** Deflate/inflate (`node:zlib`) on the whole payload. */
@@ -18,6 +20,8 @@ export const CODEC_ZSTD = 3
 
 /** Single concatenated payload, one compressed stream (or raw). */
 export const MSV5_FORMAT_REV_PAYLOAD = 1
+/** Same layout with {@link FLAG_LABEL_HEAP_UTF16} set; a distinct revision so older readers reject it. */
+export const MSV5_FORMAT_REV_UTF16_LABELS = 2
 
 /** Do not compress payloads smaller than this (bytes). */
 export const MSV5_MIN_COMPRESS_BYTES = 64

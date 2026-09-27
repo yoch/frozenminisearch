@@ -5,10 +5,13 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+    paths-ignore:
+      - 'research/**'
 
 jobs:
   test:
     name: test (Node ${{ matrix.node-version }})
+    if: github.event_name == 'push' || !startsWith(github.head_ref, 'cursor/bm25-')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

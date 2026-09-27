@@ -1,0 +1,109 @@
+{
+  "study_id": "bm25-index-null-rlt-20260915",
+  "inspired_by_secondary": "arXiv:2609.14016v1",
+  "central_question": "factorized index-derived BM25 tail probability as training-free RLT before a frozen reranker",
+  "base_branch": "master",
+  "seed": 20260915,
+  "harness_status": "corrected-metrics-and-retrieval; historical results at results/historical/sha-11d27ef are obsolete",
+  "bm25": {
+    "variant": "lucene-like-positive-idf",
+    "k1": 1.2,
+    "b": 0.75,
+    "delta": 0.0,
+    "idf": "log(1 + (N - df + 0.5) / (df + 0.5))",
+    "repeated_query_terms": "unique-terms-once (query TF = 1)",
+    "zero_score": "never padded into top-K",
+    "high_df_terms": "never dropped on the reference path",
+    "dl_norm": "precomputed at index build for (k1, b); other b values need a separate vector",
+    "postings": "typed array('I') then NumPy (idx, X_t) with precomputed mu_t, var_t",
+    "retrieval": "generation/touched accumulator; O(sum df_t), not O(N)",
+    "analyzer": {
+      "pattern": "(?u)\\b\\w\\w+\\b",
+      "lowercase": true,
+      "stemming": false,
+      "stopwords": false
+    }
+  },
+  "score_transforms": {
+    "paper_exact": "not computed: would require query-term multiplicities inside BM25",
+    "power_token_len": "BM25 / |q|_tokens (unique-term BM25 in the numerator)",
+    "power_unique_len": "BM25 / |q|_unique",
+    "ceiling": "(k1+1) * sum IDF of query terms with df_t > 0; OOV does not inflate the bound",
+    "z_diag": "index-derived z-normalization (S - mu_q) / sd_diag",
+    "I_gauss_diag": "monotone map of z_diag via -log survival; not a validated P0"
+  },
+  "candidate_k": [50, 100, 200],
+  "primary_k": 100,
+  "fixed_k_baselines": [5, 10, 20, 30, 50, 75, 100],
+  "alphas_diagnostic_only": [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
+  "primary_endpoint": "nDCG@10 after frozen MiniLM rerank of retained BM25 candidates",
+  "ir_metrics": {
+    "ndcg": "IDCG from full query qrels, independent of truncation/gating/reranker",
+    "precision_at_k": "hits_in_first_k / k even if fewer than k documents are returned",
+    "map_denominator": "number of qrel-positive documents for the query",
+    "unjudged_in_ir_metrics": "treated as non-relevant (usual TREC/BEIR convention)"
+  },
+  "calibration": {
+    "default_task": "qrel-positive vs all-other-retrieved",
+    "not": "P(relevance)",
+    "judged_only_option": "restrict AUROC/AP/Brier/ECE to explicitly judged documents when judged_mask is used",
+    "no_match_queries": "kept; top-1 confidence is -inf; report no_match_rate"
+  },
+  "variance": {
+    "var_diag": "sum_t var_t from precomputed term moments",
+    "var_joint": "exact E[S^2]-E[S]^2 from touched BM25 scores (zeros for untouched docs)",
+    "variance_ratio": "var_joint / var_diag"
+  },
+  "mandatory_rlt_baselines": ["fixed-k", "surprise-EVT", "raw-global-threshold", "list-z"],
+  "surprise": {
+    "reference": "Bahri et al. SIGIR 2023 / arXiv:2010.09797",
+    "null": "GPD on the returned list, not the collection",
+    "selection": "greedy Cramér–von Mises from both ends until no CvM improvement; no 8-step cap",
+    "min_list_len": 12,
+    "min_excess": 8,
+    "shape": "xi >= 0 (negative shape refit with fc=0)",
+    "floc": 0
+  },
+  "not_reimplemented": ["Choppy", "AttnCut", "TMP-Adapter", "Cosine-Adapter"],
+  "not_reimplemented_reason": "Meng et al. SIGIR 2024 already compared them to fixed-k on TREC DL; we treat fixed-k as the method to beat",
+  "cv": {
+    "outer_folds": 5,
+    "inner_folds": 4,
+    "split_unit": "query",
+    "operating_point": "inner CV: minimise mean candidates s.t. estimated mean ΔnDCG@10 >= -δ; outer test evaluates that fixed policy",
+    "pareto_on_test": "diagnostic only; not used to pick the reported point"
+  },
+  "bootstrap": {
+    "unit": "query-level OOF predictions concatenated across outer folds",
+    "resamples": 10000,
+    "primary_noninferiority": "lower_bound_95CI(ΔnDCG@10) > -δ",
+    "delta": [0.005, 0.01]
+  },
+  "reranker": {
+    "primary": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "cache_policy": "score full BM25 top-100 once per dataset; reuse for all truncation policies",
+    "cache_contract": "atomic tmp+fsync+rename; manifest must match dataset/query/candidate/model-revision/protocol/git SHA; missing CE score or empty text is a hard error"
+  },
+  "phase_b_eval": {
+    "monotone_truncation": "policies map to a BM25 prefix K_q; prefix metrics 0..K are precomputed after one CE pass"
+  },
+  "noninferiority_ndcg10": [0.005, 0.01],
+  "query_slice": {
+    "max_queries": 400,
+    "corpus": "full — documents are never dropped",
+    "policy": "if n_judged_queries > 400, sample 400 qids with seed 20260915 after sorting; otherwise keep all",
+    "label": "results on a capped query set are not the official full-query BEIR split"
+  },
+  "skipped_methods": [
+    "saddlepoint_lugannani_rice",
+    "chernoff_mgf",
+    "independence_mc_tail",
+    "exact_convolution",
+    "pairwise_covariance_z_full",
+    "supervised_rlt_choppy_attncut",
+    "cosine_tmp_adapters"
+  ],
+  "skipped_datasets": ["trec-dl-2019", "trec-dl-2020"],
+  "skipped_datasets_reason": "MS MARCO passage dump not local this round; large BEIR sets are kept with full corpus + query cap",
+  "historical_results": "results/historical/sha-11d27ef — obsolete after harness correction; do not interpret"
+}

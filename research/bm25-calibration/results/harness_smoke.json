@@ -1,0 +1,133 @@
+{
+  "rss_note": "ru_maxrss is the process high-water mark in MiB (Linux, kB/1024)",
+  "runs": [
+    {
+      "dataset": "scifact",
+      "dropped_high_df_terms": [],
+      "index_format": 2,
+      "mean_variance_ratio": 1.2893270822318135,
+      "n_docs": 5183,
+      "n_packed": 300,
+      "n_queries": 300,
+      "no_match_rate": 0.0,
+      "rss_mb_after_build": 129.1875,
+      "rss_mb_delta_from_start": 7.2734375,
+      "sample_queries": [
+        {
+          "n_cand": 100,
+          "n_qrels": 1,
+          "n_rel_in_pool": 0,
+          "no_match": false,
+          "qid": "1",
+          "qlen_tok": 5,
+          "qlen_uniq": 5,
+          "query": "0-dimensional biomaterials show inductive properties.",
+          "sum_idf": 24.88691599085058,
+          "top_doc": "43385013",
+          "top_score": 9.832771301269531,
+          "variance_ratio": 1.0204664025837322
+        },
+        {
+          "n_cand": 100,
+          "n_qrels": 1,
+          "n_rel_in_pool": 1,
+          "no_match": false,
+          "qid": "100",
+          "qlen_tok": 8,
+          "qlen_uniq": 8,
+          "query": "All hematopoietic stem cells segregate their chromosomes randomly.",
+          "sum_idf": 25.100055319614317,
+          "top_doc": "4381486",
+          "top_score": 31.825428009033203,
+          "variance_ratio": 1.3582937813084364
+        },
+        {
+          "n_cand": 100,
+          "n_qrels": 1,
+          "n_rel_in_pool": 1,
+          "no_match": false,
+          "qid": "1012",
+          "qlen_tok": 10,
+          "qlen_uniq": 10,
+          "query": "Radioiodine treatment of non-toxic multinodular goitre reduces thyroid volume.",
+          "sum_idf": 43.70603848020748,
+          "top_doc": "9745001",
+          "top_score": 61.319602966308594,
+          "variance_ratio": 1.5192652377231186
+        }
+      ],
+      "seconds": {
+        "build_index": 0.3395898260005197,
+        "prepare_or_reuse": 0.005956052999863459,
+        "retrieve_all_accumulator": 14.767031076999956,
+        "retrieve_naive_loop": 0.03796441899976344,
+        "retrieve_query_loop": 0.07692147299985663
+      },
+      "topk20_mismatches_vs_naive": 0
+    },
+    {
+      "dataset": "nfcorpus",
+      "dropped_high_df_terms": [],
+      "index_format": 2,
+      "mean_variance_ratio": 1.0097513938957394,
+      "n_docs": 3633,
+      "n_packed": 323,
+      "n_queries": 323,
+      "no_match_rate": 0.07739938080495357,
+      "rss_mb_after_build": 137.5390625,
+      "rss_mb_delta_from_start": 0.125,
+      "sample_queries": [
+        {
+          "n_cand": 0,
+          "n_qrels": 5,
+          "n_rel_in_pool": 0,
+          "no_match": true,
+          "qid": "PLAIN-1008",
+          "qlen_tok": 1,
+          "qlen_uniq": 1,
+          "query": "deafness",
+          "sum_idf": 0.0,
+          "top_doc": null,
+          "top_score": null,
+          "variance_ratio": 0.0
+        },
+        {
+          "n_cand": 25,
+          "n_qrels": 60,
+          "n_rel_in_pool": 8,
+          "no_match": false,
+          "qid": "PLAIN-1018",
+          "qlen_tok": 1,
+          "qlen_uniq": 1,
+          "query": "DHA",
+          "sum_idf": 4.959410796791736,
+          "top_doc": "MED-5095",
+          "top_score": 10.084985733032227,
+          "variance_ratio": 0.9999999989851279
+        },
+        {
+          "n_cand": 100,
+          "n_qrels": 24,
+          "n_rel_in_pool": 1,
+          "no_match": false,
+          "qid": "PLAIN-102",
+          "qlen_tok": 5,
+          "qlen_uniq": 5,
+          "query": "Stopping Heart Disease in Childhood",
+          "sum_idf": 13.997068898331381,
+          "top_doc": "MED-4247",
+          "top_score": 12.64880657196045,
+          "variance_ratio": 1.231309705696789
+        }
+      ],
+      "seconds": {
+        "build_index": 0.2567111490006937,
+        "prepare_or_reuse": 0.020011018000332115,
+        "retrieve_all_accumulator": 26.75354878000053,
+        "retrieve_naive_loop": 0.01308692600014183,
+        "retrieve_query_loop": 0.023543436000181828
+      },
+      "topk20_mismatches_vs_naive": 0
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "typed": {
+    "mode": "typed",
+    "n_docs": 20000,
+    "seconds": 0.6048123460004717,
+    "rss_mb": 112.1171875,
+    "rss_delta_mb": 69.12890625,
+    "n_posting_entries": 381832
+  },
+  "list": {
+    "mode": "list",
+    "n_docs": 20000,
+    "seconds": 0.2146534880002946,
+    "rss_mb": 52.51171875,
+    "rss_delta_mb": 9.5,
+    "n_posting_entries": 381832
+  },
+  "retrieve": {
+    "retrieve_acc_s": 0.018239168000036443,
+    "retrieve_naive_s": 0.009494130999883055,
+    "n_docs": 20000,
+    "n_queries": 80,
+    "speedup": 0.5205353116909766
+  },
+  "retrieve_100k": {
+    "n_docs": 100000,
+    "n_queries": 40,
+    "retrieve_acc_s": 0.008366224999917904,
+    "retrieve_naive_s": 0.010087363999446097,
+    "speedup_acc_over_naive": 1.2057246846152336
+  }
+}

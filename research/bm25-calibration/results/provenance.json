@@ -1,0 +1,31 @@
+{
+  "b": 0.75,
+  "base_attempted": "origin/master",
+  "branch": "cursor/bm25-score-normalization-study-fb5b",
+  "cwd": "/workspace",
+  "extra": {
+    "phase": "A+B-decision",
+    "phase_a": [
+      "scifact",
+      "nfcorpus",
+      "fiqa",
+      "arguana",
+      "scidocs",
+      "trec-covid",
+      "webis-touche2020"
+    ],
+    "phase_b": [
+      "trec-covid",
+      "scifact",
+      "fiqa"
+    ],
+    "verdict": "STOP"
+  },
+  "git_sha": "526215bb6a113deeea74642d33bcfe1f8151cad2",
+  "k1": 1.2,
+  "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
+  "primary_k": 100,
+  "protocol_sha256": "8d513fd1dba71b76e6fbd3cfd2891660347e7bc369152f7f8ccfe329555ce1db",
+  "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+  "seed": 20260915
+}

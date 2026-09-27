@@ -155,7 +155,7 @@ export type AggregateTermOptions = {
   allowedDocs?: DocIdGate
 }
 
-function getDerivedTerm(
+export function getDerivedTerm(
   derivedTerm: AggregateDerivedTerm,
   cache: { value?: string },
   context: AggregateContext,

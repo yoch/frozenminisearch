@@ -158,6 +158,29 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expectSameResults(ms, fr, 'zen whale')
   })
 
+  test('AND_NOT keeps docs whose negated-term boostDocument is 0', () => {
+    const boostDocument = (id, term) => (id === 4 && term === 'archery') ? 0 : 1
+    expectSameResults(mutable, frozen, 'zen archery', { combineWith: 'AND_NOT', boostDocument })
+    expectSameResults(mutable, frozen, { combineWith: 'AND_NOT', queries: ['zen', 'archery'] }, { boostDocument })
+    expectSameResults(mutable, frozen, {
+      combineWith: 'AND_NOT',
+      queries: ['zen', { combineWith: 'OR', queries: ['archery', 'whale'], boostDocument }],
+    })
+  })
+
+  test('AND_NOT with boostDocument matches MiniSearch on the two-phase path', () => {
+    const corpus = Array.from({ length: 6000 }, (_, id) => ({ id, text: id % 2 === 0 ? 'common half' : 'common' }))
+    const opts = { fields: ['text'] }
+    const ms = new MiniSearch(opts)
+    ms.addAll(corpus)
+    const fr = frozenFromMiniSearch(FrozenMiniSearch, ms, opts)
+    const boostDocument = (id, term) => (term === 'half' && id % 4 === 0) ? 0 : 1
+    for (const combineWith of ['AND_NOT', 'AND']) {
+      const ids = index => index.search('common half', { combineWith, boostDocument }).map(r => r.id).sort((a, b) => a - b)
+      expect(ids(fr)).toEqual(ids(ms))
+    }
+  })
+
   test('field boost', () => {
     expectSameResults(mutable, frozen, 'zen', { boost: { title: 2 } })
   })

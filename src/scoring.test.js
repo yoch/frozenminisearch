@@ -148,21 +148,21 @@ describe('aggregateTerm', () => {
     expect(results.size).toBe(0)
   })
 
-  test('resolves indexed derived terms once per posting list', () => {
+  test('resolves cursor derived terms once per posting list', () => {
     let resolves = 0
+    const cursor = {
+      term() {
+        resolves += 1
+        return 'derived'
+      },
+    }
     const fieldTermData = mapPostings(0, [[0, 1], [1, 1]])
     const results = aggregateTerm(
-      'src', 42,
+      'src', cursor,
       1, 1,
       fieldTermData,
       fieldBoosts,
-      makeContext({
-        resolveTermByIndex: (termIndex) => {
-          resolves += 1
-          expect(termIndex).toBe(42)
-          return 'derived'
-        },
-      }),
+      makeContext(),
       undefined, defaultBM25params,
     )
     expect(results.get(0)?.match.derived).toEqual(['text'])

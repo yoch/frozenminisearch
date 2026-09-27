@@ -14,6 +14,11 @@ export type PackedFuzzyRef = PackedTermRef & {
   distance: number
 }
 
+/** Term currently visited by a `visit*Refs` traversal; only valid synchronously inside the callback. */
+export interface PackedTermCursor {
+  term(): string
+}
+
 /** In-memory packed string radix map (term → payload). */
 export interface PackedStringRadixMap<V = number> {
   readonly size: number

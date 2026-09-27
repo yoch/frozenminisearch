@@ -8,15 +8,12 @@ In-memory packed radix tree for string keys with numeric payloads.
 
 ## Term resolution (frozen search)
 
-- **`termByIndex(termIndex)`** rebuilds the UTF-16 string on every call by walking parent edges (`lazyMetadata.ts`). There is **no cross-request string cache** on the tree instance.
-- **`lazyTermMetadata()`** (private) builds parent pointers once per `PackedRadixTree` instance; subsequent `termByIndex` / `termLengthByIndex` calls reuse that structure only.
-- **`termLengthByIndex`** returns length without materializing the string (used for prefix/fuzzy weights).
-
-Frozen search uses `prefixRefs` / `fuzzyRefs` plus lazy `termByIndex` only when a posting is scored (match keys, `boostDocument`, etc.).
+- **`visitPrefixRefs` / `visitFuzzyRefs`** pass a `PackedTermCursor` to the visitor. `cursor.term()` concatenates the labels on the traversal's current root-to-leaf edge stack (`termPath.ts`); it is valid only synchronously inside the callback. Frozen search keeps the cursor as the derived term and calls `term()` at most once per posting list, only when a document is actually scored (match keys, `boostDocument`, etc.).
+- **`termByIndex(termIndex)`** / **`termLengthByIndex`** rebuild a term from its index by climbing parent pointers. The pointers (`lazyMetadata.ts`, ~3 index arrays) are built on first call and kept on the instance, so these helpers are for tests, benchmarks and tooling; the search path does not call them.
 
 ## Deprecated dev helpers
 
-- **`packedPrefixEntries(tree, prefix)`** (`testSupport/packedRadixStringIterators.js`) — string iterator scoped to a prefix (bench/parity, same DFS path as `entries()`). Not shipped in published bundles. Production code should use `prefixRefs` and call `termByIndex` only when a term string is needed.
+- **`packedPrefixEntries(tree, prefix)`** (`testSupport/packedRadixStringIterators.js`) — string iterator scoped to a prefix (bench/parity, same DFS path as `entries()`). Not shipped in published bundles. Production code should use `visitPrefixRefs` and resolve terms through the visitor cursor.
 - Fuzzy string tuples: use `fuzzyRefs` + `termByIndex` (the former `fuzzyEntries` wrapper was removed).
 
 ## Product build path

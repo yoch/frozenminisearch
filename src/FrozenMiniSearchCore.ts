@@ -183,7 +183,6 @@ export default class FrozenMiniSearchCore<T = any> {
       fieldIds: this._fieldIds,
       getFieldLength: (docId, fieldId) => this._getFieldLength(docId, fieldId),
       getExternalId: this._getExternalId,
-      resolveTermByIndex: termIndex => this._index.termByIndex(termIndex),
       getStoredFields: this._hasStoredFields
         ? docId => readStoredFields(this._storedFields, docId)
         : noStoredFields,

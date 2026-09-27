@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Improved
+
+- **Compressed binary load memory** — `loadBinarySync()` / `loadBinaryAsync()` on zlib/zstd snapshots (the `'auto'` default) no longer keep the whole decoded payload alive behind typed-array views. Resident memory after load drops by ~25–50% on typical indexes (e.g. 5k × 5 KB stored documents: ~48 MB → ~24 MB), at the cost of a sub-millisecond typed-array copy.
+
+### Changed
+
+- **Heap benchmarks** — default heap paths now also measure `loadBinary` and a serving steady state (`loadBinary-steady`: load + one prefix/fuzzy query + one `has()`), so memory built lazily on first use is visible.
+
 ## v1.8.0 — `@yoch/frozenminisearch`
 
 Minor release: faster MiniSearch JSON import, tighter snapshot validation at the import boundary, and internal query-engine cleanup. No public API or MSv5 wire-format changes.

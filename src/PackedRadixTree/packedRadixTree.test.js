@@ -359,6 +359,49 @@ describe('PackedRadixTree module', () => {
     expect(() => validateFrozenTermIndexLeaves(malformed, 0)).toThrow(/child out of bounds/)
   })
 
+  const withEdgeChild = (tree, edgeChild) => PackedRadixTree.fromData({
+    size: tree.size,
+    nodeCount: tree.nodeCount,
+    edgeCount: tree.edgeCount,
+    labelHeap: tree.labelHeap,
+    nodeEdgeOffset: tree.nodeEdgeOffset,
+    nodeValue: tree.nodeValue,
+    nodeLeafOrder: tree.nodeLeafOrder,
+    edgeLabelStart: tree.edgeLabelStart,
+    edgeLabelLength: tree.edgeLabelLength,
+    edgeChild,
+  })
+
+  test('validateFrozenTermIndexLeaves accepts packed trees', () => {
+    expect(() => validateFrozenTermIndexLeaves(packed, map.size)).not.toThrow()
+    expect(() => validateFrozenTermIndexLeaves(withEdgeChild(packed, new Uint32Array(packed.edgeChild)), map.size))
+      .not.toThrow()
+  })
+
+  test('validateFrozenTermIndexLeaves rejects cycles and shared or orphan nodes', () => {
+    const toRoot = new Uint32Array(packed.edgeChild)
+    toRoot[toRoot.length - 1] = 0
+    expect(() => validateFrozenTermIndexLeaves(withEdgeChild(packed, toRoot), map.size)).toThrow(/reached more than once/)
+
+    const shared = new Uint32Array(packed.edgeChild)
+    shared[1] = shared[0]
+    expect(() => validateFrozenTermIndexLeaves(withEdgeChild(packed, shared), map.size)).toThrow(/reached more than once/)
+
+    const selfLoop = PackedRadixTree.fromData({
+      size: 0,
+      nodeCount: 2,
+      edgeCount: 1,
+      labelHeap: 'a',
+      nodeEdgeOffset: new Uint32Array([0, 0, 1]),
+      nodeValue: new Uint32Array([0, 0]),
+      nodeLeafOrder: new Uint32Array([0, 0]),
+      edgeLabelStart: new Uint32Array([0]),
+      edgeLabelLength: new Uint16Array([1]),
+      edgeChild: new Uint32Array([1]),
+    })
+    expect(() => validateFrozenTermIndexLeaves(selfLoop, 0)).toThrow(/1 nodes are unreachable from the root/)
+  })
+
   test('rejects edge labels that cannot fit the packed length array', () => {
     const longLabel = 'x'.repeat(0x10000)
     expect(() => packEntries([[longLabel, 0]])).toThrow(/edge label too long/)

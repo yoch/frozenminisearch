@@ -250,7 +250,8 @@ export default class FrozenMiniSearchCore<T = any> {
    */
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
     const merged = { ...this._options.autoSuggestOptions, ...options }
-    if (merged.filter == null) {
+    const { filter } = { ...this._options.searchOptions, ...merged }
+    if (filter == null) {
       return suggestFromRawResults(runQuery(queryString, merged, this._queryEngineParams))
     }
     return suggestFromSearchResults(this.search(queryString, merged))

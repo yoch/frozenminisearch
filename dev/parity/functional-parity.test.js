@@ -189,6 +189,16 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expectSameSuggestions(frozen.autoSuggest('zen ar'), mutable.autoSuggest('zen ar'))
   })
 
+  test('autoSuggest applies the global searchOptions filter', () => {
+    const filtered = { ...options, searchOptions: { filter: r => r.category === 'fiction' } }
+    const ms = new MiniSearch(filtered)
+    ms.addAll(docs)
+    const fr = frozenFromMiniSearch(FrozenMiniSearch, ms, filtered)
+    expectSameSuggestions(fr.autoSuggest('zen'), ms.autoSuggest('zen'))
+    expect(fr.autoSuggest('archery')).toEqual([])
+    expectSameSuggestions(fr.autoSuggest('zen', { filter: undefined }), ms.autoSuggest('zen', { filter: undefined }))
+  })
+
   test('has and getStoredFields', () => {
     expect(frozen.has(1)).toBe(true)
     expect(frozen.has(999)).toBe(false)

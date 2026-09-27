@@ -20,6 +20,10 @@
 
 - **Heap benchmarks** — default heap paths now also measure `loadBinary` and a serving steady state (`loadBinary-steady`: load + one prefix/fuzzy query + one `has()`), so memory built lazily on first use is visible.
 
+### Fixed
+
+- **Searches re-entered from `boostDocument`** — calling `search()`, `autoSuggest()` or `toJSON()` on the same index from inside a `boostDocument` callback no longer corrupts the outer search (wrong `match` fields, scores and order on multi-field indexes). Nested searches get their own posting view; the outermost search keeps the shared one, so query cost is unchanged.
+
 ## v1.8.0 — `@yoch/frozenminisearch`
 
 Minor release: faster MiniSearch JSON import, tighter snapshot validation at the import boundary, and internal query-engine cleanup. No public API or MSv5 wire-format changes.

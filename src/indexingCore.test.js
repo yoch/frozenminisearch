@@ -51,6 +51,49 @@ describe('indexingCore default tokenizer', () => {
     }
   })
 
+  test('tokenizeDefaultInto matches split for every code point in every position', () => {
+    const out = []
+    const mismatches = []
+    const check = (text) => {
+      tokenizeDefaultInto(out, text)
+      const expected = text.split(SPACE_OR_PUNCTUATION)
+      if (out.length !== expected.length || out.some((t, i) => t !== expected[i])) {
+        mismatches.push(text)
+      }
+    }
+    for (let cp = 0; cp <= 0x10ffff; cp++) {
+      const ch = String.fromCodePoint(cp)
+      check(`a${ch}b`)
+      if (cp < 0x10000) check(`${ch}${ch}`)
+    }
+    for (const lone of ['\ud800', '\udbff', '\udc00', '\udfff']) {
+      for (const neighbor of ['a', ' ', ',', '\u3001', '\ud83d\ude00', '\ud800', '\udc00', '']) {
+        check(`${lone}${neighbor}`)
+        check(`${neighbor}${lone}`)
+        check(`x${neighbor}${lone}${neighbor}y`)
+      }
+    }
+    expect(mismatches.slice(0, 5)).toEqual([])
+  })
+
+  test('tokenizeDefaultInto matches split on random mixed-script text', () => {
+    const alphabet = ['a', 'Z', '7', ' ', '\u00a0', ',', '.', '-', '_', '\n', '\r', '\t', 'é', '—', '…',
+      '日', '本', '\u3000', '\u3001', 'ж', '«', '»', '\u2028', '\ud83d\ude00', '\ud800', '\udc00', '𝔸']
+    let seed = 12345
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) >>> 0
+      return seed / 0x100000000
+    }
+    const out = []
+    for (let round = 0; round < 5000; round++) {
+      let text = ''
+      const len = Math.floor(rand() * 24)
+      for (let i = 0; i < len; i++) text += alphabet[Math.floor(rand() * alphabet.length)]
+      tokenizeDefaultInto(out, text)
+      expect(out).toEqual(text.split(SPACE_OR_PUNCTUATION))
+    }
+  })
+
   test('collectFieldTermFreqsFromFieldInto matches split for default and custom-equivalent tokenizers', () => {
     const fieldName = 'txt'
     const processTerm = term => term.toLowerCase()

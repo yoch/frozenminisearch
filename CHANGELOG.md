@@ -29,6 +29,7 @@
 - **`QueryCombination` without `combineWith`** — now combines with `OR` (or the operator inherited from an enclosing combination), as in MiniSearch. It previously picked up the constructor's global `searchOptions.combineWith`, which does not apply to query combinations.
 - **`AND_NOT` with `boostDocument`** — a document for which `boostDocument` returns `0` on a negated term no longer counts as matching that term, so it is not excluded (MiniSearch parity). Previously the negated branch ignored `boostDocument` and could drop such documents.
 - **`autoSuggest()` and the global `searchOptions.filter`** — a `filter` set in the constructor's `searchOptions` was ignored by `autoSuggest()` unless also passed per call; it now applies, as in MiniSearch.
+- **`storeFields: undefined` / `null`** — `fromDocuments()`, `createFrozenIndexBuilder()` and `fromJSON()` threw a `TypeError`; they now treat it as no stored fields, like MiniSearch.
 
 ## v1.8.0 — `@yoch/frozenminisearch`
 

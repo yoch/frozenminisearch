@@ -37,6 +37,19 @@ describe('FrozenMiniSearch core', () => {
     expect(loaded.search('zen').map(r => r.id)).toEqual(frozen.search('zen').map(r => r.id))
   })
 
+  test.each([undefined, null])('storeFields: %s behaves like no stored fields', (storeFields) => {
+    const opts = { fields: ['title', 'text'], storeFields }
+    const direct = FrozenMiniSearch.fromDocuments(docs, opts)
+    const builder = createFrozenIndexBuilder(opts)
+    for (const doc of docs) builder.add(doc)
+    const fromJson = FrozenMiniSearch.fromJSON(JSON.stringify(direct), opts)
+    const loaded = FrozenMiniSearch.loadBinarySync(direct.saveBinarySync(), opts)
+    for (const index of [direct, freezeFrozenIndexBuilder(builder), fromJson, loaded]) {
+      expect(index.search('zen').map(r => r.id)).toEqual([2])
+      expect(index.getStoredFields(2)).toBeUndefined()
+    }
+  })
+
   test('rejects missing document id', () => {
     expect(() => FrozenMiniSearch.fromDocuments([{ text: 'a' }], { fields: ['text'] }))
       .toThrow(/ID/)

@@ -168,6 +168,7 @@ function executeQuerySpecInternal(
   const { fieldBoosts, options } = normalized
   const termOptions: AggregateTermOptions | undefined = allowedDocs == null ? undefined : { allowedDocs }
   const results = new Map() as RawResult
+  let derivedTermOrdinal = 0
 
   visitQuerySpecForScoring(query, normalized, params, (data, derivedTerm, termWeight) => {
     aggregateTerm(
@@ -182,6 +183,7 @@ function executeQuerySpecInternal(
       options.bm25,
       results,
       termOptions,
+      derivedTermOrdinal++,
     )
   })
 

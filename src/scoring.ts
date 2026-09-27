@@ -155,9 +155,18 @@ export type AggregateTermOptions = {
   allowedDocs?: DocIdGate
 }
 
+/**
+ * Past this many derived terms in one spec, keyed stores on fresh objects grow the root map's
+ * transition tree enough (V8) to be slower than computed-key literals.
+ */
+const KEYED_MATCH_MAX_DERIVED_TERMS = 1024
+
+/** Per posting list: resolved derived term and how new match objects are built. */
+type DerivedTermState = { value?: string, keyedMatch: boolean }
+
 function getDerivedTerm(
   derivedTerm: AggregateDerivedTerm,
-  cache: { value?: string },
+  cache: DerivedTermState,
 ): string {
   if (typeof derivedTerm === 'string') return derivedTerm
   if (cache.value === undefined) cache.value = derivedTerm.term()
@@ -179,7 +188,7 @@ function scorePostingDoc(
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25: Bm25FieldConstants,
   results: RawResult,
-  derivedTermCache: { value?: string },
+  derivedTermCache: DerivedTermState,
   hoistedIdf?: number,
 ): void {
   const resolvedDerivedTerm = getDerivedTerm(derivedTerm, derivedTermCache)
@@ -210,9 +219,22 @@ function scorePostingDoc(
     results.set(docId, {
       score: weightedScore,
       terms: [sourceTerm],
-      match: { [resolvedDerivedTerm]: [field] },
+      match: derivedTermCache.keyedMatch
+        ? keyedSingleMatch(resolvedDerivedTerm, field)
+        : { [resolvedDerivedTerm]: [field] },
     })
   }
+}
+
+/**
+ * Faster than a computed-key literal on V8 for moderate key counts; `__proto__` must still become
+ * an own data property.
+ */
+function keyedSingleMatch(term: string, field: string): MatchInfo {
+  if (term === '__proto__') return { [term]: [field] }
+  const match: MatchInfo = {}
+  match[term] = [field]
+  return match
 }
 
 function aggregateSegmentPostingList(
@@ -228,13 +250,14 @@ function aggregateSegmentPostingList(
   boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
   bm25params: BM25Params,
   results: RawResult,
+  keyedMatch: boolean,
   allowedDocs?: DocIdGate,
 ): void {
   const matchingFields = list.length
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
   const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
   const { docIds, freqs, offset, length } = list
-  const derivedTermCache: { value?: string } = {}
+  const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch }
 
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
     for (const docId of allowedDocs) {
@@ -278,9 +301,11 @@ export function aggregateTerm(
   bm25params: BM25Params,
   results: RawResult = new Map(),
   termOptions?: AggregateTermOptions,
+  derivedTermOrdinal = 0,
 ): RawResult {
   if (fieldTermData == null) return results
 
+  const keyedMatch = derivedTermOrdinal < KEYED_MATCH_MAX_DERIVED_TERMS
   const { allowedDocs } = termOptions ?? {}
 
   for (const field of fieldBoosts.names) {
@@ -294,7 +319,7 @@ export function aggregateTerm(
         sourceTerm, derivedTerm, termWeight, termBoost,
         field, fieldId, fieldBoost, postingList,
         context, boostDocumentFn, bm25params, results,
-        allowedDocs,
+        keyedMatch, allowedDocs,
       )
       continue
     }
@@ -302,7 +327,7 @@ export function aggregateTerm(
     const matchingFields = postingList.size
     const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
     const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
-    const derivedTermCache: { value?: string } = {}
+    const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch }
 
     postingList.forEachDoc((docId, termFreq) => {
       if (allowedDocs != null && !allowedDocs.has(docId)) return

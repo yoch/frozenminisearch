@@ -412,14 +412,13 @@ function collectCompressedPayloadSections(
   uncompressedLength: number,
   payloadCrc32: number,
 ): {
-  sections: Buffer[]
   consume: (chunk: Buffer) => void
-  finish: () => void
+  finish: () => Buffer[]
 } {
   if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
     throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
   }
-  const sections: Buffer[] = new Array(directory.length)
+  let sections: Buffer[] = new Array(directory.length)
   let sectionId = 0
   let streamOffset = 0
   let current: Buffer | null = null
@@ -480,7 +479,7 @@ function collectCompressedPayloadSections(
     }
   }
 
-  function finish(): void {
+  function finish(): Buffer[] {
     emitEmptySections()
     if (streamOffset !== uncompressedLength || sectionId !== directory.length) {
       throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
@@ -488,9 +487,14 @@ function collectCompressedPayloadSections(
     if (payloadCrc !== payloadCrc32) {
       throw new Error(MSV5_ERR_PAYLOAD_CRC_MISMATCH)
     }
+    // The stream keeps these closures alive until its 'close' tick; drop the section
+    // references so the caller's decode is their only owner.
+    const out = sections
+    sections = []
+    return out
   }
 
-  return { sections, consume, finish }
+  return { consume, finish }
 }
 
 function loadMsv5SectionsFromZstdStream(
@@ -533,6 +537,9 @@ function loadMsv5SectionsFromCompressedStream(
   return new Promise((resolve, reject) => {
     const collector = collectCompressedPayloadSections(directory, uncompressedLength, payloadCrc32)
     const stream = createStream()
+    // The stream retains its listeners until its 'close' tick. Listeners reach the promise
+    // (and thus the resolved sections) only through `settle`, cleared once settled.
+    let settle: { resolve: typeof resolve, reject: typeof reject } | null = { resolve, reject }
     stream.on('data', (chunk: Buffer) => {
       try {
         collector.consume(chunk)
@@ -540,13 +547,18 @@ function loadMsv5SectionsFromCompressedStream(
         stream.destroy(err as Error)
       }
     })
-    stream.on('error', reject)
+    stream.on('error', (err: Error) => {
+      settle?.reject(err)
+      settle = null
+    })
     stream.on('end', () => {
+      if (settle == null) return
+      const { resolve: onResolve, reject: onReject } = settle
+      settle = null
       try {
-        collector.finish()
-        resolve(collector.sections)
+        onResolve(collector.finish())
       } catch (err) {
-        reject(err)
+        onReject(err)
       }
     })
     stream.end(compressed)

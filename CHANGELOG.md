@@ -5,6 +5,7 @@
 ### Improved
 
 - **Compressed binary load memory** — `loadBinarySync()` / `loadBinaryAsync()` on zlib/zstd snapshots (the `'auto'` default) no longer keep the whole decoded payload alive behind typed-array views. Resident memory after load drops by ~25–50% on typical indexes (e.g. 5k × 5 KB stored documents: ~48 MB → ~24 MB), at the cost of a sub-millisecond typed-array copy.
+- **Async binary load memory** — `loadBinaryAsync()` on compressed snapshots no longer keeps the decompressed sections reachable from the finished zlib/zstd stream until its `close` tick; memory right after `await` now matches `loadBinarySync()` (e.g. 5k × 5 KB stored documents: ~48 MB → ~24 MB).
 - **Binary save CPU (Node)** — MSv5 payload assembly computes section and payload CRC-32 with native `zlib.crc32` when available (Node 20.15+ / 22.2+) instead of the pure-JS table, ~10–37% faster `saveBinarySync()` in paired benchmarks. Output bytes are unchanged; browser builds keep the portable implementation.
 
 ### Changed

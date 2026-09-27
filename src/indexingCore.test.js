@@ -136,4 +136,13 @@ describe('indexingCore default tokenizer', () => {
       user: 1,
     })
   })
+
+  test('custom tokenizer returning more tokens than the call stack allows', () => {
+    const text = Array.from({ length: 200_000 }, (_, i) => `w${i % 997}`).join(' ')
+    const index = FrozenMiniSearch.fromDocuments([{ id: 1, body: text }], {
+      fields: ['body'],
+      tokenize: s => s.split(' '),
+    })
+    expect(index.search('w0').map(r => r.id)).toEqual([1])
+  })
 })

@@ -69,4 +69,32 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
   if (tree.size !== termCount) {
     throw new Error(`FrozenTermIndex: size ${tree.size} !== termCount ${termCount}`)
   }
+  assertTreeShape(tree)
+}
+
+/** Every node is reached exactly once from the root, so traversals and parent climbs terminate. */
+function assertTreeShape(tree: PackedRadixTree): void {
+  const { nodeCount, nodeEdgeOffset, edgeChild } = tree
+  const visited = new Uint8Array(nodeCount)
+  const stack = new Uint32Array(nodeCount)
+  let top = 0
+  stack[top++] = 0
+  visited[0] = 1
+  let reached = 1
+  while (top > 0) {
+    const node = stack[--top]
+    const end = nodeEdgeOffset[node + 1]
+    for (let edge = nodeEdgeOffset[node]; edge < end; edge++) {
+      const child = edgeChild[edge]
+      if (visited[child] !== 0) {
+        throw new Error(`FrozenTermIndex: node ${child} is reached more than once`)
+      }
+      visited[child] = 1
+      reached++
+      stack[top++] = child
+    }
+  }
+  if (reached !== nodeCount) {
+    throw new Error(`FrozenTermIndex: ${nodeCount - reached} nodes are unreachable from the root`)
+  }
 }

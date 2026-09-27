@@ -376,6 +376,8 @@ describe('PackedRadixTree module', () => {
     expect(() => validateFrozenTermIndexLeaves(packed, map.size)).not.toThrow()
     expect(() => validateFrozenTermIndexLeaves(withEdgeChild(packed, new Uint32Array(packed.edgeChild)), map.size))
       .not.toThrow()
+    const wide = packTermsFromList(Array.from({ length: 300 }, (_, i) => String.fromCharCode(0x4e00 + i) + 'x'))
+    expect(() => validateFrozenTermIndexLeaves(wide, 300)).not.toThrow()
   })
 
   test('validateFrozenTermIndexLeaves rejects cycles and shared or orphan nodes', () => {

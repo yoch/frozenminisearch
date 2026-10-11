@@ -35,3 +35,9 @@ Add or update colocated vitest tests for behavior changes. For search semantics,
 ## Commit & Pull Request Guidelines
 
 Recent commits use concise imperative subjects, for example `Fix lint failures blocking CI.` and `Add toJSON export and deprecate fromJson alias.` Keep commits focused and mention user-visible changes in `CHANGELOG.md`. PRs should describe the change, list tests or benchmarks run, link related issues, and call out compatibility, binary format, or parity impacts. Do not commit generated `docs/` HTML; published docs are produced by the release/docs workflows.
+
+## Releases
+
+Follow [`RELEASE.md`](RELEASE.md). Agents prepare a release: choose the semver bump (minor for new public API, patch otherwise), move `## Unreleased` into a ``## vX.Y.Z — `@yoch/frozenminisearch` `` section with a one-paragraph compatibility summary, bump `package.json`, run the local verification, commit `Release X.Y.Z.`, and push `master` plus an annotated `vX.Y.Z` tag only with the maintainer's explicit approval. Wait for the Docs workflow on the tag and CI on `master`.
+
+The maintainer publishes to npm with `pnpm login` then `pnpm release:stable` (or `release:beta`), which requires their 2FA; agents never handle npm credentials or read auth files. A publish failure with `404 Not Found` means an expired or missing login, not a package problem. After a failed publish, do not commit on top of the tagged commit or move the tag; rerun from the same commit, or release the next patch if the release commit must change. Check the result with the registry's dist-tags endpoint, since `npm view` can show a stale `latest`.

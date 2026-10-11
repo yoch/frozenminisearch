@@ -2,8 +2,9 @@
 /**
  * Publish a pre-release to npm with dist-tag `beta` (does not move `latest`).
  *
- * Usage: pnpm release:beta
- * Requires: pnpm login + 2FA OTP when prompted.
+ * Usage: pnpm login && pnpm release:beta
+ * Extra arguments are passed to `pnpm publish`, e.g. `node scripts/publish-beta.cjs --otp=123456`.
+ * pnpm publishes natively; an expired login fails with 404 Not Found (see RELEASE.md).
  */
 const { readFileSync } = require('node:fs')
 const { join } = require('node:path')
@@ -23,6 +24,6 @@ function run (cmd, args) {
 console.log(`Publishing ${name}@${version} (dist-tag beta)…`)
 assertPublishReady({ root, version, channel: 'beta' })
 console.log('Docs deploy from tag v' + version + ' via the Docs workflow.\n')
-run('pnpm', ['publish', '--tag', 'beta'])
+run('pnpm', ['publish', '--tag', 'beta', ...process.argv.slice(2)])
 console.log(`\nDone. beta → ${version} (latest unchanged)`)
-console.log('Verify: pnpm view', name, 'dist-tags')
+console.log(`Verify: curl -s https://registry.npmjs.org/-/package/${name.replace('/', '%2f')}/dist-tags`)

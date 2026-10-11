@@ -75,6 +75,9 @@ make benchmark-finalize RUNS=5 BENCH_WARMUP=20 SEARCH_ITERATIONS=50
 make benchmark-autosuggest RUNS=5 BENCH_WARMUP=20 SEARCH_ITERATIONS=50
 ```
 
+`benchmark-finalize` also covers bounded (`limit`) search; see
+[`scripts/README.md`](scripts/README.md) for `FINALIZE_BENCH_ARGS`.
+
 ## Environment variables
 
 ### Set by the Makefile (do not override unless needed)

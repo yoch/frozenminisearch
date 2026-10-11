@@ -204,7 +204,7 @@ benchmark-diff-search-run: build
 # Tuning / calibration workflows
 .PHONY: benchmark-calibrate-batches benchmark-validate-freq-adaptive benchmark-and-gate-tuning
 .PHONY: benchmark-gate-posting-ratio benchmark-targeted benchmark-profile-giant-prefix
-.PHONY: benchmark-measure-scoring-steps benchmark-finalize benchmark-limit benchmark-autosuggest
+.PHONY: benchmark-measure-scoring-steps benchmark-finalize benchmark-autosuggest
 benchmark-calibrate-batches: build
 	$(NODE) $(EXPOSE) benchmarks/scripts/calibrate-search-batches.mjs
 
@@ -227,10 +227,7 @@ benchmark-measure-scoring-steps: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/measure-scoring-steps.mjs
 
 benchmark-finalize:
-	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs $(BENCH_TIMING_ARGS)
-
-benchmark-limit:
-	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/limit-search.mjs $(BENCH_TIMING_ARGS) $(LIMIT_BENCH_ARGS)
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs $(BENCH_TIMING_ARGS) $(FINALIZE_BENCH_ARGS)
 
 benchmark-autosuggest:
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/autosuggest-search.mjs $(BENCH_TIMING_ARGS)

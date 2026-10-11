@@ -126,7 +126,6 @@
     "benchmark:profile-giant-prefix": "make benchmark-profile-giant-prefix",
     "benchmark:measure-scoring-steps": "make benchmark-measure-scoring-steps",
     "benchmark:finalize": "make benchmark-finalize",
-    "benchmark:limit": "make benchmark-limit",
     "benchmark:autosuggest": "make benchmark-autosuggest",
     "benchmark:history:analyze": "make benchmark-history-analyze",
     "benchmark:history:vs-mutable": "make benchmark-history-vs-mutable",

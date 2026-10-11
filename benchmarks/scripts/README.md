@@ -38,20 +38,23 @@ Only modified **tracked** files block recording; `benchmarks/scripts/` may remai
 
 ## Commands
 
-`pnpm benchmark:limit` audits bounded search separately from the regression suite.
-It verifies correctness and reports raw-query, finalization, full-search-then-slice,
-and bounded public-search p50/p95 timings plus materialization/filter counts.
-Use `RUNS`, `BENCH_WARMUP`, and `SEARCH_ITERATIONS` as for `benchmark:finalize`.
-Pass options through `LIMIT_BENCH_ARGS`, for example:
+`pnpm benchmark:finalize` (lab) times finalization separately from the regression
+suite, including bounded (`limit`) search. For each case and limit it verifies the
+result against the unbounded search sliced to the limit, and reports raw-query,
+finalization, full-search-then-slice, and public-search p50/p95 timings plus
+materialization/filter counts. Use `RUNS`, `BENCH_WARMUP`, and `SEARCH_ITERATIONS`;
+pass options through `FINALIZE_BENCH_ARGS`, for example:
 
 ```bash
-pnpm benchmark:limit RUNS=3 SEARCH_ITERATIONS=20 LIMIT_BENCH_ARGS='--cases=exact,filter-half,wildcard --limits=1,20,near --memory --output=/tmp/limit.json'
+pnpm benchmark:finalize RUNS=3 SEARCH_ITERATIONS=20 FINALIZE_BENCH_ARGS='--corpus=limit --cases=exact,filter-half,wildcard --limits=1,20,near --memory --output=/tmp/limit.json'
 ```
 
-`--documents` controls synthetic corpus size. `--corpus=bdpm-specialites` loads
-the checked-in binary fixture (15,848 real documents); its filters use stable
-id buckets to vary selectivity. Materialization counters are available for the
-synthetic finalization probe; real-corpus rows count filter calls only.
+`--corpus` selects the cases: `finalize` (default; stored-field layouts, filter,
+wildcard and large prefix, unbounded unless `--limits` is passed), `limit`
+(bounded-search query shapes over one synthetic index; `--documents` sets its size),
+or `bdpm-specialites` (the checked-in binary fixture, 15,848 real documents; its
+filters use stable id buckets to vary selectivity). Materialization counters are
+available for the `limit` corpus; other rows count filter calls only.
 Optional memory figures measure retained
 returned results after GC, averaged over batches of 20 searches; they do not
 measure transient allocations or peak memory. Timings and counts are recorded

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.11.0 — `@yoch/frozenminisearch`
+
+Minor release: native result pagination with `searchPage()`, which returns a page and the exact total after filtering in one call. No changes to `search()` semantics, runtime dependencies, or the MSv5 wire format; the published package still supports Node 20+.
+
 ### Added
 
 - **Search pagination** — `searchPage(query, { offset, limit, ...options })` returns `{ results, total }` in the native score order, with an exact total after filtering. Page size is explicit; an empty page still counts matches. Candidate scores are computed once per request, and only the returned page is materialized without a filter. Deep pages select their window rather than sorting every earlier match. Filters evaluate all candidates once and accepted objects are reused for selection. Available in Node and browser entries; no snapshot format changes.

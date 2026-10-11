@@ -38,6 +38,27 @@ Only modified **tracked** files block recording; `benchmarks/scripts/` may remai
 
 ## Commands
 
+`pnpm benchmark:limit` audits bounded search separately from the regression suite.
+It verifies correctness and reports raw-query, finalization, full-search-then-slice,
+and bounded public-search p50/p95 timings plus materialization/filter counts.
+Use `RUNS`, `BENCH_WARMUP`, and `SEARCH_ITERATIONS` as for `benchmark:finalize`.
+Pass options through `LIMIT_BENCH_ARGS`, for example:
+
+```bash
+pnpm benchmark:limit RUNS=3 SEARCH_ITERATIONS=20 LIMIT_BENCH_ARGS='--cases=exact,filter-half,wildcard --limits=1,20,near --memory --output=/tmp/limit.json'
+```
+
+`--documents` controls synthetic corpus size. `--corpus=bdpm-specialites` loads
+the checked-in binary fixture (15,848 real documents); its filters use stable
+id buckets to vary selectivity. Materialization counters are available for the
+synthetic finalization probe; real-corpus rows count filter calls only.
+Optional memory figures measure retained
+returned results after GC, averaged over batches of 20 searches; they do not
+measure transient allocations or peak memory. Timings and counts are recorded
+separately. CPU measurements should run without other benchmarks concurrently.
+The raw-query measurement always executes the engine; public `limit: 0` and
+bounded unboosted wildcard searches now bypass that phase.
+
 | Script | Role |
 |--------|------|
 | `record-history.sh` | Append a line to `perf-history.jsonl` (HEAD, clean tree) |

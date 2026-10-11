@@ -316,4 +316,45 @@ describe('finalizeSearchResults limit', () => {
     const full = finalizeRawSearchResults(randomRawResults(20, 4), 'q', {}, defaultSearchOptions, id => id)
     expect(finalizeRawSearchResults(raw, 'q', { limit: Infinity }, defaultSearchOptions, id => id)).toEqual(full)
   })
+
+  test('only retained results read ids and stored fields without a filter', () => {
+    let ids = 0
+    let fields = 0
+    const results = finalizeSearchResults({
+      rawResults: randomRawResults(200, 9),
+      limit: 10,
+      getExternalId: (id) => { ids++; return id },
+      getStoredFields: () => { fields++; return { label: 'stored' } },
+    })
+    expect(results).toHaveLength(10)
+    expect(ids).toBe(10)
+    expect(fields).toBe(10)
+  })
+
+  test.each([1, 10, 100, 199])('filter sees ranked candidates until %i are accepted', (limit) => {
+    const raw = randomRawResults(500, 9)
+    const full = finalizeSearchResults({ ...base, rawResults: raw })
+    const visited = []
+    const accepted = r => r.bucket === 2
+    const results = finalizeSearchResults({
+      ...base, rawResults: raw, limit,
+      filter: (r) => { visited.push(r.id); return accepted(r) },
+    })
+    expect(results).toEqual(full.filter(accepted).slice(0, limit))
+    const last = results.length === limit ? full.findIndex(r => r.id === results.at(-1).id) + 1 : full.length
+    expect(visited).toEqual(full.slice(0, last).map(r => r.id))
+  })
+
+  test('a highly selective filter consumes the ranked remainder without revisiting candidates', () => {
+    const raw = randomRawResults(500, 9)
+    const full = finalizeSearchResults({ ...base, rawResults: raw })
+    const keep = new Set(full.slice(-2).map(r => r.id))
+    const visited = []
+    const results = finalizeSearchResults({
+      ...base, rawResults: raw, limit: 3,
+      filter: (r) => { visited.push(r.id); return keep.has(r.id) },
+    })
+    expect(results).toEqual(full.slice(-2))
+    expect(visited).toEqual(full.map(r => r.id))
+  })
 })

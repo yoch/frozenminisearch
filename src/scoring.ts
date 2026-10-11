@@ -458,7 +458,7 @@ export interface FinalizeSearchParams {
   limit?: number
 }
 
-function resolveResultLimit(limit: unknown): number | undefined {
+export function resolveResultLimit(limit: unknown): number | undefined {
   if (limit === undefined || limit === Infinity) return undefined
   if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0) {
     throw new Error('FrozenMiniSearch: limit must be a non-negative integer or Infinity')
@@ -569,6 +569,81 @@ function topRankIndices(scores: Float64Array, k: number): Int32Array {
   return heap.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
 }
 
+/** Rank a small prefix first, then sort the remainder only if the filter needs it. */
+function* rankedCandidateBatches(scores: Float64Array, limit: number): Generator<Int32Array> {
+  const order = new Int32Array(scores.length)
+  for (let i = 0; i < order.length; i++) order[i] = i
+  if (limit >= scores.length / 8) {
+    order.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+    yield order
+    return
+  }
+  let size = order.length
+  const siftDown = (from: number): void => {
+    const candidate = order[from]
+    let parent = from
+    for (;;) {
+      const left = parent * 2 + 1
+      if (left >= size) break
+      const right = left + 1
+      const best = right < size && ranksBefore(scores, order[right], order[left]) ? right : left
+      if (!ranksBefore(scores, order[best], candidate)) break
+      order[parent] = order[best]
+      parent = best
+    }
+    order[parent] = candidate
+  }
+  for (let i = (size >> 1) - 1; i >= 0; i--) siftDown(i)
+  const prefix = new Int32Array(Math.min(size, Math.max(64, limit * 4)))
+  for (let i = 0; i < prefix.length; i++) {
+    prefix[i] = order[0]
+    if (--size === 0) break
+    order[0] = order[size]
+    siftDown(0)
+  }
+  yield prefix
+  if (size === 0) return
+  // Restore insertion order before native sort: heap order is a poor input
+  // for V8's adaptive sort on postings with many tied scores.
+  const pending = new Uint8Array(scores.length)
+  for (let i = 0; i < size; i++) pending[order[i]] = 1
+  let write = 0
+  for (let i = 0; i < pending.length; i++) {
+    if (pending[i]) order[write++] = i
+  }
+  const remaining = order.subarray(0, size)
+  remaining.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+  yield remaining
+}
+
+function collectResultScores(rawResults: RawResult): Float64Array {
+  const scores = new Float64Array(rawResults.size)
+  let entry = 0
+  for (const { score, terms } of rawResults.values()) {
+    scores[entry++] = score * (terms.length || 1)
+  }
+  return scores
+}
+
+/** Keep the common small top-k path independent of filtered/native-sort paths. */
+function finalizeTopSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
+  const { rawResults } = params
+  const top = topRankIndices(collectResultScores(rawResults), limit)
+  const byEntry = Array.from(top.keys()).sort((a, b) => top[a] - top[b])
+  const results = new Array<SearchResult>(top.length)
+  let next = 0
+  let entry = 0
+  for (const [docId, value] of rawResults) {
+    const rank = byEntry[next]
+    if (top[rank] === entry) {
+      results[rank] = materializeSearchResult(docId, value, params)
+      if (++next === byEntry.length) break
+    }
+    entry++
+  }
+  return results
+}
+
 function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
   const { rawResults, filter, skipSort } = params
   if (limit === 0) return []
@@ -584,39 +659,68 @@ function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: numbe
     return results
   }
 
-  const scores = new Float64Array(rawResults.size)
-  let entry = 0
-  for (const { score, terms } of rawResults.values()) {
-    scores[entry++] = score * (terms.length || 1)
+  if (filter == null && limit === 1) {
+    let bestValue: RawResultValue | undefined
+    let bestScore = -Infinity
+    for (const value of rawResults.values()) {
+      const score = value.score * (value.terms.length || 1)
+      if (bestValue == null || score > bestScore) {
+        bestValue = value
+        bestScore = score
+      }
+    }
+    for (const [docId, value] of rawResults) {
+      if (value === bestValue) return [materializeSearchResult(docId, value, params)]
+    }
+    return []
+  }
+
+  if (filter == null && limit < rawResults.size / 2) return finalizeTopSearchResults(params, limit)
+
+  const scores = collectResultScores(rawResults)
+  // Equal-score detection is useful for filters and large limits; the common
+  // small top-k path above keeps its existing selection algorithm.
+  let allScoresEqual = true
+  for (let i = 1; i < scores.length; i++) {
+    if (scores[i] !== scores[0]) {
+      allScoresEqual = false
+      break
+    }
+  }
+
+  if (allScoresEqual) {
+    const results: SearchResult[] = []
+    for (const [docId, value] of rawResults) {
+      const result = materializeSearchResult(docId, value, params)
+      if (filter != null && !filter(result)) continue
+      results.push(result)
+      if (results.length === limit) break
+    }
+    return results
   }
 
   if (filter != null) {
     const docIds = Array.from(rawResults.keys())
     const values = Array.from(rawResults.values())
-    const order = new Int32Array(scores.length)
-    for (let i = 0; i < order.length; i++) order[i] = i
-    order.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
     const results: SearchResult[] = []
-    for (let i = 0; i < order.length && results.length < limit; i++) {
-      const result = materializeSearchResult(docIds[order[i]], values[order[i]], params)
-      if (filter(result)) results.push(result)
+    for (const batch of rankedCandidateBatches(scores, limit)) {
+      for (const candidate of batch) {
+        const result = materializeSearchResult(docIds[candidate], values[candidate], params)
+        if (filter(result)) results.push(result)
+        if (results.length === limit) return results
+      }
     }
     return results
   }
 
-  const top = topRankIndices(scores, limit)
-  const byEntry = Array.from(top.keys()).sort((a, b) => top[a] - top[b])
-  const results = new Array<SearchResult>(top.length)
-  let next = 0
-  entry = 0
-  for (const [docId, value] of rawResults) {
-    const rank = byEntry[next]
-    if (top[rank] === entry) {
-      results[rank] = materializeSearchResult(docId, value, params)
-      if (++next === byEntry.length) break
-    }
-    entry++
-  }
+  // Native sorting wins over heap selection when at least half are retained.
+  const docIds = Array.from(rawResults.keys())
+  const values = Array.from(rawResults.values())
+  const order = new Int32Array(scores.length)
+  for (let i = 0; i < order.length; i++) order[i] = i
+  order.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+  const results = new Array<SearchResult>(limit)
+  for (let i = 0; i < limit; i++) results[i] = materializeSearchResult(docIds[order[i]], values[order[i]], params)
   return results
 }
 

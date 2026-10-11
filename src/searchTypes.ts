@@ -100,10 +100,20 @@ export type SearchOptions = {
 
   /**
    * FrozenMiniSearch extension (not in MiniSearch): return at most `limit` results.
-   * The result equals `search(query, options).slice(0, limit)`, but only the returned
-   * results are materialized and ordered. With `filter`, the predicate runs in
-   * descending score order and stops once `limit` results are kept, so it may not see
-   * every candidate. Must be a non-negative integer or `Infinity`; ignored by `autoSuggest`.
+   * For finite scores and a deterministic filter that does not change scores, the
+   * result equals an unbounded search followed by `.slice(0, limit)`. Zero returns
+   * an empty array without executing the query or its callbacks. Invalid limits
+   * throw before query execution. Must be a non-negative integer or `Infinity`;
+   * ignored by `autoSuggest`. `Infinity` or an explicit `undefined` removes an
+   * index-level default limit.
+   *
+   * When the limit is smaller than the raw candidate count, only retained results
+   * are materialized without a filter. With a filter, candidates
+   * are materialized in descending score order (insertion order for an unboosted
+   * wildcard) until enough are accepted. Filters should not depend on invocation
+   * order or count: an unbounded search filters before sorting. An unboosted
+   * wildcard stops scanning documents once enough are accepted; other queries
+   * still compute all candidate scores before selection.
    */
   limit?: number
 }

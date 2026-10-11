@@ -60,6 +60,7 @@ import {
 } from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
 import { getFrozenDefault, type FrozenDefaultOptionName } from './searchDefaults'
+import { frozenRuntimeOptions } from './frozenOptions'
 
 const noStoredFields = (): undefined => undefined
 type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (params: FrozenAssembleParams<T>) => I
@@ -166,7 +167,7 @@ export default class FrozenMiniSearchCore<T = any> {
   private _activeQueries = 0
 
   constructor(params: FrozenAssembleParams<T>) {
-    this._options = params.options
+    this._options = frozenRuntimeOptions(params.options)
     this._documentCount = params.documentCount
     this._nextId = params.nextId
     this._externalIds = compactExternalIds(params.externalIds, params.idLookup)

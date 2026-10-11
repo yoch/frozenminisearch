@@ -48,6 +48,8 @@ export class PackedTermPathPool {
   }
 
   release(path: PackedTermPath): void {
+    path.base = ''
+    path.depth = 0
     path.inUse = false
   }
 }

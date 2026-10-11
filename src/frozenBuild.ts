@@ -5,6 +5,7 @@ import type { FrozenAssembleParams } from './frozenTypes'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { getFrozenDefault } from './searchDefaults'
+import { frozenRuntimeOptions } from './frozenOptions'
 import {
   buildFieldIds,
   collectFieldTermFreqsFromFieldInto,
@@ -31,7 +32,7 @@ export interface FrozenIndexBuilderHints {
 
 /** Incremental builder for {@link FrozenMiniSearch} without materializing a full `documents[]` array. */
 export class FrozenIndexBuilder<T> {
-  private readonly _options: IndexingOptions<T>
+  private _options: IndexingOptions<T>
   private readonly _fieldIds: { [key: string]: number }
   private readonly _fieldCount: number
   private readonly _termIndex: Map<string, number>
@@ -209,6 +210,13 @@ export class FrozenIndexBuilder<T> {
     this._fieldTermFreqScratch.clear()
     this._rawTokenScratch.clear()
     this._tokenScratch.length = 0
+    // This builder cannot be used again. Replace, rather than mutate, its
+    // options so that query callbacks transferred to the index stay intact.
+    this._options = resolveIndexingOptions({
+      fields: this._options.fields,
+      idField: this._options.idField,
+      storeFields: this._options.storeFields,
+    })
   }
 
   /**
@@ -221,6 +229,16 @@ export class FrozenIndexBuilder<T> {
     }
     this._frozen = true
 
+    try {
+      return this.buildParams()
+    } finally {
+      // A failed freeze is terminal too: callers may keep the builder for
+      // diagnostics, but it must no longer own documents or posting scratch.
+      this.releaseTransientState()
+    }
+  }
+
+  private buildParams(): FrozenAssembleParams<T> {
     const documentCount = this._nextId
     const termCount = this._terms.length
     const postings = this._postings.finalize(termCount, documentCount)
@@ -247,7 +265,7 @@ export class FrozenIndexBuilder<T> {
     const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 
     const params = {
-      options: this._options,
+      options: frozenRuntimeOptions(this._options),
       documentCount,
       nextId: documentCount,
       fieldIds: this._fieldIds,
@@ -262,7 +280,6 @@ export class FrozenIndexBuilder<T> {
       postings,
     }
 
-    this.releaseTransientState()
     return params
   }
 }

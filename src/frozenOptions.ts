@@ -5,6 +5,20 @@ import {
   defaultSearchOptions,
 } from './searchDefaults'
 
+/** Keep query callbacks, but discard ingestion-only closures after building. */
+export function frozenRuntimeOptions<T>(options: OptionsWithDefaults<T>): OptionsWithDefaults<T> {
+  return {
+    ...defaultFrozenLoadOptions,
+    fields: options.fields,
+    idField: options.idField,
+    storeFields: options.storeFields,
+    tokenize: options.tokenize,
+    processTerm: options.processTerm,
+    searchOptions: options.searchOptions,
+    autoSuggestOptions: options.autoSuggestOptions,
+  }
+}
+
 export function assertFieldsMatchSnapshot(
   optionsFields: readonly string[],
   indexedFieldIds: { [field: string]: number },

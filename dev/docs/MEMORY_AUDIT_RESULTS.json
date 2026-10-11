@@ -1,0 +1,942 @@
+{
+  "date_utc": "2026-10-11",
+  "base_commit": "0ed1091a29f42bd7b8fc40828efecca53fd4881c",
+  "runtime": "v24.19.0",
+  "source_sha256": {
+    "src/frozenBuild.ts": "8e86c96bd1bf8b513ba9a34b134f0099f08ff0d12a380862a8d400962574ea29",
+    "src/frozenOptions.ts": "5376e7b45ae058d63948a899f56ad2368ca39184ee78e8c2081f198cc28aa4f9",
+    "src/FrozenMiniSearchCore.ts": "c66a4cf813b5f663d9522d152ea5435bda73540cf43f5a7f5defddf6f15adb44",
+    "src/PackedRadixTree/termPath.ts": "09a7964dc58f7965afd3d9119974138f0f2c2fb7f307b4ff36aeb6e5a0110ccf",
+    "src/frozenMemoryLifecycle.test.js": "9203a038259d49269f0538dfd8ad41d8cd9fa59802093ed7ad03d9e9e0b520e4",
+    "benchmarks/scripts/audit-memory-retention.cjs": "75d6318bdc23432fb4a1bf7c2f52897b03368574179ab00fbe854c6597d8e297"
+  },
+  "published": {
+    "runtime": "v24.19.0",
+    "entry": "published 1.11.0 CJS bundle",
+    "samples": [
+      {
+        "label": "baseline",
+        "memory": {
+          "rss": 33574912,
+          "heapTotal": 10149888,
+          "heapUsed": 5210288,
+          "external": 1978206,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builder_1",
+        "memory": {
+          "rss": 37900288,
+          "heapTotal": 10674176,
+          "heapUsed": 5402408,
+          "external": 10367955,
+          "arrayBuffers": 8535523
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builder_2",
+        "memory": {
+          "rss": 38162432,
+          "heapTotal": 10674176,
+          "heapUsed": 5547256,
+          "external": 18756563,
+          "arrayBuffers": 16924131
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builder_3",
+        "memory": {
+          "rss": 38424576,
+          "heapTotal": 10936320,
+          "heapUsed": 5696944,
+          "external": 27145171,
+          "arrayBuffers": 25312739
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builders_dropped",
+        "memory": {
+          "rss": 38424576,
+          "heapTotal": 10412032,
+          "heapUsed": 5289592,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "finished_builder_and_index_with_ingestion_closure",
+        "memory": {
+          "rss": 38555648,
+          "heapTotal": 10412032,
+          "heapUsed": 5337264,
+          "external": 18756563,
+          "arrayBuffers": 16924131
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "callback_holder_dropped",
+        "memory": {
+          "rss": 38555648,
+          "heapTotal": 10412032,
+          "heapUsed": 5348096,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "long_fuzzy_token_gc",
+        "memory": {
+          "rss": 38686720,
+          "heapTotal": 10674176,
+          "heapUsed": 5387056,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "fixtures_loaded",
+        "memory": {
+          "rss": 71114752,
+          "heapTotal": 27357184,
+          "heapUsed": 9905072,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_1",
+        "memory": {
+          "rss": 237580288,
+          "heapTotal": 145846272,
+          "heapUsed": 10394144,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_2",
+        "memory": {
+          "rss": 238649344,
+          "heapTotal": 146108416,
+          "heapUsed": 10422992,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_3",
+        "memory": {
+          "rss": 238780416,
+          "heapTotal": 146108416,
+          "heapUsed": 10480400,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_4",
+        "memory": {
+          "rss": 238739456,
+          "heapTotal": 146108416,
+          "heapUsed": 10460800,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_5",
+        "memory": {
+          "rss": 238796800,
+          "heapTotal": 146108416,
+          "heapUsed": 10478032,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_6",
+        "memory": {
+          "rss": 238796800,
+          "heapTotal": 145846272,
+          "heapUsed": 10463712,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_1",
+        "memory": {
+          "rss": 265203712,
+          "heapTotal": 146370560,
+          "heapUsed": 10952992,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_2",
+        "memory": {
+          "rss": 265900032,
+          "heapTotal": 146370560,
+          "heapUsed": 10737536,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_3",
+        "memory": {
+          "rss": 269352960,
+          "heapTotal": 146632704,
+          "heapUsed": 10789824,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_4",
+        "memory": {
+          "rss": 275353600,
+          "heapTotal": 146108416,
+          "heapUsed": 10798936,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_5",
+        "memory": {
+          "rss": 275353600,
+          "heapTotal": 146370560,
+          "heapUsed": 10806144,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_6",
+        "memory": {
+          "rss": 275353600,
+          "heapTotal": 146370560,
+          "heapUsed": 10807160,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "all_fixture_indexes_dropped",
+        "memory": {
+          "rss": 274923520,
+          "heapTotal": 141746176,
+          "heapUsed": 6614872,
+          "external": 2138662,
+          "arrayBuffers": 306230
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "binary_cycles_completed",
+        "memory": {
+          "rss": 276234240,
+          "heapTotal": 142270464,
+          "heapUsed": 6923368,
+          "external": 2138662,
+          "arrayBuffers": 306230
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      }
+    ],
+    "fixtures": [
+      {
+        "file": "bdpm_compositions.msbin",
+        "bytes": 774237,
+        "sha256": "892517efeb205747c0cd2f10d2e2122fbd901ecf2728fdf35bf1f8391aa922da"
+      },
+      {
+        "file": "bdpm_generiques.msbin",
+        "bytes": 128964,
+        "sha256": "52f3678a150b894d2fd860cf5b9b79fc3f0c88d039ae958f8818077d3130e2f8"
+      },
+      {
+        "file": "bdpm_mitm.msbin",
+        "bytes": 336907,
+        "sha256": "dee50eeba45d506b0fdd0156e7010e36b47525f07bcdbedc33ad72db2b7bb1da"
+      },
+      {
+        "file": "bdpm_presentations.msbin",
+        "bytes": 995654,
+        "sha256": "dbdab3f4d09231b05756fe3092f2086899c41292192a4049323d4881cc24531d"
+      },
+      {
+        "file": "bdpm_specialites.msbin",
+        "bytes": 658493,
+        "sha256": "a264bc05b06dc039625bec39f3ab8973d0840f3bc8f19d4a63a5d20e94d304c2"
+      },
+      {
+        "file": "bdpm_substances.msbin",
+        "bytes": 103215,
+        "sha256": "81b9763cf6690fce5588d348865506b8a02f1b7bc76e6b0a51806975134fcd0e"
+      },
+      {
+        "file": "vet_medicaments.msbin",
+        "bytes": 159315,
+        "sha256": "eaa613acef40d1e6782603d15239e6bdbaa87d938302e130824aa772c7a370d9"
+      }
+    ],
+    "searches": 1800,
+    "loads": 85,
+    "ingestion_closure_payload_alive": true,
+    "cursor_base_after_search": "paracetamol",
+    "after_long_fuzzy_token": {
+      "rss": 55463936,
+      "heapTotal": 10412032,
+      "heapUsed": 5531528,
+      "external": 18797532,
+      "arrayBuffers": 16965100
+    },
+    "document_counts": [
+      32389,
+      10704,
+      7711,
+      20905,
+      15848,
+      3896,
+      3213
+    ],
+    "result_digest": "162079e586a5f64b9749d319f42f1dfce9a6ffc56054aff79aac4af1efc32685",
+    "retired_indexes": 85,
+    "retired_results": 72,
+    "bundle_sha256": "b4ce256b970ccbb8c555e5476a35f81f6bbe515d193deabe22046c1c586955a6"
+  },
+  "patched": {
+    "runtime": "v24.19.0",
+    "entry": "patched dist/cjs/index.require.cjs",
+    "samples": [
+      {
+        "label": "baseline",
+        "memory": {
+          "rss": 33394688,
+          "heapTotal": 10416128,
+          "heapUsed": 5210832,
+          "external": 1978206,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builder_1",
+        "memory": {
+          "rss": 37720064,
+          "heapTotal": 10416128,
+          "heapUsed": 5271800,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builder_2",
+        "memory": {
+          "rss": 38113280,
+          "heapTotal": 10416128,
+          "heapUsed": 5286016,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builder_3",
+        "memory": {
+          "rss": 46632960,
+          "heapTotal": 10416128,
+          "heapUsed": 5301760,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "failed_builders_dropped",
+        "memory": {
+          "rss": 46764032,
+          "heapTotal": 10416128,
+          "heapUsed": 5293904,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "finished_builder_and_index_with_ingestion_closure",
+        "memory": {
+          "rss": 46895104,
+          "heapTotal": 10940416,
+          "heapUsed": 5340120,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "callback_holder_dropped",
+        "memory": {
+          "rss": 46895104,
+          "heapTotal": 10940416,
+          "heapUsed": 5351016,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "long_fuzzy_token_gc",
+        "memory": {
+          "rss": 46878720,
+          "heapTotal": 10940416,
+          "heapUsed": 5394640,
+          "external": 1979347,
+          "arrayBuffers": 146915
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "fixtures_loaded",
+        "memory": {
+          "rss": 68943872,
+          "heapTotal": 27623424,
+          "heapUsed": 9890936,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_1",
+        "memory": {
+          "rss": 230191104,
+          "heapTotal": 146112512,
+          "heapUsed": 10434416,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_2",
+        "memory": {
+          "rss": 230862848,
+          "heapTotal": 145850368,
+          "heapUsed": 10428552,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_3",
+        "memory": {
+          "rss": 231002112,
+          "heapTotal": 145850368,
+          "heapUsed": 10484752,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_4",
+        "memory": {
+          "rss": 231002112,
+          "heapTotal": 145850368,
+          "heapUsed": 10465640,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_5",
+        "memory": {
+          "rss": 231272448,
+          "heapTotal": 145850368,
+          "heapUsed": 10482128,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "search_batch_6",
+        "memory": {
+          "rss": 231272448,
+          "heapTotal": 145850368,
+          "heapUsed": 10467808,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_1",
+        "memory": {
+          "rss": 260898816,
+          "heapTotal": 145850368,
+          "heapUsed": 10712912,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_2",
+        "memory": {
+          "rss": 261476352,
+          "heapTotal": 145850368,
+          "heapUsed": 10740312,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_3",
+        "memory": {
+          "rss": 262946816,
+          "heapTotal": 146112512,
+          "heapUsed": 10792600,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_4",
+        "memory": {
+          "rss": 263270400,
+          "heapTotal": 146112512,
+          "heapUsed": 10801712,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_5",
+        "memory": {
+          "rss": 265908224,
+          "heapTotal": 146374656,
+          "heapUsed": 10808920,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "reload_6",
+        "memory": {
+          "rss": 271360000,
+          "heapTotal": 146374656,
+          "heapUsed": 10809936,
+          "external": 9392493,
+          "arrayBuffers": 7560061
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "all_fixture_indexes_dropped",
+        "memory": {
+          "rss": 270929920,
+          "heapTotal": 141488128,
+          "heapUsed": 6617648,
+          "external": 2138662,
+          "arrayBuffers": 306230
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      },
+      {
+        "label": "binary_cycles_completed",
+        "memory": {
+          "rss": 272240640,
+          "heapTotal": 142536704,
+          "heapUsed": 6926752,
+          "external": 2138662,
+          "arrayBuffers": 306230
+        },
+        "resources": [],
+        "retired_indexes_alive": 0,
+        "retired_results_alive": 0,
+        "source_buffers_alive": 0
+      }
+    ],
+    "fixtures": [
+      {
+        "file": "bdpm_compositions.msbin",
+        "bytes": 774237,
+        "sha256": "892517efeb205747c0cd2f10d2e2122fbd901ecf2728fdf35bf1f8391aa922da"
+      },
+      {
+        "file": "bdpm_generiques.msbin",
+        "bytes": 128964,
+        "sha256": "52f3678a150b894d2fd860cf5b9b79fc3f0c88d039ae958f8818077d3130e2f8"
+      },
+      {
+        "file": "bdpm_mitm.msbin",
+        "bytes": 336907,
+        "sha256": "dee50eeba45d506b0fdd0156e7010e36b47525f07bcdbedc33ad72db2b7bb1da"
+      },
+      {
+        "file": "bdpm_presentations.msbin",
+        "bytes": 995654,
+        "sha256": "dbdab3f4d09231b05756fe3092f2086899c41292192a4049323d4881cc24531d"
+      },
+      {
+        "file": "bdpm_specialites.msbin",
+        "bytes": 658493,
+        "sha256": "a264bc05b06dc039625bec39f3ab8973d0840f3bc8f19d4a63a5d20e94d304c2"
+      },
+      {
+        "file": "bdpm_substances.msbin",
+        "bytes": 103215,
+        "sha256": "81b9763cf6690fce5588d348865506b8a02f1b7bc76e6b0a51806975134fcd0e"
+      },
+      {
+        "file": "vet_medicaments.msbin",
+        "bytes": 159315,
+        "sha256": "eaa613acef40d1e6782603d15239e6bdbaa87d938302e130824aa772c7a370d9"
+      }
+    ],
+    "searches": 1800,
+    "loads": 85,
+    "ingestion_closure_payload_alive": false,
+    "cursor_base_after_search": "",
+    "after_long_fuzzy_token": {
+      "rss": 63672320,
+      "heapTotal": 10940416,
+      "heapUsed": 6130016,
+      "external": 18797532,
+      "arrayBuffers": 16965100
+    },
+    "document_counts": [
+      32389,
+      10704,
+      7711,
+      20905,
+      15848,
+      3896,
+      3213
+    ],
+    "result_digest": "162079e586a5f64b9749d319f42f1dfce9a6ffc56054aff79aac4af1efc32685",
+    "retired_indexes": 85,
+    "retired_results": 72,
+    "bundle_sha256": "b4ce256b970ccbb8c555e5476a35f81f6bbe515d193deabe22046c1c586955a6"
+  },
+  "async_queue_published_1_11_0": {
+    "chunk_size": 1,
+    "extractor_fails_on_first_document": true,
+    "documents": 50000,
+    "before": {
+      "rss": 40062976,
+      "heapTotal": 17104896,
+      "heapUsed": 7401640,
+      "external": 1912474,
+      "arrayBuffers": 206314
+    },
+    "queued": {
+      "rss": 74797056,
+      "heapTotal": 53542912,
+      "heapUsed": 34876136,
+      "external": 1912478,
+      "arrayBuffers": 206314
+    },
+    "after": {
+      "rss": 75915264,
+      "heapTotal": 41746432,
+      "heapUsed": 7414848,
+      "external": 1912478,
+      "arrayBuffers": 140778
+    }
+  },
+  "validation": {
+    "build": "passed",
+    "typecheck": "passed",
+    "lint": "passed",
+    "library_tests": {
+      "passed": 741,
+      "files": 42,
+      "skipped": 0,
+      "current_bdpm_export_documents": 146489,
+      "datasets": 10
+    },
+    "runtime_tests": {
+      "passed": 36,
+      "entries": [
+        "ESM",
+        "CJS",
+        "browser"
+      ],
+      "runtime": "v24.19.0"
+    },
+    "rest_tests": {
+      "passed": 255,
+      "suites": 28,
+      "failed": 0,
+      "slow_tests": true,
+      "rest_commit": "b7e2f2fcab6faec69c2d95316cc26bcac0a363b9",
+      "temporary_jest_bundle_alias": true
+    },
+    "targeted_workload": {
+      "note": "Run after cursor/finalization fixes, before the subsequent callback-lifetime fix. Not a controlled speed comparison.",
+      "result": {
+        "capturedAt": "2026-10-11T23:03:51.136Z",
+        "node": "v24.19.0",
+        "packageVersion": "1.11.0",
+        "minisearchVersion": "7.2.0",
+        "gcExposed": true,
+        "git": {
+          "commit": "0ed1091a29f42bd7b8fc40828efecca53fd4881c",
+          "commitShort": "0ed1091",
+          "branch": "fix/memory-lifecycle",
+          "dirty": true,
+          "trackedDirty": true
+        },
+        "profileKind": "targeted-opt-profile",
+        "runs": 1,
+        "scenarioIds": [
+          "extreme-giantVocabulary"
+        ],
+        "surfaces": [
+          "search"
+        ],
+        "scenarios": [
+          {
+            "id": "extreme-giantVocabulary",
+            "name": "Extreme \u2014 giant vocabulary (50k unique terms)",
+            "documentCount": 50000,
+            "fields": [
+              "txt"
+            ],
+            "storeFields": [],
+            "benchSurfaces": [
+              "search"
+            ],
+            "search": [
+              {
+                "label": "exact",
+                "query": "unique12345",
+                "batchSize": 256,
+                "searchIterations": 50,
+                "mutableP50": 0.0021,
+                "frozenP50": 0.0014,
+                "mutableP95": 0.0042,
+                "frozenP95": 0.0027,
+                "pairedRatioP50": 0.6436,
+                "frozenP50VsMutablePct": -33.2,
+                "belowSearchFloor": true
+              },
+              {
+                "label": "AND+prefix",
+                "query": "unique1 common",
+                "batchSize": 1,
+                "searchIterations": 20,
+                "mutableP50": 65.7494,
+                "frozenP50": 24.0142,
+                "mutableP95": 99.892,
+                "frozenP95": 32.9058,
+                "pairedRatioP50": 0.3658,
+                "frozenP50VsMutablePct": -63.5,
+                "belowSearchFloor": false
+              },
+              {
+                "label": "AND_NOT",
+                "query": "unique1 common",
+                "batchSize": 4,
+                "searchIterations": 20,
+                "mutableP50": 18.0427,
+                "frozenP50": 0.03,
+                "mutableP95": 30.1048,
+                "frozenP95": 0.0562,
+                "pairedRatioP50": 0.0016,
+                "frozenP50VsMutablePct": -99.8,
+                "belowSearchFloor": false
+              },
+              {
+                "label": "prefix",
+                "query": "unique1",
+                "batchSize": 1,
+                "searchIterations": 20,
+                "mutableP50": 24.7168,
+                "frozenP50": 13.0404,
+                "mutableP95": 29.4302,
+                "frozenP95": 16.6406,
+                "pairedRatioP50": 0.5143,
+                "frozenP50VsMutablePct": -47.2,
+                "belowSearchFloor": false
+              }
+            ],
+            "summary": {
+              "searchFrozenP50AvgGainPct": 61
+            }
+          }
+        ]
+      }
+    }
+  }
+}

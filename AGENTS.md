@@ -32,3 +32,7 @@ Add or update colocated vitest tests for behavior changes. For search semantics,
 ## Commit & Pull Request Guidelines
 
 Recent commits use concise imperative subjects, for example `Fix lint failures blocking CI.` and `Add toJSON export and deprecate fromJson alias.` Keep commits focused and mention user-visible changes in `CHANGELOG.md`. PRs should describe the change, list tests or benchmarks run, link related issues, and call out compatibility, binary format, or parity impacts. Do not commit generated `docs/` HTML; published docs are produced by the release/docs workflows.
+
+## Cursor Cloud specific instructions
+
+Login shells put Node.js 26.11.1 and Bun 1.4.3 ahead of the agent runtime (`/etc/profile.d/node-bun.sh` and `~/.local/bin`). Confirm with `bash -lc 'node -v && bun --version'`. Dependencies use the pnpm version pinned by `packageManager`, activated with Corepack. CI still tests Node 20, 22, and 24; this environment uses Current Node 26 for local work. There is no dev server: `pnpm test` covers `src/` and `dev/parity/`, and `pnpm build` refreshes `dist/` after `src/` edits.

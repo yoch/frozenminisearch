@@ -26,6 +26,7 @@ FrozenMiniSearch is for the common production path where search data changes els
 - Save it as a compact binary snapshot.
 - Load it in many read-only Node.js processes.
 - Query with MiniSearch-compatible `search`, `autoSuggest`, filters, boosts, prefix/fuzzy search, wildcard, and `AND` / `OR` / `AND_NOT`.
+- Paginate with `searchPage`, which returns a page and the exact total after filtering in one call.
 
 Internally it uses packed radix postings, typed arrays, and columnar stored fields instead of large JavaScript object graphs. The result is a search engine tuned for resident efficiency, fast loads, and repeatable serving workflows.
 
@@ -126,7 +127,7 @@ Frozen indexes are **read-only**: there is no `add`, `remove`, or `discard`. Reb
 
 ### Search options
 
-MiniSearch-compatible options work on `search()` and `autoSuggest()`:
+MiniSearch-compatible options work on `search()`, `searchPage()`, and `autoSuggest()`:
 
 ```javascript
 index.search('zen', { fields: ['title'] })
@@ -294,6 +295,7 @@ fallback.
 ## Search API (MiniSearch-compatible)
 
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
+- `searchPage(query, { offset?, limit, ...searchOptions })` — FrozenMiniSearch extension returning `{ results, total }`; see [Pagination and exact totals](#pagination-and-exact-totals)
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
 - `getDefault(optionName)` — built-in `tokenize`, `processTerm`, `extractField`, `stringifyField`, …

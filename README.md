@@ -317,10 +317,16 @@ node benchmarks/scripts/generate-readme-comparison.mjs --from=benchmarks/baselin
 
 ## Development
 
+Use Node 24 and the pnpm version pinned in `package.json` for development tools,
+tests, builds, and documentation. The published package supports Node 20+; CI
+tests its built ESM, CommonJS, and browser entries on Node 20, 22, and 24 without
+installing the development tools.
+
 ```bash
 pnpm install
 pnpm test          # src/ + dev/parity/
 pnpm build
+pnpm test:runtime  # built package compatibility; also runs directly on Node 20+
 node scripts/verify-npm-pack.cjs
 ```
 

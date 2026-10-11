@@ -1,12 +1,6 @@
 import { packedIndexArray } from './PackedRadixTree/layout'
 import type { PackedIndexArray } from './PackedRadixTree/types'
 
-export {
-  buildFieldLengthMatrixSection,
-  fieldLengthMatrixWireFlags,
-  readFieldLengthMatrixSection,
-} from './fieldLengthMatrixWire'
-
 /** Adaptive-width unsigned column (1/2/4 bytes per element) for field lengths and packed radix columns. */
 export type FieldLengthArray = PackedIndexArray
 

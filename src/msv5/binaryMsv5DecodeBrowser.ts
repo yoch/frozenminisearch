@@ -11,8 +11,6 @@ import {
 } from './binaryMsv5DecodeShared'
 import type { FrozenSnapshot } from '../binaryStructures'
 
-export { isMsv5Bytes as isMsv5Buffer } from './binaryMsv5CompressionBrowser'
-
 export async function decodeFrozenSnapshotMsv5Browser(
   buf: Uint8Array,
   hints?: FrozenDecodeHints,

@@ -1,6 +1,5 @@
-# pnpm v11 settings
+# pnpm v12 settings
 allowBuilds:
   esbuild: true
-  unrs-resolver: true
 minimumReleaseAge: 0
 shamefullyHoist: false

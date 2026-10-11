@@ -1,20 +1,13 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "src/index.ts",
-    "src/browser.ts",
     "src/**/*.test.{js,ts}",
     "dev/parity/**/*.{js,ts}",
     "benchmarks/**/*.{js,mjs,ts}"
   ],
   "project": ["src/**/*.{ts,js}"],
   "ignore": [
-    "**/*.test.js",
-    "**/*.test.ts",
     "src/binaryEncode.ts",
-    "src/msv5/binaryMsv5EncodeShared.ts",
-    "src/binaryBytes.ts",
-    "src/internal/frozenInternals.ts",
     "src/msv5/binaryMsv5Constants.ts"
   ],
   "ignoreBinaries": ["make"],

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Development tools** — refresh the build, lint, test, and analysis dependencies, including ESLint 10, Vitest 5, Knip 6, TypeScript 6, and pnpm 12. Development and documentation use Node 24. The published package still supports Node 20+, with separate CI checks of its built ESM, CommonJS, and browser entries starting at Node 20.0.0.
+
 ## v1.9.0 — `@yoch/frozenminisearch`
 
 Minor release: opt-in `limit` (top-K) search option, lower CPU and memory on indexing, save, load and search, and a round of MiniSearch parity and snapshot robustness fixes. Snapshots whose term labels contain unpaired surrogates (e.g. two emoji sharing a leading surrogate) are now written as **MSv5 format revision 2**, which older versions reject; every other snapshot is byte-for-byte unchanged (revision 1). `fromJSON()` now requires as many `documentIds` as `documentCount`.

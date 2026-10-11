@@ -77,7 +77,7 @@ benchmarks/dist/packedRadixTree.cjs: $(PACKED_SOURCES)
 # Tests
 # ----------------------------------------------------------------------------
 
-.PHONY: test test-watch test-browser test-fuzzysearch test-benchmarks coverage
+.PHONY: test test-watch test-browser test-runtime test-fuzzysearch test-benchmarks coverage
 test:
 	$(RUN) vitest run src/ dev/parity/
 
@@ -87,6 +87,11 @@ test-watch:
 test-browser: $(DIST_MARKER)
 	node scripts/assert-browser-bundle.cjs
 	$(RUN) vitest run dev/browser/
+
+# Run against an existing build with Node's test runner, without devDependencies.
+# CI builds once on the tooling Node version and tests these bundles on Node 20+.
+test-runtime:
+	$(NODE) --test dev/runtime/*.test.mjs
 
 test-fuzzysearch:
 	$(RUN) vitest run dev/internal/
@@ -337,6 +342,7 @@ help:
 	@echo ""
 	@echo "Tests:"
 	@echo "  make test                   vitest run (src + dev + benchmarks)"
+	@echo "  make test-runtime           published bundle compatibility (Node 20+, build first)"
 	@echo "  make test-browser           assert-browser-bundle + vitest dev/browser/"
 	@echo "  make test-fuzzysearch       vitest run dev/internal/"
 	@echo "  make coverage               build + browser bundle check + vitest --coverage (src, parity, browser)"

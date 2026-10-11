@@ -144,7 +144,7 @@ const index = FrozenMiniSearch.fromDocuments(documents, {
 
 Wildcard and nested query combinations are supported (`FrozenMiniSearch.wildcard`, `QueryCombination`).
 
-`limit` is a FrozenMiniSearch extension (not in MiniSearch): it returns the same results as `search(...).slice(0, limit)`, but only materializes and sorts the results it returns, which saves CPU and allocations on broad queries. With `filter`, the predicate runs in descending score order and stops once `limit` results are kept. `autoSuggest()` ignores it.
+`limit` is a FrozenMiniSearch extension (not in MiniSearch): it returns the same results as `search(...).slice(0, limit)`, but only materializes and sorts the results it returns, which saves CPU and allocations on broad queries. With `filter`, the predicate runs in descending score order and stops once `limit` results are kept, so it should be deterministic and not depend on how often it is called. `limit: 0` returns `[]` without running the query, and an invalid limit throws before any callback runs. `autoSuggest()` ignores it.
 
 ```javascript
 index.search('zen', { prefix: true, limit: 10 })

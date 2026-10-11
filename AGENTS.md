@@ -6,14 +6,17 @@ Core TypeScript sources live in `src/`. Public exports start at `src/index.ts` a
 
 ## Build, Test, and Development Commands
 
-Use Node `>=20`. Install with `pnpm install` to match the checked-in `pnpm-lock.yaml`.
+The published package supports Node `>=20`. Use Node 24 for development tools,
+builds, documentation, and Vitest tests. Install with `pnpm install` to match the
+checked-in `pnpm-lock.yaml` and the pnpm version pinned in `package.json`.
 
 All `package.json` scripts are thin aliases to a `Makefile` target (`make <target>`). Run `make help` for a quick overview. The Makefile centralises prerequisites (build, `--expose-gc`, `NODE_ENV=production`) that scripts previously duplicated as `pnpm build &&` prefixes. See [`benchmarks/SCRIPTS.md`](benchmarks/SCRIPTS.md) for the boundary between the profiled `bench:*` interface (via `benchmarks/framework/cli.mjs`) and the low-level `benchmark:*` interface (direct access to `*.js`).
 
 - `pnpm test` (`make test`): runs vitest tests in `src/`, `dev/`, and `benchmarks/`.
+- `pnpm test:runtime` (`make test-runtime`): checks the built ESM, CJS, and browser entries with Node's test runner, without devDependencies. Run `pnpm build` first; CI checks the same bundles on Node 20, 22, and 24.
 - `pnpm test:fuzzysearch` (`make test-fuzzysearch`): runs long fuzzy parity sweeps from `dev/internal/`.
 - `pnpm test:benchmarks` (`make test-benchmarks`): runs benchmark test files, separate from normal CI tests.
-- `pnpm coverage` (`make coverage`): runs vitest coverage for `src/`, `dev/parity/`, and `dev/browser/` (requires `make build` for the browser bundle smoke), then the native `node --test` checks of the published bundles in `dev/runtime/`.
+- `pnpm coverage` (`make coverage`): runs vitest coverage for `src/`, `dev/parity/`, and `dev/browser/` (requires `make build` for the browser bundle smoke).
 - `pnpm lint` / `pnpm lint:fix` (`make lint` / `make lint-fix`): checks or fixes ESLint style issues in `src/`.
 - `pnpm build` (`make build`): cleans `dist/`, builds ESM/CJS bundles with Rollup, and patches CJS output.
 - `make bench`: quick local performance check (`cli.mjs run --profile=dev --quick`).

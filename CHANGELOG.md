@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- **Development tools** — refresh the build, lint, test, and analysis dependencies, including ESLint 10, Vitest 5, Knip 6, TypeScript 6, and pnpm 12. Development and documentation use Node 24. The published package still supports Node 20+, with separate CI checks of its built ESM, CommonJS, and browser entries starting at Node 20.0.0.
+
 ## v1.10.0 — `@yoch/frozenminisearch`
 
 Minor release: faster bounded (`limit`) search and stricter limit handling. `limit: 0` now returns `[]` without running the query, and invalid limits throw before any query callback runs. No other public API, search semantics, or MSv5 wire-format changes.

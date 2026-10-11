@@ -100,13 +100,13 @@ test-limit-runtime: $(DIST_MARKER)
 coverage: $(DIST_MARKER)
 	node scripts/assert-browser-bundle.cjs
 	$(RUN) vitest run --coverage src/ dev/parity/ dev/browser/
+	$(NODE) --test dev/runtime/limit.test.mjs
 
 # ----------------------------------------------------------------------------
 # Lint
 # ----------------------------------------------------------------------------
 
 .PHONY: lint lint-fix typecheck knip
-
 lint: typecheck
 	$(RUN) eslint 'src/**/*.{js,ts}'
 	node scripts/assert-internal-boundary.cjs
@@ -346,7 +346,7 @@ help:
 	@echo "  make test                   vitest run (src + dev + benchmarks)"
 	@echo "  make test-browser           assert-browser-bundle + vitest dev/browser/"
 	@echo "  make test-fuzzysearch       vitest run dev/internal/"
-	@echo "  make coverage               build + browser bundle check + vitest --coverage (src, parity, browser)"
+	@echo "  make coverage               build + browser bundle check + vitest --coverage (src, parity, browser) + native bundle tests"
 	@echo ""
 	@echo "Benchmarks (profiled interface, via cli.mjs):"
 	@echo "  make bench                  run --profile=dev --quick"

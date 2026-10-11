@@ -10,8 +10,6 @@
 
 - **Search limit validation** — invalid limits now throw before query callbacks run. The documented equivalence with an unbounded search followed by `.slice()` assumes finite scores and a deterministic filter that does not change scores; filters may observe fewer candidates and a different invocation order with a limit.
 
-## Unreleased
-
 ## v1.9.0 — `@yoch/frozenminisearch`
 
 Minor release: opt-in `limit` (top-K) search option, lower CPU and memory on indexing, save, load and search, and a round of MiniSearch parity and snapshot robustness fixes. Snapshots whose term labels contain unpaired surrogates (e.g. two emoji sharing a leading surrogate) are now written as **MSv5 format revision 2**, which older versions reject; every other snapshot is byte-for-byte unchanged (revision 1). `fromJSON()` now requires as many `documentIds` as `documentCount`.

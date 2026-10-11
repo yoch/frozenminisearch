@@ -5,6 +5,8 @@ export type {
   LowercaseCombinationOperator,
   CombinationOperator,
   SearchOptions,
+  SearchPageOptions,
+  SearchPage,
   Options,
   SaveBinaryOptions,
   Suggestion,

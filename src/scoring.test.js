@@ -10,6 +10,7 @@ import {
   defaultBM25params,
   finalizeRawSearchResults,
   finalizeSearchResults,
+  finalizeSearchPage,
 } from './scoring'
 import { defaultSearchOptions } from './searchDefaults'
 
@@ -274,6 +275,31 @@ describe('finalizeSearchResults limit', () => {
     getExternalId: docId => `doc-${docId}`,
     getStoredFields: docId => ({ bucket: docId % 4 }),
   }
+
+  test.each([[0, 1], [20, 10], [190, 20], [200, 10], [0, 0]])('unfiltered page materializes only returned records for offset=%i, limit=%i', (offset, limit) => {
+    for (const skipSort of [false, true]) {
+      const rawResults = randomRawResults(200, 9)
+      const full = finalizeSearchResults({ ...base, rawResults, skipSort })
+      const getStoredFields = vi.fn(base.getStoredFields)
+      const page = finalizeSearchPage({ ...base, rawResults, skipSort, getStoredFields }, offset, limit)
+      expect(page).toEqual({ results: full.slice(offset, offset + limit), total: full.length })
+      expect(getStoredFields).toHaveBeenCalledTimes(page.results.length)
+    }
+  })
+
+  test.each([
+    ['unfiltered', {}],
+    ['filtered', { filter: r => r.bucket !== 1 }],
+  ])('%s deep page windows keep the full order among frequent ties', (_name, extra) => {
+    for (const seed of [1, 2, 3]) {
+      const rawResults = randomRawResults(2000, seed)
+      const full = finalizeSearchResults({ ...base, ...extra, rawResults })
+      for (const [offset, limit] of [[0, 300], [1, 256], [250, 20], [300, 50], [1000, 100], [full.length - 5, 20], [1500, Infinity]]) {
+        expect(finalizeSearchPage({ ...base, ...extra, rawResults }, offset, limit))
+          .toEqual({ results: full.slice(offset, offset + limit), total: full.length })
+      }
+    }
+  })
 
   test.each([
     ['sorted', {}],

@@ -8,6 +8,8 @@ export type {
   Query,
   QueryCombination,
   SearchOptions,
+  SearchPageOptions,
+  SearchPage,
   SearchResult,
   Suggestion,
   Wildcard,

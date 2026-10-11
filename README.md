@@ -26,6 +26,7 @@ FrozenMiniSearch is for the common production path where search data changes els
 - Save it as a compact binary snapshot.
 - Load it in many read-only Node.js processes.
 - Query with MiniSearch-compatible `search`, `autoSuggest`, filters, boosts, prefix/fuzzy search, wildcard, and `AND` / `OR` / `AND_NOT`.
+- Paginate with `searchPage`, which returns a page and the exact total after filtering in one call.
 
 Internally it uses packed radix postings, typed arrays, and columnar stored fields instead of large JavaScript object graphs. The result is a search engine tuned for resident efficiency, fast loads, and repeatable serving workflows.
 
@@ -126,7 +127,7 @@ Frozen indexes are **read-only**: there is no `add`, `remove`, or `discard`. Reb
 
 ### Search options
 
-MiniSearch-compatible options work on `search()` and `autoSuggest()`:
+MiniSearch-compatible options work on `search()`, `searchPage()`, and `autoSuggest()`:
 
 ```javascript
 index.search('zen', { fields: ['title'] })
@@ -149,6 +150,33 @@ Wildcard and nested query combinations are supported (`FrozenMiniSearch.wildcard
 ```javascript
 index.search('zen', { prefix: true, limit: 10 })
 ```
+
+### Pagination and exact totals
+
+`searchPage()` returns a page in the same score order as an unbounded `search()`,
+plus the exact number of matches after filtering and before pagination:
+
+```javascript
+const { results, total } = index.searchPage('zen', {
+  prefix: true,
+  offset: 20,
+  limit: 10,
+  filter: result => result.category === 'fiction',
+})
+```
+
+`offset` defaults to zero and must be a non-negative integer. `limit` is required
+and overrides the index-level default; it accepts a non-negative integer or
+`Infinity` (all remaining matches). Other search options and nested queries work
+as with `search()`. Empty pages, including `limit: 0`, still return the total.
+
+Candidate scores are computed once per call. Deep pages select their window
+without sorting the matches ranked before it, and unboosted wildcard pages scan
+documents in insertion order. Without a filter, only the page is materialized.
+With a filter, every candidate is materialized and evaluated once to obtain the
+exact total, even when the page is empty. Filters should be deterministic. The
+score ordering assumes finite scores, as with bounded search. No search state is
+retained between page requests.
 
 ### Auto-suggestions
 
@@ -267,6 +295,7 @@ fallback.
 ## Search API (MiniSearch-compatible)
 
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
+- `searchPage(query, { offset?, limit, ...searchOptions })` — FrozenMiniSearch extension returning `{ results, total }`; see [Pagination and exact totals](#pagination-and-exact-totals)
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
 - `getDefault(optionName)` — built-in `tokenize`, `processTerm`, `extractField`, `stringifyField`, …

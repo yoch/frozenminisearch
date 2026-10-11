@@ -10,6 +10,7 @@ import type {
   SearchOptions,
   SearchOptionsWithDefaults,
   SearchResult,
+  SearchPage,
   CombinationOperator,
   LowercaseCombinationOperator,
   BM25Params,
@@ -625,10 +626,9 @@ function collectResultScores(rawResults: RawResult): Float64Array {
   return scores
 }
 
-/** Keep the common small top-k path independent of filtered/native-sort paths. */
-function finalizeTopSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
+/** Materialize selected entries in rank order, visiting the raw map once. */
+function materializeRankedResults(params: FinalizeSearchParams, top: Int32Array): SearchResult[] {
   const { rawResults } = params
-  const top = topRankIndices(collectResultScores(rawResults), limit)
   const byEntry = Array.from(top.keys()).sort((a, b) => top[a] - top[b])
   const results = new Array<SearchResult>(top.length)
   let next = 0
@@ -642,6 +642,97 @@ function finalizeTopSearchResults(params: FinalizeSearchParams, limit: number): 
     entry++
   }
   return results
+}
+
+/** Keep the common small top-k path independent of filtered/native-sort paths. */
+function finalizeTopSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
+  return materializeRankedResults(params, topRankIndices(collectResultScores(params.rawResults), limit))
+}
+
+/** Up to this page end, heap selection of the prefix beats selecting the page window. */
+const PAGE_HEAP_MAX = 256
+
+/** Reuse the bounded-search heap/native-sort crossover for a ranked prefix. */
+function rankResultPrefix(scores: Float64Array, end: number): Int32Array {
+  if (end < scores.length / 2) return topRankIndices(scores, end)
+  const order = new Int32Array(scores.length)
+  for (let i = 0; i < order.length; i++) order[i] = i
+  order.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+  return order.subarray(0, end)
+}
+
+/**
+ * Reorder `order[left..right]` so that `order[k]` holds the entry of that rank,
+ * with better-ranked entries before it (quickselect, median-of-three pivot).
+ */
+function selectRank(scores: Float64Array, order: Int32Array, left: number, right: number, k: number): void {
+  const swap = (i: number, j: number): void => {
+    const tmp = order[i]
+    order[i] = order[j]
+    order[j] = tmp
+  }
+  while (right > left) {
+    const mid = (left + right) >>> 1
+    if (ranksBefore(scores, order[mid], order[left])) swap(mid, left)
+    if (ranksBefore(scores, order[right], order[left])) swap(right, left)
+    if (ranksBefore(scores, order[mid], order[right])) swap(mid, right)
+    const pivot = order[right]
+    let store = left
+    for (let i = left; i < right; i++) {
+      if (ranksBefore(scores, order[i], pivot)) swap(i, store++)
+    }
+    swap(store, right)
+    if (store === k) return
+    if (store < k) left = store + 1
+    else right = store - 1
+  }
+}
+
+/** Entries ranked `start..end-1`, in rank order; selects the window instead of sorting a deep prefix. */
+function rankResultWindow(scores: Float64Array, start: number, end: number): Int32Array {
+  if (end <= PAGE_HEAP_MAX) return rankResultPrefix(scores, end).subarray(start)
+  const order = new Int32Array(scores.length)
+  for (let i = 0; i < order.length; i++) order[i] = i
+  if (start > 0) selectRank(scores, order, 0, order.length - 1, start)
+  if (end < order.length) selectRank(scores, order, start, order.length - 1, end)
+  return order.subarray(start, end).sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+}
+
+/** One scoring pass; count all filtered candidates, then select the requested page. */
+export function finalizeSearchPage(params: FinalizeSearchParams, offset: number, limit?: number): SearchPage {
+  const { rawResults, filter, skipSort } = params
+  if (filter != null) {
+    // A SearchResult predicate needs complete candidates. Keep accepted objects
+    // for selection so the returned page does not materialize them a second time.
+    const matches: SearchResult[] = []
+    for (const [docId, value] of rawResults) {
+      const result = materializeSearchResult(docId, value, params)
+      if (filter(result)) matches.push(result)
+    }
+    const total = matches.length
+    if (offset >= total || limit === 0) return { results: [], total }
+    const end = Math.min(total, offset + (limit ?? total))
+    const results = skipSort
+      ? matches.slice(offset, end)
+      : Array.from(rankResultWindow(Float64Array.from(matches, r => r.score), offset, end), i => matches[i])
+    return { results, total }
+  }
+
+  const total = rawResults.size
+  if (offset >= total || limit === 0) return { results: [], total }
+  if (offset === 0) return { results: finalizeSearchResults({ ...params, limit }), total }
+  const end = Math.min(total, offset + (limit ?? total))
+  if (skipSort) {
+    const results: SearchResult[] = []
+    let entry = 0
+    for (const [docId, value] of rawResults) {
+      if (entry >= offset) results.push(materializeSearchResult(docId, value, params))
+      if (++entry === end) break
+    }
+    return { results, total }
+  }
+  const order = rankResultWindow(collectResultScores(rawResults), offset, end)
+  return { results: materializeRankedResults(params, order), total }
 }
 
 function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
@@ -716,9 +807,7 @@ function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: numbe
   // Native sorting wins over heap selection when at least half are retained.
   const docIds = Array.from(rawResults.keys())
   const values = Array.from(rawResults.values())
-  const order = new Int32Array(scores.length)
-  for (let i = 0; i < order.length; i++) order[i] = i
-  order.sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+  const order = rankResultPrefix(scores, limit)
   const results = new Array<SearchResult>(limit)
   for (let i = 0; i < limit; i++) results[i] = materializeSearchResult(docIds[order[i]], values[order[i]], params)
   return results

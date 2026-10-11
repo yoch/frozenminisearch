@@ -288,6 +288,20 @@ describe('finalizeSearchResults limit', () => {
   })
 
   test.each([
+    ['unfiltered', {}],
+    ['filtered', { filter: r => r.bucket !== 1 }],
+  ])('%s deep page windows keep the full order among frequent ties', (_name, extra) => {
+    for (const seed of [1, 2, 3]) {
+      const rawResults = randomRawResults(2000, seed)
+      const full = finalizeSearchResults({ ...base, ...extra, rawResults })
+      for (const [offset, limit] of [[0, 300], [1, 256], [250, 20], [300, 50], [1000, 100], [full.length - 5, 20], [1500, Infinity]]) {
+        expect(finalizeSearchPage({ ...base, ...extra, rawResults }, offset, limit))
+          .toEqual({ results: full.slice(offset, offset + limit), total: full.length })
+      }
+    }
+  })
+
+  test.each([
     ['sorted', {}],
     ['sorted + filter', { filter: r => r.bucket !== 1 }],
     ['skipSort', { skipSort: true }],

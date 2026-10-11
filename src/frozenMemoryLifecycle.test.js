@@ -1,6 +1,7 @@
 import FrozenMiniSearch, { freezeFrozenIndexBuilder } from './FrozenMiniSearch'
 import { createFrozenIndexBuilder } from './frozenBuild'
 import { packTermsFromList } from './PackedRadixTree/packTermList'
+import { IncrementalPostingsAccumulator } from './incrementalPostings'
 
 function expectReleasedBuilder(builder) {
   expect(builder._terms).toEqual([])
@@ -13,7 +14,6 @@ function expectReleasedBuilder(builder) {
   expect(builder._rawTokenScratch.size).toBe(0)
   expect(builder._tokenScratch).toEqual([])
   expect(builder._seenIds).toBeUndefined()
-  expect(builder._postings._docIds.length).toBe(0)
 }
 
 test('failed radix packing releases documents and stored payloads from an unusable builder', () => {
@@ -28,9 +28,12 @@ test('failed posting finalization also releases growable columns', () => {
   const builder = createFrozenIndexBuilder({ fields: ['text'], storeFields: ['payload'] })
   builder.add({ id: 'one', text: 'alpha beta', payload: { retained: true } })
   const failure = new Error('posting finalization failed')
-  vi.spyOn(builder._postings, 'finalize').mockImplementation(() => { throw failure })
+  const release = vi.spyOn(IncrementalPostingsAccumulator.prototype, 'release')
+  vi.spyOn(IncrementalPostingsAccumulator.prototype, 'finalize').mockImplementationOnce(() => { throw failure })
   expect(() => freezeFrozenIndexBuilder(builder)).toThrow(failure)
   expectReleasedBuilder(builder)
+  expect(release).toHaveBeenCalledOnce()
+  vi.restoreAllMocks()
 })
 
 test.each([false, true])('prefix traversal releases its query reference on exit (throw=%s)', (throws) => {

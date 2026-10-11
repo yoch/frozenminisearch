@@ -80,6 +80,7 @@
   "scripts": {
     "test": "make test",
     "test:browser": "make test-browser",
+    "test:limit-runtime": "make test-limit-runtime",
     "test:watch": "make test-watch",
     "test:fuzzysearch": "make test-fuzzysearch",
     "test:benchmarks": "make test-benchmarks",
@@ -125,6 +126,7 @@
     "benchmark:profile-giant-prefix": "make benchmark-profile-giant-prefix",
     "benchmark:measure-scoring-steps": "make benchmark-measure-scoring-steps",
     "benchmark:finalize": "make benchmark-finalize",
+    "benchmark:limit": "make benchmark-limit",
     "benchmark:autosuggest": "make benchmark-autosuggest",
     "benchmark:history:analyze": "make benchmark-history-analyze",
     "benchmark:history:vs-mutable": "make benchmark-history-vs-mutable",

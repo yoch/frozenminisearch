@@ -77,7 +77,7 @@ benchmarks/dist/packedRadixTree.cjs: $(PACKED_SOURCES)
 # Tests
 # ----------------------------------------------------------------------------
 
-.PHONY: test test-watch test-browser test-fuzzysearch test-benchmarks coverage
+.PHONY: test test-watch test-browser test-fuzzysearch test-benchmarks test-limit-runtime coverage
 test:
 	$(RUN) vitest run src/ dev/parity/
 
@@ -94,6 +94,9 @@ test-fuzzysearch:
 test-benchmarks:
 	$(RUN) vitest run benchmarks/
 
+test-limit-runtime: $(DIST_MARKER)
+	$(NODE) --test dev/runtime/limit.test.mjs
+
 coverage: $(DIST_MARKER)
 	node scripts/assert-browser-bundle.cjs
 	$(RUN) vitest run --coverage src/ dev/parity/ dev/browser/
@@ -103,6 +106,7 @@ coverage: $(DIST_MARKER)
 # ----------------------------------------------------------------------------
 
 .PHONY: lint lint-fix typecheck knip
+
 lint: typecheck
 	$(RUN) eslint 'src/**/*.{js,ts}'
 	node scripts/assert-internal-boundary.cjs
@@ -200,7 +204,7 @@ benchmark-diff-search-run: build
 # Tuning / calibration workflows
 .PHONY: benchmark-calibrate-batches benchmark-validate-freq-adaptive benchmark-and-gate-tuning
 .PHONY: benchmark-gate-posting-ratio benchmark-targeted benchmark-profile-giant-prefix
-.PHONY: benchmark-measure-scoring-steps benchmark-finalize benchmark-autosuggest
+.PHONY: benchmark-measure-scoring-steps benchmark-finalize benchmark-limit benchmark-autosuggest
 benchmark-calibrate-batches: build
 	$(NODE) $(EXPOSE) benchmarks/scripts/calibrate-search-batches.mjs
 
@@ -224,6 +228,9 @@ benchmark-measure-scoring-steps: build
 
 benchmark-finalize:
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs $(BENCH_TIMING_ARGS)
+
+benchmark-limit:
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/limit-search.mjs $(BENCH_TIMING_ARGS) $(LIMIT_BENCH_ARGS)
 
 benchmark-autosuggest:
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/autosuggest-search.mjs $(BENCH_TIMING_ARGS)

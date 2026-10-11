@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.11.1 — `@yoch/frozenminisearch`
+
+Patch release: release obsolete builder state after failed finalization, discard ingestion-only callback closures from frozen indexes, and clear idle traversal references. No changes to public APIs, search semantics, the MSv5 wire format, or Node 20+ support.
+
 ### Fixed
 
 - **Callback retention** — frozen indexes no longer retain ingestion-only `extractField` / `stringifyField` closures. Finished builders drop all custom callbacks on success or failure; query callbacks remain available on the index. Caller-owned options are unchanged.

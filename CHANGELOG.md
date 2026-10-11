@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Search pagination** — `searchPage(query, { offset, limit, ...options })` returns `{ results, total }` in the native score order, with an exact total after filtering. Page size is explicit; an empty page still counts matches. Candidate scores are computed once per request, and only the returned page is materialized without a filter. Filters evaluate all candidates once and accepted objects are reused for selection. Available in Node and browser entries; no snapshot format changes.
+- **Search pagination** — `searchPage(query, { offset, limit, ...options })` returns `{ results, total }` in the native score order, with an exact total after filtering. Page size is explicit; an empty page still counts matches. Candidate scores are computed once per request, and only the returned page is materialized without a filter. Deep pages select their window rather than sorting every earlier match. Filters evaluate all candidates once and accepted objects are reused for selection. Available in Node and browser entries; no snapshot format changes.
 
 ### Changed
 

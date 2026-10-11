@@ -169,12 +169,13 @@ and overrides the index-level default; it accepts a non-negative integer or
 `Infinity` (all remaining matches). Other search options and nested queries work
 as with `search()`. Empty pages, including `limit: 0`, still return the total.
 
-Candidate scores are computed once per call; deeper pages select a larger
-prefix. Without a filter, only the page is materialized. With a filter, every
-candidate is materialized and evaluated once to obtain the exact total, even
-when the page is empty. Filters should be deterministic. The score ordering
-assumes finite scores, as with bounded search. No search state is retained
-between page requests.
+Candidate scores are computed once per call. Deep pages select their window
+without sorting the matches ranked before it, and unboosted wildcard pages scan
+documents in insertion order. Without a filter, only the page is materialized.
+With a filter, every candidate is materialized and evaluated once to obtain the
+exact total, even when the page is empty. Filters should be deterministic. The
+score ordering assumes finite scores, as with bounded search. No search state is
+retained between page requests.
 
 ### Auto-suggestions
 

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Search pagination** — `searchPage(query, { offset, limit, ...options })` returns `{ results, total }` in the native score order, with an exact total after filtering. Page size is explicit; an empty page still counts matches. Candidate scores are computed once per request, and only the returned page is materialized without a filter. Filters evaluate all candidates once and accepted objects are reused for selection. Available in Node and browser entries; no snapshot format changes.
+
 ### Changed
 
 - **Development tools** — refresh the build, lint, test, and analysis dependencies, including ESLint 10, Vitest 5, Knip 6, TypeScript 6, and pnpm 12. Development and documentation use Node 24. The published package still supports Node 20+, with separate CI checks of its built ESM, CommonJS, and browser entries starting at Node 20.0.0.

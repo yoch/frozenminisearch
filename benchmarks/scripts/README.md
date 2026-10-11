@@ -62,6 +62,17 @@ separately. CPU measurements should run without other benchmarks concurrently.
 The raw-query measurement always executes the engine; public `limit: 0` and
 bounded unboosted wildcard searches now bypass that phase.
 
+Pass `--offsets=0,20,1000` to measure `searchPage()` instead. This CPU-only mode
+checks the page and exact filtered total against a complete search, then compares
+`searchPage` with `fullThenSlice` (page and total) and `prefixThenSlice` (page only,
+without an exact total). A filtered `searchPage` evaluates every candidate, while
+the page-only reference can stop its filter early; that difference is part of
+the cost of an exact total.
+
+```bash
+pnpm benchmark:finalize RUNS=5 BENCH_WARMUP=30 SEARCH_ITERATIONS=40 FINALIZE_BENCH_ARGS='--corpus=bdpm-specialites --cases=exact,filter-half,wildcard --limits=20 --offsets=0,20,1000 --output=/tmp/pages.json'
+```
+
 | Script | Role |
 |--------|------|
 | `record-history.sh` | Append a line to `perf-history.jsonl` (HEAD, clean tree) |

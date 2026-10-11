@@ -150,6 +150,32 @@ Wildcard and nested query combinations are supported (`FrozenMiniSearch.wildcard
 index.search('zen', { prefix: true, limit: 10 })
 ```
 
+### Pagination and exact totals
+
+`searchPage()` returns a page in the same score order as an unbounded `search()`,
+plus the exact number of matches after filtering and before pagination:
+
+```javascript
+const { results, total } = index.searchPage('zen', {
+  prefix: true,
+  offset: 20,
+  limit: 10,
+  filter: result => result.category === 'fiction',
+})
+```
+
+`offset` defaults to zero and must be a non-negative integer. `limit` is required
+and overrides the index-level default; it accepts a non-negative integer or
+`Infinity` (all remaining matches). Other search options and nested queries work
+as with `search()`. Empty pages, including `limit: 0`, still return the total.
+
+Candidate scores are computed once per call; deeper pages select a larger
+prefix. Without a filter, only the page is materialized. With a filter, every
+candidate is materialized and evaluated once to obtain the exact total, even
+when the page is empty. Filters should be deterministic. The score ordering
+assumes finite scores, as with bounded search. No search state is retained
+between page requests.
+
 ### Auto-suggestions
 
 ```javascript

@@ -1,7 +1,7 @@
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
-import { type AggregateContext, finalizeRawSearchResults, type RawResult, resolveResultLimit } from './scoring'
+import { type AggregateContext, finalizeRawSearchResults, finalizeSearchPage, type RawResult, resolveResultLimit } from './scoring'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import {
   createFrozenFieldTermFlyweight,
@@ -26,6 +26,8 @@ import type {
   Options,
   Query,
   SearchOptions,
+  SearchPageOptions,
+  SearchPage,
   SearchResult,
   Suggestion,
 } from './searchTypes'
@@ -286,12 +288,50 @@ export default class FrozenMiniSearchCore<T = any> {
     )
   }
 
+  /**
+   * Return a page in the same order as an unbounded {@link search}, with an exact
+   * total after filtering. The page size is explicit and overrides index defaults.
+   * All candidate scores are computed once. Filters run on every candidate, even
+   * for an empty page; without a filter, only returned results are materialized.
+   * Assumes finite scores and deterministic filters, as with bounded search.
+   */
+  searchPage(query: Query, searchOptions: SearchPageOptions): SearchPage {
+    if (searchOptions == null || searchOptions.limit === undefined) {
+      throw new Error('FrozenMiniSearch: searchPage requires an explicit limit')
+    }
+    const limit = resolveResultLimit(searchOptions.limit)
+    const offset = searchOptions.offset === undefined ? 0 : searchOptions.offset
+    if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) {
+      throw new Error('FrozenMiniSearch: offset must be a non-negative integer')
+    }
+    const options = { ...this._options.searchOptions, ...searchOptions }
+    const skipSort = query === WILDCARD_QUERY && options.boostDocument == null
+    if (skipSort && options.filter == null) {
+      return {
+        results: offset >= this._documentCount ? [] : this._searchLimitedWildcard(limit ?? Infinity, undefined, offset),
+        total: this._documentCount,
+      }
+    }
+    return finalizeSearchPage({
+      rawResults: this._runQuery(query, searchOptions),
+      getExternalId: this._getExternalId,
+      storedFieldsLayout: this._storedFields,
+      filter: options.filter,
+      skipSort,
+    }, offset, limit)
+  }
+
   /** An unboosted wildcard is already ranked by insertion order; no raw map is needed. */
-  private _searchLimitedWildcard(limit: number, filter?: SearchOptions['filter']): SearchResult[] {
+  private _searchLimitedWildcard(limit: number, filter?: SearchOptions['filter'], offset = 0): SearchResult[] {
     const results: SearchResult[] = []
     for (let shortId = 0; shortId < this._nextId && results.length < limit; shortId++) {
       const id = this._getExternalId(shortId)
       if (id === undefined) continue
+      // searchPage only passes an offset here when there is no filter.
+      if (offset > 0) {
+        offset--
+        continue
+      }
       const result: SearchResult = { id, score: 1, terms: [], queryTerms: [], match: {} }
       assignStoredFields(this._storedFields, shortId, result)
       if (filter == null || filter(result)) results.push(result)

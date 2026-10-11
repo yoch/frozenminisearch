@@ -14,6 +14,7 @@
  * Run:
  *   pnpm benchmark:finalize RUNS=5 BENCH_WARMUP=20 SEARCH_ITERATIONS=50
  *   pnpm benchmark:finalize FINALIZE_BENCH_ARGS='--corpus=limit --cases=exact,filter-half --limits=1,20,near'
+ *   pnpm benchmark:finalize FINALIZE_BENCH_ARGS='--corpus=bdpm-specialites --cases=exact,filter-half --limits=20 --offsets=0,20,1000'
  */
 import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -137,6 +138,24 @@ const specs = corpus === 'finalize' ? finalizeCases() : corpus === 'limit' ? lim
 const selectedCases = listArg('cases', specs.map(spec => spec.id))
 for (const id of selectedCases) assert.ok(specs.some(spec => spec.id === id), `Unknown case ${id}`)
 const selectedLimits = listArg('limits', corpus === 'finalize' ? ['Infinity'] : ['0', '1', '10', '20', '100', 'near', 'Infinity'])
+const selectedOffsets = argValue('--offsets') == null ? null : listArg('offsets', [])
+assert.ok(selectedOffsets == null || !measureMemory, '--offsets measures CPU only; omit --memory')
+
+function measureJobs(jobs) {
+  const modes = Object.keys(jobs)
+  const samples = Object.fromEntries(modes.map(mode => [mode, []]))
+  // Rotate mode order to reduce systematic warmup/order bias.
+  for (let run = 0; run < runs; run++) {
+    for (let offset = 0; offset < modes.length; offset++) {
+      const mode = modes[(offset + run) % modes.length]
+      samples[mode].push(timed(jobs[mode], warmup, iterations))
+    }
+  }
+  return Object.fromEntries(modes.map(mode => [mode, {
+    p50: Number(median(samples[mode].map(s => s.p50)).toFixed(4)),
+    p95: Number(median(samples[mode].map(s => s.p95)).toFixed(4)),
+  }]))
+}
 
 const report = {
   capturedAt: new Date().toISOString(),
@@ -161,6 +180,28 @@ for (const spec of specs) {
   for (const label of selectedLimits) {
     const limit = label === 'near' ? Math.max(0, raw.size - 1) : Number(label)
     assert.ok(limit === Infinity || (Number.isInteger(limit) && limit >= 0), `Invalid limit ${label}`)
+    if (selectedOffsets != null) {
+      for (const value of selectedOffsets) {
+        const offset = Number(value)
+        assert.ok(Number.isInteger(offset) && offset >= 0, `Invalid offset ${value}`)
+        const expected = { results: full.slice(offset, offset + limit), total: full.length }
+        assert.deepEqual(index.searchPage(query, { ...options, offset, limit }), expected)
+        const jobs = {
+          fullThenSlice: () => {
+            const all = index.search(query, options)
+            return { results: all.slice(offset, offset + limit), total: all.length }
+          },
+          // Page-only reference: it does not supply an exact total.
+          prefixThenSlice: () => index.search(query, { ...options, limit: offset + limit }).slice(offset),
+          searchPage: () => index.searchPage(query, { ...options, offset, limit }),
+        }
+        report.cases.push({
+          id, offset, limit: label, documents: index.documentCount, rawResults: raw.size,
+          total: full.length, returned: expected.results.length, summary: measureJobs(jobs),
+        })
+      }
+      continue
+    }
     const limitedOptions = { ...options, limit }
     assert.deepEqual(index.search(query, limitedOptions), full.slice(0, limit))
     let materializations = storedFields == null ? null : 0
@@ -177,25 +218,13 @@ for (const spec of specs) {
         filter: countingFilter,
       })
     assert.deepEqual(audit, full.slice(0, limit))
-    const samples = { executeQuery: [], finalize: [], fullThenSlice: [], search: [] }
     const jobs = {
       executeQuery: () => executeRaw(index, query, limitedOptions),
       finalize: () => finalizeRaw(index, raw, query, limitedOptions),
       fullThenSlice: () => index.search(query, options).slice(0, limit),
       search: () => index.search(query, limitedOptions),
     }
-    // Rotate mode order to reduce systematic warmup/order bias.
-    const modes = Object.keys(jobs)
-    for (let run = 0; run < runs; run++) {
-      for (let offset = 0; offset < modes.length; offset++) {
-        const mode = modes[(offset + run) % modes.length]
-        samples[mode].push(timed(jobs[mode], warmup, iterations))
-      }
-    }
-    const summary = Object.fromEntries(modes.map(mode => [mode, {
-      p50: Number(median(samples[mode].map(s => s.p50)).toFixed(4)),
-      p95: Number(median(samples[mode].map(s => s.p95)).toFixed(4)),
-    }]))
+    const summary = measureJobs(jobs)
     const retainedResultMemory = measureMemory ? Object.fromEntries(['fullThenSlice', 'search'].map(mode => {
       // Retain a batch to make a small returned array measurable above GC noise.
       const sample = medianMeasureHeap(() => Array.from({ length: 20 }, jobs[mode]), 3)

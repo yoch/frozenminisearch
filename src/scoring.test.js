@@ -10,6 +10,7 @@ import {
   defaultBM25params,
   finalizeRawSearchResults,
   finalizeSearchResults,
+  finalizeSearchPage,
 } from './scoring'
 import { defaultSearchOptions } from './searchDefaults'
 
@@ -274,6 +275,17 @@ describe('finalizeSearchResults limit', () => {
     getExternalId: docId => `doc-${docId}`,
     getStoredFields: docId => ({ bucket: docId % 4 }),
   }
+
+  test.each([[0, 1], [20, 10], [190, 20], [200, 10], [0, 0]])('unfiltered page materializes only returned records for offset=%i, limit=%i', (offset, limit) => {
+    for (const skipSort of [false, true]) {
+      const rawResults = randomRawResults(200, 9)
+      const full = finalizeSearchResults({ ...base, rawResults, skipSort })
+      const getStoredFields = vi.fn(base.getStoredFields)
+      const page = finalizeSearchPage({ ...base, rawResults, skipSort, getStoredFields }, offset, limit)
+      expect(page).toEqual({ results: full.slice(offset, offset + limit), total: full.length })
+      expect(getStoredFields).toHaveBeenCalledTimes(page.results.length)
+    }
+  })
 
   test.each([
     ['sorted', {}],

@@ -118,6 +118,20 @@ export type SearchOptions = {
   limit?: number
 }
 
+/** Options for a page in the native score ordering, with an exact filtered total. */
+export interface SearchPageOptions extends SearchOptions {
+  /** Number of matching results to skip. Defaults to zero. */
+  offset?: number
+  /** Explicit page size. Infinity returns all remaining matches. */
+  limit: number
+}
+
+/** A page of matches and their count before pagination, after filtering. */
+export interface SearchPage {
+  results: SearchResult[]
+  total: number
+}
+
 /**
  * `SearchOptions` with library defaults filled in. Used as the canonical shape
  * resolved by `MiniSearch` / `FrozenMiniSearch` before passing options around.

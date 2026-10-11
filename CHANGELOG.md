@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Callback retention** — frozen indexes no longer retain ingestion-only `extractField` / `stringifyField` closures. Finished builders drop all custom callbacks on success or failure; query callbacks remain available on the index. Caller-owned options are unchanged.
+- **Failed index finalization** — release documents, stored fields, terms and posting scratch even when `freezeParams()` throws. Failed builders remain unusable, as before, but retaining one for diagnostics no longer retains the discarded corpus.
+- **Search traversal lifecycle** — clear the reusable prefix/fuzzy cursor's base string and depth on release, including callback failures and nested searches. No ranking, public API or binary format changes.
+
 ## v1.11.0 — `@yoch/frozenminisearch`
 
 Minor release: native result pagination with `searchPage()`, which returns a page and the exact total after filtering in one call. No changes to `search()` semantics, runtime dependencies, or the MSv5 wire format; the published package still supports Node 20+.

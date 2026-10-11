@@ -228,7 +228,7 @@ benchmark-measure-scoring-steps: build
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/measure-scoring-steps.mjs
 
 benchmark-finalize:
-	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs $(BENCH_TIMING_ARGS)
+	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/finalize-search.mjs $(BENCH_TIMING_ARGS) $(FINALIZE_BENCH_ARGS)
 
 benchmark-autosuggest:
 	NODE_OPTIONS='--expose-gc' $(PNPM) exec tsx benchmarks/scripts/autosuggest-search.mjs $(BENCH_TIMING_ARGS)

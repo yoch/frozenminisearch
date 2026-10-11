@@ -6,6 +6,11 @@
 - Same `terms` sets and `match` keys per hit (`terms` array order may differ when scores tie).
 - `autoSuggest` scores and term sets within tolerance (suggestion phrase order follows `terms`).
 - Options: prefix, fuzzy, wildcard, AND / OR / AND_NOT, filters, boosts, field restrictions.
+- Frozen-only `limit`: bounded results equal the unbounded Frozen results sliced to
+  `k`, including stable ties, complete scores and metadata. Check upstream
+  MiniSearch with an unbounded search followed by `.slice(0, k)` (MiniSearch has no
+  `limit`). Filters must be deterministic and must not change scores. Tested in
+  [`limit.test.js`](limit.test.js), including gated/naive execution and binary loads.
 
 ## Indexing build invariants (CI)
 

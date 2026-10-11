@@ -1,7 +1,7 @@
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
-import { type AggregateContext, finalizeRawSearchResults, type RawResult } from './scoring'
+import { type AggregateContext, finalizeRawSearchResults, type RawResult, resolveResultLimit } from './scoring'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import {
   createFrozenFieldTermFlyweight,
@@ -52,6 +52,7 @@ import type { FrozenSnapshot } from './binaryStructures'
 import { readU8 } from './binaryBytes'
 import { MSV5_PAYLOAD_CODEC_OFFSET } from './msv5/binaryMsv5Constants'
 import {
+  assignStoredFields,
   readStoredFields,
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
@@ -266,6 +267,14 @@ export default class FrozenMiniSearchCore<T = any> {
    * @returns Matches sorted by descending score.
    */
   search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
+    const limit = resolveResultLimit(Object.hasOwn(searchOptions, 'limit')
+      ? searchOptions.limit
+      : this._options.searchOptions.limit)
+    if (limit === 0) return []
+    if (limit !== undefined && query === WILDCARD_QUERY) {
+      const options = { ...this._options.searchOptions, ...searchOptions }
+      if (options.boostDocument == null) return this._searchLimitedWildcard(limit, options.filter)
+    }
     return finalizeRawSearchResults(
       this._runQuery(query, searchOptions),
       query,
@@ -275,6 +284,19 @@ export default class FrozenMiniSearchCore<T = any> {
       undefined,
       this._storedFields,
     )
+  }
+
+  /** An unboosted wildcard is already ranked by insertion order; no raw map is needed. */
+  private _searchLimitedWildcard(limit: number, filter?: SearchOptions['filter']): SearchResult[] {
+    const results: SearchResult[] = []
+    for (let shortId = 0; shortId < this._nextId && results.length < limit; shortId++) {
+      const id = this._getExternalId(shortId)
+      if (id === undefined) continue
+      const result: SearchResult = { id, score: 1, terms: [], queryTerms: [], match: {} }
+      assignStoredFields(this._storedFields, shortId, result)
+      if (filter == null || filter(result)) results.push(result)
+    }
+    return results
   }
 
   /**

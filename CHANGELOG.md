@@ -6,6 +6,19 @@
 
 - **Development tools** — refresh the build, lint, test, and analysis dependencies, including ESLint 10, Vitest 5, Knip 6, TypeScript 6, and pnpm 12. Development and documentation use Node 24. The published package still supports Node 20+, with separate CI checks of its built ESM, CommonJS, and browser entries starting at Node 20.0.0.
 
+## v1.10.0 — `@yoch/frozenminisearch`
+
+Minor release: faster bounded (`limit`) search and stricter limit handling. `limit: 0` now returns `[]` without running the query, and invalid limits throw before any query callback runs. No other public API, search semantics, or MSv5 wire-format changes.
+
+### Improved
+
+- **Bounded search** — `limit: 0` skips query execution, and unboosted wildcard searches stop after enough documents pass the filter. Finalization avoids score buffers for a single result, skips ranking equal scores for filters or large limits, uses native sorting when retaining many candidates, and ranks a small candidate batch before sorting the remainder for filtered searches. On the BDPM corpus, bounded searches whose filter accepts about half of the candidates are ~40% faster on Node 20 and 24; filters that accept almost nothing cost ~3–5% more.
+
+### Changed
+
+- **Search limit validation** — invalid limits now throw before query callbacks run. The documented equivalence with an unbounded search followed by `.slice()` assumes finite scores and a deterministic filter that does not change scores; filters may observe fewer candidates and a different invocation order with a limit.
+- **Finalize benchmark** — `benchmark:finalize` now also measures bounded search (`FINALIZE_BENCH_ARGS='--corpus=limit --limits=1,20,near'`, or `--corpus=bdpm-specialites`), checking every row against the unbounded search sliced to the limit.
+
 ## v1.9.0 — `@yoch/frozenminisearch`
 
 Minor release: opt-in `limit` (top-K) search option, lower CPU and memory on indexing, save, load and search, and a round of MiniSearch parity and snapshot robustness fixes. Snapshots whose term labels contain unpaired surrogates (e.g. two emoji sharing a leading surrogate) are now written as **MSv5 format revision 2**, which older versions reject; every other snapshot is byte-for-byte unchanged (revision 1). `fromJSON()` now requires as many `documentIds` as `documentCount`.

@@ -40,3 +40,6 @@ scripts/minisearch*
 examples/plain_js_frozen/frozenminisearch.js
 FrozenMiniSearch-v2.png
 FrozenMiniSearch-v2 (1).png
+# Local agent instructions (not versioned)
+/AGENTS.md
+/CLAUDE.md

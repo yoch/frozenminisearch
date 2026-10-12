@@ -2,7 +2,7 @@
 'use strict'
 
 // Local audit. Compare a published entry with dist/ in separate processes:
-// node --expose-gc benchmarks/scripts/audit-memory-retention.cjs [entry] [output]
+// node --expose-gc dev/scripts/audit-memory-retention.cjs [entry] [output]
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
@@ -10,7 +10,7 @@ const { setImmediate: turn } = require('node:timers/promises')
 const entry = path.resolve(process.argv[2] || path.join(__dirname, '../../dist/cjs/index.require.cjs'))
 const output = path.resolve(process.argv[3] || path.join(__dirname, '../../tmp/memory-audit/retention.json'))
 const { FrozenMiniSearch, createFrozenIndexBuilder, freezeFrozenIndexBuilder } = require(entry)
-const fixtureDir = path.join(__dirname, '../fixtures/medicaments-indexes')
+const fixtureDir = path.join(__dirname, '../../benchmarks/fixtures/medicaments-indexes')
 const report = { runtime: process.version, entry, samples: [], fixtures: [], searches: 0, loads: 0 }
 const hash = crypto.createHash('sha256')
 const weakIndexes = []

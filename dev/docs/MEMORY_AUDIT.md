@@ -116,9 +116,13 @@ pnpm build
 pnpm lint
 pnpm test
 pnpm test:runtime
-node --expose-gc benchmarks/scripts/audit-memory-retention.cjs \
+node --expose-gc dev/scripts/audit-memory-retention.cjs \
   dist/cjs/index.require.cjs tmp/memory-audit/fixed.json
 ```
+
+The harness is an investigation tool, not a benchmark. It was run from
+`benchmarks/scripts/` during the audit, which is the path recorded with its hash
+in the results file, and now lives in `dev/scripts/`.
 
 For a before/after comparison, run the same harness in another process with its
 first argument pointing to the installed 1.11.0 CJS entry and a different output

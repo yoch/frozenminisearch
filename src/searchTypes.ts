@@ -133,6 +133,60 @@ export interface SearchPage {
 }
 
 /**
+ * Options of `matchIds`: the search options that select documents. Scoring
+ * options are left out because they do not change which documents match.
+ */
+export type MatchIdsOptions = Omit<SearchOptions, 'filter' | 'limit' | 'boost' | 'boostTerm' | 'weights' | 'bm25'> & {
+  /** Only `undefined` is accepted: it disables a filter set in the index-level search options. */
+  filter?: undefined
+}
+
+/**
+ * FrozenMiniSearch extension (not in MiniSearch): a search result without match
+ * information, returned by `search` and `searchPage` with `matchInfo: false`.
+ */
+export type ScoredResult = {
+  /** The document ID. */
+  id: any
+  /** Query terms that matched (e.g. `"moto"` for prefix `"moto"`). */
+  queryTerms: string[]
+  /** Score of the search result, equal to the score with match information. */
+  score: number
+  /** Not set without match information. */
+  terms?: never
+  /** Not set without match information. */
+  match?: never
+  /** Stored fields are merged onto the result. */
+  [key: string]: any
+}
+
+/**
+ * Per-call options of `search` that skip match information. Results keep the
+ * same scores and order, without `terms` and `match`. `matchInfo` is not read
+ * from the index-level search options.
+ */
+export type ScoredSearchOptions = Omit<SearchOptions, 'filter'> & {
+  /** Skip `terms` and `match`: results are {@link ScoredResult}s. */
+  matchInfo: false
+  /** Receives the result without match information, like an index-level filter. */
+  filter?: (result: ScoredResult) => boolean
+}
+
+/** Per-call options of `searchPage` that skip match information, as in {@link ScoredSearchOptions}. */
+export type ScoredSearchPageOptions = Omit<SearchPageOptions, 'filter'> & {
+  /** Skip `terms` and `match`: results are {@link ScoredResult}s. */
+  matchInfo: false
+  /** Receives the result without match information, like an index-level filter. */
+  filter?: (result: ScoredResult) => boolean
+}
+
+/** A page of {@link ScoredResult}s and their count before pagination, after filtering. */
+export interface ScoredSearchPage {
+  results: ScoredResult[]
+  total: number
+}
+
+/**
  * `SearchOptions` with library defaults filled in. Used as the canonical shape
  * resolved by `MiniSearch` / `FrozenMiniSearch` before passing options around.
  */

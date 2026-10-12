@@ -1,7 +1,14 @@
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
-import { type AggregateContext, finalizeRawSearchResults, finalizeSearchPage, type RawResult, resolveResultLimit } from './scoring'
+import {
+  type AggregateContext,
+  finalizeRawSearchResults,
+  finalizeSearchPage,
+  newSearchResult,
+  type RawResult,
+  resolveResultLimit,
+} from './scoring'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import {
   createFrozenFieldTermFlyweight,
@@ -16,6 +23,7 @@ import {
   type FrozenIndexBuilderHints,
 } from './frozenBuild'
 import {
+  collectMatchingDocIds,
   createFrozenQueryIndexView,
   executeQuery as runQuery,
   type QueryEngineParams,
@@ -23,8 +31,13 @@ import {
 } from './queryEngine'
 import { suggestFromRawResults, suggestFromSearchResults } from './suggestions'
 import type {
+  MatchIdsOptions,
   Options,
   Query,
+  ScoredResult,
+  ScoredSearchOptions,
+  ScoredSearchPage,
+  ScoredSearchPageOptions,
   SearchOptions,
   SearchPageOptions,
   SearchPage,
@@ -218,6 +231,9 @@ export default class FrozenMiniSearchCore<T = any> {
         : (callback) => {
             forEachLiveShortId(this._nextId, this._externalIds, callback)
           },
+      (callback) => {
+        forEachLiveShortId(this._nextId, this._externalIds, callback)
+      },
     )
   }
 
@@ -225,19 +241,24 @@ export default class FrozenMiniSearchCore<T = any> {
    * The shared posting flyweight is rebound per term and read again per field while scoring,
    * so a search started from `boostDocument` gets its own view instead of rebinding the outer one.
    */
-  private _runQuery(query: Query, searchOptions: SearchOptions): RawResult {
-    const params = this._activeQueries === 0
+  private _withQueryParams<R>(run: (params: QueryEngineParams) => R, trackMatch = true): R {
+    let params = this._activeQueries === 0
       ? this._queryEngineParams
       : {
           ...this._queryEngineParams,
           indexView: this._createQueryIndexView(createFrozenFieldTermFlyweight(this._postings)),
         }
+    if (!trackMatch) params = { ...params, trackMatch }
     this._activeQueries++
     try {
-      return runQuery(query, searchOptions, params)
+      return run(params)
     } finally {
       this._activeQueries--
     }
+  }
+
+  private _runQuery(query: Query, searchOptions: SearchOptions, trackMatch = true): RawResult {
+    return this._withQueryParams(params => runQuery(query, searchOptions, params), trackMatch)
   }
 
   static readonly wildcard: typeof WILDCARD_QUERY = WILDCARD_QUERY
@@ -267,25 +288,35 @@ export default class FrozenMiniSearchCore<T = any> {
    * {@link Options.searchOptions}; see {@link SearchOptions} for boosts, prefix,
    * fuzzy, filters, and `combineWith`.
    *
+   * With `matchInfo: false` (FrozenMiniSearch extension), results have the same
+   * scores and order but no `terms` or `match`, and the search skips building them.
+   * A filter, including an index-level one, then receives these reduced results.
+   *
    * @returns Matches sorted by descending score.
    */
-  search(query: Query, searchOptions: SearchOptions = {}): SearchResult[] {
+  search(query: Query, searchOptions: ScoredSearchOptions): ScoredResult[]
+  search(query: Query, searchOptions?: SearchOptions & { matchInfo?: true }): SearchResult[]
+  search(query: Query, callOptions: SearchOptions | ScoredSearchOptions = {}): SearchResult[] | ScoredResult[] {
+    // Both overloads share one runtime path; a reduced-result filter is typed for that shape only.
+    const searchOptions = callOptions as SearchOptions & { matchInfo?: boolean }
     const limit = resolveResultLimit(Object.hasOwn(searchOptions, 'limit')
       ? searchOptions.limit
       : this._options.searchOptions.limit)
     if (limit === 0) return []
+    const matchInfo = searchOptions.matchInfo !== false
     if (limit !== undefined && query === WILDCARD_QUERY) {
       const options = { ...this._options.searchOptions, ...searchOptions }
-      if (options.boostDocument == null) return this._searchLimitedWildcard(limit, options.filter)
+      if (options.boostDocument == null) return this._searchLimitedWildcard(limit, options.filter, matchInfo)
     }
     return finalizeRawSearchResults(
-      this._runQuery(query, searchOptions),
+      this._runQuery(query, searchOptions, matchInfo),
       query,
       searchOptions,
       this._options.searchOptions,
       this._getExternalId,
       undefined,
       this._storedFields,
+      matchInfo,
     )
   }
 
@@ -295,8 +326,12 @@ export default class FrozenMiniSearchCore<T = any> {
    * All candidate scores are computed once. Filters run on every candidate, even
    * for an empty page; without a filter, only returned results are materialized.
    * Assumes finite scores and deterministic filters, as with bounded search.
+   * `matchInfo: false` returns results without `terms` or `match`, as with {@link search}.
    */
-  searchPage(query: Query, searchOptions: SearchPageOptions): SearchPage {
+  searchPage(query: Query, searchOptions: ScoredSearchPageOptions): ScoredSearchPage
+  searchPage(query: Query, searchOptions: SearchPageOptions & { matchInfo?: true }): SearchPage
+  searchPage(query: Query, callOptions: SearchPageOptions | ScoredSearchPageOptions): SearchPage | ScoredSearchPage {
+    const searchOptions = callOptions as SearchPageOptions & { matchInfo?: boolean }
     if (searchOptions == null || searchOptions.limit === undefined) {
       throw new Error('FrozenMiniSearch: searchPage requires an explicit limit')
     }
@@ -306,19 +341,26 @@ export default class FrozenMiniSearchCore<T = any> {
       throw new Error('FrozenMiniSearch: offset must be a non-negative integer')
     }
     const options = { ...this._options.searchOptions, ...searchOptions }
+    const matchInfo = searchOptions.matchInfo !== false
     if (query === WILDCARD_QUERY && options.boostDocument == null) {
-      return this._searchWildcardPage(offset, limit ?? Infinity, options.filter)
+      return this._searchWildcardPage(offset, limit ?? Infinity, options.filter, matchInfo)
     }
     return finalizeSearchPage({
-      rawResults: this._runQuery(query, searchOptions),
+      rawResults: this._runQuery(query, searchOptions, matchInfo),
       getExternalId: this._getExternalId,
       storedFieldsLayout: this._storedFields,
       filter: options.filter,
+      matchInfo,
     }, offset, limit)
   }
 
   /** Unboosted wildcard pages follow insertion order, so they scan documents without a raw map. */
-  private _searchWildcardPage(offset: number, limit: number, filter?: SearchOptions['filter']): SearchPage {
+  private _searchWildcardPage(
+    offset: number,
+    limit: number,
+    filter: SearchOptions['filter'],
+    matchInfo: boolean,
+  ): SearchPage {
     const results: SearchResult[] = []
     if (filter == null) {
       // Without discarded slots, a short id is the document's rank.
@@ -327,7 +369,7 @@ export default class FrozenMiniSearchCore<T = any> {
         const id = this._getExternalId(shortId)
         if (id === undefined) continue
         if (skipped < offset) skipped++
-        else results.push(this._wildcardResult(id, shortId))
+        else results.push(this._wildcardResult(id, shortId, matchInfo))
       }
       return { results, total: this._documentCount }
     }
@@ -335,30 +377,63 @@ export default class FrozenMiniSearchCore<T = any> {
     for (let shortId = 0; shortId < this._nextId; shortId++) {
       const id = this._getExternalId(shortId)
       if (id === undefined) continue
-      const result = this._wildcardResult(id, shortId)
+      const result = this._wildcardResult(id, shortId, matchInfo)
       if (!filter(result)) continue
       if (total++ >= offset && results.length < limit) results.push(result)
     }
     return { results, total }
   }
 
-  private _wildcardResult(id: unknown, shortId: number): SearchResult {
-    const result: SearchResult = { id, score: 1, terms: [], queryTerms: [], match: {} }
+  private _wildcardResult(id: unknown, shortId: number, matchInfo: boolean): SearchResult {
+    const result = newSearchResult(id, 1, [], matchInfo ? {} : undefined, matchInfo)
     assignStoredFields(this._storedFields, shortId, result)
     return result
   }
 
   /** An unboosted wildcard is already ranked by insertion order; no raw map is needed. */
-  private _searchLimitedWildcard(limit: number, filter?: SearchOptions['filter']): SearchResult[] {
+  private _searchLimitedWildcard(limit: number, filter: SearchOptions['filter'], matchInfo: boolean): SearchResult[] {
     const results: SearchResult[] = []
     for (let shortId = 0; shortId < this._nextId && results.length < limit; shortId++) {
       const id = this._getExternalId(shortId)
       if (id === undefined) continue
-      const result: SearchResult = { id, score: 1, terms: [], queryTerms: [], match: {} }
-      assignStoredFields(this._storedFields, shortId, result)
+      const result = this._wildcardResult(id, shortId, matchInfo)
       if (filter == null || filter(result)) results.push(result)
     }
     return results
+  }
+
+  /**
+   * External ids of the documents matching `query`, in insertion order, without
+   * scores, match information or result objects (FrozenMiniSearch extension). They
+   * are the documents of an unbounded {@link search} with the same options.
+   *
+   * A filter, local or from the index-level search options, throws: it needs complete
+   * results. Pass `filter: undefined` to disable an index-level filter. A local `limit`
+   * throws too, since the method returns every match; an index-level limit is ignored.
+   * `boostDocument` must be deterministic. As in {@link search}, a document does not
+   * match a query term when it returns a falsy value for every term derived from it
+   * (exact, prefix or fuzzy). A wildcard query returns every document without calling
+   * it, since {@link search} keeps them all, with their boosted scores.
+   */
+  matchIds(query: Query, searchOptions: MatchIdsOptions = {}): unknown[] {
+    const local = searchOptions as SearchOptions
+    if ({ ...this._options.searchOptions, ...local }.filter != null) {
+      throw new Error('FrozenMiniSearch: matchIds does not support filter (pass filter: undefined to disable an index-level filter)')
+    }
+    if (local.limit !== undefined) throw new Error('FrozenMiniSearch: matchIds does not support limit')
+
+    if (query === WILDCARD_QUERY) {
+      const ids: unknown[] = []
+      for (let shortId = 0; shortId < this._nextId; shortId++) {
+        const id = this._getExternalId(shortId)
+        if (id !== undefined) ids.push(id)
+      }
+      return ids
+    }
+    const docIds = this._withQueryParams(params => collectMatchingDocIds(query, searchOptions, params, this._nextId))
+    const ids = new Array<unknown>(docIds.length)
+    for (let i = 0; i < docIds.length; i++) ids[i] = this._getExternalId(docIds[i])
+    return ids
   }
 
   /**
@@ -371,7 +446,7 @@ export default class FrozenMiniSearchCore<T = any> {
     if (filter == null) {
       return suggestFromRawResults(this._runQuery(queryString, merged))
     }
-    return suggestFromSearchResults(this.search(queryString, { ...merged, limit: undefined }))
+    return suggestFromSearchResults(this.search(queryString, { ...merged, limit: undefined, matchInfo: undefined }))
   }
 
   /** Built-in default for indexing / load options (`tokenize`, `processTerm`, `extractField`, …). */

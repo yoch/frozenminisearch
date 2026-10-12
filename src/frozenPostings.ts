@@ -6,7 +6,7 @@ import {
   type DocIdArray,
   type FreqArray,
 } from './compactPostings'
-import type { AggregateContext, DocIdGate, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
+import type { AggregateContext, DocIdGate, DocIdSet, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
 import type { PackedIndexArray } from './PackedRadixTree/types'
 
 export type { DocIdArray } from './compactPostings'
@@ -225,7 +225,7 @@ function collectDocIdsFromFrozenSegment(
   allDocIds: DocIdArray,
   offset: number,
   length: number,
-  docIds: Set<number>,
+  docIds: DocIdSet,
   allowedDocs?: DocIdGate,
 ): void {
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
@@ -250,7 +250,7 @@ export function collectDocIdsFromFrozenLayout(
   termIndex: number,
   fieldBoosts: FieldBoostsForQuery,
   context: AggregateContext,
-  docIds: Set<number>,
+  docIds: DocIdSet,
   allowedDocs?: DocIdGate,
 ): void {
   const { fieldIds } = context

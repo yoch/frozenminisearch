@@ -14,7 +14,7 @@ text. That requirement still shapes the design today, alongside two related
 optimization axes: fast loading from persisted snapshots, and fast query
 execution over a frozen representation.
 
-**Latest update: July 8, 2026**
+**Latest update: September 27, 2026**
 
 ## Goals (and non-goals)
 

@@ -3,6 +3,7 @@ import {
   combineResults,
   type CombinationOperator,
   type DocIdGate,
+  type DocIdSet,
   type RawResult,
 } from './scoring'
 import {
@@ -14,6 +15,7 @@ import {
   type QueryEngineRunOptions,
 } from './queryEngineGateLimits'
 import type { QueryEngineParams } from './queryEngine'
+import { DocIdBitSet } from './docIdBitSet'
 
 /** Empirical broad-exclusion cutoff: only collect first when both sides cover much of the corpus. */
 const BROAD_EXCLUSION_TWO_PHASE_MIN_FRACTION = 0.5
@@ -32,13 +34,34 @@ function gateFromResult(result: RawResult): DocIdGate {
   }
 }
 
-function intersectDocIdsInPlace(docIds: Set<number>, branchDocIds: DocIdGate): void {
+/** Default collection set: insertion-ordered, as search gates expect. */
+export const createDocIdSet = (): DocIdSet => new Set<number>()
+
+// Bitsets (matchIds) combine word by word; Sets (search gates) keep their insertion order.
+
+function unionDocIdsInPlace(docIds: DocIdSet, branchDocIds: DocIdGate): void {
+  if (docIds instanceof DocIdBitSet && branchDocIds instanceof DocIdBitSet) {
+    docIds.or(branchDocIds)
+    return
+  }
+  for (const docId of branchDocIds) docIds.add(docId)
+}
+
+function intersectDocIdsInPlace(docIds: DocIdSet, branchDocIds: DocIdGate): void {
+  if (docIds instanceof DocIdBitSet && branchDocIds instanceof DocIdBitSet) {
+    docIds.and(branchDocIds)
+    return
+  }
   for (const docId of docIds) {
     if (!branchDocIds.has(docId)) docIds.delete(docId)
   }
 }
 
-function subtractDocIdsInPlace(docIds: Set<number>, excludedDocIds: DocIdGate): void {
+function subtractDocIdsInPlace(docIds: DocIdSet, excludedDocIds: DocIdGate): void {
+  if (docIds instanceof DocIdBitSet && excludedDocIds instanceof DocIdBitSet) {
+    docIds.andNot(excludedDocIds)
+    return
+  }
   for (const docId of excludedDocIds) docIds.delete(docId)
 }
 
@@ -107,7 +130,7 @@ function shouldUseTwoPhaseAndNot(
 
 function executeAndWithFinalGate<T>(
   branches: readonly T[],
-  finalGate: Set<number>,
+  finalGate: DocIdSet,
   executeBranch: (branch: T, allowedDocs?: DocIdGate) => RawResult,
 ): RawResult {
   if (finalGate.size === 0) return new Map()
@@ -120,12 +143,13 @@ function executeAndWithFinalGate<T>(
   return result
 }
 
-function collectAndDocIdsByEstimatedLength<T>(
+/** AND of the branches, collected from the shortest estimated posting list onwards. */
+export function collectAndDocIdsByEstimatedLength<T>(
   branches: readonly T[],
   branchPostingLengths: readonly number[],
-  collectBranch: (branch: T, allowedDocs?: DocIdGate) => Set<number>,
+  collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
-): Set<number> {
+): DocIdSet {
   const order = branches.map((_, i) => i)
   order.sort((a, b) => branchPostingLengths[a] - branchPostingLengths[b] || a - b)
 
@@ -140,23 +164,22 @@ function collectAndDocIdsByEstimatedLength<T>(
 export function collectCombinedDocIds<T>(
   branches: readonly T[],
   operator: CombinationOperator,
-  collectBranch: (branch: T, allowedDocs?: DocIdGate) => Set<number>,
+  collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
-): Set<number> {
-  if (branches.length === 0) return new Set()
+  newDocIdSet: () => DocIdSet = createDocIdSet,
+): DocIdSet {
+  if (branches.length === 0) return newDocIdSet()
 
   const op = operator.toLowerCase()
+  // Each branch returns a fresh set, so the first one accumulates the result.
+  const docIds = collectBranch(branches[0], allowedDocs)
   if (op === 'or') {
-    const docIds = new Set<number>()
-    for (const branch of branches) {
-      for (const docId of collectBranch(branch, allowedDocs)) {
-        docIds.add(docId)
-      }
+    for (let i = 1; i < branches.length; i++) {
+      unionDocIdsInPlace(docIds, collectBranch(branches[i], allowedDocs))
     }
     return docIds
   }
 
-  const docIds = collectBranch(branches[0], allowedDocs)
   if (op === 'and') {
     for (let i = 1; i < branches.length; i++) {
       if (docIds.size === 0) return docIds
@@ -187,7 +210,7 @@ export function executeCombinedBranches<T>(
   operator: CombinationOperator,
   params: QueryEngineParams,
   executeBranch: (branch: T, allowedDocs?: DocIdGate) => RawResult,
-  collectBranch: (branch: T, allowedDocs?: DocIdGate) => Set<number>,
+  collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
   run?: QueryEngineRunOptions,
   estimateBranchPostingLength?: (branch: T) => number,

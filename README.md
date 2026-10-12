@@ -27,6 +27,7 @@ FrozenMiniSearch is for the common production path where search data changes els
 - Load it in many read-only Node.js processes.
 - Query with MiniSearch-compatible `search`, `autoSuggest`, filters, boosts, prefix/fuzzy search, wildcard, and `AND` / `OR` / `AND_NOT`.
 - Paginate with `searchPage`, which returns a page and the exact total after filtering in one call.
+- Skip what you do not read: bounded results, results without match information, or bare matching ids.
 
 Internally it uses packed radix postings, typed arrays, and columnar stored fields instead of large JavaScript object graphs. The result is a search engine tuned for resident efficiency, fast loads, and repeatable serving workflows.
 
@@ -143,40 +144,7 @@ const index = FrozenMiniSearch.fromDocuments(documents, {
 })
 ```
 
-Wildcard and nested query combinations are supported (`FrozenMiniSearch.wildcard`, `QueryCombination`).
-
-`limit` is a FrozenMiniSearch extension (not in MiniSearch): it returns the same results as `search(...).slice(0, limit)`, but only materializes and sorts the results it returns, which saves CPU and allocations on broad queries. With `filter`, the predicate runs in descending score order and stops once `limit` results are kept, so it should be deterministic and not depend on how often it is called. `limit: 0` returns `[]` without running the query, and an invalid limit throws before any callback runs. `autoSuggest()` ignores it.
-
-```javascript
-index.search('zen', { prefix: true, limit: 10 })
-```
-
-### Pagination and exact totals
-
-`searchPage()` returns a page in the same score order as an unbounded `search()`,
-plus the exact number of matches after filtering and before pagination:
-
-```javascript
-const { results, total } = index.searchPage('zen', {
-  prefix: true,
-  offset: 20,
-  limit: 10,
-  filter: result => result.category === 'fiction',
-})
-```
-
-`offset` defaults to zero and must be a non-negative integer. `limit` is required
-and overrides the index-level default; it accepts a non-negative integer or
-`Infinity` (all remaining matches). Other search options and nested queries work
-as with `search()`. Empty pages, including `limit: 0`, still return the total.
-
-Candidate scores are computed once per call. Deep pages select their window
-without sorting the matches ranked before it, and unboosted wildcard pages scan
-documents in insertion order. Without a filter, only the page is materialized.
-With a filter, every candidate is materialized and evaluated once to obtain the
-exact total, even when the page is empty. Filters should be deterministic. The
-score ordering assumes finite scores, as with bounded search. No search state is
-retained between page requests.
+Wildcard and nested query combinations are supported (`FrozenMiniSearch.wildcard`, `QueryCombination`). FrozenMiniSearch adds a few options of its own; see [Beyond MiniSearch](#beyond-minisearch).
 
 ### Auto-suggestions
 
@@ -249,6 +217,86 @@ Use these when wrapping a custom function and delegating to the library default.
 
 ---
 
+## Beyond MiniSearch
+
+These extensions are not in MiniSearch. They find the same matches as `search()`,
+and save CPU and allocations when you need less than the full sorted list of
+results: its first results, a page, results without match information, or only
+the matching ids.
+
+### Bounded results (`limit`)
+
+`limit` returns the same results as `search(...).slice(0, limit)`, but only materializes and sorts the results it returns, which saves CPU and allocations on broad queries. With `filter`, the predicate runs in descending score order and stops once `limit` results are kept, so it should be deterministic and not depend on how often it is called. `limit: 0` returns `[]` without running the query, and an invalid limit throws before any callback runs. `autoSuggest()` ignores it.
+
+```javascript
+index.search('zen', { prefix: true, limit: 10 })
+```
+
+### Pagination and exact totals
+
+`searchPage()` returns a page in the same score order as an unbounded `search()`,
+plus the exact number of matches after filtering and before pagination:
+
+```javascript
+const { results, total } = index.searchPage('zen', {
+  prefix: true,
+  offset: 20,
+  limit: 10,
+  filter: result => result.category === 'fiction',
+})
+```
+
+`offset` defaults to zero and must be a non-negative integer. `limit` is required
+and overrides the index-level default; it accepts a non-negative integer or
+`Infinity` (all remaining matches). Other search options and nested queries work
+as with `search()`. Empty pages, including `limit: 0`, still return the total.
+
+Candidate scores are computed once per call. Deep pages select their window
+without sorting the matches ranked before it, and unboosted wildcard pages scan
+documents in insertion order. Without a filter, only the page is materialized.
+With a filter, every candidate is materialized and evaluated once to obtain the
+exact total, even when the page is empty. Filters should be deterministic. The
+score ordering assumes finite scores, as with bounded search. No search state is
+retained between page requests.
+
+### Results without match information
+
+Pass `matchInfo: false` to `search()` or `searchPage()` when you do not read
+`terms` or `match`. Results keep the same scores, order and stored fields, and
+the search skips building the match information:
+
+```javascript
+index.search('zen', { prefix: true, matchInfo: false })
+// => [{ id, score, queryTerms: ['zen'], title, category }, ...]
+```
+
+Filters, including an index-level one, receive these reduced results. The option
+is read from each call only, and `autoSuggest()` ignores it.
+
+### Matching ids without scores
+
+`matchIds()` returns the ids of the matching documents in insertion order,
+without scores or result objects. It finds the same documents as an unbounded
+`search()` with the same options, in a fraction of the time and memory. Use it
+when you rank or merge matches yourself:
+
+```javascript
+index.matchIds('zen art', { prefix: true, combineWith: 'AND' })
+// => [2]
+```
+
+It takes the options that select documents: `fields`, `prefix`, `fuzzy`,
+`maxFuzzy`, `combineWith`, `tokenize`, `processTerm` and `boostDocument`.
+
+- A filter throws, whether passed to the call or set in the index-level
+  `searchOptions`. Pass `filter: undefined` to disable an index-level filter.
+- A `limit` passed to the call throws; an index-level limit is ignored.
+- `boostDocument` should be deterministic. As in `search()`, a document does not
+  match a query term when it returns a falsy value for every term derived from
+  it, and a wildcard query returns every document.
+
+---
+
 ## Migration and interoperability
 
 For fixed corpora, most serving code can stay the same. Change how the index is built or loaded, then keep calling `search`, `autoSuggest`, `has`, and `getStoredFields`.
@@ -286,16 +334,16 @@ const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(upstream), options)
 ```
 
 This path is useful for migration and interchange. In normal frozen deployments, you typically build with `fromDocuments`, the builder API, or binary snapshots directly.
-Internally, `fromJSON` now packs terms directly into the immutable packed term
-index; it no longer routes through any local `SearchableMap` or mutable radix
-fallback.
 
 ---
 
-## Search API (MiniSearch-compatible)
+## Search API
 
-- `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
-- `searchPage(query, { offset?, limit, ...searchOptions })` — FrozenMiniSearch extension returning `{ results, total }`; see [Pagination and exact totals](#pagination-and-exact-totals)
+MiniSearch-compatible, with the [extensions](#beyond-minisearch) marked:
+
+- `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`; extension options [`limit`](#bounded-results-limit) and [`matchInfo`](#results-without-match-information)
+- `searchPage(query, { offset?, limit, ...searchOptions })` — extension returning `{ results, total }`; see [Pagination and exact totals](#pagination-and-exact-totals)
+- `matchIds(query, options?)` — extension returning the matching ids in insertion order; see [Matching ids without scores](#matching-ids-without-scores)
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
 - `getDefault(optionName)` — built-in `tokenize`, `processTerm`, `extractField`, `stringifyField`, …

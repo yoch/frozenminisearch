@@ -37,12 +37,15 @@ function frozenQueryEngineParams<T>(frozen: FrozenMiniSearchCore<T>): QueryEngin
   return viewOf(frozen)._queryEngineParams
 }
 
+/** Raw scored results; `trackMatch: false` leaves `match` undefined, as `matchInfo: false` does. */
 export function executeRaw<T>(
   frozen: FrozenMiniSearchCore<T>,
   query: Query,
   searchOptions: SearchOptions = {},
+  trackMatch = true,
 ): RawResult {
-  return executeQueryWithRunOptions(query, searchOptions, frozenQueryEngineParams(frozen))
+  const params = frozenQueryEngineParams(frozen)
+  return executeQueryWithRunOptions(query, searchOptions, trackMatch ? params : { ...params, trackMatch })
 }
 
 export function executeRawWithRunOptions<T>(

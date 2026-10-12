@@ -11,6 +11,14 @@
   MiniSearch with an unbounded search followed by `.slice(0, k)` (MiniSearch has no
   `limit`). Filters must be deterministic and must not change scores. Tested in
   [`limit.test.js`](limit.test.js), including gated/naive execution and binary loads.
+- Frozen-only `matchIds`: the same documents as an unbounded upstream `search` with the
+  same options, in insertion order, including nested combinations, wildcards,
+  `fields` and a deterministic `boostDocument`. Index-level options apply to terms
+  but not to combination operators, as in `search`. Tested on random queries in
+  [`matchIds.test.js`](matchIds.test.js).
+- Frozen-only `matchInfo: false`: the same results as Frozen `search` / `searchPage`
+  without `terms` and `match`, with bit-identical scores and the same order, in
+  gated and naive execution (`src/matchInfo.test.js`).
 
 ## Indexing build invariants (CI)
 

@@ -3,6 +3,8 @@
  * Wire format stays row JSON; encode/decode can skip intermediate row arrays when layout is known.
  */
 
+import { assignOwnProperties, setOwnProperty } from './ownProperties'
+
 export type StoredFieldsLayout
   = | { kind: 'none' }
     | { kind: 'single', field: string, values: unknown[] }
@@ -36,7 +38,7 @@ export function writeStoredField<T>(
   const row: Record<string, unknown> = {}
   for (const name of storeFields) {
     const value = extractField(document, name)
-    if (value !== undefined) row[name] = value
+    if (value !== undefined) setOwnProperty(row, name, value)
   }
   layout.rows[shortId] = row
 }
@@ -62,11 +64,11 @@ export function assignStoredFields(
   if (layout.kind === 'none') return
   if (layout.kind === 'single') {
     const value = layout.values[shortId]
-    if (value !== undefined) target[layout.field] = value
+    if (value !== undefined) setOwnProperty(target, layout.field, value)
     return
   }
   const row = layout.rows[shortId]
-  if (row != null) Object.assign(target, row)
+  if (row != null) assignOwnProperties(target, row)
 }
 
 export function resizeStoredFields(layout: StoredFieldsLayout, length: number): StoredFieldsLayout {

@@ -19,6 +19,7 @@ import {
 } from './binaryMsv5Constants'
 import { decodeMsv5PostingsSections } from './binaryMsv5Postings'
 import { readPackedTermTreeSectionColumnar } from './packedRadixBinaryMsv5'
+import { setOwnProperty } from '../ownProperties'
 
 export type FrozenDecodeHints = {
   storeFields: readonly string[]
@@ -80,7 +81,7 @@ export function decodeMsv5Sections(
 
   const fieldIds: { [field: string]: number } = {}
   for (let f = 0; f < fieldNames.length; f++) {
-    fieldIds[fieldNames[f]] = f
+    setOwnProperty(fieldIds, fieldNames[f], f)
   }
 
   const externalIds = readExternalIdsSection(

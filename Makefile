@@ -341,7 +341,7 @@ help:
 	@echo "  make build-packed-radix-bench  PackedRadixTree specialised build"
 	@echo ""
 	@echo "Tests:"
-	@echo "  make test                   vitest run (src + dev + benchmarks)"
+	@echo "  make test                   vitest run (src + dev/parity)"
 	@echo "  make test-runtime           published bundle compatibility (Node 20+, build first)"
 	@echo "  make test-browser           assert-browser-bundle + vitest dev/browser/"
 	@echo "  make test-fuzzysearch       vitest run dev/internal/"

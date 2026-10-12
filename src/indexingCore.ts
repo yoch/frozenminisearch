@@ -1,6 +1,7 @@
 import type { Options, OptionsWithDefaults } from './searchTypes'
 import { getFrozenDefault } from './searchDefaults'
 import { resolveFrozenOptions } from './frozenOptions'
+import { setOwnProperty } from './ownProperties'
 
 /**
  * Indexing-time view of options: same shape as the canonical {@link OptionsWithDefaults}
@@ -15,7 +16,7 @@ export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<
 export function buildFieldIds(fields: string[]): { [key: string]: number } {
   const fieldIds: { [key: string]: number } = {}
   for (let i = 0; i < fields.length; i++) {
-    fieldIds[fields[i]] = i
+    setOwnProperty(fieldIds, fields[i], i)
   }
   return fieldIds
 }

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Preserve literal `__proto__` term and field names while accumulating/combining matches, storing fields and importing snapshots. Such keys now remain own data properties instead of changing result prototypes or disappearing from matches. No wire-format changes.
+
 ## v1.12.0 — `@yoch/frozenminisearch`
 
 Minor release: lean result paths for callers that rank or merge matches themselves. `matchIds()` returns the ids an unbounded `search()` would match, collected in bitsets without scores or result objects, and `matchInfo: false` on `search()` and `searchPage()` keeps the same scores and order without building match information. Without these options, search results, scores and ordering are unchanged; combination operators named after inherited object properties, such as `constructor`, now throw. No changes to runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.

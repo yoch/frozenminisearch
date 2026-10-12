@@ -18,6 +18,7 @@ import type {
 import { isWildcardQuery } from './symbols'
 import { assignStoredFields, type StoredFieldsLayout } from './storedFieldsLayout'
 import type { PackedTermCursor } from './PackedRadixTree/types'
+import { assignOwnProperties, setOwnProperty } from './ownProperties'
 
 export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
 
@@ -135,7 +136,7 @@ export function fieldBoostsForQuery(
   const searchFields = options.fields || fields
   const boosts: { [field: string]: number } = {}
   for (const field of searchFields) {
-    boosts[field] = (getOwnProperty(options.boost as Record<string, unknown>, field) as number) || 1
+    setOwnProperty(boosts, field, (getOwnProperty(options.boost as Record<string, unknown>, field) as number) || 1)
   }
   return { names: Object.keys(boosts), boosts }
 }
@@ -226,7 +227,7 @@ function scorePostingDoc(
     if (match) {
       match.push(field)
     } else {
-      result.match![resolvedDerivedTerm] = [field]
+      setOwnProperty(result.match!, resolvedDerivedTerm, [field])
     }
   } else {
     results.set(docId, {
@@ -420,7 +421,7 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
       } else {
         const { score, terms, match } = b.get(docId)!
         existing.score = existing.score + score
-        if (existing.match !== undefined) Object.assign(existing.match, match)
+        if (existing.match !== undefined) assignOwnProperties(existing.match, match)
         assignUniqueTerms(existing.terms, terms)
       }
     }
@@ -437,7 +438,7 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
       const { score, terms, match } = inB
       existing.score += score
       assignUniqueTerms(existing.terms, terms)
-      if (existing.match !== undefined) Object.assign(existing.match, match)
+      if (existing.match !== undefined) assignOwnProperties(existing.match, match)
     }
     return a
   },
@@ -509,7 +510,7 @@ function writeStoredFieldsOntoResult(
   }
   if (getStoredFields != null) {
     const storedFields = getStoredFields(docId)
-    if (storedFields != null) Object.assign(result, storedFields)
+    if (storedFields != null) assignOwnProperties(result, storedFields)
   }
 }
 

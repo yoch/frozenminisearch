@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.12.0 — `@yoch/frozenminisearch`
+
+Minor release: lean result paths for callers that rank or merge matches themselves. `matchIds()` returns the ids an unbounded `search()` would match, collected in bitsets without scores or result objects, and `matchInfo: false` on `search()` and `searchPage()` keeps the same scores and order without building match information. Without these options, search results, scores and ordering are unchanged; combination operators named after inherited object properties, such as `constructor`, now throw. No changes to runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.
+
 ### Added
 
 - **Matching ids** — `matchIds(query, options?)` returns the ids of the documents an unbounded `search()` would return, in insertion order, without computing scores, match information or result objects. It accepts the options that select documents. A filter throws, including one set in the index-level search options (`filter: undefined` disables it), as does a local `limit`; an index-level limit is ignored. Matches are collected and combined in bitsets, starting AND queries from their most selective exact terms, and listed without sorting: on the bundled medicament indexes, a broad prefix query (`a`, 6k–17k matches) allocates about 0.2 MB and runs in under 1 ms, against 5.8–11.3 MB and 5–14 ms with `search()`. Available in Node and browser entries.

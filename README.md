@@ -178,6 +178,44 @@ exact total, even when the page is empty. Filters should be deterministic. The
 score ordering assumes finite scores, as with bounded search. No search state is
 retained between page requests.
 
+### Matching ids without scores
+
+`matchIds()` returns the ids of the documents matched by a query, in insertion
+order, without scores or result objects. It finds the same documents as an
+unbounded `search()` with the same options, for less memory and time. Use it
+when you rank or merge matches yourself:
+
+```javascript
+const ids = index.matchIds('zen art', { prefix: true, combineWith: 'AND' })
+// => ids in insertion order, e.g. [2] for the documents above
+```
+
+It accepts the options that select documents (`fields`, `prefix`, `fuzzy`,
+`maxFuzzy`, `combineWith`, `tokenize`, `processTerm`, `boostDocument`). A filter
+throws, whether passed to the call or set in the index-level `searchOptions`,
+because it needs complete results; pass `filter: undefined` to disable an
+index-level filter. A `limit` passed to the call throws too, since the method
+returns every match; an index-level limit is ignored. `boostDocument` should be
+deterministic: as in `search()`, a document does not match a query term when it
+returns a falsy value for every term derived from it (exact, prefix or fuzzy),
+and a wildcard query returns every document.
+
+### Results without match information
+
+Pass `matchInfo: false` to `search()` or `searchPage()` when you do not read
+`terms` or `match`. Results keep the same scores, order and stored fields, as
+`{ id, score, queryTerms, ...storedFields }`, and the search skips building the
+per-document match information:
+
+```javascript
+index.search('zen', { prefix: true, matchInfo: false })
+// => [{ id, score, queryTerms: ['zen'], title, category }, ...]
+```
+
+A filter, including one set in the index-level `searchOptions`, then receives
+these reduced results. `matchInfo` is read from each call only, not from
+index-level options, and `autoSuggest()` ignores it.
+
 ### Auto-suggestions
 
 ```javascript
@@ -296,6 +334,8 @@ fallback.
 
 - `search(query, searchOptions?)` — string, wildcard (`FrozenMiniSearch.wildcard`), or nested `QueryCombination`
 - `searchPage(query, { offset?, limit, ...searchOptions })` — FrozenMiniSearch extension returning `{ results, total }`; see [Pagination and exact totals](#pagination-and-exact-totals)
+- `matchIds(query, options?)` — FrozenMiniSearch extension returning the matching ids in insertion order; see [Matching ids without scores](#matching-ids-without-scores)
+- `matchInfo: false` on `search` and `searchPage` — FrozenMiniSearch extension returning results without `terms` and `match`; see [Results without match information](#results-without-match-information)
 - `autoSuggest(queryString, options?)`
 - `has(id)`, `getStoredFields(id)`
 - `getDefault(optionName)` — built-in `tokenize`, `processTerm`, `extractField`, `stringifyField`, …

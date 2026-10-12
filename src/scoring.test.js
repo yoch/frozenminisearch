@@ -111,9 +111,9 @@ describe('combineResults', () => {
     expect(merged.get(0)?.score).toBe(2)
   })
 
-  test('rejects invalid combination operator', () => {
+  test.each(['xor', 'constructor', '__proto__', 'hasOwnProperty'])('rejects invalid combination operator %s', (operator) => {
     const { a, b } = makeOperands()
-    expect(() => combineResults([a, b], 'xor')).toThrow(/invalid combination operator/)
+    expect(() => combineResults([a, b], operator)).toThrow(/invalid combination operator/)
   })
 
   test('returns empty map for empty operand list', () => {
@@ -172,6 +172,56 @@ describe('aggregateTerm', () => {
     expect(results.get(0)?.match.derived).toEqual(['text'])
     expect(results.get(1)?.match.derived).toEqual(['text'])
     expect(resolves).toBe(1)
+  })
+
+  test.each([
+    ['map postings', mapPostings(0, [[0, 1], [1, 3]])],
+    ['segment postings', {
+      get: fieldId => (fieldId === 0 ? new SegmentPostingList(new Uint32Array([0, 1]), new Uint8Array([1, 3]), 0, 2) : undefined),
+    }],
+  ])('without match tracking, keeps scores and query terms and skips derived terms (%s)', (_name, fieldTermData) => {
+    let resolves = 0
+    const cursor = {
+      term() {
+        resolves += 1
+        return 'derived'
+      },
+    }
+    const run = (boostDocument, trackMatch) => aggregateTerm(
+      'src', cursor, 0.5, 2,
+      fieldTermData, fieldBoosts, makeContext(),
+      boostDocument, defaultBM25params, new Map(), { trackMatch },
+    )
+    const full = run(undefined, true)
+    resolves = 0
+    const reduced = run(undefined, false)
+    expect(resolves).toBe(0)
+    expect(Array.from(reduced.keys())).toEqual(Array.from(full.keys()))
+    for (const [docId, { score, terms, match }] of reduced) {
+      expect(match).toBeUndefined()
+      expect(terms).toEqual(['src'])
+      expect(score).toBe(full.get(docId).score)
+    }
+    const boostedTerms = []
+    const boosted = run((id, term) => {
+      boostedTerms.push(term)
+      return id === 0 ? 0 : 2
+    }, false)
+    expect(boostedTerms).toEqual(['derived', 'derived'])
+    expect(Array.from(boosted.keys())).toEqual([1])
+    expect(boosted.get(1).match).toBeUndefined()
+  })
+
+  test('combinators merge results without match information', () => {
+    const left = () => new Map([[0, { score: 1, terms: ['a'], match: undefined }], [1, { score: 2, terms: ['a'], match: undefined }]])
+    const right = () => new Map([[1, { score: 3, terms: ['b'], match: undefined }], [2, { score: 4, terms: ['b'], match: undefined }]])
+    expect(combineResults([left(), right()], OR)).toEqual(new Map([
+      [0, { score: 1, terms: ['a'], match: undefined }],
+      [1, { score: 5, terms: ['a', 'b'], match: undefined }],
+      [2, { score: 4, terms: ['b'], match: undefined }],
+    ]))
+    expect(combineResults([left(), right()], AND)).toEqual(new Map([[1, { score: 5, terms: ['a', 'b'], match: undefined }]]))
+    expect(Array.from(combineResults([left(), right()], AND_NOT).keys())).toEqual([0])
   })
 
   test.each([0, 1024, 5000])('builds identical match objects at derived term ordinal %i', (ordinal) => {

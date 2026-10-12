@@ -6,11 +6,13 @@ import {
 } from './frozenPostings'
 import {
   aggregateTerm,
+  assertCombinationOperator,
   combineResults,
   fieldBoostsForQuery,
   type AggregateContext,
   type AggregateTermOptions,
   type DocIdGate,
+  type DocIdSet,
   type FieldBoostsForQuery,
   type FieldTermDataLike,
   OR,
@@ -28,9 +30,12 @@ import type {
 import { isWildcardQuery } from './symbols'
 import { type QueryEngineRunOptions } from './queryEngineGateLimits'
 import {
+  collectAndDocIdsByEstimatedLength,
   collectCombinedDocIds,
+  createDocIdSet,
   executeCombinedBranches,
 } from './queryEngineGating'
+import { DocIdBitSet } from './docIdBitSet'
 import {
   estimateCheapTwoPhasePostingLengthForQuerySpec,
   estimateMaxPostingLengthForQuerySpec,
@@ -50,6 +55,8 @@ export interface QueryIndexView {
   getTermData(term: string): FieldTermDataLike | undefined
   /** Iterate over active documents (used by wildcard queries). */
   forEachActiveDoc(callback: (docId: number, externalId: unknown, storedFields?: Record<string, unknown>) => void): void
+  /** Iterate over active document ids only, without reading stored fields. */
+  forEachActiveDocId(callback: (docId: number) => void): void
   resolveTermIndex(term: string): number | undefined
   /**
    * Rebinds the instance flyweight; returned reference is valid only until the next
@@ -60,7 +67,7 @@ export interface QueryIndexView {
     termIndex: number,
     fieldBoosts: FieldBoostsForQuery,
     context: AggregateContext,
-    docIds: Set<number>,
+    docIds: DocIdSet,
     allowedDocs?: DocIdGate,
   ): void
   visitPrefixMatchesByIndex(
@@ -81,6 +88,8 @@ export interface QueryEngineParams {
   processTerm: (term: string, fieldName?: string) => string | string[] | null | undefined | false
   indexView: QueryIndexView
   aggregateContext: AggregateContext
+  /** False for a search without match information: raw results leave `match` undefined. */
+  trackMatch?: boolean
 }
 
 function useGatedEvaluation(
@@ -167,7 +176,10 @@ function executeQuerySpecInternal(
   allowedDocs?: DocIdGate,
 ): RawResult {
   const { fieldBoosts, options } = normalized
-  const termOptions: AggregateTermOptions | undefined = allowedDocs == null ? undefined : { allowedDocs }
+  const trackMatch = params.trackMatch !== false
+  const termOptions: AggregateTermOptions | undefined = allowedDocs == null && trackMatch
+    ? undefined
+    : { allowedDocs, trackMatch }
   const results = new Map() as RawResult
   let derivedTermOrdinal = 0
 
@@ -224,10 +236,12 @@ function collectDocIdsForQuerySpec(
   normalized: NormalizedStringQuery,
   params: QueryEngineParams,
   allowedDocs?: DocIdGate,
-): Set<number> {
+  newDocIdSet: () => DocIdSet = createDocIdSet,
+): DocIdSet {
   const { fieldBoosts, options: { boostDocument } } = normalized
-  const docIds = new Set<number>()
+  const docIds = newDocIdSet()
   const { indexView, aggregateContext } = params
+  let termDocIds: Set<number> | undefined
 
   forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex, _length, _distance, cursor) => {
     if (termIndex == null) return
@@ -236,7 +250,8 @@ function collectDocIdsForQuerySpec(
       return
     }
     // Scoring drops docs whose boostDocument is 0 for this term, so membership must too.
-    const termDocIds = new Set<number>()
+    if (termDocIds == null) termDocIds = new Set<number>()
+    else termDocIds.clear()
     indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, termDocIds, allowedDocs)
     if (termDocIds.size === 0) return
     const term = kind === 'exact' ? query.term : cursor?.term()
@@ -257,6 +272,7 @@ export function createFrozenQueryIndexView(
   layout: FrozenPostingsLayout,
   flyweight: FrozenFieldTermFlyweight,
   forEachActiveDoc: QueryIndexView['forEachActiveDoc'],
+  forEachActiveDocId: QueryIndexView['forEachActiveDocId'],
 ): QueryIndexView {
   return {
     resolveTermIndex(term) {
@@ -280,6 +296,7 @@ export function createFrozenQueryIndexView(
       index.visitFuzzyRefs(term, maxDistance, visit)
     },
     forEachActiveDoc,
+    forEachActiveDocId,
   }
 }
 
@@ -288,10 +305,11 @@ function collectDocIdsForQueryInternal(
   searchOptions: SearchOptions,
   params: QueryEngineParams,
   allowedDocs?: DocIdGate,
-): Set<number> {
+  newDocIdSet: () => DocIdSet = createDocIdSet,
+): DocIdSet {
   if (isWildcardQuery(query)) {
-    const docIds = new Set<number>()
-    params.indexView.forEachActiveDoc((docId) => {
+    const docIds = newDocIdSet()
+    params.indexView.forEachActiveDocId((docId) => {
       if (allowedDocs != null && !allowedDocs.has(docId)) return
       docIds.add(docId)
     })
@@ -304,8 +322,9 @@ function collectDocIdsForQueryInternal(
     return collectCombinedDocIds(
       query.queries,
       operator,
-      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
+      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed, newDocIdSet),
       allowedDocs,
+      newDocIdSet,
     )
   }
 
@@ -316,18 +335,22 @@ function collectDocIdsForQueryInternal(
   const normalized = normalizeStringQuery(query, searchOptions, params)
   const { specs, operator } = normalized
 
-  if (specs.length <= 1) {
-    return specs.length === 1
-      ? collectDocIdsForQuerySpec(specs[0], normalized, params, allowedDocs)
-      : new Set<number>()
+  if (specs.length === 0) return newDocIdSet()
+  if (specs.length === 1) {
+    // Scoring validates the operator of a single-term query too.
+    assertCombinationOperator(operator)
+    return collectDocIdsForQuerySpec(specs[0], normalized, params, allowedDocs, newDocIdSet)
   }
 
-  return collectCombinedDocIds(
-    specs,
-    operator,
-    (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
-    allowedDocs,
-  )
+  const collectSpec = (spec: QuerySpec, branchAllowed?: DocIdGate) =>
+    collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed, newDocIdSet)
+  if (operator.toLowerCase() === 'and') {
+    // Start from the most selective exact terms, so a broad first term is only read under a gate.
+    const lengths = specs.map(spec =>
+      estimateCheapTwoPhasePostingLengthForQuerySpec(spec, normalized, params) ?? Number.MAX_SAFE_INTEGER)
+    return collectAndDocIdsByEstimatedLength(specs, lengths, collectSpec, allowedDocs)
+  }
+  return collectCombinedDocIds(specs, operator, collectSpec, allowedDocs, newDocIdSet)
 }
 
 function executeWildcardQuery(
@@ -337,10 +360,11 @@ function executeWildcardQuery(
   const results = new Map() as RawResult
   const options: SearchOptionsWithDefaults = { ...params.globalSearchOptions, ...searchOptions }
   const { boostDocument } = options
+  const trackMatch = params.trackMatch !== false
 
   params.indexView.forEachActiveDoc((shortId, id, storedFields) => {
     const score = boostDocument ? boostDocument(id, '', storedFields) : 1
-    results.set(shortId, { score, terms: [], match: {} })
+    results.set(shortId, { score, terms: [], match: trackMatch ? {} : undefined })
   })
 
   return results
@@ -422,4 +446,22 @@ export function executeQuery(
   params: QueryEngineParams,
 ): RawResult {
   return executeQueryWithRunOptions(query, searchOptions, params)
+}
+
+/**
+ * Short ids, in ascending order, of the documents matched by `query`, without scores or
+ * match information: the documents of an unbounded, unfiltered search with the same options.
+ * Collects into bitsets, which need no per-document allocation and no final sort.
+ */
+export function collectMatchingDocIds(
+  query: Query,
+  searchOptions: SearchOptions,
+  params: QueryEngineParams,
+  docIdLimit: number,
+): Uint32Array {
+  const docIds = collectDocIdsForQueryInternal(
+    query, searchOptions, params, undefined, () => new DocIdBitSet(docIdLimit),
+  )
+  // Every set comes from the factory above, so the result is a bitset.
+  return (docIds as DocIdBitSet).toArray()
 }

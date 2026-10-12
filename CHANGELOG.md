@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Matching ids** — `matchIds(query, options?)` returns the ids of the documents an unbounded `search()` would return, in insertion order, without computing scores, match information or result objects. It accepts the options that select documents. A filter throws, including one set in the index-level search options (`filter: undefined` disables it), as does a local `limit`; an index-level limit is ignored. Matches are collected and combined in bitsets, starting AND queries from their most selective exact terms, and listed without sorting: on the bundled medicament indexes, a broad prefix query (`a`, 6k–17k matches) allocates about 0.2 MB and runs in under 1 ms, against 5.8–11.3 MB and 5–14 ms with `search()`. Available in Node and browser entries.
+- **Results without match information** — `matchInfo: false` on `search()` and `searchPage()` returns `{ id, score, queryTerms, ...storedFields }` with the same scores and order, and skips building `terms`, `match` and the derived term strings during scoring. Filters receive the reduced results. On the same queries, `search()` allocates 24–31% less, and `limit: 10` searches and `searchPage()` counts 36–55% less, with no measurable change in hot timings without the option. `matchInfo` is read from each call only; `autoSuggest()` ignores it. Search results, scores and the MSv5 wire format are unchanged without the option.
+
+### Fixed
+
+- **Combination operators** — `combineWith` values that name inherited object properties, such as `constructor` or `__proto__`, are rejected as invalid operators. Previously `constructor` silently kept only the first term's results.
+
 ## v1.11.1 — `@yoch/frozenminisearch`
 
 Patch release: memory lifecycle fixes. Frozen indexes and finished builders no longer keep ingestion callbacks or a failed build's corpus reachable, and the search traversal cursor no longer keeps its last prefix. No changes to search semantics, public API, runtime dependencies, or the MSv5 wire format; the published package still supports Node 20+.

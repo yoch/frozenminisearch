@@ -28,7 +28,8 @@ export const AND_NOT: LowercaseCombinationOperator = 'and_not'
 export interface RawResultValue {
   score: number
   terms: string[]
-  match: MatchInfo
+  /** Undefined when the query runs without match tracking (`matchInfo: false`). */
+  match: MatchInfo | undefined
 }
 
 export type RawResult = Map<number, RawResultValue>
@@ -37,6 +38,12 @@ export type RawResult = Map<number, RawResultValue>
 export interface DocIdGate extends Iterable<number> {
   readonly size: number
   has(docId: number): boolean
+}
+
+/** DocIds filled by collection: a `Set` for search gates, a `DocIdBitSet` for `matchIds`. */
+export interface DocIdSet extends DocIdGate {
+  add(docId: number): unknown
+  delete(docId: number): unknown
 }
 
 /** Posting list for one (term, field): docId -> term frequency */
@@ -154,6 +161,8 @@ export type AggregateDerivedTerm
 export type AggregateTermOptions = {
   /** When set, only score postings whose docId is in this gate. Does not affect matchingFields. */
   allowedDocs?: DocIdGate
+  /** When false, accumulate scores and query terms only, leaving `match` undefined. */
+  trackMatch?: boolean
 }
 
 /**
@@ -162,8 +171,8 @@ export type AggregateTermOptions = {
  */
 const KEYED_MATCH_MAX_DERIVED_TERMS = 1024
 
-/** Per posting list: resolved derived term and how new match objects are built. */
-type DerivedTermState = { value?: string, keyedMatch: boolean }
+/** Per posting list: resolved derived term, and whether and how match objects are built. */
+type DerivedTermState = { value?: string, keyedMatch: boolean, trackMatch: boolean }
 
 function getDerivedTerm(
   derivedTerm: AggregateDerivedTerm,
@@ -192,7 +201,9 @@ function scorePostingDoc(
   derivedTermCache: DerivedTermState,
   hoistedIdf?: number,
 ): void {
-  const resolvedDerivedTerm = getDerivedTerm(derivedTerm, derivedTermCache)
+  const { trackMatch } = derivedTermCache
+  // Without match tracking, only boostDocument needs the derived term string.
+  const resolvedDerivedTerm = trackMatch || boostDocumentFn ? getDerivedTerm(derivedTerm, derivedTermCache) : ''
   const docBoost = boostDocumentFn
     ? boostDocumentFn(context.getExternalId(docId), resolvedDerivedTerm, context.getStoredFields(docId))
     : 1
@@ -210,19 +221,22 @@ function scorePostingDoc(
   if (result) {
     result.score += weightedScore
     assignUniqueTerm(result.terms, sourceTerm)
+    if (!trackMatch) return
     const match = getOwnProperty(result.match as Record<string, unknown>, resolvedDerivedTerm) as string[] | undefined
     if (match) {
       match.push(field)
     } else {
-      result.match[resolvedDerivedTerm] = [field]
+      result.match![resolvedDerivedTerm] = [field]
     }
   } else {
     results.set(docId, {
       score: weightedScore,
       terms: [sourceTerm],
-      match: derivedTermCache.keyedMatch
-        ? keyedSingleMatch(resolvedDerivedTerm, field)
-        : { [resolvedDerivedTerm]: [field] },
+      match: !trackMatch
+        ? undefined
+        : derivedTermCache.keyedMatch
+          ? keyedSingleMatch(resolvedDerivedTerm, field)
+          : { [resolvedDerivedTerm]: [field] },
     })
   }
 }
@@ -252,13 +266,14 @@ function aggregateSegmentPostingList(
   bm25params: BM25Params,
   results: RawResult,
   keyedMatch: boolean,
+  trackMatch: boolean,
   allowedDocs?: DocIdGate,
 ): void {
   const matchingFields = list.length
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
   const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
   const { docIds, freqs, offset, length } = list
-  const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch }
+  const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch, trackMatch }
 
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
     for (const docId of allowedDocs) {
@@ -307,7 +322,7 @@ export function aggregateTerm(
   if (fieldTermData == null) return results
 
   const keyedMatch = derivedTermOrdinal < KEYED_MATCH_MAX_DERIVED_TERMS
-  const { allowedDocs } = termOptions ?? {}
+  const { allowedDocs, trackMatch = true } = termOptions ?? {}
 
   for (const field of fieldBoosts.names) {
     const fieldBoost = fieldBoosts.boosts[field]
@@ -320,7 +335,7 @@ export function aggregateTerm(
         sourceTerm, derivedTerm, termWeight, termBoost,
         field, fieldId, fieldBoost, postingList,
         context, boostDocumentFn, bm25params, results,
-        keyedMatch, allowedDocs,
+        keyedMatch, trackMatch, allowedDocs,
       )
       continue
     }
@@ -328,7 +343,7 @@ export function aggregateTerm(
     const matchingFields = postingList.size
     const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
     const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
-    const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch }
+    const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch, trackMatch }
 
     postingList.forEachDoc((docId, termFreq) => {
       if (allowedDocs != null && !allowedDocs.has(docId)) return
@@ -405,7 +420,7 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
       } else {
         const { score, terms, match } = b.get(docId)!
         existing.score = existing.score + score
-        existing.match = Object.assign(existing.match, match)
+        if (existing.match !== undefined) Object.assign(existing.match, match)
         assignUniqueTerms(existing.terms, terms)
       }
     }
@@ -422,7 +437,7 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
       const { score, terms, match } = inB
       existing.score += score
       assignUniqueTerms(existing.terms, terms)
-      Object.assign(existing.match, match)
+      if (existing.match !== undefined) Object.assign(existing.match, match)
     }
     return a
   },
@@ -438,13 +453,26 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
  */
 export function combineResults(results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
   if (results.length === 0) return new Map()
-  const operator = combineWith.toLowerCase() as LowercaseCombinationOperator
-  const combinator = combinators[operator]
+  const combinator = combinatorFor(combineWith)
+  if (results.length === 1) return results[0]
+  return results.reduce(combinator)
+}
+
+function combinatorFor(combineWith: CombinationOperator): CombinatorFunction {
+  const operator = combineWith.toLowerCase()
+  // Own keys only: inherited names such as `constructor` are not operators.
+  const combinator = Object.hasOwn(combinators, operator)
+    ? combinators[operator as LowercaseCombinationOperator]
+    : undefined
   if (!combinator) {
     throw new Error(`FrozenMiniSearch: invalid combination operator: ${combineWith}`)
   }
-  if (results.length === 1) return results[0]
-  return results.reduce(combinator)
+  return combinator
+}
+
+/** Throws for an operator that {@link combineResults} rejects, even with a single result. */
+export function assertCombinationOperator(combineWith: CombinationOperator): void {
+  combinatorFor(combineWith)
 }
 
 export interface FinalizeSearchParams {
@@ -457,6 +485,8 @@ export interface FinalizeSearchParams {
   skipSort?: boolean
   /** Keep only the first `limit` results of the unbounded, sorted list. */
   limit?: number
+  /** False: results without `terms` and `match` (`matchInfo: false`). Defaults to true. */
+  matchInfo?: boolean
 }
 
 export function resolveResultLimit(limit: unknown): number | undefined {
@@ -492,6 +522,7 @@ export function finalizeRawSearchResults(
   getExternalId: (docId: number) => unknown,
   getStoredFields?: (docId: number) => Record<string, unknown> | undefined,
   storedFieldsLayout?: StoredFieldsLayout,
+  matchInfo = true,
 ): SearchResult[] {
   const searchOptionsWithDefaults: SearchOptionsWithDefaults = {
     ...globalSearchOptions,
@@ -506,7 +537,24 @@ export function finalizeRawSearchResults(
     filter: searchOptionsWithDefaults.filter,
     skipSort,
     limit: resolveResultLimit(searchOptionsWithDefaults.limit),
+    matchInfo,
   })
+}
+
+/**
+ * A result in its public shape. Without match information it has no `terms` or
+ * `match` (a `ScoredResult`), and is typed as a `SearchResult` internally.
+ */
+export function newSearchResult(
+  id: unknown,
+  score: number,
+  terms: string[],
+  match: MatchInfo | undefined,
+  matchInfo: boolean,
+): SearchResult {
+  return matchInfo
+    ? { id, score, terms: Object.keys(match!), queryTerms: terms, match: match! }
+    : { id, score, queryTerms: terms } as SearchResult
 }
 
 function materializeSearchResult(
@@ -515,13 +563,9 @@ function materializeSearchResult(
   params: FinalizeSearchParams,
 ): SearchResult {
   const { score, terms, match } = value
-  const result: SearchResult = {
-    id: params.getExternalId(docId),
-    score: score * (terms.length || 1),
-    terms: Object.keys(match),
-    queryTerms: terms,
-    match,
-  }
+  const result = newSearchResult(
+    params.getExternalId(docId), score * (terms.length || 1), terms, match, params.matchInfo !== false,
+  )
   writeStoredFieldsOntoResult(docId, result, params.storedFieldsLayout, params.getStoredFields)
   return result
 }
@@ -818,6 +862,7 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
   if (limit !== undefined && limit < rawResults.size) {
     return finalizeLimitedSearchResults(params, limit)
   }
+  const matchInfo = params.matchInfo !== false
   let allScoresEqual = true
   let firstScore: number | undefined
 
@@ -832,13 +877,7 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
       } else if (allScoresEqual && finalScore !== firstScore) {
         allScoresEqual = false
       }
-      const result: SearchResult = {
-        id: getExternalId(docId),
-        score: finalScore,
-        terms: Object.keys(match),
-        queryTerms: terms,
-        match,
-      }
+      const result = newSearchResult(getExternalId(docId), finalScore, terms, match, matchInfo)
       writeStoredFieldsOntoResult(docId, result, storedFieldsLayout, getStoredFields)
       results[write++] = result
     }
@@ -853,13 +892,7 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
   for (const [docId, { score, terms, match }] of rawResults) {
     const quality = terms.length || 1
     const finalScore = score * quality
-    const result: SearchResult = {
-      id: getExternalId(docId),
-      score: finalScore,
-      terms: Object.keys(match),
-      queryTerms: terms,
-      match,
-    }
+    const result = newSearchResult(getExternalId(docId), finalScore, terms, match, matchInfo)
     writeStoredFieldsOntoResult(docId, result, storedFieldsLayout, getStoredFields)
     if (filter(result)) {
       if (firstScore == null) {

@@ -53,7 +53,10 @@ export function suggestFromSearchResults(
   return buildSuggestions(hits)
 }
 
-/** Build suggestions from raw search hits without materializing full public results. */
+/**
+ * Build suggestions from raw search hits without materializing full public results.
+ * Suggestions are the matched terms, so the raw results must track `match`.
+ */
 export function suggestFromRawResults(
   rawResults: RawResult,
 ): Suggestion[] {
@@ -73,7 +76,7 @@ export function suggestFromRawResults(
   if (allScoresEqual) {
     const suggestions = new Map<string, { score: number, terms: string[], count: number }>()
     for (const { score, terms, match } of rawResults.values()) {
-      addSuggestion(suggestions, finalRawScore(score, terms), Object.keys(match))
+      addSuggestion(suggestions, finalRawScore(score, terms), Object.keys(match!))
     }
     return finalizeSuggestions(suggestions)
   }
@@ -84,7 +87,7 @@ export function suggestFromRawResults(
   for (const { score, terms, match } of rawResults.values()) {
     hits[write++] = {
       score: finalRawScore(score, terms),
-      terms: Object.keys(match),
+      terms: Object.keys(match!),
     }
   }
 

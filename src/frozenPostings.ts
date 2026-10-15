@@ -6,7 +6,13 @@ import {
   type DocIdArray,
   type FreqArray,
 } from './compactPostings'
-import type { AggregateContext, DocIdGate, DocIdSet, FieldBoostsForQuery, FieldTermDataLike } from './scoring'
+import type {
+  AggregateContext,
+  DocIdGate,
+  DocIdSet,
+  FieldBoostsForQuery,
+  FieldTermDataLike,
+} from './scoring'
 import type { PackedIndexArray } from './PackedRadixTree/types'
 
 export type { DocIdArray } from './compactPostings'
@@ -56,7 +62,8 @@ export function choosePostingsLayout(
 ): PostingsLayoutKind {
   const denseBytes = termCount * fieldCount * 8
   const sparseFieldIdBytes = chooseSparseFieldIdWidth(fieldCount) === 16 ? 2 : 1
-  const sparseBytes = (termCount + 1) * 4 + nonEmptySlots * (sparseFieldIdBytes + 8)
+  const sparseBytes =
+    (termCount + 1) * 4 + nonEmptySlots * (sparseFieldIdBytes + 8)
   return denseBytes <= sparseBytes ? 'dense' : 'sparse'
 }
 
@@ -64,7 +71,9 @@ export function validateFrozenPostingsLayout(
   layout: FrozenPostingsLayout,
   documentCount: number,
   nextId: number,
-  fail: (detail: string) => never = (detail) => { throw new Error(detail) },
+  fail: (detail: string) => never = (detail) => {
+    throw new Error(detail)
+  },
 ): void {
   if (layout.fieldCount <= 0) fail('fieldCount must be positive')
   if (layout.nextId !== nextId) fail('nextId mismatch')
@@ -74,7 +83,10 @@ export function validateFrozenPostingsLayout(
   }
   if (layout.layout === 'dense') {
     const slotCount = layout.termCount * layout.fieldCount
-    if (layout.denseOffsets.length !== slotCount || layout.denseLengths.length !== slotCount) {
+    if (
+      layout.denseOffsets.length !== slotCount ||
+      layout.denseLengths.length !== slotCount
+    ) {
       fail('dense postings slot count mismatch')
     }
     for (let slot = 0; slot < slotCount; slot++) {
@@ -95,9 +107,13 @@ export function validateFrozenPostingsLayout(
     }
 
     const starts = layout.sparseTermStarts
-    if (starts.length !== layout.termCount + 1) fail('sparseTermStarts length mismatch')
+    if (starts.length !== layout.termCount + 1)
+      fail('sparseTermStarts length mismatch')
     const slotCount = layout.sparseFieldIds.length
-    if (layout.sparseOffsets.length !== slotCount || layout.sparseLengths.length !== slotCount) {
+    if (
+      layout.sparseOffsets.length !== slotCount ||
+      layout.sparseLengths.length !== slotCount
+    ) {
       fail('sparse slot count mismatch')
     }
     for (let slot = 0; slot < slotCount; slot++) {
@@ -117,7 +133,9 @@ export function validateFrozenPostingsLayout(
     }
   } else {
     const _exhaustive: never = layout
-    fail(`unknown postings layout: ${(_exhaustive as FrozenPostingsLayout).layout}`)
+    fail(
+      `unknown postings layout: ${(_exhaustive as FrozenPostingsLayout).layout}`,
+    )
   }
 
   if (documentCount < 0 || documentCount > nextId) {
@@ -167,7 +185,7 @@ function resolvePostingSlice(
   layout: FrozenPostingsLayout,
   termIndex: number,
   fieldId: number,
-  out: { offset: number, length: number },
+  out: { offset: number; length: number },
 ): boolean {
   if (layout.layout === 'dense') {
     const base = termIndex * layout.fieldCount + fieldId
@@ -181,7 +199,12 @@ function resolvePostingSlice(
   if (layout.layout === 'sparse') {
     const start = layout.sparseTermStarts[termIndex]
     const end = layout.sparseTermStarts[termIndex + 1]
-    const slot = findSparseSlotByFieldId(layout.sparseFieldIds, start, end, fieldId)
+    const slot = findSparseSlotByFieldId(
+      layout.sparseFieldIds,
+      start,
+      end,
+      fieldId,
+    )
     if (slot < 0) return false
     const len = layout.sparseLengths[slot]
     if (len === 0) return false
@@ -203,7 +226,9 @@ export type FrozenFieldTermFlyweight = FieldTermDataLike & {
  * One flyweight wrapper for the lifetime of a frozen index. Call {@link bind} before each
  * `get`; the returned object is always the same instance (valid until the next `bind`).
  */
-export function createFrozenFieldTermFlyweight(layout: FrozenPostingsLayout): FrozenFieldTermFlyweight {
+export function createFrozenFieldTermFlyweight(
+  layout: FrozenPostingsLayout,
+): FrozenFieldTermFlyweight {
   let termIndex = -1
   const { allDocIds, allFreqs } = layout
   const segment = new SegmentPostingList(allDocIds, allFreqs, 0, 0)
@@ -214,8 +239,12 @@ export function createFrozenFieldTermFlyweight(layout: FrozenPostingsLayout): Fr
       return flyweight
     },
     get(fieldId: number) {
-      if (!resolvePostingSlice(layout, termIndex, fieldId, postingSliceScratch)) return undefined
-      return segment.rebind(postingSliceScratch.offset, postingSliceScratch.length)
+      if (!resolvePostingSlice(layout, termIndex, fieldId, postingSliceScratch))
+        return undefined
+      return segment.rebind(
+        postingSliceScratch.offset,
+        postingSliceScratch.length,
+      )
     },
   }
   return flyweight
@@ -256,7 +285,15 @@ export function collectDocIdsFromFrozenLayout(
   const { fieldIds } = context
 
   for (const field of fieldBoosts.names) {
-    if (!resolvePostingSlice(layout, termIndex, fieldIds[field], postingSliceScratch)) continue
+    if (
+      !resolvePostingSlice(
+        layout,
+        termIndex,
+        fieldIds[field],
+        postingSliceScratch,
+      )
+    )
+      continue
     collectDocIdsFromFrozenSegment(
       layout.allDocIds,
       postingSliceScratch.offset,

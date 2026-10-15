@@ -1,8 +1,4 @@
-import {
-  allocBytes,
-  readFloatLE,
-  writeFloatLE,
-} from './binaryBytes'
+import { allocBytes, readFloatLE, writeFloatLE } from './binaryBytes'
 import { readFloat32Array } from './binaryWireIo'
 
 describe('binaryBytes float32 LE wire', () => {
@@ -16,16 +12,19 @@ describe('binaryBytes float32 LE wire', () => {
     ['NaN', NaN],
   ]
 
-  test.each(ieee754Samples)('writeFloatLE + readFloatLE round-trip (%s)', (_label, value) => {
-    const buf = allocBytes(4)
-    writeFloatLE(buf, 0, value)
-    const read = readFloatLE(buf, 0)
-    if (Number.isNaN(value)) {
-      expect(Number.isNaN(read)).toBe(true)
-    } else {
-      expect(read).toBe(Math.fround(value))
-    }
-  })
+  test.each(ieee754Samples)(
+    'writeFloatLE + readFloatLE round-trip (%s)',
+    (_label, value) => {
+      const buf = allocBytes(4)
+      writeFloatLE(buf, 0, value)
+      const read = readFloatLE(buf, 0)
+      if (Number.isNaN(value)) {
+        expect(Number.isNaN(read)).toBe(true)
+      } else {
+        expect(read).toBe(Math.fround(value))
+      }
+    },
+  )
 
   test('writeFloatLE matches DataView little-endian encoding', () => {
     const buf = allocBytes(4)

@@ -6,8 +6,18 @@ import { assignStoredFields } from './storedFieldsLayout'
 import { suggestFromRawResults, suggestFromSearchResults } from './suggestions'
 
 const docs = [
-  { id: 1, title: 'Moby Dick', text: 'Call me Ishmael whale sea', category: 'fiction' },
-  { id: 2, title: 'Zen Motorcycle', text: 'zen art motorcycle maintenance', category: 'fiction' },
+  {
+    id: 1,
+    title: 'Moby Dick',
+    text: 'Call me Ishmael whale sea',
+    category: 'fiction',
+  },
+  {
+    id: 2,
+    title: 'Zen Motorcycle',
+    text: 'zen art motorcycle maintenance',
+    category: 'fiction',
+  },
 ]
 
 const options = {
@@ -28,48 +38,81 @@ describe('FrozenMiniSearch core', () => {
     for (const doc of docs) builder.add(doc)
     const built = freezeFrozenIndexBuilder(builder)
     const direct = FrozenMiniSearch.fromDocuments(docs, options)
-    expect(built.search('zen').map(r => r.id)).toEqual(direct.search('zen').map(r => r.id))
+    expect(built.search('zen').map((r) => r.id)).toEqual(
+      direct.search('zen').map((r) => r.id),
+    )
   })
 
   test('binary round-trip', () => {
     const frozen = FrozenMiniSearch.fromDocuments(docs, options)
-    const loaded = FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options)
-    expect(loaded.search('zen').map(r => r.id)).toEqual(frozen.search('zen').map(r => r.id))
+    const loaded = FrozenMiniSearch.loadBinarySync(
+      frozen.saveBinarySync(),
+      options,
+    )
+    expect(loaded.search('zen').map((r) => r.id)).toEqual(
+      frozen.search('zen').map((r) => r.id),
+    )
   })
 
-  test.each(['raw', 'zlib'])('loadBinarySync / loadBinaryAsync accept a plain Uint8Array (%s)', async (compression) => {
-    const frozen = FrozenMiniSearch.fromDocuments(docs, options)
-    const bytes = frozen.saveBinarySync({ compression })
-    const padded = new Uint8Array(bytes.length + 3)
-    padded.set(bytes, 3)
-    for (const view of [new Uint8Array(bytes), padded.subarray(3)]) {
-      expect(FrozenMiniSearch.loadBinarySync(view, options).search('zen')).toEqual(frozen.search('zen'))
-      expect((await FrozenMiniSearch.loadBinaryAsync(view, options)).search('zen')).toEqual(frozen.search('zen'))
-    }
-  })
+  test.each(['raw', 'zlib'])(
+    'loadBinarySync / loadBinaryAsync accept a plain Uint8Array (%s)',
+    async (compression) => {
+      const frozen = FrozenMiniSearch.fromDocuments(docs, options)
+      const bytes = frozen.saveBinarySync({ compression })
+      const padded = new Uint8Array(bytes.length + 3)
+      padded.set(bytes, 3)
+      for (const view of [new Uint8Array(bytes), padded.subarray(3)]) {
+        expect(
+          FrozenMiniSearch.loadBinarySync(view, options).search('zen'),
+        ).toEqual(frozen.search('zen'))
+        expect(
+          (await FrozenMiniSearch.loadBinaryAsync(view, options)).search('zen'),
+        ).toEqual(frozen.search('zen'))
+      }
+    },
+  )
 
-  test.each(['gzip', 'ZLIB', null])('saveBinary rejects unsupported compression %j', async (compression) => {
-    const frozen = FrozenMiniSearch.fromDocuments(docs, options)
-    expect(() => frozen.saveBinarySync({ compression })).toThrow(/unsupported compression/)
-    await expect(frozen.saveBinaryAsync({ compression })).rejects.toThrow(/unsupported compression/)
-  })
+  test.each(['gzip', 'ZLIB', null])(
+    'saveBinary rejects unsupported compression %j',
+    async (compression) => {
+      const frozen = FrozenMiniSearch.fromDocuments(docs, options)
+      expect(() => frozen.saveBinarySync({ compression })).toThrow(
+        /unsupported compression/,
+      )
+      await expect(frozen.saveBinaryAsync({ compression })).rejects.toThrow(
+        /unsupported compression/,
+      )
+    },
+  )
 
-  test.each([undefined, null])('storeFields: %s behaves like no stored fields', (storeFields) => {
-    const opts = { fields: ['title', 'text'], storeFields }
-    const direct = FrozenMiniSearch.fromDocuments(docs, opts)
-    const builder = createFrozenIndexBuilder(opts)
-    for (const doc of docs) builder.add(doc)
-    const fromJson = FrozenMiniSearch.fromJSON(JSON.stringify(direct), opts)
-    const loaded = FrozenMiniSearch.loadBinarySync(direct.saveBinarySync(), opts)
-    for (const index of [direct, freezeFrozenIndexBuilder(builder), fromJson, loaded]) {
-      expect(index.search('zen').map(r => r.id)).toEqual([2])
-      expect(index.getStoredFields(2)).toBeUndefined()
-    }
-  })
+  test.each([undefined, null])(
+    'storeFields: %s behaves like no stored fields',
+    (storeFields) => {
+      const opts = { fields: ['title', 'text'], storeFields }
+      const direct = FrozenMiniSearch.fromDocuments(docs, opts)
+      const builder = createFrozenIndexBuilder(opts)
+      for (const doc of docs) builder.add(doc)
+      const fromJson = FrozenMiniSearch.fromJSON(JSON.stringify(direct), opts)
+      const loaded = FrozenMiniSearch.loadBinarySync(
+        direct.saveBinarySync(),
+        opts,
+      )
+      for (const index of [
+        direct,
+        freezeFrozenIndexBuilder(builder),
+        fromJson,
+        loaded,
+      ]) {
+        expect(index.search('zen').map((r) => r.id)).toEqual([2])
+        expect(index.getStoredFields(2)).toBeUndefined()
+      }
+    },
+  )
 
   test('rejects missing document id', () => {
-    expect(() => FrozenMiniSearch.fromDocuments([{ text: 'a' }], { fields: ['text'] }))
-      .toThrow(/ID/)
+    expect(() =>
+      FrozenMiniSearch.fromDocuments([{ text: 'a' }], { fields: ['text'] }),
+    ).toThrow(/ID/)
   })
 
   test('finalizeSearchResults supports no stored fields reader', () => {
@@ -80,7 +123,7 @@ describe('FrozenMiniSearch core', () => {
     const seen = []
     const results = finalizeSearchResults({
       rawResults,
-      getExternalId: docId => docId + 1,
+      getExternalId: (docId) => docId + 1,
       filter: (result) => {
         seen.push({
           id: result.id,
@@ -93,8 +136,18 @@ describe('FrozenMiniSearch core', () => {
     })
 
     expect(seen).toEqual([
-      { id: 1, terms: ['alpha'], queryTerms: ['alpha'], match: { alpha: ['text'] } },
-      { id: 2, terms: ['beta'], queryTerms: ['beta'], match: { beta: ['text'] } },
+      {
+        id: 1,
+        terms: ['alpha'],
+        queryTerms: ['alpha'],
+        match: { alpha: ['text'] },
+      },
+      {
+        id: 2,
+        terms: ['beta'],
+        queryTerms: ['beta'],
+        match: { beta: ['text'] },
+      },
     ])
     expect(results).toEqual([
       {
@@ -153,7 +206,7 @@ describe('FrozenMiniSearch core', () => {
     expect(inspected[0].terms).toEqual(['beta'])
     expect(inspected[0].queryTerms).toEqual(['beta'])
     expect(inspected[0].match).toEqual({ beta: ['text'] })
-    expect(results.map(r => r.id)).toEqual([2])
+    expect(results.map((r) => r.id)).toEqual([2])
   })
 
   test('finalizeSearchResults preserves insertion order when all scores tie', () => {
@@ -165,10 +218,10 @@ describe('FrozenMiniSearch core', () => {
 
     const results = finalizeSearchResults({
       rawResults,
-      getExternalId: docId => docId + 1,
+      getExternalId: (docId) => docId + 1,
     })
 
-    expect(results.map(r => r.id)).toEqual([3, 1, 2])
+    expect(results.map((r) => r.id)).toEqual([3, 1, 2])
   })
 
   test('single stored field is copied without materializing missing values', () => {
@@ -199,7 +252,11 @@ describe('FrozenMiniSearch core', () => {
     const inspected = []
     const results = index.search('alpha', {
       filter: (result) => {
-        inspected.push({ id: result.id, title: result.title, category: result.category })
+        inspected.push({
+          id: result.id,
+          title: result.title,
+          category: result.category,
+        })
         return result.category === 'sci-fi'
       },
     })
@@ -208,36 +265,73 @@ describe('FrozenMiniSearch core', () => {
       { id: 1, title: 'One', category: 'fiction' },
       { id: 2, title: 'Two', category: 'sci-fi' },
     ])
-    expect(results.map(r => ({ id: r.id, title: r.title, category: r.category }))).toEqual([
-      { id: 2, title: 'Two', category: 'sci-fi' },
-    ])
+    expect(
+      results.map((r) => ({ id: r.id, title: r.title, category: r.category })),
+    ).toEqual([{ id: 2, title: 'Two', category: 'sci-fi' }])
   })
 
   test('assignStoredFields skips undefined single-column values', () => {
     const target = { id: 1 }
-    assignStoredFields({ kind: 'single', field: 'category', values: [] }, 0, target)
+    assignStoredFields(
+      { kind: 'single', field: 'category', values: [] },
+      0,
+      target,
+    )
     expect(target).toEqual({ id: 1 })
   })
 
   test('suggestFromRawResults matches finalized hit ordering and scores', () => {
     const rawResults = new Map([
-      [1, { score: 2, terms: ['zen', 'ar'], match: { zen: ['text'], archery: ['text'], art: ['text'] } }],
-      [0, { score: 1, terms: ['zen', 'ar'], match: { zen: ['text'], art: ['text'] } }],
-      [2, { score: 1, terms: ['zen', 'ar'], match: { zen: ['text'], archery: ['text'], art: ['text'] } }],
+      [
+        1,
+        {
+          score: 2,
+          terms: ['zen', 'ar'],
+          match: { zen: ['text'], archery: ['text'], art: ['text'] },
+        },
+      ],
+      [
+        0,
+        {
+          score: 1,
+          terms: ['zen', 'ar'],
+          match: { zen: ['text'], art: ['text'] },
+        },
+      ],
+      [
+        2,
+        {
+          score: 1,
+          terms: ['zen', 'ar'],
+          match: { zen: ['text'], archery: ['text'], art: ['text'] },
+        },
+      ],
     ])
 
     const finalized = finalizeSearchResults({
       rawResults,
-      getExternalId: docId => docId,
+      getExternalId: (docId) => docId,
     })
 
-    expect(suggestFromRawResults(rawResults)).toEqual(suggestFromSearchResults(finalized))
+    expect(suggestFromRawResults(rawResults)).toEqual(
+      suggestFromSearchResults(finalized),
+    )
   })
 
   test('suggestFromRawResults preserves insertion order when hit scores tie', () => {
     const rawResults = new Map([
-      [2, { score: 1, terms: ['zen'], match: { zen: ['text'], archery: ['text'] } }],
-      [0, { score: 1, terms: ['zen'], match: { zen: ['text'], art: ['text'] } }],
+      [
+        2,
+        {
+          score: 1,
+          terms: ['zen'],
+          match: { zen: ['text'], archery: ['text'] },
+        },
+      ],
+      [
+        0,
+        { score: 1, terms: ['zen'], match: { zen: ['text'], art: ['text'] } },
+      ],
     ])
 
     expect(suggestFromRawResults(rawResults)).toEqual([
@@ -249,12 +343,22 @@ describe('FrozenMiniSearch core', () => {
   test('autoSuggest with filter matches the search-derived fallback path', () => {
     const index = FrozenMiniSearch.fromDocuments(
       [
-        { id: 1, title: 'Zen Motorcycle', text: 'zen art motorcycle maintenance', category: 'fiction' },
-        { id: 2, title: 'Zen Archery', text: 'zen archery art practice', category: 'non-fiction' },
+        {
+          id: 1,
+          title: 'Zen Motorcycle',
+          text: 'zen art motorcycle maintenance',
+          category: 'fiction',
+        },
+        {
+          id: 2,
+          title: 'Zen Archery',
+          text: 'zen archery art practice',
+          category: 'non-fiction',
+        },
       ],
       { fields: ['title', 'text'], storeFields: ['category'] },
     )
-    const filter = result => result.category === 'fiction'
+    const filter = (result) => result.category === 'fiction'
     const options = { ...defaultAutoSuggestOptions, filter }
 
     expect(index.autoSuggest('zen ar', { filter })).toEqual(

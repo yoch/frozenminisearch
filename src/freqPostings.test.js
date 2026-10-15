@@ -22,17 +22,21 @@ describe('freqPostings wire helpers', () => {
   })
 
   test('readFreqsSection rejects u8 size mismatch', () => {
-    expect(() => readFreqsSection(new Uint8Array([1, 2]), 0, 3))
-      .toThrow(/allFreqs u8 size mismatch/)
+    expect(() => readFreqsSection(new Uint8Array([1, 2]), 0, 3)).toThrow(
+      /allFreqs u8 size mismatch/,
+    )
   })
 
   test('readFreqsSection rejects u16 size mismatch', () => {
-    expect(() => readFreqsSection(new Uint8Array([1, 2, 3]), FLAG_FREQ_U16, 2))
-      .toThrow(/allFreqs u16 size mismatch/)
+    expect(() =>
+      readFreqsSection(new Uint8Array([1, 2, 3]), FLAG_FREQ_U16, 2),
+    ).toThrow(/allFreqs u16 size mismatch/)
   })
 
   test('readFreqsSection returns empty typed arrays for zero postings', () => {
     expect(readFreqsSection(new Uint8Array(0), 0, 0)).toEqual(new Uint8Array(0))
-    expect(readFreqsSection(new Uint8Array(0), FLAG_FREQ_U16, 0)).toEqual(new Uint16Array(0))
+    expect(readFreqsSection(new Uint8Array(0), FLAG_FREQ_U16, 0)).toEqual(
+      new Uint16Array(0),
+    )
   })
 })

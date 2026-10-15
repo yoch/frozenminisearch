@@ -1,4 +1,8 @@
-import { bytesFromView, isWellFormedUtf16, type BinaryBytes } from '../binaryBytes'
+import {
+  bytesFromView,
+  isWellFormedUtf16,
+  type BinaryBytes,
+} from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import {
   buildCoreSectionWithTermCountWire,
@@ -47,14 +51,24 @@ export function buildMsv5EncodePrepared(
   const flFlags = fieldLengthMatrixWireFlags(snap.fieldLengthMatrix)
   const freqFlags = freqWireFlags(snap.postings.allFreqs)
   const utf16Labels = !isWellFormedUtf16(packedTermIndex.labelHeap)
-  const globalFlags = postingsWire.flags | flFlags | freqFlags | (utf16Labels ? FLAG_LABEL_HEAP_UTF16 : 0)
+  const globalFlags =
+    postingsWire.flags |
+    flFlags |
+    freqFlags |
+    (utf16Labels ? FLAG_LABEL_HEAP_UTF16 : 0)
 
-  const storedFieldsSection = snap.storedFieldsLayout != null
-    ? buildStoredFieldsWireSection(snap.storedFieldsLayout, snap.nextId)
-    : buildStoredFieldsSectionWire(snap.storedFields, snap.nextId)
+  const storedFieldsSection =
+    snap.storedFieldsLayout != null
+      ? buildStoredFieldsWireSection(snap.storedFieldsLayout, snap.nextId)
+      : buildStoredFieldsSectionWire(snap.storedFields, snap.nextId)
 
   const rawSections = [
-    buildCoreSectionWithTermCountWire(snap.documentCount, snap.nextId, snap.fieldCount, termCount),
+    buildCoreSectionWithTermCountWire(
+      snap.documentCount,
+      snap.nextId,
+      snap.fieldCount,
+      termCount,
+    ),
     buildFieldNamesSectionWire(fieldNames),
     buildExternalIdsSectionWire(snap.externalIds, snap.nextId),
     storedFieldsSection,

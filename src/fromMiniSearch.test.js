@@ -36,8 +36,8 @@ describe('fromMiniSearch loaders', () => {
     const json = JSON.stringify(reference)
     const frozen = FrozenMiniSearch.fromJSON(json, options)
     expect(frozen.search('zen')).toEqual(reference.search('zen'))
-    expect(frozen.search('ishmael', { prefix: true }).map(r => r.id)).toEqual(
-      reference.search('ishmael', { prefix: true }).map(r => r.id),
+    expect(frozen.search('ishmael', { prefix: true }).map((r) => r.id)).toEqual(
+      reference.search('ishmael', { prefix: true }).map((r) => r.id),
     )
   })
 
@@ -51,7 +51,9 @@ describe('fromMiniSearch loaders', () => {
     reference.addAll(docs)
     const frozen = frozenFromMiniSearch(FrozenMiniSearch, reference, options)
     expect(frozen.documentCount).toBe(reference.documentCount)
-    expect(frozen.search('zen art', { combineWith: 'AND' }).length).toBeGreaterThan(0)
+    expect(
+      frozen.search('zen art', { combineWith: 'AND' }).length,
+    ).toBeGreaterThan(0)
   })
 
   test('fromJSON accepts serializationVersion 1 wire entries', () => {
@@ -64,13 +66,13 @@ describe('fromMiniSearch loaders', () => {
       averageFieldLength: [1],
       storedFields: {},
       dirtCount: 2,
-      index: [
-        ['hello', { 0: { ds: { 0: 1 } } }],
-      ],
+      index: [['hello', { 0: { ds: { 0: 1 } } }]],
       serializationVersion: 1,
     }
-    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] })
-    expect(frozen.search('hello').map(r => r.id)).toEqual(['a'])
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
+      fields: ['text'],
+    })
+    expect(frozen.search('hello').map((r) => r.id)).toEqual(['a'])
   })
 
   test('fromJSON remaps sparse shortIds with gaps', () => {
@@ -88,9 +90,11 @@ describe('fromMiniSearch loaders', () => {
       ],
       serializationVersion: 2,
     }
-    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['t'] })
-    expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])
-    expect(frozen.search('gamma').map(r => r.id)).toEqual(['c'])
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
+      fields: ['t'],
+    })
+    expect(frozen.search('alpha').map((r) => r.id)).toEqual(['a'])
+    expect(frozen.search('gamma').map((r) => r.id)).toEqual(['c'])
   })
 
   test('fromJSON ignores postings for discarded shortIds in dirty snapshots', () => {
@@ -109,9 +113,11 @@ describe('fromMiniSearch loaders', () => {
       ],
       serializationVersion: 2,
     }
-    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['t'] })
-    expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])
-    expect(frozen.search('gamma').map(r => r.id)).toEqual(['c'])
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
+      fields: ['t'],
+    })
+    expect(frozen.search('alpha').map((r) => r.id)).toEqual(['a'])
+    expect(frozen.search('gamma').map((r) => r.id)).toEqual(['c'])
   })
 
   test('fromJSON loads an empty snapshot', () => {
@@ -126,115 +132,150 @@ describe('fromMiniSearch loaders', () => {
       index: [],
       serializationVersion: 2,
     }
-    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] })
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
+      fields: ['text'],
+    })
     expect(frozen.documentCount).toBe(0)
     expect(frozen.search('anything')).toEqual([])
   })
 
   test('fromJSON rejects unsupported serializationVersion', () => {
     const snapshot = validSnapshot({ serializationVersion: 99 })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/unsupported MiniSearch serializationVersion 99/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/unsupported MiniSearch serializationVersion 99/)
   })
 
   test('fromJSON rejects fields that do not match the snapshot', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
     const json = JSON.stringify(reference)
-    expect(() => FrozenMiniSearch.fromJSON(json, { fields: ['title'] }))
-      .toThrow(/option "fields" must match/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(json, { fields: ['title'] }),
+    ).toThrow(/option "fields" must match/)
   })
 
   test('fromJSON rejects a non-integer posting docId key', () => {
     const snapshot = validSnapshot({
       index: [['hello', { 0: { oops: 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot/)
   })
 
   test('fromJSON rejects a partially numeric posting docId key', () => {
     const snapshot = validSnapshot({
       index: [['hello', { 0: { '0abc': 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot/)
   })
 
   test('fromJSON rejects leading-zero posting docId keys in index', () => {
     const snapshot = validSnapshot({
       documentCount: 12,
       nextId: 12,
-      documentIds: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i, `doc-${i}`])),
-      fieldLength: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [i, [1]])),
+      documentIds: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [i, `doc-${i}`]),
+      ),
+      fieldLength: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [i, [1]]),
+      ),
       index: [['hello', { 0: { '01': 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index shortId key "01" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index shortId key "01" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects a posting docId outside nextId', () => {
     const snapshot = validSnapshot({
       index: [['hello', { 0: { 99: 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index shortId 99 must be < nextId 1/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index shortId 99 must be < nextId 1/,
+    )
   })
 
   test('fromJSON rejects empty posting docId keys in index', () => {
     const snapshot = validSnapshot({
       index: [['hello', { 0: { '': 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index shortId/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot: index shortId/)
   })
 
   test('fromJSON rejects negative posting docId keys in index', () => {
     const snapshot = validSnapshot({
       index: [['hello', { 0: { '-1': 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index shortId/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot: index shortId/)
   })
 
   test('fromJSON rejects index fieldId outside field count', () => {
     const snapshot = validSnapshot({
       index: [['hello', { 9: { 0: 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index fieldId 9 must be < field count 1/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index fieldId 9 must be < field count 1/,
+    )
   })
 
   test('fromJSON rejects malformed index fieldId keys even when they parse in range', () => {
     const snapshot = validSnapshot({
-      fieldIds: Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`f${i}`, i])),
+      fieldIds: Object.fromEntries(
+        Array.from({ length: 12 }, (_, i) => [`f${i}`, i]),
+      ),
       fieldLength: { 0: Array.from({ length: 12 }, () => 1) },
       averageFieldLength: Array.from({ length: 12 }, () => 1),
       index: [['hello', { ':': { 0: 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
-      fields: Array.from({ length: 12 }, (_, i) => `f${i}`),
-    })).toThrow(/invalid MiniSearch snapshot: index fieldId key ":" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
+        fields: Array.from({ length: 12 }, (_, i) => `f${i}`),
+      }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index fieldId key ":" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects malformed index docId keys even when they parse in range', () => {
     const snapshot = validSnapshot({
       documentCount: 11,
       nextId: 11,
-      documentIds: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i, `doc-${i}`])),
-      fieldLength: Object.fromEntries(Array.from({ length: 11 }, (_, i) => [i, [1]])),
+      documentIds: Object.fromEntries(
+        Array.from({ length: 11 }, (_, i) => [i, `doc-${i}`]),
+      ),
+      fieldLength: Object.fromEntries(
+        Array.from({ length: 11 }, (_, i) => [i, [1]]),
+      ),
       index: [['hello', { 0: { ':': 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index shortId key ":" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index shortId key ":" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects malformed index entries', () => {
     const snapshot = validSnapshot({
       index: ['hello'],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot|FrozenTermIndex/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot|FrozenTermIndex/)
   })
 
   test('fromJSON rejects duplicate index terms', () => {
@@ -244,76 +285,109 @@ describe('fromMiniSearch loaders', () => {
         ['hello', { 0: { 0: 1 } }],
       ],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot|FrozenTermIndex/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot|FrozenTermIndex/)
   })
 
   test('fromJSON rejects malformed documentIds keys', () => {
     const snapshot = validSnapshot({
       documentIds: { oops: 'a' },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds key "oops"/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot: documentIds key "oops"/)
   })
 
   test('fromJSON rejects empty documentIds keys', () => {
     const snapshot = validSnapshot({
       documentIds: { '': 'a' },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds key "" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentIds key "" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects leading-zero documentIds keys', () => {
     const snapshot = validSnapshot({
       documentIds: { '01': 'a' },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds key "01" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentIds key "01" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects documentIds keys above MAX_SAFE_INTEGER', () => {
     const snapshot = validSnapshot({
       documentIds: { '9007199254740993': 'a' },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds key "9007199254740993" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentIds key "9007199254740993" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects fieldIds outside the field count', () => {
     const snapshot = validSnapshot({
       fieldIds: { text: 1 },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: fieldIds.text must be < field count 1/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: fieldIds.text must be < field count 1/,
+    )
   })
 
   test('fromJSON rejects malformed fieldLength rows', () => {
     const snapshot = validSnapshot({
       fieldLength: { 0: 1 },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: fieldLength shortId 0 must be an array/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: fieldLength shortId 0 must be an array/,
+    )
   })
 
   test('fromJSON rejects non-object snapshot root', () => {
-    expect(() => FrozenMiniSearch.fromJSON('null', { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: snapshot must be an object/)
-    expect(() => FrozenMiniSearch.fromJSON('[]', { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: snapshot must be an object/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON('null', { fields: ['text'] }),
+    ).toThrow(/invalid MiniSearch snapshot: snapshot must be an object/)
+    expect(() => FrozenMiniSearch.fromJSON('[]', { fields: ['text'] })).toThrow(
+      /invalid MiniSearch snapshot: snapshot must be an object/,
+    )
   })
 
   test('fromJSON rejects non-integer documentCount and nextId', () => {
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({ documentCount: 1.5 })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentCount must be a non-negative integer/)
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({ nextId: -1 })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: nextId must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(
+        JSON.stringify(validSnapshot({ documentCount: 1.5 })),
+        { fields: ['text'] },
+      ),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentCount must be a non-negative integer/,
+    )
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({ nextId: -1 })), {
+        fields: ['text'],
+      }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: nextId must be a non-negative integer/,
+    )
   })
 
   test('fromJSON rejects documentCount greater than nextId', () => {
     const snapshot = validSnapshot({ documentCount: 2, nextId: 1 })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentCount 2 must be <= nextId 1/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentCount 2 must be <= nextId 1/,
+    )
   })
 
   test('fromJSON rejects documentIds count different from documentCount', () => {
@@ -323,14 +397,33 @@ describe('fromMiniSearch loaders', () => {
       documentIds: { 0: 'a', 1: 'b' },
       fieldLength: { 0: [1], 1: [1] },
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(more), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds count 2 must equal documentCount 1/)
-    const fewer = validSnapshot({ documentCount: 2, nextId: 2, index: [['hello', { 0: { 0: 1, 1: 1 } }]] })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(fewer), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds count 1 must equal documentCount 2/)
-    const huge = validSnapshot({ documentCount: 2e8, nextId: 2e8, documentIds: {}, fieldLength: {}, index: [] })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(huge), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: documentIds count 0 must equal documentCount 200000000/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(more), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentIds count 2 must equal documentCount 1/,
+    )
+    const fewer = validSnapshot({
+      documentCount: 2,
+      nextId: 2,
+      index: [['hello', { 0: { 0: 1, 1: 1 } }]],
+    })
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(fewer), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentIds count 1 must equal documentCount 2/,
+    )
+    const huge = validSnapshot({
+      documentCount: 2e8,
+      nextId: 2e8,
+      documentIds: {},
+      fieldLength: {},
+      index: [],
+    })
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(huge), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: documentIds count 0 must equal documentCount 200000000/,
+    )
   })
 
   test('fromJSON rejects duplicate and incomplete fieldIds', () => {
@@ -340,8 +433,11 @@ describe('fromMiniSearch loaders', () => {
       averageFieldLength: [1, 1],
       index: [['hello', { 0: { 0: 1 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(dup), { fields: ['a', 'b'] }))
-      .toThrow(/invalid MiniSearch snapshot: fieldId 0 is assigned more than once/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(dup), { fields: ['a', 'b'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: fieldId 0 is assigned more than once/,
+    )
   })
 
   test('fromJSON rejects storedFields and fieldLength shortIds missing from documentIds', () => {
@@ -353,34 +449,81 @@ describe('fromMiniSearch loaders', () => {
       fieldLength: { 0: [1] },
     }
     const stored = { ...sparse, storedFields: { 1: { txt: 'x' } } }
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(stored), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: storedFields shortId 1 is missing from documentIds/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(stored), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: storedFields shortId 1 is missing from documentIds/,
+    )
 
     const lengths = { ...sparse, fieldLength: { 0: [1], 1: [1] } }
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(lengths), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: fieldLength shortId 1 is missing from documentIds/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(lengths), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: fieldLength shortId 1 is missing from documentIds/,
+    )
   })
 
   test('fromJSON rejects malformed averageFieldLength and index', () => {
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({ averageFieldLength: 1 })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: averageFieldLength must be an array/)
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({
-      averageFieldLength: [1, 1],
-    })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: averageFieldLength length must be <= field count 1/)
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({
-      averageFieldLength: ['1'],
-    })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: averageFieldLength field 0 must be a finite number/)
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(validSnapshot({ index: 'bad' })), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index must be an array/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(
+        JSON.stringify(validSnapshot({ averageFieldLength: 1 })),
+        { fields: ['text'] },
+      ),
+    ).toThrow(
+      /invalid MiniSearch snapshot: averageFieldLength must be an array/,
+    )
+    expect(() =>
+      FrozenMiniSearch.fromJSON(
+        JSON.stringify(
+          validSnapshot({
+            averageFieldLength: [1, 1],
+          }),
+        ),
+        { fields: ['text'] },
+      ),
+    ).toThrow(
+      /invalid MiniSearch snapshot: averageFieldLength length must be <= field count 1/,
+    )
+    expect(() =>
+      FrozenMiniSearch.fromJSON(
+        JSON.stringify(
+          validSnapshot({
+            averageFieldLength: ['1'],
+          }),
+        ),
+        { fields: ['text'] },
+      ),
+    ).toThrow(
+      /invalid MiniSearch snapshot: averageFieldLength field 0 must be a finite number/,
+    )
+    expect(() =>
+      FrozenMiniSearch.fromJSON(
+        JSON.stringify(validSnapshot({ index: 'bad' })),
+        { fields: ['text'] },
+      ),
+    ).toThrow(/invalid MiniSearch snapshot: index must be an array/)
   })
 
   test.each([
     ['an empty index', [], { fields: ['title', 'text'] }],
-    ['a field no document has', [{ id: 1, title: 'hello' }], { fields: ['title', 'text'] }],
-    ['a leading field no document has', [{ id: 1, text: 'hello' }], { fields: ['title', 'text'] }],
-    ['a document without indexed text', [{ id: 1, title: 'hello world' }, { id: 2, title: null }], { fields: ['title'] }],
+    [
+      'a field no document has',
+      [{ id: 1, title: 'hello' }],
+      { fields: ['title', 'text'] },
+    ],
+    [
+      'a leading field no document has',
+      [{ id: 1, text: 'hello' }],
+      { fields: ['title', 'text'] },
+    ],
+    [
+      'a document without indexed text',
+      [
+        { id: 1, title: 'hello world' },
+        { id: 2, title: null },
+      ],
+      { fields: ['title'] },
+    ],
   ])('fromJSON loads MiniSearch snapshots of %s', (_label, corpus, opts) => {
     const reference = new MiniSearch(opts)
     reference.addAll(corpus)
@@ -402,7 +545,7 @@ describe('fromMiniSearch loaders', () => {
     expect(JSON.parse(json).averageFieldLength[0]).toBeLessThan(0)
     const expected = MiniSearch.loadJSON(json, opts).search('x')
     const actual = FrozenMiniSearch.fromJSON(json, opts).search('x')
-    expect(actual.map(r => r.id)).toEqual(expected.map(r => r.id))
+    expect(actual.map((r) => r.id)).toEqual(expected.map((r) => r.id))
     expect(actual[0].score).toBeCloseTo(expected[0].score, 5)
   })
 
@@ -410,8 +553,11 @@ describe('fromMiniSearch loaders', () => {
     const badFreq = validSnapshot({
       index: [['hello', { 0: { 0: 0 } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(badFreq), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index posting frequency must be a positive integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(badFreq), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index posting frequency must be a positive integer/,
+    )
   })
 
   test('fromJSON accepts serializationVersion 1 entries without ds wrapper', () => {
@@ -419,8 +565,10 @@ describe('fromMiniSearch loaders', () => {
       serializationVersion: 1,
       index: [['hello', { 0: { 0: 1 } }]],
     })
-    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] })
-    expect(frozen.search('hello').map(r => r.id)).toEqual(['a'])
+    const frozen = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), {
+      fields: ['text'],
+    })
+    expect(frozen.search('hello').map((r) => r.id)).toEqual(['a'])
   })
 
   test('fromJSON rejects malformed serializationVersion 1 index keys', () => {
@@ -428,20 +576,31 @@ describe('fromMiniSearch loaders', () => {
       serializationVersion: 1,
       index: [['hello', { 0: { ds: { '01': 1 } } }]],
     })
-    expect(() => FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }))
-      .toThrow(/invalid MiniSearch snapshot: index shortId key "01" must be a non-negative integer/)
+    expect(() =>
+      FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), { fields: ['text'] }),
+    ).toThrow(
+      /invalid MiniSearch snapshot: index shortId key "01" must be a non-negative integer/,
+    )
   })
 
   test('fromJSON postings layout matches fromDocuments', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
-    const fromJSON = FrozenMiniSearch.fromJSON(JSON.stringify(reference), options)
+    const fromJSON = FrozenMiniSearch.fromJSON(
+      JSON.stringify(reference),
+      options,
+    )
     const fromDocs = FrozenMiniSearch.fromDocuments(docs, options)
 
-    expect(frozenMemoryBreakdown(fromJSON).postings).toEqual(frozenMemoryBreakdown(fromDocs).postings)
+    expect(frozenMemoryBreakdown(fromJSON).postings).toEqual(
+      frozenMemoryBreakdown(fromDocs).postings,
+    )
     expect(fromJSON.termCount).toBe(fromDocs.termCount)
-    expect(fromJSON.search('zen art', { combineWith: 'AND' }).map(r => r.id))
-      .toEqual(fromDocs.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+    expect(
+      fromJSON.search('zen art', { combineWith: 'AND' }).map((r) => r.id),
+    ).toEqual(
+      fromDocs.search('zen art', { combineWith: 'AND' }).map((r) => r.id),
+    )
   })
 
   test('fromJSON frozen toJSON round-trip is deterministic and search-equivalent', () => {
@@ -452,7 +611,8 @@ describe('fromMiniSearch loaders', () => {
     const a = Buffer.from(viaJsonA.saveBinarySync())
     const b = Buffer.from(viaJsonB.saveBinarySync())
     expect(a.equals(b)).toBe(true)
-    expect(viaJsonA.search('zen art', { combineWith: 'AND' }).map(r => r.id))
-      .toEqual(direct.search('zen art', { combineWith: 'AND' }).map(r => r.id))
+    expect(
+      viaJsonA.search('zen art', { combineWith: 'AND' }).map((r) => r.id),
+    ).toEqual(direct.search('zen art', { combineWith: 'AND' }).map((r) => r.id))
   })
 })

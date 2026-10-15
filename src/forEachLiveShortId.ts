@@ -7,7 +7,8 @@ export function forEachLiveShortId(
   callback: (shortId: number, externalId: unknown) => void,
 ): void {
   if (externalIds == null) {
-    for (let shortId = 0; shortId < nextId; shortId++) callback(shortId, shortId)
+    for (let shortId = 0; shortId < nextId; shortId++)
+      callback(shortId, shortId)
     return
   }
   for (let shortId = 0; shortId < nextId; shortId++) {

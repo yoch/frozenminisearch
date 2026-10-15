@@ -29,22 +29,37 @@ const options = {
 function assembleParams() {
   const mutable = new MiniSearch(options)
   mutable.addAll(docs)
-  return buildFrozenAssembleParamsFromMiniSearchSnapshot(mutable.toJSON(), options)
+  return buildFrozenAssembleParamsFromMiniSearchSnapshot(
+    mutable.toJSON(),
+    options,
+  )
 }
 
 describe('frozenInternals helpers', () => {
   test('frozenAssembleWithCtor rejects fieldLengthMatrix size mismatch', () => {
     const params = assembleParams()
     params.fieldLengthMatrix = new Uint8Array(1)
-    expect(() => frozenAssembleWithCtor(params, false, 'minisearch-json', FrozenMiniSearch))
-      .toThrow(/fieldLengthMatrix size mismatch/)
+    expect(() =>
+      frozenAssembleWithCtor(
+        params,
+        false,
+        'minisearch-json',
+        FrozenMiniSearch,
+      ),
+    ).toThrow(/fieldLengthMatrix size mismatch/)
   })
 
   test('frozenAssembleWithCtor rejects avgFieldLength size mismatch', () => {
     const params = assembleParams()
     params.avgFieldLength = new Float32Array(99)
-    expect(() => frozenAssembleWithCtor(params, false, 'minisearch-json', FrozenMiniSearch))
-      .toThrow(/avgFieldLength size mismatch/)
+    expect(() =>
+      frozenAssembleWithCtor(
+        params,
+        false,
+        'minisearch-json',
+        FrozenMiniSearch,
+      ),
+    ).toThrow(/avgFieldLength size mismatch/)
   })
 
   test('frozenAssembleWithCtor trustedSource skips postings validation', () => {
@@ -53,10 +68,21 @@ describe('frozenInternals helpers', () => {
     badDocIds[0] = params.nextId
     params.postings = { ...params.postings, allDocIds: badDocIds }
 
-    expect(() => frozenAssembleWithCtor(params, false, 'minisearch-json', FrozenMiniSearch))
-      .toThrow(/posting docId/)
+    expect(() =>
+      frozenAssembleWithCtor(
+        params,
+        false,
+        'minisearch-json',
+        FrozenMiniSearch,
+      ),
+    ).toThrow(/posting docId/)
 
-    const trusted = frozenAssembleWithCtor(params, true, 'minisearch-json', FrozenMiniSearch)
+    const trusted = frozenAssembleWithCtor(
+      params,
+      true,
+      'minisearch-json',
+      FrozenMiniSearch,
+    )
     expect(trusted.termCount).toBe(params.termCount)
   })
 
@@ -64,9 +90,16 @@ describe('frozenInternals helpers', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(docs)
     const snapshot = mutable.toJSON()
-    const parsed = parseSnapshotIndex(snapshot, options.fields.length, snapshot.nextId)
+    const parsed = parseSnapshotIndex(
+      snapshot,
+      options.fields.length,
+      snapshot.nextId,
+    )
     expect(parsed.termCount).toBe(snapshot.index.length)
-    const postings = parsed.accumulator.finalize(parsed.termCount, snapshot.nextId)
+    const postings = parsed.accumulator.finalize(
+      parsed.termCount,
+      snapshot.nextId,
+    )
     expect(postings.termCount).toBe(parsed.termCount)
     expect(postings.allDocIds.length).toBeGreaterThan(0)
   })
@@ -103,6 +136,8 @@ describe('frozenInternals helpers', () => {
       prefix: true,
       fuzzy: 0.2,
     })
-    expect(mergedAutoSuggestOptions(frozen, { prefix: false }).prefix).toBe(false)
+    expect(mergedAutoSuggestOptions(frozen, { prefix: false }).prefix).toBe(
+      false,
+    )
   })
 })

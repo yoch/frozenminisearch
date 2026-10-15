@@ -6,7 +6,9 @@ import {
 } from './searchDefaults'
 
 /** Keep query callbacks, but discard ingestion-only closures after building. */
-export function frozenRuntimeOptions<T>(options: OptionsWithDefaults<T>): OptionsWithDefaults<T> {
+export function frozenRuntimeOptions<T>(
+  options: OptionsWithDefaults<T>,
+): OptionsWithDefaults<T> {
   return {
     ...defaultFrozenLoadOptions,
     fields: options.fields,
@@ -25,7 +27,10 @@ export function assertFieldsMatchSnapshot(
 ): void {
   const snapNames = Object.keys(indexedFieldIds).sort()
   const optNames = [...optionsFields].sort()
-  if (snapNames.length !== optNames.length || snapNames.some((name, i) => name !== optNames[i])) {
+  if (
+    snapNames.length !== optNames.length ||
+    snapNames.some((name, i) => name !== optNames[i])
+  ) {
     throw new Error(
       `FrozenMiniSearch: option "fields" must match the indexed fields exactly (expected: ${snapNames.join(', ')})`,
     )
@@ -45,7 +50,13 @@ export function resolveFrozenOptions<T>(
     ...options,
     fields,
     storeFields: options.storeFields ?? defaultFrozenLoadOptions.storeFields,
-    searchOptions: { ...defaultSearchOptions, ...(options.searchOptions || {}) },
-    autoSuggestOptions: { ...defaultAutoSuggestOptions, ...(options.autoSuggestOptions || {}) },
+    searchOptions: {
+      ...defaultSearchOptions,
+      ...(options.searchOptions || {}),
+    },
+    autoSuggestOptions: {
+      ...defaultAutoSuggestOptions,
+      ...(options.autoSuggestOptions || {}),
+    },
   } as OptionsWithDefaults<T>
 }

@@ -2,14 +2,20 @@ export function snapshotError(detail: string): Error {
   return new Error(`FrozenMiniSearch: invalid MiniSearch snapshot: ${detail}`)
 }
 
-export function assertRecord(value: unknown, context: string): Record<string, unknown> {
+export function assertRecord(
+  value: unknown,
+  context: string,
+): Record<string, unknown> {
   if (value == null || typeof value !== 'object' || Array.isArray(value)) {
     throw snapshotError(`${context} must be an object`)
   }
   return value as Record<string, unknown>
 }
 
-export function assertNonNegativeInteger(value: unknown, context: string): number {
+export function assertNonNegativeInteger(
+  value: unknown,
+  context: string,
+): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) {
     throw snapshotError(`${context} must be a non-negative integer`)
   }
@@ -38,19 +44,33 @@ export function parseCanonicalIntegerKey(key: string, context: string): number {
     }
   }
   if (!valid || !Number.isSafeInteger(n)) {
-    throw snapshotError(`${context} key "${key}" must be a non-negative integer`)
+    throw snapshotError(
+      `${context} key "${key}" must be a non-negative integer`,
+    )
   }
   return n
 }
 
-export function assertShortIdInRange(shortId: number, nextId: number, context: string): void {
+export function assertShortIdInRange(
+  shortId: number,
+  nextId: number,
+  context: string,
+): void {
   if (shortId >= nextId) {
-    throw snapshotError(`${context} shortId ${shortId} must be < nextId ${nextId}`)
+    throw snapshotError(
+      `${context} shortId ${shortId} must be < nextId ${nextId}`,
+    )
   }
 }
 
-export function assertFieldIdInRange(fieldId: number, fieldCount: number, context: string): void {
+export function assertFieldIdInRange(
+  fieldId: number,
+  fieldCount: number,
+  context: string,
+): void {
   if (fieldId >= fieldCount) {
-    throw snapshotError(`${context} fieldId ${fieldId} must be < field count ${fieldCount}`)
+    throw snapshotError(
+      `${context} fieldId ${fieldId} must be < field count ${fieldCount}`,
+    )
   }
 }

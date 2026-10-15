@@ -3,10 +3,11 @@ import type { SearchResult, Suggestion } from './searchTypes'
 
 type SuggestionHit = Pick<SearchResult, 'score' | 'terms'>
 
-function buildSuggestions(
-  hits: Iterable<SuggestionHit>,
-): Suggestion[] {
-  const suggestions = new Map<string, { score: number, terms: string[], count: number }>()
+function buildSuggestions(hits: Iterable<SuggestionHit>): Suggestion[] {
+  const suggestions = new Map<
+    string,
+    { score: number; terms: string[]; count: number }
+  >()
 
   for (const { score, terms } of hits) {
     addSuggestion(suggestions, score, terms)
@@ -16,7 +17,7 @@ function buildSuggestions(
 }
 
 function addSuggestion(
-  suggestions: Map<string, { score: number, terms: string[], count: number }>,
+  suggestions: Map<string, { score: number; terms: string[]; count: number }>,
   score: number,
   terms: string[],
 ): void {
@@ -31,7 +32,7 @@ function addSuggestion(
 }
 
 function finalizeSuggestions(
-  suggestions: Map<string, { score: number, terms: string[], count: number }>,
+  suggestions: Map<string, { score: number; terms: string[]; count: number }>,
 ): Suggestion[] {
   const results: Suggestion[] = []
   for (const [suggestion, { score, terms, count }] of suggestions) {
@@ -57,9 +58,7 @@ export function suggestFromSearchResults(
  * Build suggestions from raw search hits without materializing full public results.
  * Suggestions are the matched terms, so the raw results must track `match`.
  */
-export function suggestFromRawResults(
-  rawResults: RawResult,
-): Suggestion[] {
+export function suggestFromRawResults(rawResults: RawResult): Suggestion[] {
   let allScoresEqual = true
   let firstScore: number | undefined
 
@@ -74,9 +73,16 @@ export function suggestFromRawResults(
   }
 
   if (allScoresEqual) {
-    const suggestions = new Map<string, { score: number, terms: string[], count: number }>()
+    const suggestions = new Map<
+      string,
+      { score: number; terms: string[]; count: number }
+    >()
     for (const { score, terms, match } of rawResults.values()) {
-      addSuggestion(suggestions, finalRawScore(score, terms), Object.keys(match!))
+      addSuggestion(
+        suggestions,
+        finalRawScore(score, terms),
+        Object.keys(match!),
+      )
     }
     return finalizeSuggestions(suggestions)
   }

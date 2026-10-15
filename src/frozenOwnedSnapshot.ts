@@ -7,9 +7,12 @@ import type { OptionsWithDefaults } from './searchTypes'
 import { cloneStoredFields } from './storedFieldsLayout'
 import { CODEC_RAW } from './msv5/binaryMsv5Constants'
 
-export type SnapshotOwnershipMode = 'trusted-build' | 'minisearch-json' | 'binary-load' | 'binary-load-wire'
+export type SnapshotOwnershipMode =
+  'trusted-build' | 'minisearch-json' | 'binary-load' | 'binary-load-wire'
 
-export function binaryLoadOwnershipModeFromCodec(codec: number): SnapshotOwnershipMode {
+export function binaryLoadOwnershipModeFromCodec(
+  codec: number,
+): SnapshotOwnershipMode {
   return codec === CODEC_RAW ? 'binary-load-wire' : 'binary-load'
 }
 
@@ -38,13 +41,17 @@ function ownedPackedRadixTree(index: PackedRadixTree): PackedRadixTree {
   })
 }
 
-function ownedPostingsLayout(postings: FrozenPostingsLayout): FrozenPostingsLayout {
-  const allDocIds = postings.docIdWidth === 16
-    ? new Uint16Array(postings.allDocIds)
-    : new Uint32Array(postings.allDocIds)
-  const allFreqs = postings.allFreqs instanceof Uint8Array
-    ? new Uint8Array(postings.allFreqs)
-    : new Uint16Array(postings.allFreqs)
+function ownedPostingsLayout(
+  postings: FrozenPostingsLayout,
+): FrozenPostingsLayout {
+  const allDocIds =
+    postings.docIdWidth === 16
+      ? new Uint16Array(postings.allDocIds)
+      : new Uint32Array(postings.allDocIds)
+  const allFreqs =
+    postings.allFreqs instanceof Uint8Array
+      ? new Uint8Array(postings.allFreqs)
+      : new Uint16Array(postings.allFreqs)
 
   if (postings.layout === 'dense') {
     return {
@@ -56,9 +63,10 @@ function ownedPostingsLayout(postings: FrozenPostingsLayout): FrozenPostingsLayo
     }
   }
 
-  const sparseFieldIds = postings.sparseFieldIdWidth === 16
-    ? new Uint16Array(postings.sparseFieldIds)
-    : new Uint8Array(postings.sparseFieldIds)
+  const sparseFieldIds =
+    postings.sparseFieldIdWidth === 16
+      ? new Uint16Array(postings.sparseFieldIds)
+      : new Uint8Array(postings.sparseFieldIds)
 
   return {
     ...postings,
@@ -71,7 +79,9 @@ function ownedPostingsLayout(postings: FrozenPostingsLayout): FrozenPostingsLayo
   }
 }
 
-function shallowCopyOptions<T>(options: OptionsWithDefaults<T>): OptionsWithDefaults<T> {
+function shallowCopyOptions<T>(
+  options: OptionsWithDefaults<T>,
+): OptionsWithDefaults<T> {
   return {
     ...options,
     fields: [...options.fields],

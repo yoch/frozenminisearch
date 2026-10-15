@@ -8,10 +8,12 @@ describe('PackedRadixTree string segment helpers', () => {
   test('rebuilds a term from non-contiguous heap segments', () => {
     const heap = '--alpha--bet--'
 
-    expect(buildTermFromSegments(heap, [
-      { start: 2, len: 5 },
-      { start: 9, len: 3 },
-    ])).toBe('alphabet')
+    expect(
+      buildTermFromSegments(heap, [
+        { start: 2, len: 5 },
+        { start: 9, len: 3 },
+      ]),
+    ).toBe('alphabet')
   })
 
   test('rebuilds a term from reusable segment arrays up to the active depth', () => {
@@ -26,9 +28,23 @@ describe('PackedRadixTree string segment helpers', () => {
     const heap = 'prefix'
 
     expect(buildTermFromSegments(heap, [])).toBe('')
-    expect(buildTermFromSegmentArrays(heap, new Uint32Array(0), new Uint32Array(0), 0)).toBe('')
+    expect(
+      buildTermFromSegmentArrays(
+        heap,
+        new Uint32Array(0),
+        new Uint32Array(0),
+        0,
+      ),
+    ).toBe('')
     expect(labelSlice(heap, 3, 3)).toBe('fix')
     expect(buildTermFromSegments(heap, [{ start: 0, len: 3 }])).toBe('pre')
-    expect(buildTermFromSegmentArrays(heap, new Uint32Array([0]), new Uint32Array([3]), 1)).toBe('pre')
+    expect(
+      buildTermFromSegmentArrays(
+        heap,
+        new Uint32Array([0]),
+        new Uint32Array([3]),
+        1,
+      ),
+    ).toBe('pre')
   })
 })

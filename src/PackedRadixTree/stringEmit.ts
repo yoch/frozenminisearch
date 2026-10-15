@@ -1,4 +1,8 @@
-import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
+import {
+  decodeLeafSlot,
+  edgeOffsetAtSlot,
+  packedNodeChildCount,
+} from './layout'
 import type PackedRadixTree from './PackedRadixTree'
 import { labelSlice } from './strings'
 
@@ -10,7 +14,12 @@ type EmitFrame = {
   prefix: string
 }
 
-function pushEmitFrame(frames: EmitFrame[], tree: PackedRadixTree, node: number, prefix: string): void {
+function pushEmitFrame(
+  frames: EmitFrame[],
+  tree: PackedRadixTree,
+  node: number,
+  prefix: string,
+): void {
   const first = tree.nodeEdgeOffset[node]
   const edgeCount = tree.nodeEdgeOffset[node + 1] - first
   const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])

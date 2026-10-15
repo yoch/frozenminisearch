@@ -25,15 +25,21 @@ function viewOf<T>(frozen: FrozenMiniSearchCore<T>): FrozenInternalView<T> {
   return frozen as unknown as FrozenInternalView<T>
 }
 
-export function frozenTermIndex<T>(frozen: FrozenMiniSearchCore<T>): FrozenTermIndex {
+export function frozenTermIndex<T>(
+  frozen: FrozenMiniSearchCore<T>,
+): FrozenTermIndex {
   return viewOf(frozen)._index
 }
 
-export function frozenPostings<T>(frozen: FrozenMiniSearchCore<T>): FrozenPostingsLayout {
+export function frozenPostings<T>(
+  frozen: FrozenMiniSearchCore<T>,
+): FrozenPostingsLayout {
   return viewOf(frozen)._postings
 }
 
-function frozenQueryEngineParams<T>(frozen: FrozenMiniSearchCore<T>): QueryEngineParams {
+function frozenQueryEngineParams<T>(
+  frozen: FrozenMiniSearchCore<T>,
+): QueryEngineParams {
   return viewOf(frozen)._queryEngineParams
 }
 
@@ -45,7 +51,11 @@ export function executeRaw<T>(
   trackMatch = true,
 ): RawResult {
   const params = frozenQueryEngineParams(frozen)
-  return executeQueryWithRunOptions(query, searchOptions, trackMatch ? params : { ...params, trackMatch })
+  return executeQueryWithRunOptions(
+    query,
+    searchOptions,
+    trackMatch ? params : { ...params, trackMatch },
+  )
 }
 
 export function executeRawWithRunOptions<T>(
@@ -54,7 +64,12 @@ export function executeRawWithRunOptions<T>(
   searchOptions: SearchOptions = {},
   run?: QueryEngineRunOptions,
 ): RawResult {
-  return executeQueryWithRunOptions(query, searchOptions, frozenQueryEngineParams(frozen), run)
+  return executeQueryWithRunOptions(
+    query,
+    searchOptions,
+    frozenQueryEngineParams(frozen),
+    run,
+  )
 }
 
 export function finalizeRaw<T>(
@@ -79,7 +94,10 @@ export function mergedAutoSuggestOptions<T>(
   frozen: FrozenMiniSearchCore<T>,
   autoSuggestOptions: SearchOptions = {},
 ): SearchOptions {
-  return { ...viewOf(frozen)._options.autoSuggestOptions, ...autoSuggestOptions }
+  return {
+    ...viewOf(frozen)._options.autoSuggestOptions,
+    ...autoSuggestOptions,
+  }
 }
 
 export function searchWithRunOptions<T>(
@@ -96,6 +114,6 @@ export function searchWithRunOptions<T>(
     searchOptions,
     view._options.searchOptions,
     view._getExternalId,
-    docId => readStoredFields(view._storedFields, docId),
+    (docId) => readStoredFields(view._storedFields, docId),
   )
 }

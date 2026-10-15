@@ -4,7 +4,10 @@ import type { PackedIndexArray } from './PackedRadixTree/types'
 /** Adaptive-width unsigned column (1/2/4 bytes per element) for field lengths and packed radix columns. */
 export type FieldLengthArray = PackedIndexArray
 
-export function maxInArrayLike(data: ArrayLike<number>, length?: number): number {
+export function maxInArrayLike(
+  data: ArrayLike<number>,
+  length?: number,
+): number {
   const len = length ?? data.length
   let max = 0
   for (let i = 0; i < len; i++) {
@@ -14,11 +17,17 @@ export function maxInArrayLike(data: ArrayLike<number>, length?: number): number
   return max
 }
 
-export function allocateFieldLengthMatrix(length: number, maxValue: number): FieldLengthArray {
+export function allocateFieldLengthMatrix(
+  length: number,
+  maxValue: number,
+): FieldLengthArray {
   return packedIndexArray(length, maxValue)
 }
 
-export function materializeFieldLengthMatrix(data: ArrayLike<number>, length?: number): FieldLengthArray {
+export function materializeFieldLengthMatrix(
+  data: ArrayLike<number>,
+  length?: number,
+): FieldLengthArray {
   const len = length ?? data.length
   const matrix = packedIndexArray(len, maxInArrayLike(data, len))
   for (let i = 0; i < len; i++) {

@@ -10,7 +10,10 @@ import {
 export type { FrozenDecodeHints } from './msv5/binaryMsv5Decode'
 
 /** Decode a frozen binary snapshot buffer. */
-export function decodeFrozenSnapshot(buf: Buffer, hints?: FrozenDecodeHints): FrozenSnapshot {
+export function decodeFrozenSnapshot(
+  buf: Buffer,
+  hints?: FrozenDecodeHints,
+): FrozenSnapshot {
   assertBufferLength(buf, 8)
   const version = buf.readUInt16LE(4)
 

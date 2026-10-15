@@ -20,7 +20,9 @@ type BinarySnapshotState = {
   postings: FrozenSnapshot['postings']
 }
 
-export function buildBinarySnapshotInput(state: BinarySnapshotState): FrozenSnapshot {
+export function buildBinarySnapshotInput(
+  state: BinarySnapshotState,
+): FrozenSnapshot {
   return {
     documentCount: state.documentCount,
     nextId: state.nextId,
@@ -29,7 +31,8 @@ export function buildBinarySnapshotInput(state: BinarySnapshotState): FrozenSnap
     fieldNames: fieldNamesFromFieldIds(state.fieldIds),
     avgFieldLength: state.avgFieldLength,
     externalIds: state.externalIds,
-    storedFields: state.storedFieldsLayout != null ? [] : new Array(state.nextId),
+    storedFields:
+      state.storedFieldsLayout != null ? [] : new Array(state.nextId),
     storedFieldsLayout: state.storedFieldsLayout,
     fieldLengthMatrix: state.fieldLengthMatrix,
     postings: state.postings,
@@ -40,7 +43,8 @@ export function assembleParamsFromBinarySnapshot<T>(
   snap: FrozenSnapshot,
   options: Options<T>,
 ): FrozenAssembleParams<T> {
-  const snapshotFields = snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
+  const snapshotFields =
+    snap.fieldNames ?? fieldNamesFromFieldIds(snap.fieldIds)
   if (options.fields != null) {
     assertFieldsMatchSnapshot(options.fields, snap.fieldIds)
   }
@@ -49,7 +53,9 @@ export function assembleParamsFromBinarySnapshot<T>(
 
   const index = snap.packedTermIndex
   if (index == null) {
-    throw new Error('FrozenMiniSearch: binary snapshot missing packed term index')
+    throw new Error(
+      'FrozenMiniSearch: binary snapshot missing packed term index',
+    )
   }
 
   return {
@@ -60,7 +66,9 @@ export function assembleParamsFromBinarySnapshot<T>(
     fieldCount: snap.fieldCount,
     externalIds: snap.externalIds,
     idLookup: createIdToShortIdLookup(snap.externalIds, snap.nextId),
-    storedFields: snap.storedFieldsLayout ?? storedFieldsFromRows(snap.storedFields, resolvedOptions.storeFields),
+    storedFields:
+      snap.storedFieldsLayout ??
+      storedFieldsFromRows(snap.storedFields, resolvedOptions.storeFields),
     fieldLengthMatrix: snap.fieldLengthMatrix,
     avgFieldLength: snap.avgFieldLength,
     index,

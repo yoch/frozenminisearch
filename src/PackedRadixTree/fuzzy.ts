@@ -1,6 +1,10 @@
 /* eslint-disable no-labels */
 import { shouldPruneFuzzyEdge } from '../fuzzyLengthPrune'
-import { decodeLeafSlot, edgeOffsetAtSlot, packedNodeChildCount } from './layout'
+import {
+  decodeLeafSlot,
+  edgeOffsetAtSlot,
+  packedNodeChildCount,
+} from './layout'
 import type PackedRadixTree from './PackedRadixTree'
 import type { PackedTermPath } from './termPath'
 import type { PackedFuzzyRef, PackedTermCursor } from './types'
@@ -17,7 +21,12 @@ export function packedRadixVisitFuzzyRefs(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
-  visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
+  visit: (
+    termIndex: number,
+    length: number,
+    distance: number,
+    cursor: PackedTermCursor,
+  ) => void,
 ): void {
   if (maxDistance < 0) return
 
@@ -58,9 +67,14 @@ function* runFuzzy(
   maxDistance: number,
 ): Generator<PackedFuzzyRef> {
   const refs: PackedFuzzyRef[] = []
-  packedRadixVisitFuzzyRefs(tree, query, maxDistance, (termIndex, length, distance) => {
-    refs.push({ termIndex, length, distance })
-  })
+  packedRadixVisitFuzzyRefs(
+    tree,
+    query,
+    maxDistance,
+    (termIndex, length, distance) => {
+      refs.push({ termIndex, length, distance })
+    },
+  )
   yield* refs
 }
 
@@ -75,7 +89,12 @@ function visitRecurse(
   termLength: number,
   depth: number,
   path: PackedTermPath,
-  visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
+  visit: (
+    termIndex: number,
+    length: number,
+    distance: number,
+    cursor: PackedTermCursor,
+  ) => void,
 ): void {
   const heap = tree.labelHeap
   const n = queryLen + 1

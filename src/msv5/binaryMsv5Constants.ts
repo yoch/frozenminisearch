@@ -34,7 +34,8 @@ export const MSV5_SECTION_ENTRY_BYTES = 20
 
 /** magic(4) + version(2) + indexFlags(2) + payloadMeta(4) + formatRev(2) + sectionCount(4) */
 export const MSV5_HEADER_PREFIX_SIZE = 32
-export const MSV5_HEADER_SIZE = MSV5_HEADER_PREFIX_SIZE + MSV5_SECTION_COUNT * MSV5_SECTION_ENTRY_BYTES
+export const MSV5_HEADER_SIZE =
+  MSV5_HEADER_PREFIX_SIZE + MSV5_SECTION_COUNT * MSV5_SECTION_ENTRY_BYTES
 
 export const MSV5_PAYLOAD_CODEC_OFFSET = 8
 export const MSV5_ZSTD_LEVEL_OFFSET = 9
@@ -72,14 +73,21 @@ export const MSV5_TREE_COLUMN_COUNT = 6
 // Browser (binaryMsv5CompressionBrowser.ts) MSv5 code.
 // ---------------------------------------------------------------------------
 export const MSV5_ERR_PAYLOAD_EXCEEDS_1GIB = 'MSv5 payload exceeds 1 GiB limit'
-export const MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER = 'MSv5 buffer too short for header'
+export const MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER =
+  'MSv5 buffer too short for header'
 export const MSV5_ERR_SECTION_CRC_MISMATCH = 'MSv5 section CRC mismatch'
 export const MSV5_ERR_PAYLOAD_CRC_MISMATCH = 'MSv5 payload CRC mismatch'
-export const MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED = 'MSv5 section offset not aligned'
-export const MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC = 'MSv5 section offsets not monotonic'
-export const MSV5_ERR_SECTION_OUT_OF_BOUNDS = 'MSv5 section out of uncompressed bounds'
-export const MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH = 'MSv5 uncompressed payload length mismatch'
+export const MSV5_ERR_SECTION_OFFSET_NOT_ALIGNED =
+  'MSv5 section offset not aligned'
+export const MSV5_ERR_SECTION_OFFSETS_NOT_MONOTONIC =
+  'MSv5 section offsets not monotonic'
+export const MSV5_ERR_SECTION_OUT_OF_BOUNDS =
+  'MSv5 section out of uncompressed bounds'
+export const MSV5_ERR_UNCOMPRESSED_PAYLOAD_LENGTH =
+  'MSv5 uncompressed payload length mismatch'
 export const MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS = 'MSv5 payload out of bounds'
 export const MSV5_ERR_RAW_PAYLOAD_LENGTH = 'MSv5 raw payload length mismatch'
-export const MSV5_ERR_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH = 'MSv5 compressed payload exceeds declared length'
-export const MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH = 'MSv5 decompressed payload length mismatch'
+export const MSV5_ERR_COMPRESSED_PAYLOAD_EXCEEDS_LENGTH =
+  'MSv5 compressed payload exceeds declared length'
+export const MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH =
+  'MSv5 decompressed payload length mismatch'

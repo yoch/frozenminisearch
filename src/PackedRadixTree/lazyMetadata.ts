@@ -22,7 +22,9 @@ export type PackedLazyTermMetadata = {
   parentEdge: PackedIndexArray
 }
 
-export function buildLazyTermMetadata(tree: PackedRadixTreeData): PackedLazyTermMetadata {
+export function buildLazyTermMetadata(
+  tree: PackedRadixTreeData,
+): PackedLazyTermMetadata {
   const termCount = tree.size
   const nodeCount = tree.nodeCount
   const edgeCount = tree.edgeCount
@@ -54,7 +56,9 @@ export function buildLazyTermMetadata(tree: PackedRadixTreeData): PackedLazyTerm
   }
 
   if (leafCount !== termCount) {
-    throw new Error(`PackedRadixTree: lazy metadata leaf count ${leafCount} !== term count ${termCount}`)
+    throw new Error(
+      `PackedRadixTree: lazy metadata leaf count ${leafCount} !== term count ${termCount}`,
+    )
   }
 
   return { leafNodeByTermIndex, parentNode, parentEdge }
@@ -62,7 +66,9 @@ export function buildLazyTermMetadata(tree: PackedRadixTreeData): PackedLazyTerm
 
 function assertTermIndex(tree: PackedRadixTreeData, termIndex: number): void {
   if (termIndex < 0 || termIndex >= tree.size) {
-    throw new RangeError(`PackedRadixTree: term index out of range: ${termIndex}`)
+    throw new RangeError(
+      `PackedRadixTree: term index out of range: ${termIndex}`,
+    )
   }
 }
 

@@ -6,7 +6,10 @@ import type { PackedIndexArray } from './types'
  * postings (Uint16 vs Uint32), trading nothing at read time for a smaller
  * footprint on the common small/medium index.
  */
-export function packedIndexArray(length: number, maxValue: number): PackedIndexArray {
+export function packedIndexArray(
+  length: number,
+  maxValue: number,
+): PackedIndexArray {
   if (maxValue <= 0xff) return new Uint8Array(length)
   if (maxValue <= 0xffff) return new Uint16Array(length)
   return new Uint32Array(length)
@@ -24,7 +27,10 @@ export function decodeLeafSlot(storedLeafOrder: number): number {
 /**
  * Number of logical children for a node: radix edges plus optional leaf slot.
  */
-export function packedNodeChildCount(edgeCount: number, hasLeaf: boolean): number {
+export function packedNodeChildCount(
+  edgeCount: number,
+  hasLeaf: boolean,
+): number {
   return edgeCount + (hasLeaf ? 1 : 0)
 }
 

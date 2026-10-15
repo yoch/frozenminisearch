@@ -47,7 +47,10 @@ function unionDocIdsInPlace(docIds: DocIdSet, branchDocIds: DocIdGate): void {
   for (const docId of branchDocIds) docIds.add(docId)
 }
 
-function intersectDocIdsInPlace(docIds: DocIdSet, branchDocIds: DocIdGate): void {
+function intersectDocIdsInPlace(
+  docIds: DocIdSet,
+  branchDocIds: DocIdGate,
+): void {
   if (docIds instanceof DocIdBitSet && branchDocIds instanceof DocIdBitSet) {
     docIds.and(branchDocIds)
     return
@@ -57,7 +60,10 @@ function intersectDocIdsInPlace(docIds: DocIdSet, branchDocIds: DocIdGate): void
   }
 }
 
-function subtractDocIdsInPlace(docIds: DocIdSet, excludedDocIds: DocIdGate): void {
+function subtractDocIdsInPlace(
+  docIds: DocIdSet,
+  excludedDocIds: DocIdGate,
+): void {
   if (docIds instanceof DocIdBitSet && excludedDocIds instanceof DocIdBitSet) {
     docIds.andNot(excludedDocIds)
     return
@@ -65,13 +71,17 @@ function subtractDocIdsInPlace(docIds: DocIdSet, excludedDocIds: DocIdGate): voi
   for (const docId of excludedDocIds) docIds.delete(docId)
 }
 
-function subtractDocIdsFromResult(result: RawResult, excludedDocIds: DocIdGate): void {
+function subtractDocIdsFromResult(
+  result: RawResult,
+  excludedDocIds: DocIdGate,
+): void {
   for (const docId of excludedDocIds) result.delete(docId)
 }
 
 function twoPhasePostingLengths<T>(
   branches: readonly T[],
-  estimateTwoPhasePostingLength: ((branch: T) => number | undefined) | undefined,
+  estimateTwoPhasePostingLength:
+    ((branch: T) => number | undefined) | undefined,
 ): number[] | undefined {
   if (estimateTwoPhasePostingLength == null) return undefined
   const lengths = new Array<number>(branches.length)
@@ -88,7 +98,9 @@ function effectiveFirstBranchLength(
   allowedDocs: DocIdGate | undefined,
 ): number {
   const firstLength = branchPostingLengths[0]
-  return allowedDocs == null ? firstLength : Math.min(firstLength, allowedDocs.size)
+  return allowedDocs == null
+    ? firstLength
+    : Math.min(firstLength, allowedDocs.size)
 }
 
 function shouldUseTwoPhaseAnd(
@@ -97,7 +109,10 @@ function shouldUseTwoPhaseAnd(
 ): boolean {
   if (branchPostingLengths.length <= 1) return false
 
-  const effectiveFirstLength = effectiveFirstBranchLength(branchPostingLengths, allowedDocs)
+  const effectiveFirstLength = effectiveFirstBranchLength(
+    branchPostingLengths,
+    allowedDocs,
+  )
   if (effectiveFirstLength < DEFAULT_POSTING_GATE_MIN_LENGTH) return false
 
   const targetLength = effectiveFirstLength >>> DEFAULT_POSTING_GATE_RATIO_SHIFT
@@ -115,7 +130,10 @@ function shouldUseTwoPhaseAndNot(
 ): boolean {
   if (branchPostingLengths.length <= 1) return false
 
-  const effectiveFirstLength = effectiveFirstBranchLength(branchPostingLengths, allowedDocs)
+  const effectiveFirstLength = effectiveFirstBranchLength(
+    branchPostingLengths,
+    allowedDocs,
+  )
   const largeThreshold = Math.max(
     DEFAULT_POSTING_GATE_MIN_LENGTH,
     Math.floor(documentCount * BROAD_EXCLUSION_TWO_PHASE_MIN_FRACTION),
@@ -138,7 +156,10 @@ function executeAndWithFinalGate<T>(
   let result = executeBranch(branches[0], finalGate)
   for (let i = 1; i < branches.length; i++) {
     if (result.size === 0) return result
-    result = combineResults([result, executeBranch(branches[i], finalGate)], AND)
+    result = combineResults(
+      [result, executeBranch(branches[i], finalGate)],
+      AND,
+    )
   }
   return result
 }
@@ -151,7 +172,9 @@ export function collectAndDocIdsByEstimatedLength<T>(
   allowedDocs?: DocIdGate,
 ): DocIdSet {
   const order = branches.map((_, i) => i)
-  order.sort((a, b) => branchPostingLengths[a] - branchPostingLengths[b] || a - b)
+  order.sort(
+    (a, b) => branchPostingLengths[a] - branchPostingLengths[b] || a - b,
+  )
 
   const docIds = collectBranch(branches[order[0]], allowedDocs)
   for (let i = 1; i < order.length; i++) {
@@ -221,14 +244,20 @@ export function executeCombinedBranches<T>(
   const op = operator.toLowerCase()
   if (op === 'or') {
     return combineResults(
-      branches.map(branch => executeBranch(branch, allowedDocs)),
+      branches.map((branch) => executeBranch(branch, allowedDocs)),
       operator,
     )
   }
 
   if (op === 'and') {
-    const branchPostingLengths = twoPhasePostingLengths(branches, estimateTwoPhasePostingLength)
-    if (branchPostingLengths != null && shouldUseTwoPhaseAnd(branchPostingLengths, allowedDocs)) {
+    const branchPostingLengths = twoPhasePostingLengths(
+      branches,
+      estimateTwoPhasePostingLength,
+    )
+    if (
+      branchPostingLengths != null &&
+      shouldUseTwoPhaseAnd(branchPostingLengths, allowedDocs)
+    ) {
       const finalGate = collectAndDocIdsByEstimatedLength(
         branches,
         branchPostingLengths,
@@ -242,7 +271,8 @@ export function executeCombinedBranches<T>(
     let gate = gateFromResult(result)
     const limits = run?.gateLimits
     const documentCount = params.aggregateContext.documentCount
-    const postingGatePolicy = run?.postingGatePolicy ?? DEFAULT_POSTING_GATE_POLICY
+    const postingGatePolicy =
+      run?.postingGatePolicy ?? DEFAULT_POSTING_GATE_POLICY
     const maxGateSize = resolveGateMaxSize(documentCount, limits)
     for (let i = 1; i < branches.length; i++) {
       if (gate.size === 0) return result
@@ -259,29 +289,38 @@ export function executeCombinedBranches<T>(
         postingListLength,
         postingGatePolicy,
       )
-      const branchAllowed = selective
-        ? gate
-        : allowedDocs
-      result = combineResults([result, executeBranch(branches[i], branchAllowed)], AND)
+      const branchAllowed = selective ? gate : allowedDocs
+      result = combineResults(
+        [result, executeBranch(branches[i], branchAllowed)],
+        AND,
+      )
       gate = gateFromResult(result)
     }
     return result
   }
 
   if (op === 'and_not') {
-    const branchPostingLengths = twoPhasePostingLengths(branches, estimateTwoPhasePostingLength)
-    if (branchPostingLengths != null && shouldUseTwoPhaseAndNot(
-      branchPostingLengths,
-      allowedDocs,
-      params.aggregateContext.documentCount,
-    )) {
+    const branchPostingLengths = twoPhasePostingLengths(
+      branches,
+      estimateTwoPhasePostingLength,
+    )
+    if (
+      branchPostingLengths != null &&
+      shouldUseTwoPhaseAndNot(
+        branchPostingLengths,
+        allowedDocs,
+        params.aggregateContext.documentCount,
+      )
+    ) {
       const finalGate = collectCombinedDocIds(
         branches,
         operator,
         collectBranch,
         allowedDocs,
       )
-      return finalGate.size === 0 ? new Map() : executeBranch(branches[0], finalGate)
+      return finalGate.size === 0
+        ? new Map()
+        : executeBranch(branches[0], finalGate)
     }
 
     const result = executeBranch(branches[0], allowedDocs)

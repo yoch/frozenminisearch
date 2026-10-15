@@ -107,10 +107,19 @@ coverage: $(DIST_MARKER)
 # Lint
 # ----------------------------------------------------------------------------
 
-.PHONY: lint lint-fix typecheck knip
-lint: typecheck
-	$(RUN) eslint 'src/**/*.{js,ts}'
+.PHONY: lint lint-fix fmt fmt-check hooks typecheck knip
+lint: typecheck fmt-check
+	bun run lint
 	node scripts/assert-internal-boundary.cjs
+
+fmt:
+	bun run fmt
+
+fmt-check:
+	bun run fmt:check
+
+hooks:
+	git config core.hooksPath .githooks
 
 knip:
 	$(RUN) knip
@@ -119,7 +128,7 @@ typecheck:
 	$(RUN) tsc --noEmit
 
 lint-fix:
-	$(RUN) eslint --fix 'src/**/*.{js,ts}'
+	bun run lint:fix
 
 # ----------------------------------------------------------------------------
 # Benchmarks — profiled interface (via benchmarks/framework/cli.mjs)

@@ -11,7 +11,10 @@ import {
 import type { BinaryBytes } from '../binaryBytes'
 import { invalidFrozenIndex } from '../frozenErrors'
 import PackedRadixTree from '../PackedRadixTree'
-import type { PackedIndexArray, PackedRadixTreeData } from '../PackedRadixTree/types'
+import type {
+  PackedIndexArray,
+  PackedRadixTreeData,
+} from '../PackedRadixTree/types'
 import { MSV5_TREE_COLUMN_COUNT } from './binaryMsv5Constants'
 
 const TREE_SECTION_HEADER_BYTES = 16
@@ -50,13 +53,20 @@ function pad4(n: number): number {
   return (n + 3) & ~3
 }
 
-function writeColumnAt(out: BinaryBytes, offset: number, arr: PackedIndexArray): number {
+function writeColumnAt(
+  out: BinaryBytes,
+  offset: number,
+  arr: PackedIndexArray,
+): number {
   const raw = bytesFromView(arr)
   out.set(raw, offset)
   return offset + pad4(raw.length)
 }
 
-function termTreeColumnarPayloadLength(columns: PackedIndexArray[], labelBytes: BinaryBytes): number {
+function termTreeColumnarPayloadLength(
+  columns: PackedIndexArray[],
+  labelBytes: BinaryBytes,
+): number {
   let total = TREE_SECTION_HEADER_BYTES
   for (const col of columns) {
     total += pad4(bytesFromView(col).length)
@@ -68,9 +78,14 @@ function termTreeColumnarPayloadLength(columns: PackedIndexArray[], labelBytes: 
  * Edges split terms on UTF-16 code units, so the heap can hold halves of a surrogate pair;
  * pass `utf16Labels` then, since UTF-8 would replace them with U+FFFD.
  */
-export function buildTermTreeSectionColumnar(tree: PackedRadixTree, utf16Labels = false): Uint8Array {
+export function buildTermTreeSectionColumnar(
+  tree: PackedRadixTree,
+  utf16Labels = false,
+): Uint8Array {
   const columns = termTreeColumns(tree)
-  const labelBytes = utf16Labels ? utf16LeBytes(tree.labelHeap) : utf8Bytes(tree.labelHeap)
+  const labelBytes = utf16Labels
+    ? utf16LeBytes(tree.labelHeap)
+    : utf8Bytes(tree.labelHeap)
   const out = allocBytes(termTreeColumnarPayloadLength(columns, labelBytes))
 
   writeU32LE(out, 0, tree.size)
@@ -100,7 +115,7 @@ function readColumn(
   offset: number,
   elementCount: number,
   width: 1 | 2 | 4,
-): { arr: PackedIndexArray, next: number } {
+): { arr: PackedIndexArray; next: number } {
   const byteLength = elementCount * width
   const padded = pad4(byteLength)
   if (offset + padded > buf.length) {
@@ -108,24 +123,27 @@ function readColumn(
   }
   let arr: PackedIndexArray
   if (width === 1) {
-    arr = elementCount === 0
-      ? new Uint8Array(0)
-      : new Uint8Array(buf.buffer, buf.byteOffset + offset, elementCount)
+    arr =
+      elementCount === 0
+        ? new Uint8Array(0)
+        : new Uint8Array(buf.buffer, buf.byteOffset + offset, elementCount)
   } else if (width === 2) {
     // Columns are pad4-aligned at encode time; section buffers are 4-aligned in MSv5 payloads.
     if (offset % 2 !== 0) {
       throw invalidFrozenIndex('term tree Uint16 column misaligned')
     }
-    arr = elementCount === 0
-      ? new Uint16Array(0)
-      : new Uint16Array(buf.buffer, buf.byteOffset + offset, elementCount)
+    arr =
+      elementCount === 0
+        ? new Uint16Array(0)
+        : new Uint16Array(buf.buffer, buf.byteOffset + offset, elementCount)
   } else {
     if (offset % 4 !== 0) {
       throw invalidFrozenIndex('term tree Uint32 column misaligned')
     }
-    arr = elementCount === 0
-      ? new Uint32Array(0)
-      : new Uint32Array(buf.buffer, buf.byteOffset + offset, elementCount)
+    arr =
+      elementCount === 0
+        ? new Uint32Array(0)
+        : new Uint32Array(buf.buffer, buf.byteOffset + offset, elementCount)
   }
   return { arr, next: offset + padded }
 }
@@ -177,9 +195,12 @@ export function readPackedTermTreeSectionColumnar(
   if (utf16Labels && (buf.length - o) % 2 !== 0) {
     throw invalidFrozenIndex('term tree UTF-16 label heap has odd length')
   }
-  const labelHeap = o === buf.length
-    ? ''
-    : utf16Labels ? readUtf16LE(buf, o, buf.length) : readUtf8(buf, o, buf.length)
+  const labelHeap =
+    o === buf.length
+      ? ''
+      : utf16Labels
+        ? readUtf16LE(buf, o, buf.length)
+        : readUtf8(buf, o, buf.length)
 
   const data: PackedRadixTreeData = {
     size,

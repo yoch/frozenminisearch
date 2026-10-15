@@ -4,10 +4,7 @@ import { validateFrozenPostingsLayout } from './frozenPostings'
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
 import { invalidFrozenIndex } from './frozenErrors'
-import {
-  readExternalId,
-  readLengthPrefixedUtf8,
-} from './binaryWireIo'
+import { readExternalId, readLengthPrefixedUtf8 } from './binaryWireIo'
 import type { BinaryBytes } from './binaryBytes'
 import type { StoredFieldsLayout } from './storedFieldsLayout'
 
@@ -63,16 +60,21 @@ export function validateFrozenSnapshotNumeric(snap: {
     throw invalidFrozenIndex('avgFieldLength size mismatch')
   }
 
-  validateFrozenPostingsLayout(snap.postings, snap.documentCount, snap.nextId, (detail) => {
-    throw invalidFrozenIndex(detail)
-  })
+  validateFrozenPostingsLayout(
+    snap.postings,
+    snap.documentCount,
+    snap.nextId,
+    (detail) => {
+      throw invalidFrozenIndex(detail)
+    },
+  )
 
   const indexedFields = Object.keys(snap.fieldIds)
   if (indexedFields.length !== snap.fieldCount) {
     throw invalidFrozenIndex('fieldIds count mismatch')
   }
   for (let f = 0; f < snap.fieldCount; f++) {
-    const found = indexedFields.some(name => snap.fieldIds[name] === f)
+    const found = indexedFields.some((name) => snap.fieldIds[name] === f)
     if (!found) {
       throw invalidFrozenIndex(`missing field id ${f}`)
     }
@@ -127,7 +129,9 @@ export function validateFrozenSnapshot(snap: FrozenSnapshot): void {
   validateFrozenTermIndexLeaves(snap.packedTermIndex, termCount)
 }
 
-export function fieldNamesFromFieldIds(fieldIds: { [field: string]: number }): string[] {
+export function fieldNamesFromFieldIds(fieldIds: {
+  [field: string]: number
+}): string[] {
   const names = Object.keys(fieldIds)
   names.sort((a, b) => fieldIds[a] - fieldIds[b])
   return names

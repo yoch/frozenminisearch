@@ -8,7 +8,9 @@ import { resolveFrozenOptions } from './frozenOptions'
  */
 export type IndexingOptions<T> = OptionsWithDefaults<T>
 
-export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<T> {
+export function resolveIndexingOptions<T>(
+  options: Options<T>,
+): IndexingOptions<T> {
   return resolveFrozenOptions(options)
 }
 
@@ -38,7 +40,11 @@ const DEFAULT_DELIMITER_CODE_POINT = /^[\n\r\p{Z}\p{P}]$/u
 
 const LATIN1_DELIMITER = new Uint8Array(256)
 for (let c = 0; c < 256; c++) {
-  LATIN1_DELIMITER[c] = DEFAULT_DELIMITER_CODE_POINT.test(String.fromCharCode(c)) ? 1 : 0
+  LATIN1_DELIMITER[c] = DEFAULT_DELIMITER_CODE_POINT.test(
+    String.fromCharCode(c),
+  )
+    ? 1
+    : 0
 }
 
 const BMP_UNKNOWN = 0
@@ -48,11 +54,13 @@ const BMP_TOKEN = 2
 const bmpDelimiterMemo: (Uint8Array | undefined)[] = new Array(256)
 
 function isBmpDelimiter(c: number): boolean {
-  const block = bmpDelimiterMemo[c >>> 8] ??= new Uint8Array(256)
+  const block = (bmpDelimiterMemo[c >>> 8] ??= new Uint8Array(256))
   const low = c & 0xff
   let state = block[low]
   if (state === BMP_UNKNOWN) {
-    state = DEFAULT_DELIMITER_CODE_POINT.test(String.fromCharCode(c)) ? BMP_DELIMITER : BMP_TOKEN
+    state = DEFAULT_DELIMITER_CODE_POINT.test(String.fromCharCode(c))
+      ? BMP_DELIMITER
+      : BMP_TOKEN
     block[low] = state
   }
   return state === BMP_DELIMITER
@@ -90,7 +98,10 @@ export function isDefaultTokenize(
 }
 
 /** Same tokens as `text.split(/[\n\r\p{Z}\p{P}]+/u)`, including empty leading/trailing tokens. */
-function forEachDefaultToken(text: string, onToken: (token: string) => void): void {
+function forEachDefaultToken(
+  text: string,
+  onToken: (token: string) => void,
+): void {
   const n = text.length
   let start = 0
   let i = 0
@@ -113,7 +124,7 @@ function forEachDefaultToken(text: string, onToken: (token: string) => void): vo
 /** Default tokenizer into a reusable buffer (avoids `text.split()` array allocation). */
 export function tokenizeDefaultInto(out: string[], text: string): void {
   out.length = 0
-  forEachDefaultToken(text, token => out.push(token))
+  forEachDefaultToken(text, (token) => out.push(token))
 }
 
 /** Tokenize field text into `out` (reused). Fast path when `tokenize` is the library default. */
@@ -192,12 +203,20 @@ export function collectFieldTermFreqsFromFieldInto(
 ): FieldTermCollectResult {
   if (isDefaultTokenize(tokenize)) {
     return collectDefaultFieldTermFreqsInto(
-      localFreqs, rawTokenScratch, text, fieldName, processTerm,
+      localFreqs,
+      rawTokenScratch,
+      text,
+      fieldName,
+      processTerm,
     )
   }
   tokenizeFieldInto(tokenScratch, tokenize, text, fieldName)
   return collectTokenArrayFieldTermFreqsInto(
-    localFreqs, rawTokenScratch, tokenScratch, fieldName, processTerm,
+    localFreqs,
+    rawTokenScratch,
+    tokenScratch,
+    fieldName,
+    processTerm,
   )
 }
 
@@ -208,6 +227,6 @@ export function updateAvgFieldLength(
   length: number,
 ): void {
   const averageFieldLength = avgFieldLength[fieldId] || 0
-  const totalFieldLength = (averageFieldLength * count) + length
+  const totalFieldLength = averageFieldLength * count + length
   avgFieldLength[fieldId] = totalFieldLength / (count + 1)
 }

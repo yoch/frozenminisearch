@@ -40,11 +40,12 @@ export function readU16LE(buf: BinaryBytes, offset: number): number {
 
 export function readU32LE(buf: BinaryBytes, offset: number): number {
   return (
-    buf[offset]
-    | (buf[offset + 1] << 8)
-    | (buf[offset + 2] << 16)
-    | (buf[offset + 3] << 24)
-  ) >>> 0
+    (buf[offset] |
+      (buf[offset + 1] << 8) |
+      (buf[offset + 2] << 16) |
+      (buf[offset + 3] << 24)) >>>
+    0
+  )
 }
 
 // Decode floats through a fixed 8-byte scratch DataView. Hot loops (external id
@@ -79,19 +80,31 @@ export function writeU8(buf: BinaryBytes, offset: number, value: number): void {
   buf[offset] = value & 0xff
 }
 
-export function writeU16LE(buf: BinaryBytes, offset: number, value: number): void {
+export function writeU16LE(
+  buf: BinaryBytes,
+  offset: number,
+  value: number,
+): void {
   buf[offset] = value & 0xff
   buf[offset + 1] = (value >>> 8) & 0xff
 }
 
-export function writeU32LE(buf: BinaryBytes, offset: number, value: number): void {
+export function writeU32LE(
+  buf: BinaryBytes,
+  offset: number,
+  value: number,
+): void {
   buf[offset] = value & 0xff
   buf[offset + 1] = (value >>> 8) & 0xff
   buf[offset + 2] = (value >>> 16) & 0xff
   buf[offset + 3] = (value >>> 24) & 0xff
 }
 
-export function writeFloatLE(buf: BinaryBytes, offset: number, value: number): void {
+export function writeFloatLE(
+  buf: BinaryBytes,
+  offset: number,
+  value: number,
+): void {
   floatScratchView.setFloat32(0, value, true)
   buf[offset] = floatScratchBytes[0]
   buf[offset + 1] = floatScratchBytes[1]
@@ -99,7 +112,11 @@ export function writeFloatLE(buf: BinaryBytes, offset: number, value: number): v
   buf[offset + 3] = floatScratchBytes[3]
 }
 
-export function writeDoubleLE(buf: BinaryBytes, offset: number, value: number): void {
+export function writeDoubleLE(
+  buf: BinaryBytes,
+  offset: number,
+  value: number,
+): void {
   floatScratchView.setFloat64(0, value, true)
   buf[offset] = floatScratchBytes[0]
   buf[offset + 1] = floatScratchBytes[1]
@@ -111,13 +128,21 @@ export function writeDoubleLE(buf: BinaryBytes, offset: number, value: number): 
   buf[offset + 7] = floatScratchBytes[7]
 }
 
-export function writeAscii(buf: BinaryBytes, offset: number, str: string): void {
+export function writeAscii(
+  buf: BinaryBytes,
+  offset: number,
+  str: string,
+): void {
   for (let i = 0; i < str.length; i++) {
     buf[offset + i] = str.charCodeAt(i) & 0xff
   }
 }
 
-export function readAscii(buf: BinaryBytes, offset: number, length: number): string {
+export function readAscii(
+  buf: BinaryBytes,
+  offset: number,
+  length: number,
+): string {
   let out = ''
   for (let i = 0; i < length; i++) out += String.fromCharCode(buf[offset + i])
   return out
@@ -127,7 +152,8 @@ export function readUtf8(buf: BinaryBytes, start: number, end: number): string {
   return textDecoder.decode(buf.subarray(start, end))
 }
 
-const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+const LONE_SURROGATE =
+  /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
 
 /** False when `str` has an unpaired surrogate, which UTF-8 cannot represent. */
 export function isWellFormedUtf16(str: string): boolean {
@@ -146,7 +172,11 @@ export function utf16LeBytes(str: string): Uint8Array {
 
 const UTF16_DECODE_CHUNK = 0x2000
 
-export function readUtf16LE(buf: BinaryBytes, start: number, end: number): string {
+export function readUtf16LE(
+  buf: BinaryBytes,
+  start: number,
+  end: number,
+): string {
   const length = (end - start) >>> 1
   const codes = new Uint16Array(Math.min(length, UTF16_DECODE_CHUNK))
   let out = ''

@@ -1,7 +1,4 @@
-import {
-  assertBufferLength,
-  crc32Buffer,
-} from './binaryIo'
+import { assertBufferLength, crc32Buffer } from './binaryIo'
 
 describe('binaryIo', () => {
   test('validates snapshot buffer length', () => {

@@ -1,7 +1,10 @@
 import { createIdToShortIdLookup } from './frozenIdLookup'
 import { materializeFieldLengthMatrix } from './fieldLengthMatrix'
 import { parseSnapshotIndex } from './freezeSnapshotIndex'
-import { assertFieldsMatchSnapshot, resolveFrozenOptions } from './frozenOptions'
+import {
+  assertFieldsMatchSnapshot,
+  resolveFrozenOptions,
+} from './frozenOptions'
 import { storedFieldsFromRows } from './storedFieldsLayout'
 import {
   assertNonNegativeInteger,
@@ -25,7 +28,10 @@ export type MiniSearchSnapshot = {
   averageFieldLength: number[]
   storedFields: { [shortId: string]: Record<string, unknown> | undefined }
   dirtCount?: number
-  index: [string, { [fieldId: string]: SerializedIndexEntry | { ds: SerializedIndexEntry } }][]
+  index: [
+    string,
+    { [fieldId: string]: SerializedIndexEntry | { ds: SerializedIndexEntry } },
+  ][]
   serializationVersion: number
 }
 
@@ -37,12 +43,20 @@ const DISCARDED_DOC_ID = 0xffffffff
 // re-check order here: MiniSearch.toJSON() emits ascending shortIds, dense remap preserves
 // monotonicity, and JS integer object keys are enumerated in ascending order (for…in).
 
-function validateFieldIds(fieldIds: Record<string, unknown>, fieldCount: number): { [fieldName: string]: number } {
+function validateFieldIds(
+  fieldIds: Record<string, unknown>,
+  fieldCount: number,
+): { [fieldName: string]: number } {
   const seen = new Set<number>()
   for (const [fieldName, rawFieldId] of Object.entries(fieldIds)) {
-    const fieldId = assertNonNegativeInteger(rawFieldId, `fieldIds.${fieldName}`)
+    const fieldId = assertNonNegativeInteger(
+      rawFieldId,
+      `fieldIds.${fieldName}`,
+    )
     if (fieldId >= fieldCount) {
-      throw snapshotError(`fieldIds.${fieldName} must be < field count ${fieldCount}`)
+      throw snapshotError(
+        `fieldIds.${fieldName} must be < field count ${fieldCount}`,
+      )
     }
     if (seen.has(fieldId)) {
       throw snapshotError(`fieldId ${fieldId} is assigned more than once`)
@@ -66,7 +80,9 @@ function validateActiveShortIds(
     return shortId
   })
   if (shortIds.length !== documentCount) {
-    throw snapshotError(`documentIds count ${shortIds.length} must equal documentCount ${documentCount}`)
+    throw snapshotError(
+      `documentIds count ${shortIds.length} must equal documentCount ${documentCount}`,
+    )
   }
   shortIds.sort((a, b) => a - b)
   return shortIds
@@ -91,7 +107,10 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   const documentIds = assertRecord(snapshot.documentIds, 'documentIds')
   const rawFieldIds = assertRecord(snapshot.fieldIds, 'fieldIds')
   const fieldLength = assertRecord(snapshot.fieldLength, 'fieldLength')
-  const storedFieldSnapshot = assertRecord(snapshot.storedFields, 'storedFields')
+  const storedFieldSnapshot = assertRecord(
+    snapshot.storedFields,
+    'storedFields',
+  )
   if (!Array.isArray(snapshot.index)) {
     throw snapshotError('index must be an array')
   }
@@ -107,23 +126,36 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   const opts = resolveFrozenOptions({ ...options, fields })
 
   const fieldCount = opts.fields.length
-  const documentCount = assertNonNegativeInteger(snapshot.documentCount, 'documentCount')
+  const documentCount = assertNonNegativeInteger(
+    snapshot.documentCount,
+    'documentCount',
+  )
   const nextId = assertNonNegativeInteger(snapshot.nextId, 'nextId')
   if (documentCount > nextId) {
-    throw snapshotError(`documentCount ${documentCount} must be <= nextId ${nextId}`)
+    throw snapshotError(
+      `documentCount ${documentCount} must be <= nextId ${nextId}`,
+    )
   }
   const fieldIds = validateFieldIds(rawFieldIds, fieldCount)
-  const activeShortIds = validateActiveShortIds(documentIds, documentCount, nextId)
+  const activeShortIds = validateActiveShortIds(
+    documentIds,
+    documentCount,
+    nextId,
+  )
   const activeShortIdSet = new Set(activeShortIds)
   for (const shortIdStr of Object.keys(storedFieldSnapshot)) {
     const shortId = parseCanonicalIntegerKey(shortIdStr, 'storedFields')
     assertShortIdInRange(shortId, nextId, 'storedFields')
     if (!activeShortIdSet.has(shortId)) {
-      throw snapshotError(`storedFields shortId ${shortId} is missing from documentIds`)
+      throw snapshotError(
+        `storedFields shortId ${shortId} is missing from documentIds`,
+      )
     }
   }
   if (snapshot.averageFieldLength.length > fieldCount) {
-    throw snapshotError(`averageFieldLength length must be <= field count ${fieldCount}`)
+    throw snapshotError(
+      `averageFieldLength length must be <= field count ${fieldCount}`,
+    )
   }
   // MiniSearch leaves entries unset for fields no document has, and its running average can drift
   // below zero after discards; both load fine there, so only non-numbers are rejected.
@@ -132,7 +164,9 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     const avg = snapshot.averageFieldLength[f]
     if (avg == null) continue
     if (!Number.isFinite(avg)) {
-      throw snapshotError(`averageFieldLength field ${f} must be a finite number`)
+      throw snapshotError(
+        `averageFieldLength field ${f} must be a finite number`,
+      )
     }
     avgFieldLength[f] = avg
   }
@@ -141,7 +175,9 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   let shortIdRemap: Uint32Array | null = null
   const resolvedNextId = useDense ? documentCount : nextId
   const externalIds: unknown[] = new Array(resolvedNextId)
-  const storedFieldRows: (Record<string, unknown> | undefined)[] = new Array(externalIds.length)
+  const storedFieldRows: (Record<string, unknown> | undefined)[] = new Array(
+    externalIds.length,
+  )
 
   if (useDense) {
     shortIdRemap = new Uint32Array(nextId)
@@ -152,14 +188,16 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
       const shortIdStr = String(shortId)
       shortIdRemap[shortId] = dense
       externalIds[dense] = documentIds[shortIdStr]
-      storedFieldRows[dense] = storedFieldSnapshot[shortIdStr] as Record<string, unknown> | undefined
+      storedFieldRows[dense] = storedFieldSnapshot[shortIdStr] as
+        Record<string, unknown> | undefined
       dense++
     }
   } else {
     for (const [shortIdStr, id] of Object.entries(documentIds)) {
       const shortId = parseCanonicalIntegerKey(shortIdStr, 'documentIds')
       externalIds[shortId] = id
-      storedFieldRows[shortId] = storedFieldSnapshot[shortIdStr] as Record<string, unknown> | undefined
+      storedFieldRows[shortId] = storedFieldSnapshot[shortIdStr] as
+        Record<string, unknown> | undefined
     }
   }
 
@@ -173,7 +211,9 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     const shortId = parseCanonicalIntegerKey(shortIdStr, 'fieldLength')
     assertShortIdInRange(shortId, nextId, 'fieldLength')
     if (!activeShortIdSet.has(shortId)) {
-      throw snapshotError(`fieldLength shortId ${shortId} is missing from documentIds`)
+      throw snapshotError(
+        `fieldLength shortId ${shortId} is missing from documentIds`,
+      )
     }
     if (!Array.isArray(lengths)) {
       throw snapshotError(`fieldLength shortId ${shortId} must be an array`)
@@ -183,15 +223,25 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     for (let f = 0; f < fieldCount; f++) {
       const length = (lengths as number[])[f] ?? 0
       if (!Number.isFinite(length) || length < 0) {
-        throw snapshotError(`fieldLength shortId ${shortId} field ${f} must be a non-negative number`)
+        throw snapshotError(
+          `fieldLength shortId ${shortId} field ${f} must be a non-negative number`,
+        )
       }
       fieldLengthScratch[rowBase + f] = length
     }
   }
   const fieldLengthMatrix = materializeFieldLengthMatrix(fieldLengthScratch)
 
-  const parsedIndex = parseSnapshotIndex(snapshot, fieldCount, nextId, shortIdRemap)
-  const postings = parsedIndex.accumulator.finalize(parsedIndex.termCount, resolvedNextId)
+  const parsedIndex = parseSnapshotIndex(
+    snapshot,
+    fieldCount,
+    nextId,
+    shortIdRemap,
+  )
+  const postings = parsedIndex.accumulator.finalize(
+    parsedIndex.termCount,
+    resolvedNextId,
+  )
 
   const storedFields = storedFieldsFromRows(storedFieldRows, opts.storeFields)
 

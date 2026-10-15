@@ -1,5 +1,9 @@
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
-import { choosePostingsLayout, collectDocIdsFromFrozenLayout, validateFrozenPostingsLayout } from './frozenPostings'
+import {
+  choosePostingsLayout,
+  collectDocIdsFromFrozenLayout,
+  validateFrozenPostingsLayout,
+} from './frozenPostings'
 import { shouldSeekAllowedDocs } from './compactPostings'
 
 function buildLayout(fieldCount, postings, nextId = 10) {
@@ -12,8 +16,9 @@ function buildLayout(fieldCount, postings, nextId = 10) {
 }
 
 function expectValidateFail(layout, documentCount, nextId, message) {
-  expect(() => validateFrozenPostingsLayout(layout, documentCount, nextId))
-    .toThrow(message)
+  expect(() =>
+    validateFrozenPostingsLayout(layout, documentCount, nextId),
+  ).toThrow(message)
 }
 
 describe('choosePostingsLayout', () => {
@@ -75,7 +80,12 @@ describe('validateFrozenPostingsLayout', () => {
 
   test('rejects non-positive fieldCount', () => {
     const layout = buildLayout(1, densePostings)
-    expectValidateFail({ ...layout, fieldCount: 0 }, 2, 10, /fieldCount must be positive/)
+    expectValidateFail(
+      { ...layout, fieldCount: 0 },
+      2,
+      10,
+      /fieldCount must be positive/,
+    )
   })
 
   test('rejects nextId mismatch', () => {
@@ -85,75 +95,138 @@ describe('validateFrozenPostingsLayout', () => {
 
   test('rejects negative termCount', () => {
     const layout = buildLayout(1, densePostings)
-    expectValidateFail({ ...layout, termCount: -1 }, 2, 10, /termCount out of range/)
+    expectValidateFail(
+      { ...layout, termCount: -1 },
+      2,
+      10,
+      /termCount out of range/,
+    )
   })
 
   test('rejects allDocIds / allFreqs length mismatch', () => {
     const layout = buildLayout(1, densePostings)
     const shortFreqs = layout.allFreqs.subarray(0, layout.allFreqs.length - 1)
-    expectValidateFail({ ...layout, allFreqs: shortFreqs }, 2, 10, /length mismatch/)
+    expectValidateFail(
+      { ...layout, allFreqs: shortFreqs },
+      2,
+      10,
+      /length mismatch/,
+    )
   })
 
   test('rejects dense slot metadata length mismatch', () => {
     const layout = buildLayout(1, densePostings)
-    expectValidateFail({
-      ...layout,
-      denseOffsets: layout.denseOffsets.subarray(0, layout.denseOffsets.length - 1),
-    }, 2, 10, /dense postings slot count mismatch/)
+    expectValidateFail(
+      {
+        ...layout,
+        denseOffsets: layout.denseOffsets.subarray(
+          0,
+          layout.denseOffsets.length - 1,
+        ),
+      },
+      2,
+      10,
+      /dense postings slot count mismatch/,
+    )
   })
 
   test('rejects dense posting slot past allDocIds bounds', () => {
     const layout = buildLayout(1, densePostings)
     const denseLengths = new Uint32Array(layout.denseLengths)
     denseLengths[0] = layout.allDocIds.length + 1
-    expectValidateFail({ ...layout, denseLengths }, 2, 10, /exceeds allDocIds bounds/)
+    expectValidateFail(
+      { ...layout, denseLengths },
+      2,
+      10,
+      /exceeds allDocIds bounds/,
+    )
   })
 
   test('rejects dense posting docId >= nextId', () => {
-    const layout = buildLayout(1, [{ termIndex: 0, fieldId: 0, docId: 10, freq: 1 }], 10)
+    const layout = buildLayout(
+      1,
+      [{ termIndex: 0, fieldId: 0, docId: 10, freq: 1 }],
+      10,
+    )
     expectValidateFail(layout, 9, 10, /posting docId 10 >= nextId 10/)
   })
 
   test('rejects sparse sparseFieldIdWidth mismatch', () => {
     const layout = buildLayout(4, sparsePostings)
     expect(layout.layout).toBe('sparse')
-    expectValidateFail({ ...layout, sparseFieldIdWidth: 16 }, 2, 10, /sparseFieldIdWidth mismatch/)
+    expectValidateFail(
+      { ...layout, sparseFieldIdWidth: 16 },
+      2,
+      10,
+      /sparseFieldIdWidth mismatch/,
+    )
   })
 
   test('rejects sparse sparseTermStarts length mismatch', () => {
     const layout = buildLayout(4, sparsePostings)
-    expectValidateFail({
-      ...layout,
-      sparseTermStarts: layout.sparseTermStarts.subarray(0, layout.sparseTermStarts.length - 1),
-    }, 2, 10, /sparseTermStarts length mismatch/)
+    expectValidateFail(
+      {
+        ...layout,
+        sparseTermStarts: layout.sparseTermStarts.subarray(
+          0,
+          layout.sparseTermStarts.length - 1,
+        ),
+      },
+      2,
+      10,
+      /sparseTermStarts length mismatch/,
+    )
   })
 
   test('rejects sparse metadata slot count mismatch', () => {
     const layout = buildLayout(4, sparsePostings)
-    expectValidateFail({
-      ...layout,
-      sparseOffsets: layout.sparseOffsets.subarray(0, layout.sparseOffsets.length - 1),
-    }, 2, 10, /sparse slot count mismatch/)
+    expectValidateFail(
+      {
+        ...layout,
+        sparseOffsets: layout.sparseOffsets.subarray(
+          0,
+          layout.sparseOffsets.length - 1,
+        ),
+      },
+      2,
+      10,
+      /sparse slot count mismatch/,
+    )
   })
 
   test('rejects sparse fieldId >= fieldCount', () => {
     const layout = buildLayout(4, sparsePostings)
-    const fieldIds = layout.sparseFieldIds instanceof Uint16Array
-      ? new Uint16Array(layout.sparseFieldIds)
-      : new Uint8Array(layout.sparseFieldIds)
+    const fieldIds =
+      layout.sparseFieldIds instanceof Uint16Array
+        ? new Uint16Array(layout.sparseFieldIds)
+        : new Uint8Array(layout.sparseFieldIds)
     fieldIds[0] = 4
-    expectValidateFail({ ...layout, sparseFieldIds: fieldIds }, 2, 10, /sparse fieldId 4 >= fieldCount 4/)
+    expectValidateFail(
+      { ...layout, sparseFieldIds: fieldIds },
+      2,
+      10,
+      /sparse fieldId 4 >= fieldCount 4/,
+    )
   })
 
   test('rejects sparse slot past allDocIds bounds', () => {
     const layout = buildLayout(4, sparsePostings)
     const sparseLengths = new Uint32Array(layout.sparseLengths)
     sparseLengths[0] = layout.allDocIds.length + 1
-    expectValidateFail({ ...layout, sparseLengths }, 2, 10, /sparse slot 0 exceeds allDocIds bounds/)
+    expectValidateFail(
+      { ...layout, sparseLengths },
+      2,
+      10,
+      /sparse slot 0 exceeds allDocIds bounds/,
+    )
   })
 
   test('rejects sparse posting docId >= nextId', () => {
-    const layout = buildLayout(4, [{ termIndex: 0, fieldId: 0, docId: 10, freq: 1 }], 10)
+    const layout = buildLayout(
+      4,
+      [{ termIndex: 0, fieldId: 0, docId: 10, freq: 1 }],
+      10,
+    )
     expectValidateFail(layout, 9, 10, /posting docId 10 >= nextId 10/)
   })
 
@@ -164,15 +237,26 @@ describe('validateFrozenPostingsLayout', () => {
 
   test('routes failures through custom fail callback', () => {
     const layout = buildLayout(1, densePostings)
-    const fail = vi.fn((detail) => { throw new Error(`custom:${detail}`) })
-    expect(() => validateFrozenPostingsLayout(layout, 11, 10, fail)).toThrow(/custom:documentCount/)
+    const fail = vi.fn((detail) => {
+      throw new Error(`custom:${detail}`)
+    })
+    expect(() => validateFrozenPostingsLayout(layout, 11, 10, fail)).toThrow(
+      /custom:documentCount/,
+    )
     expect(fail).toHaveBeenCalled()
   })
 })
 
 function collectDocIds(layout, termIndex, fieldBoosts, context, allowedDocs) {
   const docIds = new Set()
-  collectDocIdsFromFrozenLayout(layout, termIndex, fieldBoosts, context, docIds, allowedDocs)
+  collectDocIdsFromFrozenLayout(
+    layout,
+    termIndex,
+    fieldBoosts,
+    context,
+    docIds,
+    allowedDocs,
+  )
   return [...docIds].sort((a, b) => a - b)
 }
 
@@ -182,7 +266,7 @@ function makeCollectContext(fieldIds, documentCount = 10) {
     avgFieldLength: new Float32Array(Object.keys(fieldIds).length || 1),
     fieldIds,
     getFieldLength: () => 5,
-    getExternalId: docId => docId,
+    getExternalId: (docId) => docId,
     getStoredFields: () => undefined,
   }
 }
@@ -230,7 +314,9 @@ describe('collectDocIdsFromFrozenLayout', () => {
     ])
     const context = makeCollectContext({ txt: 0 })
     const fieldBoosts = { names: ['txt'], boosts: { txt: 1 } }
-    expect(collectDocIds(layout, 0, fieldBoosts, context, new Set())).toEqual([])
+    expect(collectDocIds(layout, 0, fieldBoosts, context, new Set())).toEqual(
+      [],
+    )
   })
 
   test('long postings use seek path and honor selective allowedDocs', () => {
@@ -241,7 +327,9 @@ describe('collectDocIdsFromFrozenLayout', () => {
 
     const context = makeCollectContext({ txt: 0 }, 3000)
     const fieldBoosts = { names: ['txt'], boosts: { txt: 1 } }
-    expect(collectDocIds(layout, 0, fieldBoosts, context, allowed)).toEqual([5, 100, 999])
+    expect(collectDocIds(layout, 0, fieldBoosts, context, allowed)).toEqual([
+      5, 100, 999,
+    ])
   })
 
   test('short postings use scan path and honor selective allowedDocs', () => {
@@ -252,7 +340,9 @@ describe('collectDocIdsFromFrozenLayout', () => {
 
     const context = makeCollectContext({ txt: 0 }, 100)
     const fieldBoosts = { names: ['txt'], boosts: { txt: 1 } }
-    expect(collectDocIds(layout, 0, fieldBoosts, context, allowed)).toEqual([4, 40, 41, 42])
+    expect(collectDocIds(layout, 0, fieldBoosts, context, allowed)).toEqual([
+      4, 40, 41, 42,
+    ])
   })
 
   test('skips fields omitted from fieldBoosts', () => {

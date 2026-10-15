@@ -1,4 +1,7 @@
-import { encodeFrozenSnapshotMsv5, encodeFrozenSnapshotMsv5Async } from './msv5/binaryMsv5Encode'
+import {
+  encodeFrozenSnapshotMsv5,
+  encodeFrozenSnapshotMsv5Async,
+} from './msv5/binaryMsv5Encode'
 import type { FrozenSnapshot } from './binaryStructures'
 import type { BinaryCompression } from './searchTypes'
 

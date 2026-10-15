@@ -31,12 +31,18 @@ describe('queryEngineGateLimits', () => {
   })
 
   test('gateIsSelectiveEnough posting ratio path for giant-like gate', () => {
-    expect(gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 50_000)).toBe(true)
-    expect(gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 10_000)).toBe(false)
+    expect(
+      gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 50_000),
+    ).toBe(true)
+    expect(
+      gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 10_000),
+    ).toBe(false)
   })
 
   test('gateIsSelectiveEnough posting ratio rejects full-list gate', () => {
-    expect(gateIsSelectiveEnough(10_000, 10_000, DEFAULT_AND_GATE_LIMITS, 10_000)).toBe(false)
+    expect(
+      gateIsSelectiveEnough(10_000, 10_000, DEFAULT_AND_GATE_LIMITS, 10_000),
+    ).toBe(false)
   })
 
   test('DEFAULT_POSTING_GATE_POLICY matches compactPostings seek threshold', () => {
@@ -46,10 +52,18 @@ describe('queryEngineGateLimits', () => {
   })
 
   test('gateIsSelectiveEnough owns the query-engine gate decision', () => {
-    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 12)).toBe(true)
-    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 16)).toBe(true)
-    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 17)).toBe(true)
-    expect(gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 50_000)).toBe(true)
+    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 12)).toBe(
+      true,
+    )
+    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 16)).toBe(
+      true,
+    )
+    expect(gateIsSelectiveEnough(16, 50_000, DEFAULT_AND_GATE_LIMITS, 17)).toBe(
+      true,
+    )
+    expect(
+      gateIsSelectiveEnough(11_111, 50_000, DEFAULT_AND_GATE_LIMITS, 50_000),
+    ).toBe(true)
   })
 
   test('shouldSeekAllowedDocs delegates to passGateByPostingRatio (distinct decision, same numbers)', () => {

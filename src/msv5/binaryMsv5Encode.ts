@@ -1,6 +1,9 @@
 import type { FrozenSnapshot } from '../binaryStructures'
 import type { BinaryCompression } from '../searchTypes'
-import { assembleMsv5File, assembleMsv5FileAsync } from './binaryMsv5Compression'
+import {
+  assembleMsv5File,
+  assembleMsv5FileAsync,
+} from './binaryMsv5Compression'
 import { prepareEncodeFrozenSnapshotMsv5 } from './binaryMsv5EncodeShared'
 
 export function encodeFrozenSnapshotMsv5(
@@ -16,5 +19,6 @@ export async function encodeFrozenSnapshotMsv5Async(
   compression?: BinaryCompression,
 ): Promise<Buffer> {
   const { globalFlags, rawSections } = prepareEncodeFrozenSnapshotMsv5(snap)
-  return (await assembleMsv5FileAsync(globalFlags, rawSections, compression)).buffer
+  return (await assembleMsv5FileAsync(globalFlags, rawSections, compression))
+    .buffer
 }

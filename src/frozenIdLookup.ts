@@ -7,7 +7,10 @@ export interface IdToShortIdLookup {
   get(id: unknown): number | undefined
 }
 
-function detectIdentityNumericIds(externalIds: readonly unknown[], nextId: number): boolean {
+function detectIdentityNumericIds(
+  externalIds: readonly unknown[],
+  nextId: number,
+): boolean {
   if (nextId === 0) return true
   // Identity mode drops the id array and returns shortIds, which would turn `-0` into `0`.
   if (Object.is(externalIds[0], -0)) return false
@@ -17,7 +20,10 @@ function detectIdentityNumericIds(externalIds: readonly unknown[], nextId: numbe
   return true
 }
 
-function buildLazyMap(externalIds: readonly unknown[], nextId: number): Map<unknown, number> {
+function buildLazyMap(
+  externalIds: readonly unknown[],
+  nextId: number,
+): Map<unknown, number> {
   const map = new Map<unknown, number>()
   for (let i = 0; i < nextId; i++) {
     const id = externalIds[i]
@@ -33,10 +39,17 @@ function identityLookup(nextId: number): IdToShortIdLookup {
     mode: 'identity',
     mapEntryCount: 0,
     has(id) {
-      return typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId
+      return (
+        typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId
+      )
     },
     get(id) {
-      if (typeof id === 'number' && Number.isInteger(id) && id >= 0 && id < nextId) {
+      if (
+        typeof id === 'number' &&
+        Number.isInteger(id) &&
+        id >= 0 &&
+        id < nextId
+      ) {
         return id
       }
       return undefined
@@ -44,7 +57,10 @@ function identityLookup(nextId: number): IdToShortIdLookup {
   }
 }
 
-function lazyMapLookup(externalIds: readonly unknown[], nextId: number): IdToShortIdLookup {
+function lazyMapLookup(
+  externalIds: readonly unknown[],
+  nextId: number,
+): IdToShortIdLookup {
   let map: Map<unknown, number> | undefined
   const ensureMap = (): Map<unknown, number> => {
     if (map == null) map = buildLazyMap(externalIds, nextId)

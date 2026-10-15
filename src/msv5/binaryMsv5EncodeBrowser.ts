@@ -8,6 +8,10 @@ export async function encodeFrozenSnapshotMsv5Browser(
   compression?: BrowserBinaryCompression,
 ): Promise<Uint8Array> {
   const { globalFlags, rawSections } = prepareEncodeFrozenSnapshotMsv5(snap)
-  const file = await assembleMsv5FileBrowser(globalFlags, rawSections, compression)
+  const file = await assembleMsv5FileBrowser(
+    globalFlags,
+    rawSections,
+    compression,
+  )
   return file.buffer
 }

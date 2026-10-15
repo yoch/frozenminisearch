@@ -35,7 +35,10 @@ import {
   MSV5_SECTION_ENTRY_BYTES,
   MSV5_ZSTD_LEVEL_OFFSET,
 } from './binaryMsv5Constants'
-import type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
+import type {
+  Msv5SectionEntry,
+  Msv5SnapshotCompressionMeta,
+} from './binaryMsv5Types'
 
 export const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 
@@ -47,7 +50,9 @@ export interface PreparedMsv5Payload {
 }
 
 function formatRevForFlags(globalFlags: number): number {
-  return (globalFlags & FLAG_LABEL_HEAP_UTF16) !== 0 ? MSV5_FORMAT_REV_UTF16_LABELS : MSV5_FORMAT_REV_PAYLOAD
+  return (globalFlags & FLAG_LABEL_HEAP_UTF16) !== 0
+    ? MSV5_FORMAT_REV_UTF16_LABELS
+    : MSV5_FORMAT_REV_PAYLOAD
 }
 
 export function assertPayloadFormatRev(buf: BinaryBytes): void {
@@ -57,9 +62,13 @@ export function assertPayloadFormatRev(buf: BinaryBytes): void {
   }
 }
 
-export function assertRawSectionCount(rawSections: readonly BinaryBytes[]): void {
+export function assertRawSectionCount(
+  rawSections: readonly BinaryBytes[],
+): void {
   if (rawSections.length !== MSV5_SECTION_COUNT) {
-    throw new Error(`MSv5 expects ${MSV5_SECTION_COUNT} sections, got ${rawSections.length}`)
+    throw new Error(
+      `MSv5 expects ${MSV5_SECTION_COUNT} sections, got ${rawSections.length}`,
+    )
   }
 }
 
@@ -141,7 +150,9 @@ export function readMsv5SectionDirectory(buf: BinaryBytes): Msv5SectionEntry[] {
   return entries
 }
 
-export function readMsv5SnapshotCompressionMeta(buf: BinaryBytes): Msv5SnapshotCompressionMeta {
+export function readMsv5SnapshotCompressionMeta(
+  buf: BinaryBytes,
+): Msv5SnapshotCompressionMeta {
   const directory = readMsv5SectionDirectory(buf)
   return {
     formatRev: readU16LE(buf, MSV5_FORMAT_REV_OFFSET),
@@ -181,11 +192,20 @@ export function validatePayloadDirectory(
   }
 }
 
-export function preparePayload(fileBuf: BinaryBytes, directory: Msv5SectionEntry[]): PreparedMsv5Payload {
+export function preparePayload(
+  fileBuf: BinaryBytes,
+  directory: Msv5SectionEntry[],
+): PreparedMsv5Payload {
   assertPayloadFormatRev(fileBuf)
   const payloadOffset = readU32LE(fileBuf, MSV5_PAYLOAD_COMPRESSED_OFFSET)
-  const compressedLength = readU32LE(fileBuf, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)
-  const uncompressedLength = readU32LE(fileBuf, MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET)
+  const compressedLength = readU32LE(
+    fileBuf,
+    MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
+  )
+  const uncompressedLength = readU32LE(
+    fileBuf,
+    MSV5_PAYLOAD_UNCOMPRESSED_LENGTH_OFFSET,
+  )
   const payloadCrc32 = readU32LE(fileBuf, MSV5_PAYLOAD_CRC_OFFSET)
   const payloadCodec = readU8(fileBuf, MSV5_PAYLOAD_CODEC_OFFSET)
   if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
@@ -193,7 +213,10 @@ export function preparePayload(fileBuf: BinaryBytes, directory: Msv5SectionEntry
   }
   validatePayloadDirectory(directory, uncompressedLength)
 
-  if (payloadOffset !== MSV5_HEADER_SIZE || payloadOffset + compressedLength > fileBuf.length) {
+  if (
+    payloadOffset !== MSV5_HEADER_SIZE ||
+    payloadOffset + compressedLength > fileBuf.length
+  ) {
     throw new Error(MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS)
   }
   if (payloadCodec === CODEC_RAW && compressedLength !== uncompressedLength) {

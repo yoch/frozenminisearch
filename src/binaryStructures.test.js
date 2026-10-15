@@ -2,7 +2,11 @@ import {
   validateFrozenSnapshot,
   validateFrozenSnapshotNumeric,
 } from './binaryStructures'
-import { buildStoredFieldsSectionWire, readExternalId, writeExternalId } from './binaryWireIo'
+import {
+  buildStoredFieldsSectionWire,
+  readExternalId,
+  writeExternalId,
+} from './binaryWireIo'
 import { readStoredFieldsRowsSection } from './storedFieldsWire'
 import { allocBytes, concatBytes, writeU32LE } from './binaryBytes'
 import { packTermsFromList } from './PackedRadixTree/packTermList'
@@ -52,29 +56,47 @@ function validPackedSnap(overrides = {}) {
 
 describe('validateFrozenSnapshotNumeric', () => {
   test('accepts a consistent numeric snapshot', () => {
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap())).not.toThrow()
+    expect(() =>
+      validateFrozenSnapshotNumeric(validNumericSnap()),
+    ).not.toThrow()
   })
 
   test('rejects invalid numeric invariants', () => {
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap({ fieldCount: 0 })))
-      .toThrow(/fieldCount must be positive/)
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap({ nextId: 0xffffffff })))
-      .toThrow(/nextId out of range/)
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap({ documentCount: 3, nextId: 2 })))
-      .toThrow(/documentCount inconsistent/)
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap({ avgFieldLength: new Float32Array() })))
-      .toThrow(/avgFieldLength size mismatch/)
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap({
-      fieldCount: 2,
-      fieldIds: { text: 0 },
-      fieldLengthMatrix: new Uint32Array(4),
-      avgFieldLength: new Float32Array(2),
-      postings: densePostings(2, 2),
-    }))).toThrow(/fieldIds count mismatch/)
-    expect(() => validateFrozenSnapshotNumeric(validNumericSnap({
-      fieldIds: { text: 1 },
-      fieldCount: 1,
-    }))).toThrow(/missing field id 0/)
+    expect(() =>
+      validateFrozenSnapshotNumeric(validNumericSnap({ fieldCount: 0 })),
+    ).toThrow(/fieldCount must be positive/)
+    expect(() =>
+      validateFrozenSnapshotNumeric(validNumericSnap({ nextId: 0xffffffff })),
+    ).toThrow(/nextId out of range/)
+    expect(() =>
+      validateFrozenSnapshotNumeric(
+        validNumericSnap({ documentCount: 3, nextId: 2 }),
+      ),
+    ).toThrow(/documentCount inconsistent/)
+    expect(() =>
+      validateFrozenSnapshotNumeric(
+        validNumericSnap({ avgFieldLength: new Float32Array() }),
+      ),
+    ).toThrow(/avgFieldLength size mismatch/)
+    expect(() =>
+      validateFrozenSnapshotNumeric(
+        validNumericSnap({
+          fieldCount: 2,
+          fieldIds: { text: 0 },
+          fieldLengthMatrix: new Uint32Array(4),
+          avgFieldLength: new Float32Array(2),
+          postings: densePostings(2, 2),
+        }),
+      ),
+    ).toThrow(/fieldIds count mismatch/)
+    expect(() =>
+      validateFrozenSnapshotNumeric(
+        validNumericSnap({
+          fieldIds: { text: 1 },
+          fieldCount: 1,
+        }),
+      ),
+    ).toThrow(/missing field id 0/)
   })
 })
 
@@ -84,14 +106,18 @@ describe('validateFrozenSnapshot packed term index', () => {
   })
 
   test('rejects snapshots without a packed term index', () => {
-    expect(() => validateFrozenSnapshot(validPackedSnap({ packedTermIndex: undefined })))
-      .toThrow(/packedTermIndex is required/)
+    expect(() =>
+      validateFrozenSnapshot(validPackedSnap({ packedTermIndex: undefined })),
+    ).toThrow(/packedTermIndex is required/)
   })
 })
 
 describe('readStoredFieldsRowsSection', () => {
   test('round-trips stored field rows', () => {
-    const section = buildStoredFieldsSectionWire([{ txt: 'x' }, undefined, { txt: 'y' }], 3)
+    const section = buildStoredFieldsSectionWire(
+      [{ txt: 'x' }, undefined, { txt: 'y' }],
+      3,
+    )
     expect(readStoredFieldsRowsSection(section, 0, 3, section.length)).toEqual([
       { txt: 'x' },
       undefined,
@@ -101,19 +127,22 @@ describe('readStoredFieldsRowsSection', () => {
 
   test('rejects corrupted stored-fields sections', () => {
     const section = buildStoredFieldsSectionWire([{ txt: 'x' }], 1)
-    expect(() => readStoredFieldsRowsSection(section, 0, 2, 4))
-      .toThrow(/stored fields table out of bounds/)
+    expect(() => readStoredFieldsRowsSection(section, 0, 2, 4)).toThrow(
+      /stored fields table out of bounds/,
+    )
 
     const tableOnly = allocBytes(4)
     writeU32LE(tableOnly, 0, 1)
-    expect(() => readStoredFieldsRowsSection(tableOnly, 0, 1, 4))
-      .toThrow(/stored fields entry offset out of bounds/)
+    expect(() => readStoredFieldsRowsSection(tableOnly, 0, 1, 4)).toThrow(
+      /stored fields entry offset out of bounds/,
+    )
 
     const badJsonLen = allocBytes(8)
     writeU32LE(badJsonLen, 0, 1)
     writeU32LE(badJsonLen, 4, 99)
-    expect(() => readStoredFieldsRowsSection(badJsonLen, 0, 1, 8))
-      .toThrow(/stored fields JSON out of bounds/)
+    expect(() => readStoredFieldsRowsSection(badJsonLen, 0, 1, 8)).toThrow(
+      /stored fields JSON out of bounds/,
+    )
   })
 
   test.each([
@@ -125,7 +154,9 @@ describe('readStoredFieldsRowsSection', () => {
     writeU32LE(section, 0, 1)
     writeU32LE(section, 4, body.length)
     section.set(body, 8)
-    expect(() => readStoredFieldsRowsSection(section, 0, 1, section.length)).toThrow(error)
+    expect(() =>
+      readStoredFieldsRowsSection(section, 0, 1, section.length),
+    ).toThrow(error)
   })
 })
 
@@ -135,6 +166,8 @@ describe('readExternalId', () => {
     writeExternalId(chunks, { a: 1 })
     const buf = concatBytes(chunks)
     buf[buf.length - 1] = 0x20
-    expect(() => readExternalId(buf, 0)).toThrow(/Invalid frozen index: external id is not valid JSON/)
+    expect(() => readExternalId(buf, 0)).toThrow(
+      /Invalid frozen index: external id is not valid JSON/,
+    )
   })
 })

@@ -22,13 +22,19 @@ function growableCapacity(currentLength: number): number {
 type GrowableDocIdArray = Uint16Array | Uint32Array
 type GrowableFreqArray = Uint8Array | Uint16Array
 
-function packedColumnFromUint32(values: Uint32Array, maxValue: number): Uint8Array | Uint16Array | Uint32Array {
+function packedColumnFromUint32(
+  values: Uint32Array,
+  maxValue: number,
+): Uint8Array | Uint16Array | Uint32Array {
   const out = packedIndexArray(values.length, maxValue)
   out.set(values)
   return out
 }
 
-function packedColumnFromNumbers(values: readonly number[], maxValue: number): Uint8Array | Uint16Array | Uint32Array {
+function packedColumnFromNumbers(
+  values: readonly number[],
+  maxValue: number,
+): Uint8Array | Uint16Array | Uint32Array {
   const out = packedIndexArray(values.length, maxValue)
   out.set(values)
   return out
@@ -91,9 +97,10 @@ class GrowableDocIdColumn {
   }
 
   private grow(minCapacity: number): void {
-    const grown = this._buf instanceof Uint16Array
-      ? new Uint16Array(minCapacity)
-      : new Uint32Array(minCapacity)
+    const grown =
+      this._buf instanceof Uint16Array
+        ? new Uint16Array(minCapacity)
+        : new Uint32Array(minCapacity)
     grown.set(this._buf)
     this._buf = grown
   }
@@ -144,9 +151,10 @@ class GrowableFreqColumn {
   }
 
   private grow(minCapacity: number): void {
-    const grown = this._buf instanceof Uint8Array
-      ? new Uint8Array(minCapacity)
-      : new Uint16Array(minCapacity)
+    const grown =
+      this._buf instanceof Uint8Array
+        ? new Uint8Array(minCapacity)
+        : new Uint16Array(minCapacity)
     grown.set(this._buf)
     this._buf = grown
   }
@@ -214,7 +222,12 @@ export class IncrementalPostingsAccumulator {
     return this._maxFreq
   }
 
-  append(termIndex: number, fieldId: number, docId: number, freq: number): void {
+  append(
+    termIndex: number,
+    fieldId: number,
+    docId: number,
+    freq: number,
+  ): void {
     const slot = termIndex * this._fieldCount + fieldId
     this._docIds.push(docId)
     const v = this._freqs.push(freq)
@@ -251,9 +264,9 @@ export class IncrementalPostingsAccumulator {
       const docId = this._docIds.get(i)
       const freq = this._freqs.get(i)
       if (docIdWidth === 16) {
-        (allDocIds as Uint16Array)[dest] = docId
+        ;(allDocIds as Uint16Array)[dest] = docId
       } else {
-        (allDocIds as Uint32Array)[dest] = docId
+        ;(allDocIds as Uint32Array)[dest] = docId
       }
       allFreqs[dest] = freq
     }
@@ -280,9 +293,10 @@ export class IncrementalPostingsAccumulator {
 
     const layout = choosePostingsLayout(fieldCount, termCount, nonEmptySlots)
     const docIdWidth: 16 | 32 = nextId <= 65535 ? 16 : 32
-    const allDocIds: DocIdArray = docIdWidth === 16
-      ? new Uint16Array(totalPostings)
-      : new Uint32Array(totalPostings)
+    const allDocIds: DocIdArray =
+      docIdWidth === 16
+        ? new Uint16Array(totalPostings)
+        : new Uint32Array(totalPostings)
     const allFreqs = allocateFreqs(totalPostings, maxFreq)
     const slotOffsets = new Uint32Array(slotCount)
     let write = 0
@@ -335,9 +349,10 @@ export class IncrementalPostingsAccumulator {
     this.scatterPostings(allDocIds, allFreqs, cursors, docIdWidth)
     this.release()
 
-    const sparseFieldIds: FieldIdArray = sparseFieldIdWidth === 16
-      ? new Uint16Array(sparseFieldIdsScratch)
-      : new Uint8Array(sparseFieldIdsScratch)
+    const sparseFieldIds: FieldIdArray =
+      sparseFieldIdWidth === 16
+        ? new Uint16Array(sparseFieldIdsScratch)
+        : new Uint8Array(sparseFieldIdsScratch)
 
     return {
       fieldCount,
@@ -350,7 +365,10 @@ export class IncrementalPostingsAccumulator {
       allFreqs,
       sparseTermStarts: packedColumnFromUint32(termStarts, nonEmptySlots),
       sparseFieldIds,
-      sparseOffsets: packedColumnFromNumbers(sparseOffsetsScratch, totalPostings),
+      sparseOffsets: packedColumnFromNumbers(
+        sparseOffsetsScratch,
+        totalPostings,
+      ),
       sparseLengths: packedColumnFromNumbers(sparseLengthsScratch, nextId),
     }
   }

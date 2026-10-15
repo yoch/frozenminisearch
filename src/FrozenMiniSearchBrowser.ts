@@ -1,8 +1,6 @@
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
 import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodePacked'
-import {
-  defaultFrozenLoadOptions,
-} from './searchDefaults'
+import { defaultFrozenLoadOptions } from './searchDefaults'
 import type { BrowserSaveBinaryAsyncOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
   assembleFrozenFromBinarySnapshot,
@@ -16,7 +14,11 @@ export function buildFrozenFromDocuments<T>(
   documents: readonly T[],
   options: Options<T>,
 ): FrozenMiniSearchBrowser<T> {
-  return frozenFromDocumentsWithCtor(FrozenMiniSearchBrowser, documents, options)
+  return frozenFromDocumentsWithCtor(
+    FrozenMiniSearchBrowser,
+    documents,
+    options,
+  )
 }
 
 /** Finalize a {@link FrozenIndexBuilder} into a read-only browser index. */
@@ -26,8 +28,12 @@ export function freezeFrozenIndexBuilder<T>(
   return frozenFromIndexBuilderWithCtor(FrozenMiniSearchBrowser, builder)
 }
 
-export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCore<T> {
-  async saveBinaryAsync(saveOptions: BrowserSaveBinaryAsyncOptions = {}): Promise<Uint8Array> {
+export default class FrozenMiniSearchBrowser<
+  T = any,
+> extends FrozenMiniSearchCore<T> {
+  async saveBinaryAsync(
+    saveOptions: BrowserSaveBinaryAsyncOptions = {},
+  ): Promise<Uint8Array> {
     return encodeFrozenSnapshotMsv5PackedBrowser(
       this._binarySnapshotInput(),
       this._index,
@@ -39,7 +45,8 @@ export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCo
     buffer: Uint8Array,
     options: Options<T> = {} as Options<T>,
   ): Promise<FrozenMiniSearchBrowser<T>> {
-    const storeFields = options.storeFields ?? defaultFrozenLoadOptions.storeFields
+    const storeFields =
+      options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = await decodeFrozenSnapshotMsv5Browser(buffer, { storeFields })
     return FrozenMiniSearchBrowser._fromBinarySnapshot(snap, options, buffer)
   }
@@ -49,6 +56,11 @@ export default class FrozenMiniSearchBrowser<T = any> extends FrozenMiniSearchCo
     options: Options<T>,
     buffer: Uint8Array,
   ): FrozenMiniSearchBrowser<T> {
-    return assembleFrozenFromBinarySnapshot(snap, options, buffer, FrozenMiniSearchBrowser)
+    return assembleFrozenFromBinarySnapshot(
+      snap,
+      options,
+      buffer,
+      FrozenMiniSearchBrowser,
+    )
   }
 }

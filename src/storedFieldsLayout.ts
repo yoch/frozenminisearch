@@ -3,12 +3,15 @@
  * Wire format stays row JSON; encode/decode can skip intermediate row arrays when layout is known.
  */
 
-export type StoredFieldsLayout
-  = | { kind: 'none' }
-    | { kind: 'single', field: string, values: unknown[] }
-    | { kind: 'multi', rows: (Record<string, unknown> | undefined)[] }
+export type StoredFieldsLayout =
+  | { kind: 'none' }
+  | { kind: 'single'; field: string; values: unknown[] }
+  | { kind: 'multi'; rows: (Record<string, unknown> | undefined)[] }
 
-export { storedFieldsJsonBytes, storedFieldsSlotCount } from './storedFieldsLayoutMetrics.js'
+export {
+  storedFieldsJsonBytes,
+  storedFieldsSlotCount,
+} from './storedFieldsLayoutMetrics.js'
 
 export function createStoredFieldsLayout(
   storeFields: readonly string[],
@@ -16,7 +19,11 @@ export function createStoredFieldsLayout(
 ): StoredFieldsLayout {
   if (storeFields.length === 0) return { kind: 'none' }
   if (storeFields.length === 1) {
-    return { kind: 'single', field: storeFields[0], values: new Array(capacity) }
+    return {
+      kind: 'single',
+      field: storeFields[0],
+      values: new Array(capacity),
+    }
   }
   return { kind: 'multi', rows: new Array(capacity) }
 }
@@ -69,22 +76,35 @@ export function assignStoredFields(
   if (row != null) Object.assign(target, row)
 }
 
-export function resizeStoredFields(layout: StoredFieldsLayout, length: number): StoredFieldsLayout {
+export function resizeStoredFields(
+  layout: StoredFieldsLayout,
+  length: number,
+): StoredFieldsLayout {
   if (layout.kind === 'none') return layout
   if (layout.kind === 'single') {
     return layout.values.length <= length
       ? layout
-      : { kind: 'single', field: layout.field, values: layout.values.slice(0, length) }
+      : {
+          kind: 'single',
+          field: layout.field,
+          values: layout.values.slice(0, length),
+        }
   }
   return layout.rows.length <= length
     ? layout
     : { kind: 'multi', rows: layout.rows.slice(0, length) }
 }
 
-export function cloneStoredFields(layout: StoredFieldsLayout): StoredFieldsLayout {
+export function cloneStoredFields(
+  layout: StoredFieldsLayout,
+): StoredFieldsLayout {
   if (layout.kind === 'none') return layout
   if (layout.kind === 'single') {
-    return { kind: 'single', field: layout.field, values: layout.values.slice() }
+    return {
+      kind: 'single',
+      field: layout.field,
+      values: layout.values.slice(),
+    }
   }
   return { kind: 'multi', rows: layout.rows.slice() }
 }
@@ -95,12 +115,14 @@ export function storedFieldsFromRows(
   storeFields: readonly string[],
 ): StoredFieldsLayout {
   if (storeFields.length === 0) {
-    const hasAny = rows.some(row => row != null && Object.keys(row).length > 0)
+    const hasAny = rows.some(
+      (row) => row != null && Object.keys(row).length > 0,
+    )
     return hasAny ? { kind: 'multi', rows } : { kind: 'none' }
   }
   if (storeFields.length === 1) {
     const field = storeFields[0]
-    const values = rows.map(row => row?.[field])
+    const values = rows.map((row) => row?.[field])
     return { kind: 'single', field, values }
   }
   return { kind: 'multi', rows }

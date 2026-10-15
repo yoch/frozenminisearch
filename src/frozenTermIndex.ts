@@ -6,22 +6,30 @@ import { decodeLeafSlot } from './PackedRadixTree/layout'
 export type FrozenTermIndex = PackedRadixTree
 
 /** Validate packed-tree invariants for a frozen index (term indices in `[0, termCount)`). */
-export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: number): void {
+export function validateFrozenTermIndexLeaves(
+  tree: PackedRadixTree,
+  termCount: number,
+): void {
   if (
-    tree.nodeEdgeOffset.length !== tree.nodeCount + 1
-    || tree.nodeValue.length !== tree.nodeCount
-    || tree.nodeLeafOrder.length !== tree.nodeCount
-    || tree.edgeLabelStart.length !== tree.edgeCount
-    || tree.edgeLabelLength.length !== tree.edgeCount
-    || tree.edgeChild.length !== tree.edgeCount
+    tree.nodeEdgeOffset.length !== tree.nodeCount + 1 ||
+    tree.nodeValue.length !== tree.nodeCount ||
+    tree.nodeLeafOrder.length !== tree.nodeCount ||
+    tree.edgeLabelStart.length !== tree.edgeCount ||
+    tree.edgeLabelLength.length !== tree.edgeCount ||
+    tree.edgeChild.length !== tree.edgeCount
   ) {
     throw new Error('FrozenTermIndex: array length mismatch')
   }
   if (tree.nodeCount === 0) {
     throw new Error('FrozenTermIndex: missing root node')
   }
-  if (tree.nodeEdgeOffset[0] !== 0 || tree.nodeEdgeOffset[tree.nodeCount] !== tree.edgeCount) {
-    throw new Error('FrozenTermIndex: edge offsets not bounded by [0, edgeCount]')
+  if (
+    tree.nodeEdgeOffset[0] !== 0 ||
+    tree.nodeEdgeOffset[tree.nodeCount] !== tree.edgeCount
+  ) {
+    throw new Error(
+      'FrozenTermIndex: edge offsets not bounded by [0, edgeCount]',
+    )
   }
 
   const seenLeaves = new Uint8Array(termCount)
@@ -30,7 +38,9 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
     const first = tree.nodeEdgeOffset[node]
     const count = tree.nodeEdgeOffset[node + 1] - first
     if (count < 0) {
-      throw new Error(`FrozenTermIndex: node ${node} edge offsets not monotonic`)
+      throw new Error(
+        `FrozenTermIndex: node ${node} edge offsets not monotonic`,
+      )
     }
 
     const leafSlot = decodeLeafSlot(tree.nodeLeafOrder[node])
@@ -56,7 +66,11 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
   for (let edge = 0; edge < tree.edgeCount; edge++) {
     const start = tree.edgeLabelStart[edge]
     const len = tree.edgeLabelLength[edge]
-    if (len === 0 || len > MAX_PACKED_EDGE_LABEL_LENGTH || start + len > tree.labelHeap.length) {
+    if (
+      len === 0 ||
+      len > MAX_PACKED_EDGE_LABEL_LENGTH ||
+      start + len > tree.labelHeap.length
+    ) {
       throw new Error(`FrozenTermIndex: edge ${edge} label range out of bounds`)
     }
     if (tree.edgeChild[edge] >= tree.nodeCount) {
@@ -64,10 +78,14 @@ export function validateFrozenTermIndexLeaves(tree: PackedRadixTree, termCount: 
     }
   }
   if (leafCount !== termCount) {
-    throw new Error(`FrozenTermIndex: leaf count ${leafCount} !== termCount ${termCount}`)
+    throw new Error(
+      `FrozenTermIndex: leaf count ${leafCount} !== termCount ${termCount}`,
+    )
   }
   if (tree.size !== termCount) {
-    throw new Error(`FrozenTermIndex: size ${tree.size} !== termCount ${termCount}`)
+    throw new Error(
+      `FrozenTermIndex: size ${tree.size} !== termCount ${termCount}`,
+    )
   }
   assertTreeShape(tree)
 }
@@ -87,7 +105,9 @@ function assertTreeShape(tree: PackedRadixTree): void {
     const first = nodeEdgeOffset[node]
     const end = nodeEdgeOffset[node + 1]
     if (top + end - first > stack.length) {
-      const grown = new Uint32Array(Math.max(stack.length * 2, top + end - first))
+      const grown = new Uint32Array(
+        Math.max(stack.length * 2, top + end - first),
+      )
       grown.set(stack.subarray(0, top))
       stack = grown
     }
@@ -96,7 +116,9 @@ function assertTreeShape(tree: PackedRadixTree): void {
       const word = child >>> 5
       const bit = 1 << (child & 31)
       if ((visited[word] & bit) !== 0) {
-        throw new Error(`FrozenTermIndex: node ${child} is reached more than once`)
+        throw new Error(
+          `FrozenTermIndex: node ${child} is reached more than once`,
+        )
       }
       visited[word] |= bit
       reached++
@@ -104,6 +126,8 @@ function assertTreeShape(tree: PackedRadixTree): void {
     }
   }
   if (reached !== nodeCount) {
-    throw new Error(`FrozenTermIndex: ${nodeCount - reached} nodes are unreachable from the root`)
+    throw new Error(
+      `FrozenTermIndex: ${nodeCount - reached} nodes are unreachable from the root`,
+    )
   }
 }

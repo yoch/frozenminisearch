@@ -1,7 +1,7 @@
 {
   "name": "@yoch/frozenminisearch",
   "version": "1.12.0",
-  "description": "Read-only full-text search — compact frozen indexes and binary snapshots (Node.js and browser)",
+  "description": "Low-memory, read-only full-text search for Node.js and browsers: MiniSearch-compatible API on frozen, compact indexes and binary snapshots",
   "main": "dist/cjs/index.require.cjs",
   "module": "dist/es/index.js",
   "type": "module",
@@ -22,7 +22,7 @@
   "contributors": [
     "Luca Ongaro <https://github.com/lucaong> (MiniSearch original)"
   ],
-  "homepage": "https://github.com/yoch/frozenminisearch#readme",
+  "homepage": "https://yoch.github.io/frozenminisearch/",
   "bugs": "https://github.com/yoch/frozenminisearch/issues",
   "repository": {
     "type": "git",
@@ -38,7 +38,13 @@
     "frozen",
     "binary",
     "node",
-    "browser"
+    "browser",
+    "minisearch",
+    "full-text-search",
+    "bm25",
+    "low-memory",
+    "search-index",
+    "typescript"
   ],
   "license": "MIT",
   "engines": {

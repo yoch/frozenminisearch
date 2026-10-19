@@ -16,6 +16,10 @@ Use it when your documents are built offline, shipped to production, and queried
 This package is intentionally focused on fixed-corpus serving: build frozen
 directly, persist binary snapshots, then load and query them many times.
 
+```bash
+npm install @yoch/frozenminisearch   # or: pnpm add @yoch/frozenminisearch
+```
+
 ---
 
 ## Why FrozenMiniSearch?

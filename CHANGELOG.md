@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- An indexed field named `__proto__` returned wrong matches (its terms were attributed to another field) and made `saveBinarySync` / `saveBinaryAsync` throw. Field ids and per-query field boosts now live in objects without a prototype, so such a field behaves like any other, as in MiniSearch. No wire-format changes.
+
 ## v1.12.0 — `@yoch/frozenminisearch`
 
 Minor release: lean result paths for callers that rank or merge matches themselves. `matchIds()` returns the ids an unbounded `search()` would match, collected in bitsets without scores or result objects, and `matchInfo: false` on `search()` and `searchPage()` keeps the same scores and order without building match information. Without these options, search results, scores and ordering are unchanged; combination operators named after inherited object properties, such as `constructor`, now throw. No changes to runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.

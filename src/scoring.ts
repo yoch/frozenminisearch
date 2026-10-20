@@ -16,10 +16,17 @@ import type {
   BM25Params,
 } from './searchTypes'
 import { isWildcardQuery } from './symbols'
-import { assignStoredFields, type StoredFieldsLayout } from './storedFieldsLayout'
+import {
+  assignStoredFields,
+  type StoredFieldsLayout,
+} from './storedFieldsLayout'
 import type { PackedTermCursor } from './PackedRadixTree/types'
 
-export type { BM25Params, CombinationOperator, LowercaseCombinationOperator } from './searchTypes'
+export type {
+  BM25Params,
+  CombinationOperator,
+  LowercaseCombinationOperator,
+} from './searchTypes'
 
 export const OR: LowercaseCombinationOperator = 'or'
 export const AND: LowercaseCombinationOperator = 'and'
@@ -49,12 +56,12 @@ export interface DocIdSet extends DocIdGate {
 /** Posting list for one (term, field): docId -> term frequency */
 export interface PostingListLike {
   readonly size: number
-  forEachDoc (callback: (docId: number, termFreq: number) => void): void
+  forEachDoc(callback: (docId: number, termFreq: number) => void): void
 }
 
 /** term -> fieldId -> posting list */
 export interface FieldTermDataLike {
-  get (fieldId: number): PostingListLike | undefined
+  get(fieldId: number): PostingListLike | undefined
 }
 
 export interface AggregateContext {
@@ -77,13 +84,18 @@ type Bm25FieldConstants = {
   bOverAvg: number
 }
 
-function bm25FieldConstants(bm25params: BM25Params, avgFieldLength: number): Bm25FieldConstants {
+function bm25FieldConstants(
+  bm25params: BM25Params,
+  avgFieldLength: number,
+): Bm25FieldConstants {
   const { k, b, d } = bm25params
   return { k, d, k1: k + 1, oneMinusB: 1 - b, bOverAvg: b / avgFieldLength }
 }
 
 function bm25Idf(matchingCount: number, totalCount: number): number {
-  return Math.log(1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5))
+  return Math.log(
+    1 + (totalCount - matchingCount + 0.5) / (matchingCount + 0.5),
+  )
 }
 
 function calcBm25TfWithConstants(
@@ -93,7 +105,11 @@ function calcBm25TfWithConstants(
   idf: number,
 ): number {
   const { k, d, k1, oneMinusB, bOverAvg } = constants
-  return idf * (d + termFreq * k1 / (termFreq + k * (oneMinusB + bOverAvg * fieldLength)))
+  return (
+    idf *
+    (d +
+      (termFreq * k1) / (termFreq + k * (oneMinusB + bOverAvg * fieldLength)))
+  )
 }
 
 function calcBM25ScoreWithConstants(
@@ -104,7 +120,10 @@ function calcBM25ScoreWithConstants(
   constants: Bm25FieldConstants,
 ): number {
   return calcBm25TfWithConstants(
-    termFreq, fieldLength, constants, bm25Idf(matchingCount, totalCount),
+    termFreq,
+    fieldLength,
+    constants,
+    bm25Idf(matchingCount, totalCount),
   )
 }
 
@@ -115,12 +134,19 @@ export const calcBM25Score = (
   fieldLength: number,
   avgFieldLength: number,
   bm25params: BM25Params,
-): number => calcBM25ScoreWithConstants(
-  termFreq, matchingCount, totalCount, fieldLength, bm25FieldConstants(bm25params, avgFieldLength),
-)
+): number =>
+  calcBM25ScoreWithConstants(
+    termFreq,
+    matchingCount,
+    totalCount,
+    fieldLength,
+    bm25FieldConstants(bm25params, avgFieldLength),
+  )
 
-const getOwnProperty = (object: Record<string, unknown>, property: string): unknown =>
-  Object.hasOwn(object, property) ? object[property] : undefined
+const getOwnProperty = (
+  object: Record<string, unknown>,
+  property: string,
+): unknown => (Object.hasOwn(object, property) ? object[property] : undefined)
 
 /** Field boosts for one query spec; `names` is computed once from `boosts`. */
 export type FieldBoostsForQuery = {
@@ -135,7 +161,11 @@ export function fieldBoostsForQuery(
   const searchFields = options.fields || fields
   const boosts: { [field: string]: number } = {}
   for (const field of searchFields) {
-    boosts[field] = (getOwnProperty(options.boost as Record<string, unknown>, field) as number) || 1
+    boosts[field] =
+      (getOwnProperty(
+        options.boost as Record<string, unknown>,
+        field,
+      ) as number) || 1
   }
   return { names: Object.keys(boosts), boosts }
 }
@@ -144,7 +174,10 @@ const assignUniqueTerm = (target: string[], term: string): void => {
   if (!target.includes(term)) target.push(term)
 }
 
-const assignUniqueTerms = (target: string[], source: readonly string[]): void => {
+const assignUniqueTerms = (
+  target: string[],
+  source: readonly string[],
+): void => {
   for (const term of source) {
     if (!target.includes(term)) target.push(term)
   }
@@ -154,9 +187,7 @@ export type Scored = { score: number }
 export const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
 /** Eager materialized term, or a traversal cursor resolved at most once per posting list. */
-export type AggregateDerivedTerm
-  = | string
-    | PackedTermCursor
+export type AggregateDerivedTerm = string | PackedTermCursor
 
 export type AggregateTermOptions = {
   /** When set, only score postings whose docId is in this gate. Does not affect matchingFields. */
@@ -172,7 +203,11 @@ export type AggregateTermOptions = {
 const KEYED_MATCH_MAX_DERIVED_TERMS = 1024
 
 /** Per posting list: resolved derived term, and whether and how match objects are built. */
-type DerivedTermState = { value?: string, keyedMatch: boolean, trackMatch: boolean }
+type DerivedTermState = {
+  value?: string
+  keyedMatch: boolean
+  trackMatch: boolean
+}
 
 function getDerivedTerm(
   derivedTerm: AggregateDerivedTerm,
@@ -195,7 +230,13 @@ function scorePostingDoc(
   fieldBoost: number,
   matchingFields: number,
   context: AggregateContext,
-  boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
+  boostDocumentFn:
+    | ((
+        id: unknown,
+        term: string,
+        storedFields?: Record<string, unknown>,
+      ) => number)
+    | undefined,
   bm25: Bm25FieldConstants,
   results: RawResult,
   derivedTermCache: DerivedTermState,
@@ -203,26 +244,42 @@ function scorePostingDoc(
 ): void {
   const { trackMatch } = derivedTermCache
   // Without match tracking, only boostDocument needs the derived term string.
-  const resolvedDerivedTerm = trackMatch || boostDocumentFn ? getDerivedTerm(derivedTerm, derivedTermCache) : ''
+  const resolvedDerivedTerm =
+    trackMatch || boostDocumentFn
+      ? getDerivedTerm(derivedTerm, derivedTermCache)
+      : ''
   const docBoost = boostDocumentFn
-    ? boostDocumentFn(context.getExternalId(docId), resolvedDerivedTerm, context.getStoredFields(docId))
+    ? boostDocumentFn(
+        context.getExternalId(docId),
+        resolvedDerivedTerm,
+        context.getStoredFields(docId),
+      )
     : 1
   if (!docBoost) return
 
   const fieldLength = context.getFieldLength(docId, fieldId)
-  const rawScore = hoistedIdf !== undefined
-    ? calcBm25TfWithConstants(termFreq, fieldLength, bm25, hoistedIdf)
-    : calcBM25ScoreWithConstants(
-        termFreq, matchingFields, context.documentCount, fieldLength, bm25,
-      )
-  const weightedScore = termWeight * termBoost * fieldBoost * docBoost * rawScore
+  const rawScore =
+    hoistedIdf !== undefined
+      ? calcBm25TfWithConstants(termFreq, fieldLength, bm25, hoistedIdf)
+      : calcBM25ScoreWithConstants(
+          termFreq,
+          matchingFields,
+          context.documentCount,
+          fieldLength,
+          bm25,
+        )
+  const weightedScore =
+    termWeight * termBoost * fieldBoost * docBoost * rawScore
 
   const result = results.get(docId)
   if (result) {
     result.score += weightedScore
     assignUniqueTerm(result.terms, sourceTerm)
     if (!trackMatch) return
-    const match = getOwnProperty(result.match as Record<string, unknown>, resolvedDerivedTerm) as string[] | undefined
+    const match = getOwnProperty(
+      result.match as Record<string, unknown>,
+      resolvedDerivedTerm,
+    ) as string[] | undefined
     if (match) {
       match.push(field)
     } else {
@@ -262,7 +319,13 @@ function aggregateSegmentPostingList(
   fieldBoost: number,
   list: SegmentPostingList,
   context: AggregateContext,
-  boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
+  boostDocumentFn:
+    | ((
+        id: unknown,
+        term: string,
+        storedFields?: Record<string, unknown>,
+      ) => number)
+    | undefined,
   bm25params: BM25Params,
   results: RawResult,
   keyedMatch: boolean,
@@ -273,7 +336,11 @@ function aggregateSegmentPostingList(
   const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
   const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
   const { docIds, freqs, offset, length } = list
-  const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch, trackMatch }
+  const derivedTermCache: DerivedTermState = {
+    value: undefined,
+    keyedMatch,
+    trackMatch,
+  }
 
   if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
     for (const docId of allowedDocs) {
@@ -281,9 +348,21 @@ function aggregateSegmentPostingList(
       if (index < 0) continue
 
       scorePostingDoc(
-        sourceTerm, derivedTerm, field, fieldId, docId, freqs[index],
-        termWeight, termBoost, fieldBoost, matchingFields,
-        context, boostDocumentFn, bm25, results, derivedTermCache,
+        sourceTerm,
+        derivedTerm,
+        field,
+        fieldId,
+        docId,
+        freqs[index],
+        termWeight,
+        termBoost,
+        fieldBoost,
+        matchingFields,
+        context,
+        boostDocumentFn,
+        bm25,
+        results,
+        derivedTermCache,
         hoistedIdf,
       )
     }
@@ -297,9 +376,21 @@ function aggregateSegmentPostingList(
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
 
     scorePostingDoc(
-      sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
-      termWeight, termBoost, fieldBoost, matchingFields,
-      context, boostDocumentFn, bm25, results, derivedTermCache,
+      sourceTerm,
+      derivedTerm,
+      field,
+      fieldId,
+      docId,
+      termFreq,
+      termWeight,
+      termBoost,
+      fieldBoost,
+      matchingFields,
+      context,
+      boostDocumentFn,
+      bm25,
+      results,
+      derivedTermCache,
       hoistedIdf,
     )
   }
@@ -313,7 +404,13 @@ export function aggregateTerm(
   fieldTermData: FieldTermDataLike | undefined,
   fieldBoosts: FieldBoostsForQuery,
   context: AggregateContext,
-  boostDocumentFn: ((id: unknown, term: string, storedFields?: Record<string, unknown>) => number) | undefined,
+  boostDocumentFn:
+    | ((
+        id: unknown,
+        term: string,
+        storedFields?: Record<string, unknown>,
+      ) => number)
+    | undefined,
   bm25params: BM25Params,
   results: RawResult = new Map(),
   termOptions?: AggregateTermOptions,
@@ -332,10 +429,21 @@ export function aggregateTerm(
 
     if (postingList instanceof SegmentPostingList) {
       aggregateSegmentPostingList(
-        sourceTerm, derivedTerm, termWeight, termBoost,
-        field, fieldId, fieldBoost, postingList,
-        context, boostDocumentFn, bm25params, results,
-        keyedMatch, trackMatch, allowedDocs,
+        sourceTerm,
+        derivedTerm,
+        termWeight,
+        termBoost,
+        field,
+        fieldId,
+        fieldBoost,
+        postingList,
+        context,
+        boostDocumentFn,
+        bm25params,
+        results,
+        keyedMatch,
+        trackMatch,
+        allowedDocs,
       )
       continue
     }
@@ -343,15 +451,31 @@ export function aggregateTerm(
     const matchingFields = postingList.size
     const bm25 = bm25FieldConstants(bm25params, context.avgFieldLength[fieldId])
     const hoistedIdf = bm25Idf(matchingFields, context.documentCount)
-    const derivedTermCache: DerivedTermState = { value: undefined, keyedMatch, trackMatch }
+    const derivedTermCache: DerivedTermState = {
+      value: undefined,
+      keyedMatch,
+      trackMatch,
+    }
 
     postingList.forEachDoc((docId, termFreq) => {
       if (allowedDocs != null && !allowedDocs.has(docId)) return
 
       scorePostingDoc(
-        sourceTerm, derivedTerm, field, fieldId, docId, termFreq,
-        termWeight, termBoost, fieldBoost, matchingFields,
-        context, boostDocumentFn, bm25, results, derivedTermCache,
+        sourceTerm,
+        derivedTerm,
+        field,
+        fieldId,
+        docId,
+        termFreq,
+        termWeight,
+        termBoost,
+        fieldBoost,
+        matchingFields,
+        context,
+        boostDocumentFn,
+        bm25,
+        results,
+        derivedTermCache,
         hoistedIdf,
       )
     })
@@ -451,7 +575,10 @@ const combinators: Record<LowercaseCombinationOperator, CombinatorFunction> = {
  * Combines per-term raw results. Mutates `results[0]` in place (OR/AND/AND_NOT); do not reuse
  * other entries in `results` after this call.
  */
-export function combineResults(results: RawResult[], combineWith: CombinationOperator = OR): RawResult {
+export function combineResults(
+  results: RawResult[],
+  combineWith: CombinationOperator = OR,
+): RawResult {
   if (results.length === 0) return new Map()
   const combinator = combinatorFor(combineWith)
   if (results.length === 1) return results[0]
@@ -465,13 +592,17 @@ function combinatorFor(combineWith: CombinationOperator): CombinatorFunction {
     ? combinators[operator as LowercaseCombinationOperator]
     : undefined
   if (!combinator) {
-    throw new Error(`FrozenMiniSearch: invalid combination operator: ${combineWith}`)
+    throw new Error(
+      `FrozenMiniSearch: invalid combination operator: ${combineWith}`,
+    )
   }
   return combinator
 }
 
 /** Throws for an operator that {@link combineResults} rejects, even with a single result. */
-export function assertCombinationOperator(combineWith: CombinationOperator): void {
+export function assertCombinationOperator(
+  combineWith: CombinationOperator,
+): void {
   combinatorFor(combineWith)
 }
 
@@ -492,7 +623,9 @@ export interface FinalizeSearchParams {
 export function resolveResultLimit(limit: unknown): number | undefined {
   if (limit === undefined || limit === Infinity) return undefined
   if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 0) {
-    throw new Error('FrozenMiniSearch: limit must be a non-negative integer or Infinity')
+    throw new Error(
+      'FrozenMiniSearch: limit must be a non-negative integer or Infinity',
+    )
   }
   return limit
 }
@@ -528,7 +661,8 @@ export function finalizeRawSearchResults(
     ...globalSearchOptions,
     ...searchOptions,
   }
-  const skipSort = isWildcardQuery(query) && searchOptionsWithDefaults.boostDocument == null
+  const skipSort =
+    isWildcardQuery(query) && searchOptionsWithDefaults.boostDocument == null
   return finalizeSearchResults({
     rawResults,
     getExternalId,
@@ -553,8 +687,14 @@ export function newSearchResult(
   matchInfo: boolean,
 ): SearchResult {
   return matchInfo
-    ? { id, score, terms: Object.keys(match!), queryTerms: terms, match: match! }
-    : { id, score, queryTerms: terms } as SearchResult
+    ? {
+        id,
+        score,
+        terms: Object.keys(match!),
+        queryTerms: terms,
+        match: match!,
+      }
+    : ({ id, score, queryTerms: terms } as SearchResult)
 }
 
 function materializeSearchResult(
@@ -564,9 +704,18 @@ function materializeSearchResult(
 ): SearchResult {
   const { score, terms, match } = value
   const result = newSearchResult(
-    params.getExternalId(docId), score * (terms.length || 1), terms, match, params.matchInfo !== false,
+    params.getExternalId(docId),
+    score * (terms.length || 1),
+    terms,
+    match,
+    params.matchInfo !== false,
   )
-  writeStoredFieldsOntoResult(docId, result, params.storedFieldsLayout, params.getStoredFields)
+  writeStoredFieldsOntoResult(
+    docId,
+    result,
+    params.storedFieldsLayout,
+    params.getStoredFields,
+  )
   return result
 }
 
@@ -586,7 +735,8 @@ function topRankIndices(scores: Float64Array, k: number): Int32Array {
       if (left >= size) return
       const right = left + 1
       let worst = left
-      if (right < size && ranksBefore(scores, heap[left], heap[right])) worst = right
+      if (right < size && ranksBefore(scores, heap[left], heap[right]))
+        worst = right
       if (!ranksBefore(scores, heap[i], heap[worst])) return
       const tmp = heap[i]
       heap[i] = heap[worst]
@@ -615,7 +765,10 @@ function topRankIndices(scores: Float64Array, k: number): Int32Array {
 }
 
 /** Rank a small prefix first, then sort the remainder only if the filter needs it. */
-function* rankedCandidateBatches(scores: Float64Array, limit: number): Generator<Int32Array> {
+function* rankedCandidateBatches(
+  scores: Float64Array,
+  limit: number,
+): Generator<Int32Array> {
   const order = new Int32Array(scores.length)
   for (let i = 0; i < order.length; i++) order[i] = i
   if (limit >= scores.length / 8) {
@@ -631,7 +784,10 @@ function* rankedCandidateBatches(scores: Float64Array, limit: number): Generator
       const left = parent * 2 + 1
       if (left >= size) break
       const right = left + 1
-      const best = right < size && ranksBefore(scores, order[right], order[left]) ? right : left
+      const best =
+        right < size && ranksBefore(scores, order[right], order[left])
+          ? right
+          : left
       if (!ranksBefore(scores, order[best], candidate)) break
       order[parent] = order[best]
       parent = best
@@ -671,7 +827,10 @@ function collectResultScores(rawResults: RawResult): Float64Array {
 }
 
 /** Materialize selected entries in rank order, visiting the raw map once. */
-function materializeRankedResults(params: FinalizeSearchParams, top: Int32Array): SearchResult[] {
+function materializeRankedResults(
+  params: FinalizeSearchParams,
+  top: Int32Array,
+): SearchResult[] {
   const { rawResults } = params
   const byEntry = Array.from(top.keys()).sort((a, b) => top[a] - top[b])
   const results = new Array<SearchResult>(top.length)
@@ -689,8 +848,14 @@ function materializeRankedResults(params: FinalizeSearchParams, top: Int32Array)
 }
 
 /** Keep the common small top-k path independent of filtered/native-sort paths. */
-function finalizeTopSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
-  return materializeRankedResults(params, topRankIndices(collectResultScores(params.rawResults), limit))
+function finalizeTopSearchResults(
+  params: FinalizeSearchParams,
+  limit: number,
+): SearchResult[] {
+  return materializeRankedResults(
+    params,
+    topRankIndices(collectResultScores(params.rawResults), limit),
+  )
 }
 
 /** Up to this page end, heap selection of the prefix beats selecting the page window. */
@@ -709,7 +874,13 @@ function rankResultPrefix(scores: Float64Array, end: number): Int32Array {
  * Reorder `order[left..right]` so that `order[k]` holds the entry of that rank,
  * with better-ranked entries before it (quickselect, median-of-three pivot).
  */
-function selectRank(scores: Float64Array, order: Int32Array, left: number, right: number, k: number): void {
+function selectRank(
+  scores: Float64Array,
+  order: Int32Array,
+  left: number,
+  right: number,
+  k: number,
+): void {
   const swap = (i: number, j: number): void => {
     const tmp = order[i]
     order[i] = order[j]
@@ -733,17 +904,28 @@ function selectRank(scores: Float64Array, order: Int32Array, left: number, right
 }
 
 /** Entries ranked `start..end-1`, in rank order; selects the window instead of sorting a deep prefix. */
-function rankResultWindow(scores: Float64Array, start: number, end: number): Int32Array {
+function rankResultWindow(
+  scores: Float64Array,
+  start: number,
+  end: number,
+): Int32Array {
   if (end <= PAGE_HEAP_MAX) return rankResultPrefix(scores, end).subarray(start)
   const order = new Int32Array(scores.length)
   for (let i = 0; i < order.length; i++) order[i] = i
   if (start > 0) selectRank(scores, order, 0, order.length - 1, start)
-  if (end < order.length) selectRank(scores, order, start, order.length - 1, end)
-  return order.subarray(start, end).sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
+  if (end < order.length)
+    selectRank(scores, order, start, order.length - 1, end)
+  return order
+    .subarray(start, end)
+    .sort((a, b) => (ranksBefore(scores, a, b) ? -1 : 1))
 }
 
 /** One scoring pass; count all filtered candidates, then select the requested page. */
-export function finalizeSearchPage(params: FinalizeSearchParams, offset: number, limit?: number): SearchPage {
+export function finalizeSearchPage(
+  params: FinalizeSearchParams,
+  offset: number,
+  limit?: number,
+): SearchPage {
   const { rawResults, filter, skipSort } = params
   if (filter != null) {
     // A SearchResult predicate needs complete candidates. Keep accepted objects
@@ -758,19 +940,28 @@ export function finalizeSearchPage(params: FinalizeSearchParams, offset: number,
     const end = Math.min(total, offset + (limit ?? total))
     const results = skipSort
       ? matches.slice(offset, end)
-      : Array.from(rankResultWindow(Float64Array.from(matches, r => r.score), offset, end), i => matches[i])
+      : Array.from(
+          rankResultWindow(
+            Float64Array.from(matches, (r) => r.score),
+            offset,
+            end,
+          ),
+          (i) => matches[i],
+        )
     return { results, total }
   }
 
   const total = rawResults.size
   if (offset >= total || limit === 0) return { results: [], total }
-  if (offset === 0) return { results: finalizeSearchResults({ ...params, limit }), total }
+  if (offset === 0)
+    return { results: finalizeSearchResults({ ...params, limit }), total }
   const end = Math.min(total, offset + (limit ?? total))
   if (skipSort) {
     const results: SearchResult[] = []
     let entry = 0
     for (const [docId, value] of rawResults) {
-      if (entry >= offset) results.push(materializeSearchResult(docId, value, params))
+      if (entry >= offset)
+        results.push(materializeSearchResult(docId, value, params))
       if (++entry === end) break
     }
     return { results, total }
@@ -779,7 +970,10 @@ export function finalizeSearchPage(params: FinalizeSearchParams, offset: number,
   return { results: materializeRankedResults(params, order), total }
 }
 
-function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: number): SearchResult[] {
+function finalizeLimitedSearchResults(
+  params: FinalizeSearchParams,
+  limit: number,
+): SearchResult[] {
   const { rawResults, filter, skipSort } = params
   if (limit === 0) return []
 
@@ -805,12 +999,14 @@ function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: numbe
       }
     }
     for (const [docId, value] of rawResults) {
-      if (value === bestValue) return [materializeSearchResult(docId, value, params)]
+      if (value === bestValue)
+        return [materializeSearchResult(docId, value, params)]
     }
     return []
   }
 
-  if (filter == null && limit < rawResults.size / 2) return finalizeTopSearchResults(params, limit)
+  if (filter == null && limit < rawResults.size / 2)
+    return finalizeTopSearchResults(params, limit)
 
   const scores = collectResultScores(rawResults)
   // Equal-score detection is useful for filters and large limits; the common
@@ -840,7 +1036,11 @@ function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: numbe
     const results: SearchResult[] = []
     for (const batch of rankedCandidateBatches(scores, limit)) {
       for (const candidate of batch) {
-        const result = materializeSearchResult(docIds[candidate], values[candidate], params)
+        const result = materializeSearchResult(
+          docIds[candidate],
+          values[candidate],
+          params,
+        )
         if (filter(result)) results.push(result)
         if (results.length === limit) return results
       }
@@ -853,12 +1053,27 @@ function finalizeLimitedSearchResults(params: FinalizeSearchParams, limit: numbe
   const values = Array.from(rawResults.values())
   const order = rankResultPrefix(scores, limit)
   const results = new Array<SearchResult>(limit)
-  for (let i = 0; i < limit; i++) results[i] = materializeSearchResult(docIds[order[i]], values[order[i]], params)
+  for (let i = 0; i < limit; i++)
+    results[i] = materializeSearchResult(
+      docIds[order[i]],
+      values[order[i]],
+      params,
+    )
   return results
 }
 
-export function finalizeSearchResults(params: FinalizeSearchParams): SearchResult[] {
-  const { rawResults, getExternalId, getStoredFields, storedFieldsLayout, filter, skipSort, limit } = params
+export function finalizeSearchResults(
+  params: FinalizeSearchParams,
+): SearchResult[] {
+  const {
+    rawResults,
+    getExternalId,
+    getStoredFields,
+    storedFieldsLayout,
+    filter,
+    skipSort,
+    limit,
+  } = params
   if (limit !== undefined && limit < rawResults.size) {
     return finalizeLimitedSearchResults(params, limit)
   }
@@ -877,8 +1092,19 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
       } else if (allScoresEqual && finalScore !== firstScore) {
         allScoresEqual = false
       }
-      const result = newSearchResult(getExternalId(docId), finalScore, terms, match, matchInfo)
-      writeStoredFieldsOntoResult(docId, result, storedFieldsLayout, getStoredFields)
+      const result = newSearchResult(
+        getExternalId(docId),
+        finalScore,
+        terms,
+        match,
+        matchInfo,
+      )
+      writeStoredFieldsOntoResult(
+        docId,
+        result,
+        storedFieldsLayout,
+        getStoredFields,
+      )
       results[write++] = result
     }
 
@@ -892,8 +1118,19 @@ export function finalizeSearchResults(params: FinalizeSearchParams): SearchResul
   for (const [docId, { score, terms, match }] of rawResults) {
     const quality = terms.length || 1
     const finalScore = score * quality
-    const result = newSearchResult(getExternalId(docId), finalScore, terms, match, matchInfo)
-    writeStoredFieldsOntoResult(docId, result, storedFieldsLayout, getStoredFields)
+    const result = newSearchResult(
+      getExternalId(docId),
+      finalScore,
+      terms,
+      match,
+      matchInfo,
+    )
+    writeStoredFieldsOntoResult(
+      docId,
+      result,
+      storedFieldsLayout,
+      getStoredFields,
+    )
     if (filter(result)) {
       if (firstScore == null) {
         firstScore = finalScore
@@ -917,15 +1154,20 @@ export type QuerySpec = {
   termBoost: number
 }
 
-export const termToQuerySpec = (options: SearchOptions) => (term: string, i: number, terms: string[]): QuerySpec => {
-  const fuzzy = (typeof options.fuzzy === 'function')
-    ? options.fuzzy(term, i, terms)
-    : (options.fuzzy || false)
-  const prefix = (typeof options.prefix === 'function')
-    ? options.prefix(term, i, terms)
-    : (options.prefix === true)
-  const termBoost = (typeof options.boostTerm === 'function')
-    ? options.boostTerm(term, i, terms)
-    : 1
-  return { term, fuzzy, prefix, termBoost }
-}
+export const termToQuerySpec =
+  (options: SearchOptions) =>
+  (term: string, i: number, terms: string[]): QuerySpec => {
+    const fuzzy =
+      typeof options.fuzzy === 'function'
+        ? options.fuzzy(term, i, terms)
+        : options.fuzzy || false
+    const prefix =
+      typeof options.prefix === 'function'
+        ? options.prefix(term, i, terms)
+        : options.prefix === true
+    const termBoost =
+      typeof options.boostTerm === 'function'
+        ? options.boostTerm(term, i, terms)
+        : 1
+    return { term, fuzzy, prefix, termBoost }
+  }

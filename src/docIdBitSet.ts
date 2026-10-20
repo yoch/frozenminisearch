@@ -3,7 +3,7 @@ import type { DocIdGate } from './scoring'
 function popcount(word: number): number {
   word -= (word >>> 1) & 0x55555555
   word = (word & 0x33333333) + ((word >>> 2) & 0x33333333)
-  return Math.imul((word + (word >>> 4)) & 0x0F0F0F0F, 0x01010101) >>> 24
+  return Math.imul((word + (word >>> 4)) & 0x0f0f0f0f, 0x01010101) >>> 24
 }
 
 /**
@@ -27,7 +27,8 @@ export class DocIdBitSet implements DocIdGate {
   }
 
   add(docId: number): this {
-    if (!(docId >= 0 && docId < this._limit)) throw new RangeError(`FrozenMiniSearch: doc id ${docId} out of range`)
+    if (!(docId >= 0 && docId < this._limit))
+      throw new RangeError(`FrozenMiniSearch: doc id ${docId} out of range`)
     const word = docId >>> 5
     const bit = 1 << (docId & 31)
     if ((this._words[word] & bit) === 0) {
@@ -63,7 +64,10 @@ export class DocIdBitSet implements DocIdGate {
     this._combine(other, (a, b) => a & ~b)
   }
 
-  private _combine(other: DocIdBitSet, op: (a: number, b: number) => number): void {
+  private _combine(
+    other: DocIdBitSet,
+    op: (a: number, b: number) => number,
+  ): void {
     const words = this._words
     const otherWords = other._words
     let size = 0

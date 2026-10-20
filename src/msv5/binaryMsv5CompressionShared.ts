@@ -8,10 +8,14 @@ export interface Msv5PayloadCodecChoice<T extends Uint8Array> {
 
 /** For the `default` of an exhaustive `compression` switch: rejects values outside the declared union at runtime. */
 export function unsupportedCompressionError(compression: never): Error {
-  return new Error(`FrozenMiniSearch: unsupported compression ${JSON.stringify(compression)}`)
+  return new Error(
+    `FrozenMiniSearch: unsupported compression ${JSON.stringify(compression)}`,
+  )
 }
 
-export function rawPayloadChoice<T extends Uint8Array>(uncompressed: T): Msv5PayloadCodecChoice<T> {
+export function rawPayloadChoice<T extends Uint8Array>(
+  uncompressed: T,
+): Msv5PayloadCodecChoice<T> {
   return { payload: uncompressed, codec: CODEC_RAW, zstdLevel: 0 }
 }
 

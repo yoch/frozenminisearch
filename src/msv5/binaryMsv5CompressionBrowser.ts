@@ -1,10 +1,10 @@
-import {
-  allocBytes,
-  type BinaryBytes,
-} from '../binaryBytes'
+import { allocBytes, type BinaryBytes } from '../binaryBytes'
 import { crc32Bytes } from '../crc32Wire'
 import type { BrowserBinaryCompression } from '../searchTypes'
-import type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
+import type {
+  Msv5SectionEntry,
+  Msv5SnapshotCompressionMeta,
+} from './binaryMsv5Types'
 import {
   CODEC_RAW,
   CODEC_ZSTD,
@@ -16,7 +16,10 @@ import {
   MSV5_HEADER_SIZE,
   MSV5_MIN_COMPRESS_BYTES,
 } from './binaryMsv5Constants'
-import { browserZlibDeflateAsync, browserZlibInflateAsync } from './compressionBrowser'
+import {
+  browserZlibDeflateAsync,
+  browserZlibInflateAsync,
+} from './compressionBrowser'
 import {
   computeSectionDirectory,
   concatRawSectionsWithCrc,
@@ -39,7 +42,10 @@ import {
   type Msv5PayloadCodecChoice,
   unsupportedCompressionError,
 } from './binaryMsv5CompressionShared'
-export type { Msv5SectionEntry, Msv5SnapshotCompressionMeta } from './binaryMsv5Types'
+export type {
+  Msv5SectionEntry,
+  Msv5SnapshotCompressionMeta,
+} from './binaryMsv5Types'
 
 export interface Msv5AssembledFileBrowser {
   buffer: Uint8Array
@@ -49,29 +55,41 @@ export interface Msv5AssembledFileBrowser {
 
 function zstdUnavailableWriteError(): Error {
   return new Error(
-    'MSv5 snapshot requested zstd compression, which is not supported in the browser build. '
-    + 'Use compression: "auto", "raw", or "zlib".',
+    'MSv5 snapshot requested zstd compression, which is not supported in the browser build. ' +
+      'Use compression: "auto", "raw", or "zlib".',
   )
 }
 
 function zstdUnavailableReadError(): Error {
   return new Error(
-    'MSv5 snapshot is zstd-compressed, which is not supported in the browser build. '
-    + 'Re-save with compression: "raw" or "zlib".',
+    'MSv5 snapshot is zstd-compressed, which is not supported in the browser build. ' +
+      'Re-save with compression: "raw" or "zlib".',
   )
 }
 
 type PayloadCodecChoice = Msv5PayloadCodecChoice<BinaryBytes>
 
-async function zlibPayloadChoiceAsync(uncompressed: BinaryBytes): Promise<PayloadCodecChoice> {
-  return { payload: await browserZlibDeflateAsync(uncompressed), codec: CODEC_ZLIB, zstdLevel: 0 }
+async function zlibPayloadChoiceAsync(
+  uncompressed: BinaryBytes,
+): Promise<PayloadCodecChoice> {
+  return {
+    payload: await browserZlibDeflateAsync(uncompressed),
+    codec: CODEC_ZLIB,
+    zstdLevel: 0,
+  }
 }
 
-async function autoPayloadChoiceAsync(uncompressed: BinaryBytes): Promise<PayloadCodecChoice> {
+async function autoPayloadChoiceAsync(
+  uncompressed: BinaryBytes,
+): Promise<PayloadCodecChoice> {
   if (uncompressed.length < MSV5_MIN_COMPRESS_BYTES) {
     return rawPayloadChoice(uncompressed)
   }
-  return pickAutoPayloadCodec(uncompressed, await browserZlibDeflateAsync(uncompressed), CODEC_ZLIB)
+  return pickAutoPayloadCodec(
+    uncompressed,
+    await browserZlibDeflateAsync(uncompressed),
+    CODEC_ZLIB,
+  )
 }
 
 async function choosePayloadCodecAsync(
@@ -117,7 +135,12 @@ function assembleMsv5FileRawDirect(
   }
 
   const out = allocBytes(MSV5_HEADER_SIZE + uncompressedLength)
-  const payloadCrc32 = writeRawSectionsIntoPayload(out, MSV5_HEADER_SIZE, rawSections, entries)
+  const payloadCrc32 = writeRawSectionsIntoPayload(
+    out,
+    MSV5_HEADER_SIZE,
+    rawSections,
+    entries,
+  )
   writeMsv5FileHeader(
     out,
     globalFlags,
@@ -189,8 +212,12 @@ export async function assembleMsv5FileBrowser(
   if (compression === 'raw') {
     return assembleMsv5FileRawDirect(globalFlags, rawSections)
   }
-  const { uncompressed, entries, payloadCrc32 } = concatAndValidateSections(rawSections)
-  const { payload, codec, zstdLevel } = await choosePayloadCodecAsync(uncompressed, compression)
+  const { uncompressed, entries, payloadCrc32 } =
+    concatAndValidateSections(rawSections)
+  const { payload, codec, zstdLevel } = await choosePayloadCodecAsync(
+    uncompressed,
+    compression,
+  )
   return buildMsv5AssembledFile(
     globalFlags,
     entries,
@@ -206,7 +233,9 @@ export function readMsv5SectionDirectory(buf: BinaryBytes): Msv5SectionEntry[] {
   return readMsv5SectionDirectoryShared(buf)
 }
 
-export function readMsv5SnapshotCompressionMetaBrowser(buf: BinaryBytes): Msv5SnapshotCompressionMeta {
+export function readMsv5SnapshotCompressionMetaBrowser(
+  buf: BinaryBytes,
+): Msv5SnapshotCompressionMeta {
   return readMsv5SnapshotCompressionMetaShared(buf)
 }
 
@@ -225,7 +254,10 @@ function sectionsFromPayload(
     throw new Error(MSV5_ERR_PAYLOAD_CRC_MISMATCH)
   }
   return directory.map((entry) => {
-    const slice = payload.subarray(entry.fileOffset, entry.fileOffset + entry.uncompressedLength)
+    const slice = payload.subarray(
+      entry.fileOffset,
+      entry.fileOffset + entry.uncompressedLength,
+    )
     verifySectionCrc(slice, entry.sectionCrc32)
     if ((payload.byteOffset + entry.fileOffset) % 4 === 0) return slice
     const out = allocBytes(entry.uncompressedLength)
@@ -256,12 +288,17 @@ export async function loadMsv5SectionsBrowser(
   fileBuf: BinaryBytes,
   directory: Msv5SectionEntry[],
 ): Promise<BinaryBytes[]> {
-  const { payloadCodec, slice, uncompressedLength, payloadCrc32 } = prepareMsv5Payload(fileBuf, directory)
+  const { payloadCodec, slice, uncompressedLength, payloadCrc32 } =
+    prepareMsv5Payload(fileBuf, directory)
 
   if (payloadCodec === CODEC_RAW) {
     return sectionsFromPayload(slice, directory, payloadCrc32)
   }
-  const decoded = await decompressPayloadAsync(payloadCodec, slice, uncompressedLength)
+  const decoded = await decompressPayloadAsync(
+    payloadCodec,
+    slice,
+    uncompressedLength,
+  )
   return sectionsFromPayload(decoded, directory, payloadCrc32)
 }
 

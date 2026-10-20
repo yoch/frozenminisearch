@@ -22,7 +22,10 @@ import {
 import { invalidFrozenIndex, parseSnapshotJson } from './frozenErrors'
 import { buildStoredFieldsRowsWireSection } from './storedFieldsWire'
 
-export function readLengthPrefixedUtf8(buf: BinaryBytes, offset: number): { value: string, next: number } {
+export function readLengthPrefixedUtf8(
+  buf: BinaryBytes,
+  offset: number,
+): { value: string; next: number } {
   if (offset + 4 > buf.length) {
     throw invalidFrozenIndex('length-prefixed string header truncated')
   }
@@ -35,7 +38,10 @@ export function readLengthPrefixedUtf8(buf: BinaryBytes, offset: number): { valu
   return { value: readUtf8(buf, start, end), next: end }
 }
 
-export function writeLengthPrefixedUtf8(chunks: BinaryBytes[], str: string): void {
+export function writeLengthPrefixedUtf8(
+  chunks: BinaryBytes[],
+  str: string,
+): void {
   const body = utf8Bytes(str)
   const header = allocBytes(4)
   writeU32LE(header, 0, body.length)
@@ -62,13 +68,18 @@ export function writeExternalId(chunks: BinaryBytes[], id: unknown): void {
   }
   const json = typeof id === 'bigint' ? undefined : JSON.stringify(id)
   if (json === undefined) {
-    throw new Error(`FrozenMiniSearch: a document id of type ${typeof id} cannot be saved in a binary snapshot`)
+    throw new Error(
+      `FrozenMiniSearch: a document id of type ${typeof id} cannot be saved in a binary snapshot`,
+    )
   }
   chunks.push(new Uint8Array([ID_TAG_JSON]))
   writeLengthPrefixedUtf8(chunks, json)
 }
 
-export function readExternalId(buf: BinaryBytes, offset: number): { value: unknown | undefined, next: number } {
+export function readExternalId(
+  buf: BinaryBytes,
+  offset: number,
+): { value: unknown | undefined; next: number } {
   if (offset >= buf.length) {
     throw invalidFrozenIndex('external id tag truncated')
   }
@@ -93,7 +104,11 @@ export function readExternalId(buf: BinaryBytes, offset: number): { value: unkno
   throw invalidFrozenIndex(`unknown external id tag ${tag}`)
 }
 
-export function readUint32Array(buf: BinaryBytes, offset: number, byteLength: number): Uint32Array {
+export function readUint32Array(
+  buf: BinaryBytes,
+  offset: number,
+  byteLength: number,
+): Uint32Array {
   if (byteLength === 0) return new Uint32Array(0)
   if (byteLength % 4 !== 0) {
     throw invalidFrozenIndex('uint32 section length not aligned')
@@ -109,7 +124,11 @@ export function readUint32Array(buf: BinaryBytes, offset: number, byteLength: nu
   return out
 }
 
-export function readUint16Array(buf: BinaryBytes, offset: number, byteLength: number): Uint16Array {
+export function readUint16Array(
+  buf: BinaryBytes,
+  offset: number,
+  byteLength: number,
+): Uint16Array {
   if (byteLength === 0) return new Uint16Array(0)
   if (byteLength % 2 !== 0) {
     throw invalidFrozenIndex('uint16 section length not aligned')
@@ -127,7 +146,11 @@ export function readUint16Array(buf: BinaryBytes, offset: number, byteLength: nu
   return out
 }
 
-export function readUint8Array(buf: BinaryBytes, offset: number, byteLength: number): Uint8Array {
+export function readUint8Array(
+  buf: BinaryBytes,
+  offset: number,
+  byteLength: number,
+): Uint8Array {
   if (byteLength === 0) return new Uint8Array(0)
   if (offset + byteLength > buf.length) {
     throw invalidFrozenIndex('uint8 section read past buffer end')
@@ -135,7 +158,11 @@ export function readUint8Array(buf: BinaryBytes, offset: number, byteLength: num
   return buf.subarray(offset, offset + byteLength)
 }
 
-export function readFloat32Array(buf: BinaryBytes, offset: number, byteLength: number): Float32Array {
+export function readFloat32Array(
+  buf: BinaryBytes,
+  offset: number,
+  byteLength: number,
+): Float32Array {
   if (byteLength === 0) return new Float32Array(0)
   if (byteLength % 4 !== 0) {
     throw invalidFrozenIndex('float32 section length not aligned')
@@ -151,7 +178,12 @@ export function readFloat32Array(buf: BinaryBytes, offset: number, byteLength: n
   return out
 }
 
-export function readFieldIdArray(buf: BinaryBytes, offset: number, byteLength: number, width: 8 | 16): FieldIdArray {
+export function readFieldIdArray(
+  buf: BinaryBytes,
+  offset: number,
+  byteLength: number,
+  width: 8 | 16,
+): FieldIdArray {
   if (width === 8) return readUint8Array(buf, offset, byteLength)
   return readUint16Array(buf, offset, byteLength)
 }
@@ -178,7 +210,10 @@ export function buildFieldNamesSectionWire(fieldNames: string[]): BinaryBytes {
   return concatBytes(chunks)
 }
 
-export function buildExternalIdsSectionWire(externalIds: unknown[], nextId: number): BinaryBytes {
+export function buildExternalIdsSectionWire(
+  externalIds: unknown[],
+  nextId: number,
+): BinaryBytes {
   const chunks: BinaryBytes[] = []
   for (let i = 0; i < nextId; i++) {
     writeExternalId(chunks, externalIds[i])

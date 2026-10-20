@@ -1,9 +1,10 @@
-import {
-  type FrozenSnapshot,
-} from '../binaryStructures'
+import { type FrozenSnapshot } from '../binaryStructures'
 import type { FrozenTermIndex } from '../frozenTermIndex'
 import { invalidFrozenIndex } from '../frozenErrors'
-import { buildMsv5EncodePrepared, type Msv5EncodePrepared } from './binaryMsv5EncodeSections'
+import {
+  buildMsv5EncodePrepared,
+  type Msv5EncodePrepared,
+} from './binaryMsv5EncodeSections'
 
 export type { Msv5EncodePrepared }
 

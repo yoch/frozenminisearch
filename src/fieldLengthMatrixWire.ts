@@ -11,7 +11,9 @@ export function fieldLengthMatrixWireFlags(matrix: FieldLengthArray): number {
   return 0
 }
 
-export function buildFieldLengthMatrixSection(matrix: FieldLengthArray): BinaryBytes {
+export function buildFieldLengthMatrixSection(
+  matrix: FieldLengthArray,
+): BinaryBytes {
   return bytesFromView(matrix)
 }
 

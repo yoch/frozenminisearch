@@ -1,26 +1,17 @@
-import stylistic from '@stylistic/eslint-plugin'
 import neostandard from 'neostandard'
 import globals from 'globals'
 
 const tseslint = neostandard.plugins['typescript-eslint']
 
-const styleConfig = stylistic.configs.customize({
-  severity: 'warn',
-  semi: false,
-  quotes: 'single',
-  indent: 2,
-  braceStyle: '1tbs'
-})
-
 export default [
   ...neostandard({ ts: true, noStyle: true }),
-  styleConfig,
   {
     rules: {
       'no-prototype-builtins': 'off',
       'no-use-before-define': 'off',
-      // Not part of legacy standard; mostly `if (x) return` one-liners.
-      '@stylistic/max-statements-per-line': 'off'
+      // Formatter-owned: prettier-style reflow splits `if (x) return y`
+      // one-liners into multi-line statements without adding braces.
+      'curly': 'off'
     }
   },
   {

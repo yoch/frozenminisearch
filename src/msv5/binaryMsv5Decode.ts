@@ -15,13 +15,20 @@ import type { FrozenSnapshot } from '../binaryStructures'
 export { isMsv5Buffer } from './binaryMsv5Compression'
 export type { FrozenDecodeHints } from './binaryMsv5DecodeShared'
 
-export function decodeFrozenSnapshotMsv5(buf: Buffer, hints?: FrozenDecodeHints): FrozenSnapshot {
+export function decodeFrozenSnapshotMsv5(
+  buf: Buffer,
+  hints?: FrozenDecodeHints,
+): FrozenSnapshot {
   const { globalFlags, directory } = validateMsv5Container(buf, {
     isMsv5Buffer,
     readMsv5GlobalFlags,
     readMsv5SectionDirectory,
   })
-  return decodeMsv5Sections(globalFlags, loadMsv5Sections(buf, directory), hints)
+  return decodeMsv5Sections(
+    globalFlags,
+    loadMsv5Sections(buf, directory),
+    hints,
+  )
 }
 
 export async function decodeFrozenSnapshotMsv5Async(
@@ -33,5 +40,9 @@ export async function decodeFrozenSnapshotMsv5Async(
     readMsv5GlobalFlags,
     readMsv5SectionDirectory,
   })
-  return decodeMsv5Sections(globalFlags, await loadMsv5SectionsAsync(buf, directory), hints)
+  return decodeMsv5Sections(
+    globalFlags,
+    await loadMsv5SectionsAsync(buf, directory),
+    hints,
+  )
 }

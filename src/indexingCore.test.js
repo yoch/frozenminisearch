@@ -1,4 +1,7 @@
-import { defaultFrozenLoadOptions, SPACE_OR_PUNCTUATION } from './searchDefaults'
+import {
+  defaultFrozenLoadOptions,
+  SPACE_OR_PUNCTUATION,
+} from './searchDefaults'
 import FrozenMiniSearch from './FrozenMiniSearch'
 import {
   collectFieldTermFreqsFromFieldInto,
@@ -39,7 +42,9 @@ function freqMapFromSplit(text, fieldName, processTerm) {
 }
 
 function mapToObject(map) {
-  return Object.fromEntries([...map.entries()].sort((a, b) => a[0].localeCompare(b[0])))
+  return Object.fromEntries(
+    [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+  )
 }
 
 describe('indexingCore default tokenizer', () => {
@@ -57,7 +62,10 @@ describe('indexingCore default tokenizer', () => {
     const check = (text) => {
       tokenizeDefaultInto(out, text)
       const expected = text.split(SPACE_OR_PUNCTUATION)
-      if (out.length !== expected.length || out.some((t, i) => t !== expected[i])) {
+      if (
+        out.length !== expected.length ||
+        out.some((t, i) => t !== expected[i])
+      ) {
         mismatches.push(text)
       }
     }
@@ -67,7 +75,16 @@ describe('indexingCore default tokenizer', () => {
       if (cp < 0x10000) check(`${ch}${ch}`)
     }
     for (const lone of ['\ud800', '\udbff', '\udc00', '\udfff']) {
-      for (const neighbor of ['a', ' ', ',', '\u3001', '\ud83d\ude00', '\ud800', '\udc00', '']) {
+      for (const neighbor of [
+        'a',
+        ' ',
+        ',',
+        '\u3001',
+        '\ud83d\ude00',
+        '\ud800',
+        '\udc00',
+        '',
+      ]) {
         check(`${lone}${neighbor}`)
         check(`${neighbor}${lone}`)
         check(`x${neighbor}${lone}${neighbor}y`)
@@ -77,8 +94,35 @@ describe('indexingCore default tokenizer', () => {
   })
 
   test('tokenizeDefaultInto matches split on random mixed-script text', () => {
-    const alphabet = ['a', 'Z', '7', ' ', '\u00a0', ',', '.', '-', '_', '\n', '\r', '\t', 'é', '—', '…',
-      '日', '本', '\u3000', '\u3001', 'ж', '«', '»', '\u2028', '\ud83d\ude00', '\ud800', '\udc00', '𝔸']
+    const alphabet = [
+      'a',
+      'Z',
+      '7',
+      ' ',
+      '\u00a0',
+      ',',
+      '.',
+      '-',
+      '_',
+      '\n',
+      '\r',
+      '\t',
+      'é',
+      '—',
+      '…',
+      '日',
+      '本',
+      '\u3000',
+      '\u3001',
+      'ж',
+      '«',
+      '»',
+      '\u2028',
+      '\ud83d\ude00',
+      '\ud800',
+      '\udc00',
+      '𝔸',
+    ]
     let seed = 12345
     const rand = () => {
       seed = (seed * 1103515245 + 12345) >>> 0
@@ -88,7 +132,8 @@ describe('indexingCore default tokenizer', () => {
     for (let round = 0; round < 5000; round++) {
       let text = ''
       const len = Math.floor(rand() * 24)
-      for (let i = 0; i < len; i++) text += alphabet[Math.floor(rand() * alphabet.length)]
+      for (let i = 0; i < len; i++)
+        text += alphabet[Math.floor(rand() * alphabet.length)]
       tokenizeDefaultInto(out, text)
       expect(out).toEqual(text.split(SPACE_OR_PUNCTUATION))
     }
@@ -96,8 +141,8 @@ describe('indexingCore default tokenizer', () => {
 
   test('collectFieldTermFreqsFromFieldInto matches split for default and custom-equivalent tokenizers', () => {
     const fieldName = 'txt'
-    const processTerm = term => term.toLowerCase()
-    const equivalentTokenize = text => text.split(SPACE_OR_PUNCTUATION)
+    const processTerm = (term) => term.toLowerCase()
+    const equivalentTokenize = (text) => text.split(SPACE_OR_PUNCTUATION)
     const tokenScratch = []
     const rawTokenScratch = new Set()
     const localFreqs = new Map()
@@ -134,10 +179,12 @@ describe('indexingCore default tokenizer', () => {
   })
 
   test('isDefaultTokenize accepts only the default tokenizer reference', () => {
-    expect(isDefaultTokenize(FrozenMiniSearch.getDefault('tokenize'))).toBe(true)
-    const equivalent = text => text.split(SPACE_OR_PUNCTUATION)
+    expect(isDefaultTokenize(FrozenMiniSearch.getDefault('tokenize'))).toBe(
+      true,
+    )
+    const equivalent = (text) => text.split(SPACE_OR_PUNCTUATION)
     expect(isDefaultTokenize(equivalent)).toBe(false)
-    expect(isDefaultTokenize(text => text.split(','))).toBe(false)
+    expect(isDefaultTokenize((text) => text.split(','))).toBe(false)
   })
 
   test('custom camelCase tokenizer indexes split terms via fromFieldInto', () => {
@@ -151,18 +198,18 @@ describe('indexingCore default tokenizer', () => {
           .replace(/([a-z])([A-Z])/g, '$1 $2')
           .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
           .split(/\s+/)
-          .map(w => w.toLowerCase())
-          .filter(w => w.length > 0)
+          .map((w) => w.toLowerCase())
+          .filter((w) => w.length > 0)
         if (split.length > 1) tokens.push(...split)
       }
-      return tokens.filter(w => w.length > 0)
+      return tokens.filter((w) => w.length > 0)
     }
     expect(isDefaultTokenize(camelCaseLike)).toBe(false)
 
     const localFreqs = new Map()
     const rawTokenScratch = new Set()
     const tokenScratch = []
-    const processTerm = term => term.toLowerCase()
+    const processTerm = (term) => term.toLowerCase()
     const collected = collectFieldTermFreqsFromFieldInto(
       localFreqs,
       rawTokenScratch,
@@ -181,11 +228,13 @@ describe('indexingCore default tokenizer', () => {
   })
 
   test('custom tokenizer returning more tokens than the call stack allows', () => {
-    const text = Array.from({ length: 200_000 }, (_, i) => `w${i % 997}`).join(' ')
+    const text = Array.from({ length: 200_000 }, (_, i) => `w${i % 997}`).join(
+      ' ',
+    )
     const index = FrozenMiniSearch.fromDocuments([{ id: 1, body: text }], {
       fields: ['body'],
-      tokenize: s => s.split(' '),
+      tokenize: (s) => s.split(' '),
     })
-    expect(index.search('w0').map(r => r.id)).toEqual([1])
+    expect(index.search('w0').map((r) => r.id)).toEqual([1])
   })
 })

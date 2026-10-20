@@ -25,7 +25,10 @@ export type SnapshotIndexAccumulation = {
 }
 
 /** Hot-path canonical integer key parse for MiniSearch wire keys. */
-function parseIndexIntegerKey(key: string, label: 'fieldId' | 'shortId'): number {
+function parseIndexIntegerKey(
+  key: string,
+  label: 'fieldId' | 'shortId',
+): number {
   return parseCanonicalIntegerKey(key, `index ${label}`)
 }
 
@@ -59,7 +62,8 @@ function accumulateSnapshotIndexV2(
       for (const docId in indexEntryRecord) {
         const shortId = parseIndexIntegerKey(docId, 'shortId')
         assertShortIdInRange(shortId, nextId, 'index')
-        const resolvedDocId = shortIdRemap != null ? shortIdRemap[shortId]! : shortId
+        const resolvedDocId =
+          shortIdRemap != null ? shortIdRemap[shortId]! : shortId
         if (resolvedDocId === DISCARDED_DOC_ID) continue
         accumulator.append(
           termIndex,
@@ -93,13 +97,15 @@ function accumulateSnapshotIndexV1(
       const parsedFieldId = parseIndexIntegerKey(fieldId, 'fieldId')
       assertFieldIdInRange(parsedFieldId, fieldCount, 'index')
       const raw = dataRecord[fieldId]
-      const indexEntryRecord = raw != null && typeof raw === 'object' && 'ds' in raw
-        ? (raw as { ds: Record<string, number> }).ds
-        : raw as Record<string, number>
+      const indexEntryRecord =
+        raw != null && typeof raw === 'object' && 'ds' in raw
+          ? (raw as { ds: Record<string, number> }).ds
+          : (raw as Record<string, number>)
       for (const docId in indexEntryRecord) {
         const shortId = parseIndexIntegerKey(docId, 'shortId')
         assertShortIdInRange(shortId, nextId, 'index')
-        const resolvedDocId = shortIdRemap != null ? shortIdRemap[shortId]! : shortId
+        const resolvedDocId =
+          shortIdRemap != null ? shortIdRemap[shortId]! : shortId
         if (resolvedDocId === DISCARDED_DOC_ID) continue
         accumulator.append(
           termIndex,
@@ -136,7 +142,12 @@ export function parseSnapshotIndex(
   nextId: number,
   shortIdRemap: Uint32Array | null = null,
 ): ParsedSnapshotIndex {
-  const accumulated = accumulateSnapshotIndex(snapshot, fieldCount, nextId, shortIdRemap)
+  const accumulated = accumulateSnapshotIndex(
+    snapshot,
+    fieldCount,
+    nextId,
+    shortIdRemap,
+  )
   return {
     index: packTermsFromList(accumulated.terms),
     accumulator: accumulated.accumulator,

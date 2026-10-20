@@ -14,13 +14,18 @@ function identityExternalId(docId: number): unknown {
   return docId
 }
 
-export function externalIdResolver(externalIds: FrozenExternalIds): (docId: number) => unknown {
+export function externalIdResolver(
+  externalIds: FrozenExternalIds,
+): (docId: number) => unknown {
   if (externalIds == null) return identityExternalId
-  return docId => externalIds[docId]
+  return (docId) => externalIds[docId]
 }
 
 /** Dense array form for export paths (JSON, binary save). */
-export function materializeExternalIds(externalIds: FrozenExternalIds, nextId: number): unknown[] {
+export function materializeExternalIds(
+  externalIds: FrozenExternalIds,
+  nextId: number,
+): unknown[] {
   if (externalIds != null) return externalIds as unknown[]
   const out: unknown[] = new Array(nextId)
   for (let i = 0; i < nextId; i++) out[i] = i

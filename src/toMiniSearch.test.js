@@ -14,18 +14,21 @@ const options = {
 }
 
 function searchIds(index, query, searchOptions = {}) {
-  return index.search(query, searchOptions).map(r => r.id)
+  return index.search(query, searchOptions).map((r) => r.id)
 }
 
 function searchScores(index, query, searchOptions = {}) {
-  return index.search(query, searchOptions).map(r => r.score)
+  return index.search(query, searchOptions).map((r) => r.score)
 }
 
 describe('toJSON MiniSearch wire export', () => {
   test('round-trip preserves search results', () => {
     const frozen = FrozenMiniSearch.fromDocuments(docs, options)
     const snapshot = frozen.toJSON()
-    const reloaded = FrozenMiniSearch.fromJSON(JSON.stringify(snapshot), options)
+    const reloaded = FrozenMiniSearch.fromJSON(
+      JSON.stringify(snapshot),
+      options,
+    )
 
     expect(reloaded.search('zen')).toEqual(frozen.search('zen'))
     expect(searchIds(reloaded, 'ishmael', { prefix: true })).toEqual(
@@ -49,12 +52,17 @@ describe('toJSON MiniSearch wire export', () => {
     const reference = new MiniSearch(options)
     reference.addAll(docs)
 
-    const mutable = MiniSearch.loadJSON(JSON.stringify(frozen.toJSON()), options)
+    const mutable = MiniSearch.loadJSON(
+      JSON.stringify(frozen.toJSON()),
+      options,
+    )
 
     expect(searchIds(mutable, 'zen')).toEqual(searchIds(reference, 'zen'))
 
     const andMutable = searchScores(mutable, 'zen art', { combineWith: 'AND' })
-    const andReference = searchScores(reference, 'zen art', { combineWith: 'AND' })
+    const andReference = searchScores(reference, 'zen art', {
+      combineWith: 'AND',
+    })
     expect(andMutable.length).toBe(andReference.length)
     for (let i = 0; i < andMutable.length; i++) {
       expect(andMutable[i]).toBeCloseTo(andReference[i], 6)
@@ -86,12 +94,19 @@ describe('toJSON MiniSearch wire export', () => {
       serializationVersion: 2,
     }
 
-    const frozen = frozenFromMiniSearchSnapshot(FrozenMiniSearch, snapshot, options)
-    const reloaded = FrozenMiniSearch.fromJSON(JSON.stringify(frozen.toJSON()), options)
+    const frozen = frozenFromMiniSearchSnapshot(
+      FrozenMiniSearch,
+      snapshot,
+      options,
+    )
+    const reloaded = FrozenMiniSearch.fromJSON(
+      JSON.stringify(frozen.toJSON()),
+      options,
+    )
 
-    expect(frozen.search('alpha').map(r => r.id)).toEqual(['a'])
-    expect(frozen.search('gamma').map(r => r.id)).toEqual(['c'])
-    expect(reloaded.search('alpha').map(r => r.id)).toEqual(['a'])
-    expect(reloaded.search('gamma').map(r => r.id)).toEqual(['c'])
+    expect(frozen.search('alpha').map((r) => r.id)).toEqual(['a'])
+    expect(frozen.search('gamma').map((r) => r.id)).toEqual(['c'])
+    expect(reloaded.search('alpha').map((r) => r.id)).toEqual(['a'])
+    expect(reloaded.search('gamma').map((r) => r.id)).toEqual(['c'])
   })
 })

@@ -35,7 +35,7 @@ export function passGateByPostingRatio(
   policy: PostingGatePolicy = DEFAULT_POSTING_GATE_POLICY,
 ): boolean {
   if (postingListLength < policy.minLength) return false
-  return gateSize <= (postingListLength >>> policy.ratioShift)
+  return gateSize <= postingListLength >>> policy.ratioShift
 }
 
 export function postingGateMaxRatio(policy: PostingGatePolicy): number {
@@ -67,9 +67,9 @@ export function gateIsSelectiveEnough(
   if (gateSize === 0) return true
   if (gateSize <= resolveGateMaxSize(documentCount, limits)) return true
   if (
-    postingListLength != null
-    && postingListLength > 0
-    && passGateByPostingRatio(gateSize, postingListLength, postingGatePolicy)
+    postingListLength != null &&
+    postingListLength > 0 &&
+    passGateByPostingRatio(gateSize, postingListLength, postingGatePolicy)
   ) {
     return true
   }

@@ -20,5 +20,9 @@ export async function decodeFrozenSnapshotMsv5Browser(
     readMsv5GlobalFlags: readMsv5GlobalFlagsBrowser,
     readMsv5SectionDirectory,
   })
-  return decodeMsv5Sections(globalFlags, await loadMsv5SectionsBrowser(buf, directory), hints)
+  return decodeMsv5Sections(
+    globalFlags,
+    await loadMsv5SectionsBrowser(buf, directory),
+    hints,
+  )
 }

@@ -49,6 +49,13 @@ Validated in [`indexing-parity.test.js`](indexing-parity.test.js) — **MiniSear
 
 - PackedRadixTree vs SearchableMap iteration order.
 - Internal AND-gate implementation details (oracle: gated vs naive on **frozen** only).
+- Literal `__proto__` terms (custom tokenizers only) and stored-field keys keep
+  MiniSearch's per-object behaviour: depending on query order the term can be
+  missing from `terms` and `match`, and the prototype of `match` or of the result
+  can change. Ids and scores match. An indexed field named `__proto__` works as in
+  MiniSearch. [`src/prototypeKeys.test.js`](../../src/prototypeKeys.test.js) covers
+  the field case and checks that no path modifies `Object.prototype`
+  ([#28](https://github.com/yoch/frozenminisearch/pull/28)).
 
 ## Reference
 

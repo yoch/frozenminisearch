@@ -84,7 +84,7 @@ export function decodeMsv5Sections(
     sections[Msv5SectionId.FieldNames].length,
   )
 
-  const fieldIds: { [field: string]: number } = {}
+  const fieldIds: { [field: string]: number } = Object.create(null)
   for (let f = 0; f < fieldNames.length; f++) {
     fieldIds[fieldNames[f]] = f
   }

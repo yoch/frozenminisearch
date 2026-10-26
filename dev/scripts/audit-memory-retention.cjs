@@ -59,16 +59,18 @@ function searchBatch(indexes, batch) {
   const queries = ['paracetamol', 'amoxicilline', 'dolip', 'a', '500', 'comprime']
   for (let i = 0; i < 300; i++) {
     const index = indexes[i % indexes.length]
-    const query = i % 5 === 0 ? `inexistant${batch * 300 + i}` : queries[Math.floor(i / 6) % queries.length]
+    const query = i % 5 === 0 ? `inexistant${batch * 300 + i}` : queries[Math.floor(i / 8) % queries.length]
     const options = { prefix: true, fuzzy: 0.2 }
     let results
-    switch (i % 6) {
+    switch (i % 8) {
       case 0: results = index.search(query, options); break
       case 1: results = index.search(query, { ...options, limit: 10 }); break
       case 2: results = index.searchPage(query, { ...options, offset: 5, limit: 10 }).results; break
       case 3: results = index.autoSuggest(query, options); break
       case 4: results = index.searchPage(FrozenMiniSearch.wildcard, { offset: 100, limit: 10 }).results; break
       case 5: results = index.search(query, { ...options, filter: hit => hit.score > 0, limit: 10 }); break
+      case 6: results = index.matchIds(query, options); break
+      case 7: results = index.searchPage(query, { ...options, matchInfo: false, offset: 5, limit: 10 }).results; break
     }
     report.searches++
     hash.update(JSON.stringify(results))

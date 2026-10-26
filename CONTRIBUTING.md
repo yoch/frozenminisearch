@@ -14,7 +14,7 @@ pnpm build
 node scripts/verify-npm-pack.cjs
 ```
 
-Lint/format use Bun's built-in tooling (canary): `pnpm lint` for the fast local lint, `pnpm fmt` to format, and `make lint` for the full gate (typecheck + lint + format check + internal-boundary script). Formatting style lives in `bunfig.toml`.
+Type checking, lint and format use Bun's built-in tooling (`bun check`, `bun lint`, `bun fmt`; `bun lint` needs Bun canary): `pnpm lint` for the fast local lint, `pnpm fmt` to format, and `make lint` for the full gate (typecheck + lint + format check + internal-boundary script). Formatting style lives in `bunfig.toml`.
 
 Optional upstream clone for local reference builds:
 

@@ -19,8 +19,8 @@ jobs:
           cache: 'pnpm'
       - uses: oven-sh/setup-bun@v2
         with:
-          # bun lint/fmt are canary-only for now; pin the first stable release
-          # that ships them when it lands.
+          # bun fmt and bun check are stable since 1.4.4; bun lint is still
+          # canary-only. Pin the first stable release that ships it.
           bun-version: canary
       - run: pnpm install --frozen-lockfile
       - run: make lint

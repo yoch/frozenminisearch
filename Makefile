@@ -125,7 +125,7 @@ knip:
 	$(RUN) knip
 
 typecheck:
-	$(RUN) tsc --noEmit
+	bun check --no-script
 
 lint-fix:
 	bun run lint:fix
@@ -368,8 +368,8 @@ help:
 	@echo "  make benchmark-diff         diffBaseline.js"
 	@echo ""
 	@echo "Lint:"
-	@echo "  make lint                   eslint + tsc --noEmit (src/)"
-	@echo "  make typecheck              tsc --noEmit only"
+	@echo "  make lint                   bun check + bun fmt --check + bun lint (src/)"
+	@echo "  make typecheck              bun check only"
 	@echo "  make docs-build             typedoc + demo"
 	@echo "  make docs-build-pages       typedoc GitHub Pages mode"
 	@echo ""

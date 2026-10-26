@@ -13,7 +13,7 @@ export function resolveIndexingOptions<T>(options: Options<T>): IndexingOptions<
 }
 
 export function buildFieldIds(fields: string[]): { [key: string]: number } {
-  const fieldIds: { [key: string]: number } = {}
+  const fieldIds: { [key: string]: number } = Object.create(null)
   for (let i = 0; i < fields.length; i++) {
     fieldIds[fields[i]] = i
   }

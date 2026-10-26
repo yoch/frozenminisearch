@@ -2,9 +2,18 @@
 
 ## Unreleased
 
+## v1.12.1 — `@yoch/frozenminisearch`
+
+Patch release: an indexed field named `__proto__` now behaves like any other field, as in MiniSearch, and the package metadata points to the documentation site. Other search results, scores and ordering are unchanged; no changes to the public API, runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.
+
 ### Fixed
 
 - An indexed field named `__proto__` returned wrong matches (its terms were attributed to another field) and made `saveBinarySync` / `saveBinaryAsync` throw. Field ids and per-query field boosts now live in objects without a prototype, so such a field behaves like any other, as in MiniSearch. No wire-format changes.
+
+### Changed
+
+- **Package metadata** — the npm description and keywords describe the package more precisely, and `homepage` points to the documentation site, <https://yoch.github.io/frozenminisearch/>. The README shows the install command. The documentation home page gets its own title and meta description, and its sitemap lists the demo.
+- **Development tools** — development uses Bun's built-in `bun check` (type checking), `bun lint` (still driven by `eslint.config.js`) and `bun fmt`, whose formatting is now enforced in CI; `@stylistic/eslint-plugin` is no longer a direct dependency. The sources were reformatted: apart from the fix above, the published bundles differ from 1.12.0 only in formatting and minified names. An optional pre-commit hook is enabled with `pnpm hooks`. `bun lint` currently needs Bun canary.
 
 ## v1.12.0 — `@yoch/frozenminisearch`
 

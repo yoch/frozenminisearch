@@ -3,7 +3,12 @@ import { crc32Update as crc32UpdateWire } from '../crc32Wire'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 
 /** Incremental CRC-32 IEEE update; Node passes the native `zlib.crc32` wrapper, browsers the JS table. */
-export type Crc32UpdateFn = (seed: number, buf: BinaryBytes, start?: number, end?: number) => number
+export type Crc32UpdateFn = (
+  seed: number,
+  buf: BinaryBytes,
+  start?: number,
+  end?: number,
+) => number
 
 export function computeSectionDirectory(
   rawSections: BinaryBytes[],
@@ -64,8 +69,17 @@ export function concatRawSectionsWithCrc(
   entries: Msv5SectionEntry[]
   payloadCrc32: number
 } {
-  const { entries, uncompressedLength } = computeSectionDirectory(rawSections, crc32Update)
+  const { entries, uncompressedLength } = computeSectionDirectory(
+    rawSections,
+    crc32Update,
+  )
   const uncompressed = alloc(uncompressedLength)
-  const payloadCrc32 = writeRawSectionsIntoPayload(uncompressed, 0, rawSections, entries, crc32Update)
+  const payloadCrc32 = writeRawSectionsIntoPayload(
+    uncompressed,
+    0,
+    rawSections,
+    entries,
+    crc32Update,
+  )
   return { uncompressed, entries, payloadCrc32 }
 }

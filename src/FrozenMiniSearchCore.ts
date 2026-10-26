@@ -1,6 +1,9 @@
 import type { FrozenTermIndex } from './frozenTermIndex'
 import { validateFrozenTermIndexLeaves } from './frozenTermIndex'
-import { buildFrozenAssembleParamsFromMiniSearchSnapshot, type MiniSearchSnapshot } from './fromMiniSearch'
+import {
+  buildFrozenAssembleParamsFromMiniSearchSnapshot,
+  type MiniSearchSnapshot,
+} from './fromMiniSearch'
 import {
   type AggregateContext,
   finalizeRawSearchResults,
@@ -45,10 +48,7 @@ import type {
   Suggestion,
 } from './searchTypes'
 import { type FieldLengthArray } from './fieldLengthMatrix'
-import type {
-  FrozenAssembleParams,
-  OptionsWithDefaults,
-} from './frozenTypes'
+import type { FrozenAssembleParams, OptionsWithDefaults } from './frozenTypes'
 import { forEachLiveShortId } from './forEachLiveShortId'
 import {
   compactExternalIds,
@@ -62,7 +62,10 @@ import {
   materializeOwnedSnapshot,
   type SnapshotOwnershipMode,
 } from './frozenOwnedSnapshot'
-import { assembleParamsFromBinarySnapshot, buildBinarySnapshotInput } from './frozenBinaryShared'
+import {
+  assembleParamsFromBinarySnapshot,
+  buildBinarySnapshotInput,
+} from './frozenBinaryShared'
 import type { FrozenSnapshot } from './binaryStructures'
 import { readU8 } from './binaryBytes'
 import { MSV5_PAYLOAD_CODEC_OFFSET } from './msv5/binaryMsv5Constants'
@@ -72,11 +75,16 @@ import {
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import { WILDCARD_QUERY } from './symbols'
-import { getFrozenDefault, type FrozenDefaultOptionName } from './searchDefaults'
+import {
+  getFrozenDefault,
+  type FrozenDefaultOptionName,
+} from './searchDefaults'
 import { frozenRuntimeOptions } from './frozenOptions'
 
 const noStoredFields = (): undefined => undefined
-type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (params: FrozenAssembleParams<T>) => I
+type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (
+  params: FrozenAssembleParams<T>,
+) => I
 export type { FrozenMiniSearchCtor }
 
 export function materializeFrozenAssembleParams<T>(
@@ -93,7 +101,11 @@ export function materializeFrozenAssembleParams<T>(
     throw new Error('FrozenMiniSearch: avgFieldLength size mismatch')
   }
   if (!trustedSource) {
-    validateFrozenPostingsLayout(owned.postings, owned.documentCount, owned.nextId)
+    validateFrozenPostingsLayout(
+      owned.postings,
+      owned.documentCount,
+      owned.nextId,
+    )
     validateFrozenTermIndexLeaves(owned.index, termCount)
   }
   return owned
@@ -117,7 +129,11 @@ export function assembleFrozenInternal<T, I extends FrozenMiniSearchCore<T>>(
   ownershipMode: SnapshotOwnershipMode,
   Ctor?: FrozenMiniSearchCtor<T, I>,
 ): FrozenMiniSearchCore<T> | I {
-  const owned = materializeFrozenAssembleParams(params, trustedSource, ownershipMode)
+  const owned = materializeFrozenAssembleParams(
+    params,
+    trustedSource,
+    ownershipMode,
+  )
   if (Ctor == null) {
     return new FrozenMiniSearchCore(owned)
   }
@@ -131,31 +147,54 @@ export function assembleFrozenInternal<T, I extends FrozenMiniSearchCore<T>>(
  * derived from the wire codec: raw payloads alias `wireBuffer` and must be copied,
  * compressed payloads are decoded into an owned allocation and can be kept as-is.
  */
-export function assembleFrozenFromBinarySnapshot<T, I extends FrozenMiniSearchCore<T>>(
+export function assembleFrozenFromBinarySnapshot<
+  T,
+  I extends FrozenMiniSearchCore<T>,
+>(
   snap: FrozenSnapshot,
   options: Options<T>,
   wireBuffer: Uint8Array,
   Ctor: FrozenMiniSearchCtor<T, I>,
 ): I {
-  const ownershipMode = binaryLoadOwnershipModeFromCodec(readU8(wireBuffer, MSV5_PAYLOAD_CODEC_OFFSET))
-  return assembleFrozenInternal(assembleParamsFromBinarySnapshot(snap, options), true, ownershipMode, Ctor)
+  const ownershipMode = binaryLoadOwnershipModeFromCodec(
+    readU8(wireBuffer, MSV5_PAYLOAD_CODEC_OFFSET),
+  )
+  return assembleFrozenInternal(
+    assembleParamsFromBinarySnapshot(snap, options),
+    true,
+    ownershipMode,
+    Ctor,
+  )
 }
 
 /** @internal Trusted document build for a concrete FrozenMiniSearch subclass. */
-export function frozenFromDocumentsWithCtor<T, I extends FrozenMiniSearchCore<T>>(
+export function frozenFromDocumentsWithCtor<
+  T,
+  I extends FrozenMiniSearchCore<T>,
+>(
   Ctor: FrozenMiniSearchCtor<T, I>,
   documents: readonly T[],
   options: Options<T>,
 ): I {
-  return assembleFrozenInternal(buildFrozenParamsFromDocuments(documents, options), true, 'trusted-build', Ctor)
+  return assembleFrozenInternal(
+    buildFrozenParamsFromDocuments(documents, options),
+    true,
+    'trusted-build',
+    Ctor,
+  )
 }
 
 /** @internal Trusted builder finalize for a concrete FrozenMiniSearch subclass. */
-export function frozenFromIndexBuilderWithCtor<T, I extends FrozenMiniSearchCore<T>>(
-  Ctor: FrozenMiniSearchCtor<T, I>,
-  builder: FrozenIndexBuilder<T>,
-): I {
-  return assembleFrozenInternal(builder.freezeParams(), true, 'trusted-build', Ctor)
+export function frozenFromIndexBuilderWithCtor<
+  T,
+  I extends FrozenMiniSearchCore<T>,
+>(Ctor: FrozenMiniSearchCtor<T, I>, builder: FrozenIndexBuilder<T>): I {
+  return assembleFrozenInternal(
+    builder.freezeParams(),
+    true,
+    'trusted-build',
+    Ctor,
+  )
 }
 
 export default class FrozenMiniSearchCore<T = any> {
@@ -204,7 +243,7 @@ export default class FrozenMiniSearchCore<T = any> {
       getFieldLength: (docId, fieldId) => this._getFieldLength(docId, fieldId),
       getExternalId: this._getExternalId,
       getStoredFields: this._hasStoredFields
-        ? docId => readStoredFields(this._storedFields, docId)
+        ? (docId) => readStoredFields(this._storedFields, docId)
         : noStoredFields,
     }
     this._queryEngineParams = {
@@ -217,16 +256,26 @@ export default class FrozenMiniSearchCore<T = any> {
     }
   }
 
-  private _createQueryIndexView(flyweight: FrozenFieldTermFlyweight): QueryIndexView {
+  private _createQueryIndexView(
+    flyweight: FrozenFieldTermFlyweight,
+  ): QueryIndexView {
     return createFrozenQueryIndexView(
       this._index,
       this._postings,
       flyweight,
       this._hasStoredFields
         ? (callback) => {
-            forEachLiveShortId(this._nextId, this._externalIds, (shortId, id) => {
-              callback(shortId, id, readStoredFields(this._storedFields, shortId))
-            })
+            forEachLiveShortId(
+              this._nextId,
+              this._externalIds,
+              (shortId, id) => {
+                callback(
+                  shortId,
+                  id,
+                  readStoredFields(this._storedFields, shortId),
+                )
+              },
+            )
           }
         : (callback) => {
             forEachLiveShortId(this._nextId, this._externalIds, callback)
@@ -241,13 +290,19 @@ export default class FrozenMiniSearchCore<T = any> {
    * The shared posting flyweight is rebound per term and read again per field while scoring,
    * so a search started from `boostDocument` gets its own view instead of rebinding the outer one.
    */
-  private _withQueryParams<R>(run: (params: QueryEngineParams) => R, trackMatch = true): R {
-    let params = this._activeQueries === 0
-      ? this._queryEngineParams
-      : {
-          ...this._queryEngineParams,
-          indexView: this._createQueryIndexView(createFrozenFieldTermFlyweight(this._postings)),
-        }
+  private _withQueryParams<R>(
+    run: (params: QueryEngineParams) => R,
+    trackMatch = true,
+  ): R {
+    let params =
+      this._activeQueries === 0
+        ? this._queryEngineParams
+        : {
+            ...this._queryEngineParams,
+            indexView: this._createQueryIndexView(
+              createFrozenFieldTermFlyweight(this._postings),
+            ),
+          }
     if (!trackMatch) params = { ...params, trackMatch }
     this._activeQueries++
     try {
@@ -257,14 +312,25 @@ export default class FrozenMiniSearchCore<T = any> {
     }
   }
 
-  private _runQuery(query: Query, searchOptions: SearchOptions, trackMatch = true): RawResult {
-    return this._withQueryParams(params => runQuery(query, searchOptions, params), trackMatch)
+  private _runQuery(
+    query: Query,
+    searchOptions: SearchOptions,
+    trackMatch = true,
+  ): RawResult {
+    return this._withQueryParams(
+      (params) => runQuery(query, searchOptions, params),
+      trackMatch,
+    )
   }
 
   static readonly wildcard: typeof WILDCARD_QUERY = WILDCARD_QUERY
 
-  get documentCount(): number { return this._documentCount }
-  get termCount(): number { return this._termCount }
+  get documentCount(): number {
+    return this._documentCount
+  }
+  get termCount(): number {
+    return this._termCount
+  }
 
   /** Whether a document with the given external id is in the index. */
   has(id: unknown): boolean {
@@ -277,7 +343,9 @@ export default class FrozenMiniSearchCore<T = any> {
    */
   getStoredFields(id: unknown): Record<string, unknown> | undefined {
     const shortId = this._idLookup.get(id)
-    return shortId == null ? undefined : readStoredFields(this._storedFields, shortId)
+    return shortId == null
+      ? undefined
+      : readStoredFields(this._storedFields, shortId)
   }
 
   /**
@@ -295,18 +363,27 @@ export default class FrozenMiniSearchCore<T = any> {
    * @returns Matches sorted by descending score.
    */
   search(query: Query, searchOptions: ScoredSearchOptions): ScoredResult[]
-  search(query: Query, searchOptions?: SearchOptions & { matchInfo?: true }): SearchResult[]
-  search(query: Query, callOptions: SearchOptions | ScoredSearchOptions = {}): SearchResult[] | ScoredResult[] {
+  search(
+    query: Query,
+    searchOptions?: SearchOptions & { matchInfo?: true },
+  ): SearchResult[]
+  search(
+    query: Query,
+    callOptions: SearchOptions | ScoredSearchOptions = {},
+  ): SearchResult[] | ScoredResult[] {
     // Both overloads share one runtime path; a reduced-result filter is typed for that shape only.
     const searchOptions = callOptions as SearchOptions & { matchInfo?: boolean }
-    const limit = resolveResultLimit(Object.hasOwn(searchOptions, 'limit')
-      ? searchOptions.limit
-      : this._options.searchOptions.limit)
+    const limit = resolveResultLimit(
+      Object.hasOwn(searchOptions, 'limit')
+        ? searchOptions.limit
+        : this._options.searchOptions.limit,
+    )
     if (limit === 0) return []
     const matchInfo = searchOptions.matchInfo !== false
     if (limit !== undefined && query === WILDCARD_QUERY) {
       const options = { ...this._options.searchOptions, ...searchOptions }
-      if (options.boostDocument == null) return this._searchLimitedWildcard(limit, options.filter, matchInfo)
+      if (options.boostDocument == null)
+        return this._searchLimitedWildcard(limit, options.filter, matchInfo)
     }
     return finalizeRawSearchResults(
       this._runQuery(query, searchOptions, matchInfo),
@@ -328,10 +405,21 @@ export default class FrozenMiniSearchCore<T = any> {
    * Assumes finite scores and deterministic filters, as with bounded search.
    * `matchInfo: false` returns results without `terms` or `match`, as with {@link search}.
    */
-  searchPage(query: Query, searchOptions: ScoredSearchPageOptions): ScoredSearchPage
-  searchPage(query: Query, searchOptions: SearchPageOptions & { matchInfo?: true }): SearchPage
-  searchPage(query: Query, callOptions: SearchPageOptions | ScoredSearchPageOptions): SearchPage | ScoredSearchPage {
-    const searchOptions = callOptions as SearchPageOptions & { matchInfo?: boolean }
+  searchPage(
+    query: Query,
+    searchOptions: ScoredSearchPageOptions,
+  ): ScoredSearchPage
+  searchPage(
+    query: Query,
+    searchOptions: SearchPageOptions & { matchInfo?: true },
+  ): SearchPage
+  searchPage(
+    query: Query,
+    callOptions: SearchPageOptions | ScoredSearchPageOptions,
+  ): SearchPage | ScoredSearchPage {
+    const searchOptions = callOptions as SearchPageOptions & {
+      matchInfo?: boolean
+    }
     if (searchOptions == null || searchOptions.limit === undefined) {
       throw new Error('FrozenMiniSearch: searchPage requires an explicit limit')
     }
@@ -343,15 +431,24 @@ export default class FrozenMiniSearchCore<T = any> {
     const options = { ...this._options.searchOptions, ...searchOptions }
     const matchInfo = searchOptions.matchInfo !== false
     if (query === WILDCARD_QUERY && options.boostDocument == null) {
-      return this._searchWildcardPage(offset, limit ?? Infinity, options.filter, matchInfo)
+      return this._searchWildcardPage(
+        offset,
+        limit ?? Infinity,
+        options.filter,
+        matchInfo,
+      )
     }
-    return finalizeSearchPage({
-      rawResults: this._runQuery(query, searchOptions, matchInfo),
-      getExternalId: this._getExternalId,
-      storedFieldsLayout: this._storedFields,
-      filter: options.filter,
-      matchInfo,
-    }, offset, limit)
+    return finalizeSearchPage(
+      {
+        rawResults: this._runQuery(query, searchOptions, matchInfo),
+        getExternalId: this._getExternalId,
+        storedFieldsLayout: this._storedFields,
+        filter: options.filter,
+        matchInfo,
+      },
+      offset,
+      limit,
+    )
   }
 
   /** Unboosted wildcard pages follow insertion order, so they scan documents without a raw map. */
@@ -365,7 +462,11 @@ export default class FrozenMiniSearchCore<T = any> {
     if (filter == null) {
       // Without discarded slots, a short id is the document's rank.
       let skipped = this._documentCount === this._nextId ? offset : 0
-      for (let shortId = skipped; shortId < this._nextId && results.length < limit; shortId++) {
+      for (
+        let shortId = skipped;
+        shortId < this._nextId && results.length < limit;
+        shortId++
+      ) {
         const id = this._getExternalId(shortId)
         if (id === undefined) continue
         if (skipped < offset) skipped++
@@ -384,16 +485,34 @@ export default class FrozenMiniSearchCore<T = any> {
     return { results, total }
   }
 
-  private _wildcardResult(id: unknown, shortId: number, matchInfo: boolean): SearchResult {
-    const result = newSearchResult(id, 1, [], matchInfo ? {} : undefined, matchInfo)
+  private _wildcardResult(
+    id: unknown,
+    shortId: number,
+    matchInfo: boolean,
+  ): SearchResult {
+    const result = newSearchResult(
+      id,
+      1,
+      [],
+      matchInfo ? {} : undefined,
+      matchInfo,
+    )
     assignStoredFields(this._storedFields, shortId, result)
     return result
   }
 
   /** An unboosted wildcard is already ranked by insertion order; no raw map is needed. */
-  private _searchLimitedWildcard(limit: number, filter: SearchOptions['filter'], matchInfo: boolean): SearchResult[] {
+  private _searchLimitedWildcard(
+    limit: number,
+    filter: SearchOptions['filter'],
+    matchInfo: boolean,
+  ): SearchResult[] {
     const results: SearchResult[] = []
-    for (let shortId = 0; shortId < this._nextId && results.length < limit; shortId++) {
+    for (
+      let shortId = 0;
+      shortId < this._nextId && results.length < limit;
+      shortId++
+    ) {
       const id = this._getExternalId(shortId)
       if (id === undefined) continue
       const result = this._wildcardResult(id, shortId, matchInfo)
@@ -418,9 +537,12 @@ export default class FrozenMiniSearchCore<T = any> {
   matchIds(query: Query, searchOptions: MatchIdsOptions = {}): unknown[] {
     const local = searchOptions as SearchOptions
     if ({ ...this._options.searchOptions, ...local }.filter != null) {
-      throw new Error('FrozenMiniSearch: matchIds does not support filter (pass filter: undefined to disable an index-level filter)')
+      throw new Error(
+        'FrozenMiniSearch: matchIds does not support filter (pass filter: undefined to disable an index-level filter)',
+      )
     }
-    if (local.limit !== undefined) throw new Error('FrozenMiniSearch: matchIds does not support limit')
+    if (local.limit !== undefined)
+      throw new Error('FrozenMiniSearch: matchIds does not support limit')
 
     if (query === WILDCARD_QUERY) {
       const ids: unknown[] = []
@@ -430,9 +552,12 @@ export default class FrozenMiniSearchCore<T = any> {
       }
       return ids
     }
-    const docIds = this._withQueryParams(params => collectMatchingDocIds(query, searchOptions, params, this._nextId))
+    const docIds = this._withQueryParams((params) =>
+      collectMatchingDocIds(query, searchOptions, params, this._nextId),
+    )
     const ids = new Array<unknown>(docIds.length)
-    for (let i = 0; i < docIds.length; i++) ids[i] = this._getExternalId(docIds[i])
+    for (let i = 0; i < docIds.length; i++)
+      ids[i] = this._getExternalId(docIds[i])
     return ids
   }
 
@@ -446,7 +571,13 @@ export default class FrozenMiniSearchCore<T = any> {
     if (filter == null) {
       return suggestFromRawResults(this._runQuery(queryString, merged))
     }
-    return suggestFromSearchResults(this.search(queryString, { ...merged, limit: undefined, matchInfo: undefined }))
+    return suggestFromSearchResults(
+      this.search(queryString, {
+        ...merged,
+        limit: undefined,
+        matchInfo: undefined,
+      }),
+    )
   }
 
   /** Built-in default for indexing / load options (`tokenize`, `processTerm`, `extractField`, …). */
@@ -501,7 +632,10 @@ export default class FrozenMiniSearchCore<T = any> {
     options: Options<T> = {} as Options<T>,
   ): I {
     return assembleFrozenInternal(
-      buildFrozenAssembleParamsFromMiniSearchSnapshot(JSON.parse(json) as MiniSearchSnapshot, options),
+      buildFrozenAssembleParamsFromMiniSearchSnapshot(
+        JSON.parse(json) as MiniSearchSnapshot,
+        options,
+      ),
       false,
       'minisearch-json',
       this,
@@ -525,10 +659,17 @@ export default class FrozenMiniSearchCore<T = any> {
     for await (const document of iterable) {
       builder.add(document)
     }
-    return assembleFrozenInternal(builder.freezeParams(), true, 'trusted-build', this)
+    return assembleFrozenInternal(
+      builder.freezeParams(),
+      true,
+      'trusted-build',
+      this,
+    )
   }
 
-  protected _binarySnapshotInput(): ReturnType<typeof buildBinarySnapshotInput> {
+  protected _binarySnapshotInput(): ReturnType<
+    typeof buildBinarySnapshotInput
+  > {
     return buildBinarySnapshotInput({
       documentCount: this._documentCount,
       nextId: this._nextId,

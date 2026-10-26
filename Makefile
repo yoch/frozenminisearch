@@ -107,19 +107,28 @@ coverage: $(DIST_MARKER)
 # Lint
 # ----------------------------------------------------------------------------
 
-.PHONY: lint lint-fix typecheck knip
-lint: typecheck
-	$(RUN) eslint 'src/**/*.{js,ts}'
+.PHONY: lint lint-fix fmt fmt-check hooks typecheck knip
+lint: typecheck fmt-check
+	bun run lint
 	node scripts/assert-internal-boundary.cjs
+
+fmt:
+	bun run fmt
+
+fmt-check:
+	bun run fmt:check
+
+hooks:
+	git config core.hooksPath .githooks
 
 knip:
 	$(RUN) knip
 
 typecheck:
-	$(RUN) tsc --noEmit
+	bun check --no-script
 
 lint-fix:
-	$(RUN) eslint --fix 'src/**/*.{js,ts}'
+	bun run lint:fix
 
 # ----------------------------------------------------------------------------
 # Benchmarks — profiled interface (via benchmarks/framework/cli.mjs)
@@ -359,8 +368,8 @@ help:
 	@echo "  make benchmark-diff         diffBaseline.js"
 	@echo ""
 	@echo "Lint:"
-	@echo "  make lint                   eslint + tsc --noEmit (src/)"
-	@echo "  make typecheck              tsc --noEmit only"
+	@echo "  make lint                   bun check + bun fmt --check + bun lint (src/)"
+	@echo "  make typecheck              bun check only"
 	@echo "  make docs-build             typedoc + demo"
 	@echo "  make docs-build-pages       typedoc GitHub Pages mode"
 	@echo ""

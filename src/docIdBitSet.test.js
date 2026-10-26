@@ -5,7 +5,7 @@ describe('DocIdBitSet', () => {
     const set = new DocIdBitSet(100)
     for (const docId of [99, 31, 0, 32, 63, 31]) set.add(docId)
     expect(set.size).toBe(5)
-    expect([0, 31, 32, 63, 99].every(docId => set.has(docId))).toBe(true)
+    expect([0, 31, 32, 63, 99].every((docId) => set.has(docId))).toBe(true)
     expect(set.has(1)).toBe(false)
     expect(set.delete(31)).toBe(true)
     expect(set.delete(31)).toBe(false)
@@ -33,10 +33,16 @@ describe('DocIdBitSet', () => {
     const leftIds = new Set()
     const rightIds = new Set()
     for (let docId = 0; docId < limit; docId++) {
-      if (docId % 3 === 0 || docId === 31 || docId === 199) { left.add(docId); leftIds.add(docId) }
-      if (docId % 4 === 0 || docId === 31 || docId === 63) { right.add(docId); rightIds.add(docId) }
+      if (docId % 3 === 0 || docId === 31 || docId === 199) {
+        left.add(docId)
+        leftIds.add(docId)
+      }
+      if (docId % 4 === 0 || docId === 31 || docId === 63) {
+        right.add(docId)
+        rightIds.add(docId)
+      }
     }
-    const copy = ids => {
+    const copy = (ids) => {
       const set = new DocIdBitSet(limit)
       for (const docId of ids) set.add(docId)
       return set
@@ -50,16 +56,23 @@ describe('DocIdBitSet', () => {
     expectIds(union, [...new Set([...leftIds, ...rightIds])])
     const intersection = copy(leftIds)
     intersection.and(right)
-    expectIds(intersection, [...leftIds].filter(docId => rightIds.has(docId)))
+    expectIds(
+      intersection,
+      [...leftIds].filter((docId) => rightIds.has(docId)),
+    )
     const difference = copy(leftIds)
     difference.toArray()
     difference.andNot(right)
-    expectIds(difference, [...leftIds].filter(docId => !rightIds.has(docId)))
+    expectIds(
+      difference,
+      [...leftIds].filter((docId) => !rightIds.has(docId)),
+    )
   })
 
   test('rejects ids at or above the limit', () => {
     const set = new DocIdBitSet(40)
-    for (const docId of [40, 63, 64, -1]) expect(() => set.add(docId)).toThrow(RangeError)
+    for (const docId of [40, 63, 64, -1])
+      expect(() => set.add(docId)).toThrow(RangeError)
     expect(set.size).toBe(0)
     set.add(39)
     expect(Array.from(set)).toEqual([39])
@@ -71,7 +84,9 @@ describe('DocIdBitSet', () => {
     for (const docId of set) {
       if (docId % 2 !== 0) set.delete(docId)
     }
-    expect(Array.from(set)).toEqual(Array.from({ length: 167 }, (_, i) => i * 6))
+    expect(Array.from(set)).toEqual(
+      Array.from({ length: 167 }, (_, i) => i * 6),
+    )
     expect(set.size).toBe(167)
   })
 })

@@ -35,7 +35,10 @@ export function findDocIndexInSortedSegment(
  * Scan vs binary search once `allowedDocs` is already in effect (scoring layer).
  * Uses the same numeric policy as {@link passGateByPostingRatio} today; distinct decision point.
  */
-export function shouldSeekAllowedDocs(gateSize: number, listLength: number): boolean {
+export function shouldSeekAllowedDocs(
+  gateSize: number,
+  listLength: number,
+): boolean {
   return passGateByPostingRatio(gateSize, listLength)
 }
 
@@ -59,7 +62,12 @@ export class SegmentPostingList implements PostingListLike {
   private _offset: number
   private _length: number
 
-  constructor(docIds: DocIdArray, freqs: FreqArray, offset: number, length: number) {
+  constructor(
+    docIds: DocIdArray,
+    freqs: FreqArray,
+    offset: number,
+    length: number,
+  ) {
     this.docIds = docIds
     this.freqs = freqs
     this._offset = offset

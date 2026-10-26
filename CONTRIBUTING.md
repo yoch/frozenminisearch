@@ -6,12 +6,15 @@ Thank you for helping improve this package. Issues and pull requests are welcome
 
 ```bash
 pnpm install
+pnpm hooks      # once per clone: pre-commit hook (bun lint --staged --fix + bun fmt --staged)
 pnpm test       # src/ unit tests + dev/parity/ vs MiniSearch
 pnpm test:fuzzysearch  # long fuzzy-sweep parity (dev/internal/; also CI nightly)
 pnpm test:benchmarks   # benchmarks/*.test (not part of pnpm test)
 pnpm build
 node scripts/verify-npm-pack.cjs
 ```
+
+Type checking, lint and format use Bun's built-in tooling (`bun check`, `bun lint`, `bun fmt`; `bun lint` needs Bun canary): `pnpm lint` for the fast local lint, `pnpm fmt` to format, and `make lint` for the full gate (typecheck + lint + format check + internal-boundary script). Formatting style lives in `bunfig.toml`.
 
 Optional upstream clone for local reference builds:
 
@@ -51,7 +54,7 @@ See [`benchmarks/README.md`](benchmarks/README.md) and [`benchmarks/SCRIPTS.md`]
 
 ## Pull requests
 
-- Keep changes focused; match existing TypeScript style (`pnpm lint`).
+- Keep changes focused; match existing TypeScript style (`pnpm lint`, format with `pnpm fmt`).
 - Update [`CHANGELOG.md`](CHANGELOG.md) for user-visible changes.
 - Functional parity regressions must pass `dev/parity/`.
 

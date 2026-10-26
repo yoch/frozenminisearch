@@ -19,29 +19,38 @@ function corruptPayloadAfterLoad(buf) {
 }
 
 describe('frozenOwnedSnapshot wire buffer isolation', () => {
-  test.each(['raw', 'zlib'])('search stays stable after mutating the source buffer (%s)', (compression) => {
-    const mutable = new MiniSearch(options)
-    mutable.addAll(docs)
-    const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
-    const buf = frozen.saveBinarySync({ compression })
-    const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
-    const query = 'ishmael'
-    const expected = loaded.search(query, options.searchOptions)
+  test.each(['raw', 'zlib'])(
+    'search stays stable after mutating the source buffer (%s)',
+    (compression) => {
+      const mutable = new MiniSearch(options)
+      mutable.addAll(docs)
+      const frozen = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
+      const buf = frozen.saveBinarySync({ compression })
+      const loaded = FrozenMiniSearch.loadBinarySync(buf, options)
+      const query = 'ishmael'
+      const expected = loaded.search(query, options.searchOptions)
 
-    corruptPayloadAfterLoad(buf)
-    expect(loaded.search(query, options.searchOptions)).toEqual(expected)
-  })
+      corruptPayloadAfterLoad(buf)
+      expect(loaded.search(query, options.searchOptions)).toEqual(expected)
+    },
+  )
 })
 
 describe('frozenOwnedSnapshot decoded payload release', () => {
-  const storedDocs = Array.from({ length: 200 }, (_, id) => ({ id, text: `document ${id} ${'x'.repeat(200)}` }))
+  const storedDocs = Array.from({ length: 200 }, (_, id) => ({
+    id,
+    text: `document ${id} ${'x'.repeat(200)}`,
+  }))
   const storedOptions = { fields: ['text'], storeFields: ['text'] }
 
   test.each([
-    ['sync', buf => FrozenMiniSearch.loadBinarySync(buf, storedOptions)],
-    ['async', buf => FrozenMiniSearch.loadBinaryAsync(buf, storedOptions)],
+    ['sync', (buf) => FrozenMiniSearch.loadBinarySync(buf, storedOptions)],
+    ['async', (buf) => FrozenMiniSearch.loadBinaryAsync(buf, storedOptions)],
   ])('compressed %s load owns compact typed arrays', async (_mode, load) => {
-    const buf = FrozenMiniSearch.fromDocuments(storedDocs, storedOptions).saveBinarySync({ compression: 'zlib' })
+    const buf = FrozenMiniSearch.fromDocuments(
+      storedDocs,
+      storedOptions,
+    ).saveBinarySync({ compression: 'zlib' })
     const loaded = await load(buf)
     const postings = frozenPostings(loaded)
     const index = frozenTermIndex(loaded)

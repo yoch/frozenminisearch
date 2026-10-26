@@ -1,0 +1,6 @@
+#!/bin/sh
+# Fast pre-commit feedback using Bun's built-in lint (canary) and fmt.
+# Fixes and re-stages what it can; blocks the commit on unfixable errors.
+# --no-script: without it, `bun lint` / `bun fmt` run the package.json scripts.
+bun lint --no-script --staged --fix src || exit 1
+bun fmt --no-script --staged src || exit 1

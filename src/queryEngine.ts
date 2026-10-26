@@ -54,7 +54,13 @@ import type { PackedTermCursor } from './PackedRadixTree/types'
 export interface QueryIndexView {
   getTermData(term: string): FieldTermDataLike | undefined
   /** Iterate over active documents (used by wildcard queries). */
-  forEachActiveDoc(callback: (docId: number, externalId: unknown, storedFields?: Record<string, unknown>) => void): void
+  forEachActiveDoc(
+    callback: (
+      docId: number,
+      externalId: unknown,
+      storedFields?: Record<string, unknown>,
+    ) => void,
+  ): void
   /** Iterate over active document ids only, without reading stored fields. */
   forEachActiveDocId(callback: (docId: number) => void): void
   resolveTermIndex(term: string): number | undefined
@@ -72,12 +78,21 @@ export interface QueryIndexView {
   ): void
   visitPrefixMatchesByIndex(
     term: string,
-    visit: (termIndex: number, length: number, cursor: PackedTermCursor) => void,
+    visit: (
+      termIndex: number,
+      length: number,
+      cursor: PackedTermCursor,
+    ) => void,
   ): void
   visitFuzzyMatchesByIndex(
     term: string,
     maxDistance: number,
-    visit: (termIndex: number, length: number, distance: number, cursor: PackedTermCursor) => void,
+    visit: (
+      termIndex: number,
+      length: number,
+      distance: number,
+      cursor: PackedTermCursor,
+    ) => void,
   ): void
 }
 
@@ -85,7 +100,10 @@ export interface QueryEngineParams {
   fields: string[]
   globalSearchOptions: SearchOptionsWithDefaults
   tokenize: (text: string, fieldName?: string) => string[]
-  processTerm: (term: string, fieldName?: string) => string | string[] | null | undefined | false
+  processTerm: (
+    term: string,
+    fieldName?: string,
+  ) => string | string[] | null | undefined | false
   indexView: QueryIndexView
   aggregateContext: AggregateContext
   /** False for a search without match information: raw results leave `match` undefined. */
@@ -103,14 +121,20 @@ function useGatedEvaluation(
 }
 
 function isQueryCombination(query: Query): query is QueryCombination {
-  return typeof query === 'object'
-    && query != null
-    && 'queries' in query
-    && Array.isArray((query as QueryCombination).queries)
+  return (
+    typeof query === 'object' &&
+    query != null &&
+    'queries' in query &&
+    Array.isArray((query as QueryCombination).queries)
+  )
 }
 
 function combinationHasWildcard(query: QueryCombination): boolean {
-  return query.queries.some(q => isWildcardQuery(q) || (isQueryCombination(q) && combinationHasWildcard(q)))
+  return query.queries.some(
+    (q) =>
+      isWildcardQuery(q) ||
+      (isQueryCombination(q) && combinationHasWildcard(q)),
+  )
 }
 
 function shouldUseGatedEvaluation(
@@ -177,28 +201,32 @@ function executeQuerySpecInternal(
 ): RawResult {
   const { fieldBoosts, options } = normalized
   const trackMatch = params.trackMatch !== false
-  const termOptions: AggregateTermOptions | undefined = allowedDocs == null && trackMatch
-    ? undefined
-    : { allowedDocs, trackMatch }
+  const termOptions: AggregateTermOptions | undefined =
+    allowedDocs == null && trackMatch ? undefined : { allowedDocs, trackMatch }
   const results = new Map() as RawResult
   let derivedTermOrdinal = 0
 
-  visitQuerySpecForScoring(query, normalized, params, (data, derivedTerm, termWeight) => {
-    aggregateTerm(
-      query.term,
-      derivedTerm,
-      termWeight,
-      query.termBoost,
-      data,
-      fieldBoosts,
-      params.aggregateContext,
-      options.boostDocument,
-      options.bm25,
-      results,
-      termOptions,
-      derivedTermOrdinal++,
-    )
-  })
+  visitQuerySpecForScoring(
+    query,
+    normalized,
+    params,
+    (data, derivedTerm, termWeight) => {
+      aggregateTerm(
+        query.term,
+        derivedTerm,
+        termWeight,
+        query.termBoost,
+        data,
+        fieldBoosts,
+        params.aggregateContext,
+        options.boostDocument,
+        options.bm25,
+        results,
+        termOptions,
+        derivedTermOrdinal++,
+      )
+    },
+  )
 
   return results
 }
@@ -216,7 +244,10 @@ function estimateMaxPostingLengthForQuery(
     const options = { ...searchOptions, ...query, queries: undefined }
     let maxLen = 0
     for (const branch of query.queries) {
-      maxLen = Math.max(maxLen, estimateMaxPostingLengthForQuery(branch, options, params))
+      maxLen = Math.max(
+        maxLen,
+        estimateMaxPostingLengthForQuery(branch, options, params),
+      )
     }
     return maxLen
   }
@@ -226,7 +257,10 @@ function estimateMaxPostingLengthForQuery(
   const normalized = normalizeStringQuery(query, searchOptions, params)
   let maxLen = 0
   for (const spec of normalized.specs) {
-    maxLen = Math.max(maxLen, estimateMaxPostingLengthForQuerySpec(spec, normalized, params))
+    maxLen = Math.max(
+      maxLen,
+      estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
+    )
   }
   return maxLen
 }
@@ -238,31 +272,57 @@ function collectDocIdsForQuerySpec(
   allowedDocs?: DocIdGate,
   newDocIdSet: () => DocIdSet = createDocIdSet,
 ): DocIdSet {
-  const { fieldBoosts, options: { boostDocument } } = normalized
+  const {
+    fieldBoosts,
+    options: { boostDocument },
+  } = normalized
   const docIds = newDocIdSet()
   const { indexView, aggregateContext } = params
   let termDocIds: Set<number> | undefined
 
-  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex, _length, _distance, cursor) => {
-    if (termIndex == null) return
-    if (boostDocument == null) {
-      indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, docIds, allowedDocs)
-      return
-    }
-    // Scoring drops docs whose boostDocument is 0 for this term, so membership must too.
-    if (termDocIds == null) termDocIds = new Set<number>()
-    else termDocIds.clear()
-    indexView.collectDocIds(termIndex, fieldBoosts, aggregateContext, termDocIds, allowedDocs)
-    if (termDocIds.size === 0) return
-    const term = kind === 'exact' ? query.term : cursor?.term()
-    if (term == null) return
-    for (const docId of termDocIds) {
-      if (docIds.has(docId)) continue
-      if (boostDocument(aggregateContext.getExternalId(docId), term, aggregateContext.getStoredFields(docId))) {
-        docIds.add(docId)
+  forEachQuerySpecTermRef(
+    query,
+    normalized,
+    params,
+    (kind, termIndex, _length, _distance, cursor) => {
+      if (termIndex == null) return
+      if (boostDocument == null) {
+        indexView.collectDocIds(
+          termIndex,
+          fieldBoosts,
+          aggregateContext,
+          docIds,
+          allowedDocs,
+        )
+        return
       }
-    }
-  })
+      // Scoring drops docs whose boostDocument is 0 for this term, so membership must too.
+      if (termDocIds == null) termDocIds = new Set<number>()
+      else termDocIds.clear()
+      indexView.collectDocIds(
+        termIndex,
+        fieldBoosts,
+        aggregateContext,
+        termDocIds,
+        allowedDocs,
+      )
+      if (termDocIds.size === 0) return
+      const term = kind === 'exact' ? query.term : cursor?.term()
+      if (term == null) return
+      for (const docId of termDocIds) {
+        if (docIds.has(docId)) continue
+        if (
+          boostDocument(
+            aggregateContext.getExternalId(docId),
+            term,
+            aggregateContext.getStoredFields(docId),
+          )
+        ) {
+          docIds.add(docId)
+        }
+      }
+    },
+  )
   return docIds
 }
 
@@ -283,7 +343,14 @@ export function createFrozenQueryIndexView(
       return flyweight.bind(termIndex)
     },
     collectDocIds(termIndex, fieldBoosts, context, docIds, allowedDocs) {
-      collectDocIdsFromFrozenLayout(layout, termIndex, fieldBoosts, context, docIds, allowedDocs)
+      collectDocIdsFromFrozenLayout(
+        layout,
+        termIndex,
+        fieldBoosts,
+        context,
+        docIds,
+        allowedDocs,
+      )
     },
     getTermData(term) {
       const ti = index.get(term)
@@ -322,7 +389,14 @@ function collectDocIdsForQueryInternal(
     return collectCombinedDocIds(
       query.queries,
       operator,
-      (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed, newDocIdSet),
+      (branch, branchAllowed) =>
+        collectDocIdsForQueryInternal(
+          branch,
+          options,
+          params,
+          branchAllowed,
+          newDocIdSet,
+        ),
       allowedDocs,
       newDocIdSet,
     )
@@ -339,18 +413,47 @@ function collectDocIdsForQueryInternal(
   if (specs.length === 1) {
     // Scoring validates the operator of a single-term query too.
     assertCombinationOperator(operator)
-    return collectDocIdsForQuerySpec(specs[0], normalized, params, allowedDocs, newDocIdSet)
+    return collectDocIdsForQuerySpec(
+      specs[0],
+      normalized,
+      params,
+      allowedDocs,
+      newDocIdSet,
+    )
   }
 
   const collectSpec = (spec: QuerySpec, branchAllowed?: DocIdGate) =>
-    collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed, newDocIdSet)
+    collectDocIdsForQuerySpec(
+      spec,
+      normalized,
+      params,
+      branchAllowed,
+      newDocIdSet,
+    )
   if (operator.toLowerCase() === 'and') {
     // Start from the most selective exact terms, so a broad first term is only read under a gate.
-    const lengths = specs.map(spec =>
-      estimateCheapTwoPhasePostingLengthForQuerySpec(spec, normalized, params) ?? Number.MAX_SAFE_INTEGER)
-    return collectAndDocIdsByEstimatedLength(specs, lengths, collectSpec, allowedDocs)
+    const lengths = specs.map(
+      (spec) =>
+        estimateCheapTwoPhasePostingLengthForQuerySpec(
+          spec,
+          normalized,
+          params,
+        ) ?? Number.MAX_SAFE_INTEGER,
+    )
+    return collectAndDocIdsByEstimatedLength(
+      specs,
+      lengths,
+      collectSpec,
+      allowedDocs,
+    )
   }
-  return collectCombinedDocIds(specs, operator, collectSpec, allowedDocs, newDocIdSet)
+  return collectCombinedDocIds(
+    specs,
+    operator,
+    collectSpec,
+    allowedDocs,
+    newDocIdSet,
+  )
 }
 
 function executeWildcardQuery(
@@ -358,13 +461,20 @@ function executeWildcardQuery(
   params: QueryEngineParams,
 ): RawResult {
   const results = new Map() as RawResult
-  const options: SearchOptionsWithDefaults = { ...params.globalSearchOptions, ...searchOptions }
+  const options: SearchOptionsWithDefaults = {
+    ...params.globalSearchOptions,
+    ...searchOptions,
+  }
   const { boostDocument } = options
   const trackMatch = params.trackMatch !== false
 
   params.indexView.forEachActiveDoc((shortId, id, storedFields) => {
     const score = boostDocument ? boostDocument(id, '', storedFields) : 1
-    results.set(shortId, { score, terms: [], match: trackMatch ? {} : undefined })
+    results.set(shortId, {
+      score,
+      terms: [],
+      match: trackMatch ? {} : undefined,
+    })
   })
 
   return results
@@ -386,20 +496,29 @@ function executeQueryInternal(
     const options = { ...searchOptions, ...query, queries: undefined }
     const operator = options.combineWith ?? OR
 
-    if (useGatedEvaluation(run, query.queries.length, operator, combinationHasWildcard(query))) {
+    if (
+      useGatedEvaluation(
+        run,
+        query.queries.length,
+        operator,
+        combinationHasWildcard(query),
+      )
+    ) {
       return executeCombinedBranches(
         query.queries,
         operator,
         params,
-        (branch, branchAllowed) => executeQueryInternal(branch, options, params, branchAllowed, run),
-        (branch, branchAllowed) => collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
+        (branch, branchAllowed) =>
+          executeQueryInternal(branch, options, params, branchAllowed, run),
+        (branch, branchAllowed) =>
+          collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
         allowedDocs,
         run,
-        branch => estimateMaxPostingLengthForQuery(branch, options, params),
+        (branch) => estimateMaxPostingLengthForQuery(branch, options, params),
       )
     }
 
-    const results = query.queries.map(subquery =>
+    const results = query.queries.map((subquery) =>
       executeQueryInternal(subquery, options, params, allowedDocs, run),
     )
     return combineResults(results, operator)
@@ -417,16 +536,25 @@ function executeQueryInternal(
       specs,
       operator,
       params,
-      (spec, branchAllowed) => executeQuerySpecInternal(spec, normalized, params, branchAllowed),
-      (spec, branchAllowed) => collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
+      (spec, branchAllowed) =>
+        executeQuerySpecInternal(spec, normalized, params, branchAllowed),
+      (spec, branchAllowed) =>
+        collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
       allowedDocs,
       run,
-      spec => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
-      spec => estimateCheapTwoPhasePostingLengthForQuerySpec(spec, normalized, params),
+      (spec) => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
+      (spec) =>
+        estimateCheapTwoPhasePostingLengthForQuerySpec(
+          spec,
+          normalized,
+          params,
+        ),
     )
   }
 
-  const results = specs.map(spec => executeQuerySpecInternal(spec, normalized, params, allowedDocs))
+  const results = specs.map((spec) =>
+    executeQuerySpecInternal(spec, normalized, params, allowedDocs),
+  )
   return combineResults(results, operator)
 }
 
@@ -460,7 +588,11 @@ export function collectMatchingDocIds(
   docIdLimit: number,
 ): Uint32Array {
   const docIds = collectDocIdsForQueryInternal(
-    query, searchOptions, params, undefined, () => new DocIdBitSet(docIdLimit),
+    query,
+    searchOptions,
+    params,
+    undefined,
+    () => new DocIdBitSet(docIdLimit),
   )
   // Every set comes from the factory above, so the result is a bitset.
   return (docIds as DocIdBitSet).toArray()

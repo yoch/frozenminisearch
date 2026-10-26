@@ -41,17 +41,27 @@ export function buildStoredFieldsRowsWireSection(
       writeU32LE(table, i * 4, 0)
       continue
     }
-    appendStoredFieldJsonEntry(table, heapChunks, heapOffRef, i, utf8Bytes(JSON.stringify(row)))
+    appendStoredFieldJsonEntry(
+      table,
+      heapChunks,
+      heapOffRef,
+      i,
+      utf8Bytes(JSON.stringify(row)),
+    )
   }
   return heapChunks.length === 0 ? table : concatBytes([table, ...heapChunks])
 }
 
 /** MSv5 StoredFields section from {@link StoredFieldsLayout} (no intermediate row array). */
-export function buildStoredFieldsWireSection(layout: StoredFieldsLayout, nextId: number): BinaryBytes {
+export function buildStoredFieldsWireSection(
+  layout: StoredFieldsLayout,
+  nextId: number,
+): BinaryBytes {
   if (layout.kind === 'multi') {
-    const rows = layout.rows.length >= nextId
-      ? layout.rows
-      : layout.rows.concat(new Array(nextId - layout.rows.length))
+    const rows =
+      layout.rows.length >= nextId
+        ? layout.rows
+        : layout.rows.concat(new Array(nextId - layout.rows.length))
     return buildStoredFieldsRowsWireSection(rows, nextId)
   }
 
@@ -70,7 +80,11 @@ export function buildStoredFieldsWireSection(layout: StoredFieldsLayout, nextId:
   return heapChunks.length === 0 ? table : concatBytes([table, ...heapChunks])
 }
 
-function storedFieldsTableEnd(storedOff: number, nextId: number, sectionEnd: number): number {
+function storedFieldsTableEnd(
+  storedOff: number,
+  nextId: number,
+  sectionEnd: number,
+): number {
   const tableEnd = storedOff + nextId * 4
   if (tableEnd > sectionEnd) {
     throw invalidFrozenIndex('stored fields table out of bounds')
@@ -94,7 +108,10 @@ function readStoredFieldJsonAt(
   if (jsonEnd > sectionEnd) {
     throw invalidFrozenIndex('stored fields JSON out of bounds')
   }
-  const row = parseSnapshotJson(readUtf8(buf, jsonStart, jsonEnd), 'stored fields row')
+  const row = parseSnapshotJson(
+    readUtf8(buf, jsonStart, jsonEnd),
+    'stored fields row',
+  )
   if (row === null) {
     throw invalidFrozenIndex('stored fields row is null')
   }

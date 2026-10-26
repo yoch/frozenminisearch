@@ -8,7 +8,10 @@ import {
 import { invalidFrozenIndex } from '../frozenErrors'
 import { readFieldLengthMatrixSection } from '../fieldLengthMatrixWire'
 import { readFloat32Array } from '../binaryWireIo'
-import { readStoredFieldsRowsSection, readStoredFieldsWireSection } from '../storedFieldsWire'
+import {
+  readStoredFieldsRowsSection,
+  readStoredFieldsWireSection,
+} from '../storedFieldsWire'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 import {
   FLAG_LABEL_HEAP_UTF16,
@@ -50,7 +53,10 @@ export function validateMsv5Container(
 
   const payloadOff = readU32LE(buf, MSV5_PAYLOAD_COMPRESSED_OFFSET)
   const compressedLen = readU32LE(buf, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)
-  if (payloadOff !== MSV5_HEADER_SIZE || payloadOff + compressedLen > buf.length) {
+  if (
+    payloadOff !== MSV5_HEADER_SIZE ||
+    payloadOff + compressedLen > buf.length
+  ) {
     throw invalidFrozenIndex('frozen snapshot payload out of bounds')
   }
 
@@ -90,24 +96,26 @@ export function decodeMsv5Sections(
     sections[Msv5SectionId.ExternalIds].length,
   )
 
-  const storedFieldsLayout = hints != null
-    ? readStoredFieldsWireSection(
-        sections[Msv5SectionId.StoredFields],
-        0,
-        nextId,
-        sections[Msv5SectionId.StoredFields].length,
-        hints.storeFields,
-      )
-    : undefined
+  const storedFieldsLayout =
+    hints != null
+      ? readStoredFieldsWireSection(
+          sections[Msv5SectionId.StoredFields],
+          0,
+          nextId,
+          sections[Msv5SectionId.StoredFields].length,
+          hints.storeFields,
+        )
+      : undefined
 
-  const storedFields = storedFieldsLayout != null
-    ? new Array(nextId)
-    : readStoredFieldsRowsSection(
-        sections[Msv5SectionId.StoredFields],
-        0,
-        nextId,
-        sections[Msv5SectionId.StoredFields].length,
-      )
+  const storedFields =
+    storedFieldsLayout != null
+      ? new Array(nextId)
+      : readStoredFieldsRowsSection(
+          sections[Msv5SectionId.StoredFields],
+          0,
+          nextId,
+          sections[Msv5SectionId.StoredFields].length,
+        )
 
   const packedTermIndex = readPackedTermTreeSectionColumnar(
     sections[Msv5SectionId.TermTree],

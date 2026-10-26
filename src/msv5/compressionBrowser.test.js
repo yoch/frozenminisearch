@@ -1,4 +1,7 @@
-import { browserZlibDeflateAsync, browserZlibInflateAsync } from './compressionBrowser'
+import {
+  browserZlibDeflateAsync,
+  browserZlibInflateAsync,
+} from './compressionBrowser'
 
 describe('compressionBrowser', () => {
   test('zlib deflate/inflate round-trip', async () => {
@@ -13,8 +16,9 @@ describe('compressionBrowser', () => {
     const saved = globalThis.CompressionStream
     globalThis.CompressionStream = undefined
     try {
-      await expect(browserZlibDeflateAsync(new Uint8Array([1, 2, 3])))
-        .rejects.toThrow(/CompressionStream is unavailable/)
+      await expect(
+        browserZlibDeflateAsync(new Uint8Array([1, 2, 3])),
+      ).rejects.toThrow(/CompressionStream is unavailable/)
     } finally {
       globalThis.CompressionStream = saved
     }
@@ -24,8 +28,9 @@ describe('compressionBrowser', () => {
     const saved = globalThis.DecompressionStream
     globalThis.DecompressionStream = undefined
     try {
-      await expect(browserZlibInflateAsync(new Uint8Array([1, 2, 3])))
-        .rejects.toThrow(/DecompressionStream is unavailable/)
+      await expect(
+        browserZlibInflateAsync(new Uint8Array([1, 2, 3])),
+      ).rejects.toThrow(/DecompressionStream is unavailable/)
     } finally {
       globalThis.DecompressionStream = saved
     }

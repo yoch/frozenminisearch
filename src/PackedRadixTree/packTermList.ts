@@ -2,8 +2,12 @@ import { MAX_PACKED_EDGE_LABEL_LENGTH, PACKED_NO_VALUE } from './constants'
 import { packedIndexArray } from './layout'
 import PackedRadixTree from './PackedRadixTree'
 
-export type EdgeScratch = { label: string, child: number }
-export type NodeScratch = { value: number, leafOrder: number, edges: EdgeScratch[] }
+export type EdgeScratch = { label: string; child: number }
+export type NodeScratch = {
+  value: number
+  leafOrder: number
+  edges: EdgeScratch[]
+}
 
 type SortedTermOrder = Uint32Array
 
@@ -32,7 +36,8 @@ export function finalizePackedRadixScratch(
     }
     if (node.value !== PACKED_NO_VALUE) {
       if (node.value > maxNodeValue) maxNodeValue = node.value
-      if (node.leafOrder + 1 > maxLeafOrderEncoded) maxLeafOrderEncoded = node.leafOrder + 1
+      if (node.leafOrder + 1 > maxLeafOrderEncoded)
+        maxLeafOrderEncoded = node.leafOrder + 1
     }
   }
 
@@ -131,7 +136,8 @@ function collectDirectGroups(
     const groupStart = cursor
     const firstChar = terms[order[cursor]].charCodeAt(depth)
     cursor++
-    while (cursor < end && terms[order[cursor]].charCodeAt(depth) === firstChar) cursor++
+    while (cursor < end && terms[order[cursor]].charCodeAt(depth) === firstChar)
+      cursor++
     groups.push({
       start: groupStart,
       end: cursor,
@@ -149,7 +155,11 @@ function buildScratchFromSorted(
 
   function writeNode(start: number, end: number, depth: number): number {
     const nodeId = nodes.length
-    nodes.push({ value: PACKED_NO_VALUE, leafOrder: PACKED_NO_VALUE, edges: [] })
+    nodes.push({
+      value: PACKED_NO_VALUE,
+      leafOrder: PACKED_NO_VALUE,
+      edges: [],
+    })
     const node = nodes[nodeId]!
     const hasLeaf = start < end && terms[order[start]]!.length === depth
     const groups = collectDirectGroups(terms, order, start, end, depth)
@@ -165,7 +175,10 @@ function buildScratchFromSorted(
       if (label.length > MAX_PACKED_EDGE_LABEL_LENGTH) {
         throw new Error('PackedRadixTree: edge label too long')
       }
-      node.edges.push({ label, child: writeNode(group.start, group.end, group.lcp) })
+      node.edges.push({
+        label,
+        child: writeNode(group.start, group.end, group.lcp),
+      })
     }
 
     return nodeId
@@ -178,5 +191,8 @@ function buildScratchFromSorted(
 /** Pack a term list in snapshot order (`terms[i]` → leaf index `i`). */
 export function packTermsFromList(terms: readonly string[]): PackedRadixTree {
   const order = sortedTermOrder(terms)
-  return finalizePackedRadixScratch(buildScratchFromSorted(terms, order), terms.length)
+  return finalizePackedRadixScratch(
+    buildScratchFromSorted(terms, order),
+    terms.length,
+  )
 }

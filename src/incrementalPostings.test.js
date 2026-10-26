@@ -8,7 +8,10 @@ import { frozenFromMiniSearch } from '../testSupport/frozenImportHelpers'
 import { createFrozenIndexBuilder } from './frozenBuild'
 import { MAX_FREQ, readDocId } from './compactPostings'
 import { IncrementalPostingsAccumulator } from './incrementalPostings'
-import { nextGrowableCapacity, simulateColumnGrowth } from '../testSupport/growableColumnGrowth.js'
+import {
+  nextGrowableCapacity,
+  simulateColumnGrowth,
+} from '../testSupport/growableColumnGrowth.js'
 import {
   createFrozenFieldTermFlyweight,
   validateFrozenPostingsLayout,
@@ -92,7 +95,12 @@ describe('IncrementalPostingsAccumulator', () => {
     const postings = []
     for (let termIndex = 0; termIndex < 3; termIndex++) {
       for (let fieldId = 0; fieldId < 4; fieldId++) {
-        postings.push({ termIndex, fieldId, docId: termIndex, freq: fieldId + 1 })
+        postings.push({
+          termIndex,
+          fieldId,
+          docId: termIndex,
+          freq: fieldId + 1,
+        })
       }
     }
     const layout = buildIncremental(4, postings)
@@ -103,10 +111,14 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('dense metadata uses adaptive index widths', () => {
-    const layout = buildIncremental(1, [
-      { termIndex: 0, fieldId: 0, docId: 1, freq: 2 },
-      { termIndex: 1, fieldId: 0, docId: 2, freq: 3 },
-    ], 10)
+    const layout = buildIncremental(
+      1,
+      [
+        { termIndex: 0, fieldId: 0, docId: 1, freq: 2 },
+        { termIndex: 1, fieldId: 0, docId: 2, freq: 3 },
+      ],
+      10,
+    )
 
     expect(layout.layout).toBe('dense')
     expect(layout.denseOffsets).toBeInstanceOf(Uint8Array)
@@ -128,7 +140,9 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('finalize clamps frequencies to MAX_FREQ', () => {
-    const layout = buildIncremental(1, [{ termIndex: 0, fieldId: 0, docId: 0, freq: MAX_FREQ + 50 }])
+    const layout = buildIncremental(1, [
+      { termIndex: 0, fieldId: 0, docId: 0, freq: MAX_FREQ + 50 },
+    ])
     expect(layout.allFreqs[0]).toBe(MAX_FREQ)
   })
 
@@ -145,18 +159,27 @@ describe('IncrementalPostingsAccumulator', () => {
     const mutable = new MiniSearch(options)
     mutable.addAll(documents)
 
-    const fromMiniSearch = frozenFromMiniSearch(FrozenMiniSearch, mutable, options)
+    const fromMiniSearch = frozenFromMiniSearch(
+      FrozenMiniSearch,
+      mutable,
+      options,
+    )
     const fromDocuments = FrozenMiniSearch.fromDocuments(documents, options)
 
     expect(frozenMemoryBreakdown(fromMiniSearch).postings.layout).toBe('dense')
     expect(frozenMemoryBreakdown(fromDocuments).postings.layout).toBe('dense')
-    expect(searchSnapshot(fromDocuments, 'term2')).toEqual(searchSnapshot(fromMiniSearch, 'term2'))
+    expect(searchSnapshot(fromDocuments, 'term2')).toEqual(
+      searchSnapshot(fromMiniSearch, 'term2'),
+    )
   })
 
   test('builder avoids duplicate-id Set while numeric ids stay dense', () => {
-    const builder = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] }, {
-      estimatedDocumentCount: 3,
-    })
+    const builder = createFrozenIndexBuilder(
+      { fields: ['text'], storeFields: [] },
+      {
+        estimatedDocumentCount: 3,
+      },
+    )
 
     builder.add({ id: 0, text: 'alpha' })
     builder.add({ id: 1, text: 'beta' })
@@ -166,7 +189,10 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('builder switches to duplicate-id Set when ids stop being dense', () => {
-    const builder = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] })
+    const builder = createFrozenIndexBuilder({
+      fields: ['text'],
+      storeFields: [],
+    })
 
     builder.add({ id: 0, text: 'alpha' })
     builder.add({ id: 1, text: 'beta' })
@@ -180,16 +206,24 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('builder catches duplicate ids before and after dense-id switch', () => {
-    const duplicateDense = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] })
+    const duplicateDense = createFrozenIndexBuilder({
+      fields: ['text'],
+      storeFields: [],
+    })
     duplicateDense.add({ id: 0, text: 'alpha' })
-    expect(() => duplicateDense.add({ id: 0, text: 'beta' }))
-      .toThrow(/duplicate ID 0/)
+    expect(() => duplicateDense.add({ id: 0, text: 'beta' })).toThrow(
+      /duplicate ID 0/,
+    )
 
-    const duplicateString = createFrozenIndexBuilder({ fields: ['text'], storeFields: [] })
+    const duplicateString = createFrozenIndexBuilder({
+      fields: ['text'],
+      storeFields: [],
+    })
     duplicateString.add({ id: 0, text: 'alpha' })
     duplicateString.add({ id: 'doc-1', text: 'beta' })
-    expect(() => duplicateString.add({ id: 'doc-1', text: 'gamma' }))
-      .toThrow(/duplicate ID doc-1/)
+    expect(() => duplicateString.add({ id: 'doc-1', text: 'gamma' })).toThrow(
+      /duplicate ID doc-1/,
+    )
   })
 
   test('non-contiguous scratch ranges compact to one hot-path segment', () => {
@@ -206,7 +240,7 @@ describe('IncrementalPostingsAccumulator', () => {
     const seg = fly.get(0)
     expect(seg.length).toBe(3)
     const docIds = []
-    seg.forEachDoc(docId => docIds.push(docId))
+    seg.forEachDoc((docId) => docIds.push(docId))
     expect(docIds).toEqual([1, 3, 5])
   })
 
@@ -225,11 +259,15 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('sparse metadata uses adaptive index widths', () => {
-    const layout = buildIncremental(20, [
-      { termIndex: 0, fieldId: 1, docId: 0, freq: 1 },
-      { termIndex: 1, fieldId: 3, docId: 1, freq: 1 },
-      { termIndex: 2, fieldId: 5, docId: 2, freq: 1 },
-    ], 10)
+    const layout = buildIncremental(
+      20,
+      [
+        { termIndex: 0, fieldId: 1, docId: 0, freq: 1 },
+        { termIndex: 1, fieldId: 3, docId: 1, freq: 1 },
+        { termIndex: 2, fieldId: 5, docId: 2, freq: 1 },
+      ],
+      10,
+    )
 
     expect(layout.layout).toBe('sparse')
     expect(layout.sparseTermStarts).toBeInstanceOf(Uint8Array)
@@ -239,12 +277,20 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('uint16 doc ids when nextId fits', () => {
-    const layout = buildIncremental(1, [{ termIndex: 0, fieldId: 0, docId: 65534, freq: 1 }], 65535)
+    const layout = buildIncremental(
+      1,
+      [{ termIndex: 0, fieldId: 0, docId: 65534, freq: 1 }],
+      65535,
+    )
     expect(layout.docIdWidth).toBe(16)
   })
 
   test('uint32 doc ids when nextId exceeds 65535', () => {
-    const layout = buildIncremental(1, [{ termIndex: 0, fieldId: 0, docId: 70000, freq: 1 }], 70001)
+    const layout = buildIncremental(
+      1,
+      [{ termIndex: 0, fieldId: 0, docId: 70000, freq: 1 }],
+      70001,
+    )
     expect(layout.docIdWidth).toBe(32)
   })
 
@@ -271,7 +317,9 @@ describe('IncrementalPostingsAccumulator', () => {
   })
 
   test('finalize releases growable scratch buffers', () => {
-    const acc = new IncrementalPostingsAccumulator(1, { estimatedTotalPostings: 64 })
+    const acc = new IncrementalPostingsAccumulator(1, {
+      estimatedTotalPostings: 64,
+    })
     acc.append(0, 0, 1, 1)
     acc.append(0, 0, 2, 2)
 
@@ -308,31 +356,83 @@ describe('IncrementalPostingsAccumulator', () => {
     test('×1.5 vs ×2: trade-offs on representative freeze posting counts', () => {
       const elementBytes = 4 // u32 slotIds column during freeze import
 
-      const doublingExactPowerOfTwo = simulateColumnGrowth(65_536, elementBytes, INITIAL_CAPACITY, 2)
-      const gentlerExactPowerOfTwo = simulateColumnGrowth(65_536, elementBytes, INITIAL_CAPACITY, 1.5)
+      const doublingExactPowerOfTwo = simulateColumnGrowth(
+        65_536,
+        elementBytes,
+        INITIAL_CAPACITY,
+        2,
+      )
+      const gentlerExactPowerOfTwo = simulateColumnGrowth(
+        65_536,
+        elementBytes,
+        INITIAL_CAPACITY,
+        1.5,
+      )
       // Powers of two align with ×2: zero overshoot, tighter peak than gentler steps.
       expect(doublingExactPowerOfTwo.overshoot).toBe(0)
       expect(doublingExactPowerOfTwo.peakCapacity).toBe(65_536)
-      expect(gentlerExactPowerOfTwo.peakCapacity).toBeGreaterThan(doublingExactPowerOfTwo.peakCapacity)
-      expect(gentlerExactPowerOfTwo.growEvents).toBeGreaterThan(doublingExactPowerOfTwo.growEvents)
-      expect(gentlerExactPowerOfTwo.bytesCopied).toBeGreaterThan(doublingExactPowerOfTwo.bytesCopied)
+      expect(gentlerExactPowerOfTwo.peakCapacity).toBeGreaterThan(
+        doublingExactPowerOfTwo.peakCapacity,
+      )
+      expect(gentlerExactPowerOfTwo.growEvents).toBeGreaterThan(
+        doublingExactPowerOfTwo.growEvents,
+      )
+      expect(gentlerExactPowerOfTwo.bytesCopied).toBeGreaterThan(
+        doublingExactPowerOfTwo.bytesCopied,
+      )
 
-      const denseScale = simulateColumnGrowth(300_000, elementBytes, INITIAL_CAPACITY, 2)
-      const denseScaleGentler = simulateColumnGrowth(300_000, elementBytes, INITIAL_CAPACITY, 1.5)
+      const denseScale = simulateColumnGrowth(
+        300_000,
+        elementBytes,
+        INITIAL_CAPACITY,
+        2,
+      )
+      const denseScaleGentler = simulateColumnGrowth(
+        300_000,
+        elementBytes,
+        INITIAL_CAPACITY,
+        1.5,
+      )
       // Gain on dense-scale corpora: less final slack and a lower peak buffer.
-      expect(denseScaleGentler.growEvents).toBeGreaterThan(denseScale.growEvents)
-      expect(denseScaleGentler.bytesCopied).toBeGreaterThan(denseScale.bytesCopied)
-      expect(denseScaleGentler.finalCapacity).toBeLessThan(denseScale.finalCapacity)
+      expect(denseScaleGentler.growEvents).toBeGreaterThan(
+        denseScale.growEvents,
+      )
+      expect(denseScaleGentler.bytesCopied).toBeGreaterThan(
+        denseScale.bytesCopied,
+      )
+      expect(denseScaleGentler.finalCapacity).toBeLessThan(
+        denseScale.finalCapacity,
+      )
       expect(denseScaleGentler.overshoot).toBeLessThan(denseScale.overshoot)
-      expect(denseScaleGentler.peakCapacity).toBeLessThan(denseScale.peakCapacity)
+      expect(denseScaleGentler.peakCapacity).toBeLessThan(
+        denseScale.peakCapacity,
+      )
 
-      const awkwardBand = simulateColumnGrowth(200_000, elementBytes, INITIAL_CAPACITY, 2)
-      const awkwardBandGentler = simulateColumnGrowth(200_000, elementBytes, INITIAL_CAPACITY, 1.5)
+      const awkwardBand = simulateColumnGrowth(
+        200_000,
+        elementBytes,
+        INITIAL_CAPACITY,
+        2,
+      )
+      const awkwardBandGentler = simulateColumnGrowth(
+        200_000,
+        elementBytes,
+        INITIAL_CAPACITY,
+        1.5,
+      )
       // Loss: between powers of two, gentler steps can overshoot the next ×2 plateau and waste more.
-      expect(awkwardBandGentler.growEvents).toBeGreaterThan(awkwardBand.growEvents)
-      expect(awkwardBandGentler.bytesCopied).toBeGreaterThan(awkwardBand.bytesCopied)
-      expect(awkwardBandGentler.overshoot).toBeGreaterThan(awkwardBand.overshoot)
-      expect(awkwardBandGentler.peakCapacity).toBeGreaterThan(awkwardBand.peakCapacity)
+      expect(awkwardBandGentler.growEvents).toBeGreaterThan(
+        awkwardBand.growEvents,
+      )
+      expect(awkwardBandGentler.bytesCopied).toBeGreaterThan(
+        awkwardBand.bytesCopied,
+      )
+      expect(awkwardBandGentler.overshoot).toBeGreaterThan(
+        awkwardBand.overshoot,
+      )
+      expect(awkwardBandGentler.peakCapacity).toBeGreaterThan(
+        awkwardBand.peakCapacity,
+      )
     })
 
     test('initial capacity sweep 16/32/64/128 closes DEFAULT_CAPACITY discussion', () => {
@@ -340,14 +440,18 @@ describe('IncrementalPostingsAccumulator', () => {
       const sweep = [16, 32, 64, 128]
 
       for (const postingCount of [200_000, 300_000]) {
-        const stats = sweep.map(initialCapacity =>
+        const stats = sweep.map((initialCapacity) =>
           simulateColumnGrowth(postingCount, elementBytes, initialCapacity),
         )
 
         // Larger hints shave a few grow events but converge to the same final buffer.
         for (let i = 1; i < stats.length; i++) {
-          expect(stats[i].growEvents).toBeLessThanOrEqual(stats[i - 1].growEvents)
-          expect(stats[i].bytesCopied).toBeLessThanOrEqual(stats[i - 1].bytesCopied)
+          expect(stats[i].growEvents).toBeLessThanOrEqual(
+            stats[i - 1].growEvents,
+          )
+          expect(stats[i].bytesCopied).toBeLessThanOrEqual(
+            stats[i - 1].bytesCopied,
+          )
           expect(stats[i].finalCapacity).toBe(stats[i - 1].finalCapacity)
           expect(stats[i].overshoot).toBe(stats[i - 1].overshoot)
         }
@@ -356,14 +460,18 @@ describe('IncrementalPostingsAccumulator', () => {
         const baseline = stats[0]
         const largest = stats[stats.length - 1]
         expect(largest.bytesCopied).toBeLessThan(baseline.bytesCopied)
-        expect(baseline.bytesCopied - largest.bytesCopied).toBeLessThan(baseline.bytesCopied * 0.001)
+        expect(baseline.bytesCopied - largest.bytesCopied).toBeLessThan(
+          baseline.bytesCopied * 0.001,
+        )
       }
 
-      const smallIndex = sweep.map(initialCapacity =>
+      const smallIndex = sweep.map((initialCapacity) =>
         simulateColumnGrowth(100, elementBytes, initialCapacity),
       )
       // Small snapshots pay upfront for a larger hint: same final size, more reserved from the first push.
-      expect(smallIndex[0].growEvents).toBeGreaterThan(smallIndex[smallIndex.length - 1].growEvents)
+      expect(smallIndex[0].growEvents).toBeGreaterThan(
+        smallIndex[smallIndex.length - 1].growEvents,
+      )
       for (const row of smallIndex) {
         expect(row.finalCapacity).toBe(128)
         expect(row.overshoot).toBe(28)
@@ -375,7 +483,9 @@ describe('IncrementalPostingsAccumulator', () => {
 })
 
 function buildIncrementally(documents, options) {
-  const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: documents.length })
+  const builder = createFrozenIndexBuilder(options, {
+    estimatedDocumentCount: documents.length,
+  })
   for (const doc of documents) builder.add(doc)
   return freezeFrozenIndexBuilder(builder)
 }
@@ -387,17 +497,21 @@ function buildDocByDoc(documents, options) {
 }
 
 function searchSnapshot(index, query) {
-  return index.search(query).map(r => ({ id: r.id, score: r.score }))
+  return index.search(query).map((r) => ({ id: r.id, score: r.score }))
 }
 
-const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), '../testSupport/fixtures')
-const DEFAULT_MEDICAMENTS_CORPUS_DIR = '/home/yoch/fr.gouv.medicaments.rest/data/corpus-export'
+const FIXTURES_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../testSupport/fixtures',
+)
+const DEFAULT_MEDICAMENTS_CORPUS_DIR =
+  '/home/yoch/fr.gouv.medicaments.rest/data/corpus-export'
 
 function parseJsonl(content) {
   return content
     .split('\n')
-    .filter(line => line.trim().length > 0)
-    .map(line => JSON.parse(line))
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line))
 }
 
 function loadJsonlFile(dir, file) {
@@ -411,32 +525,45 @@ function registerGoldenDatasetTests({ id, documents, options, query }) {
 
     expect(docByDoc.termCount).toBe(hinted.termCount)
     expect(docByDoc.documentCount).toBe(hinted.documentCount)
-    expect(searchSnapshot(docByDoc, query)).toEqual(searchSnapshot(hinted, query))
+    expect(searchSnapshot(docByDoc, query)).toEqual(
+      searchSnapshot(hinted, query),
+    )
 
     const builder = createFrozenIndexBuilder(options)
     for (const doc of documents) builder.add(doc)
     const params = builder.freezeParams()
-    validateFrozenPostingsLayout(params.postings, params.documentCount, params.nextId)
+    validateFrozenPostingsLayout(
+      params.postings,
+      params.documentCount,
+      params.nextId,
+    )
     assertSegmentsPartitionBuffers(params.postings)
   })
 
   test(`${id} incremental build round-trips through binary`, () => {
     const built = buildDocByDoc(documents, options)
-    const loaded = FrozenMiniSearch.loadBinarySync(built.saveBinarySync(), options)
+    const loaded = FrozenMiniSearch.loadBinarySync(
+      built.saveBinarySync(),
+      options,
+    )
 
     expect(loaded.termCount).toBe(built.termCount)
     expect(searchSnapshot(loaded, query)).toEqual(searchSnapshot(built, query))
   })
 
   test(`${id} freezeParams releases builder transients after assembling params`, () => {
-    const builder = createFrozenIndexBuilder(options, { estimatedDocumentCount: documents.length + 2 })
+    const builder = createFrozenIndexBuilder(options, {
+      estimatedDocumentCount: documents.length + 2,
+    })
     for (const doc of documents) builder.add(doc)
 
     const params = builder.freezeParams()
 
     expect(params.documentCount).toBe(documents.length)
     expect(params.externalIds.length).toBe(documents.length)
-    expect(params.fieldLengthMatrix.length).toBe(params.documentCount * params.fieldCount)
+    expect(params.fieldLengthMatrix.length).toBe(
+      params.documentCount * params.fieldCount,
+    )
     expect(builder._externalIds).toEqual([])
     expect(builder._fieldLengthData).toEqual([])
     expect(builder._avgFieldLength).toEqual([])
@@ -474,18 +601,25 @@ describe('IncrementalPostingsAccumulator golden (CI fixture)', () => {
       for (const doc of streamDocs) yield doc
     }
 
-    const fromStream = await FrozenMiniSearch.fromAsyncIterable(stream(), options, {
-      estimatedDocumentCount: streamDocs.length,
-    })
+    const fromStream = await FrozenMiniSearch.fromAsyncIterable(
+      stream(),
+      options,
+      {
+        estimatedDocumentCount: streamDocs.length,
+      },
+    )
     const fromAdds = buildDocByDoc(streamDocs, options)
 
     expect(fromStream.termCount).toBe(fromAdds.termCount)
-    expect(searchSnapshot(fromStream, 'beta')).toEqual(searchSnapshot(fromAdds, 'beta'))
+    expect(searchSnapshot(fromStream, 'beta')).toEqual(
+      searchSnapshot(fromAdds, 'beta'),
+    )
   })
 })
 
 describe('IncrementalPostingsAccumulator medicaments golden (optional local)', () => {
-  const corpusDir = process.env.CORPUS_EXPORT_DIR ?? DEFAULT_MEDICAMENTS_CORPUS_DIR
+  const corpusDir =
+    process.env.CORPUS_EXPORT_DIR ?? DEFAULT_MEDICAMENTS_CORPUS_DIR
 
   const datasets = [
     {

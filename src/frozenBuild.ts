@@ -58,14 +58,18 @@ export class FrozenIndexBuilder<T> {
     const estimatedDocs = hints?.estimatedDocumentCount ?? 0
     const perSlot = hints?.estimatedPostingsPerSlot ?? 4
     this._postings = new IncrementalPostingsAccumulator(this._fieldCount, {
-      estimatedTotalPostings: estimatedDocs > 0 ? estimatedDocs * perSlot : undefined,
+      estimatedTotalPostings:
+        estimatedDocs > 0 ? estimatedDocs * perSlot : undefined,
     })
     this._avgFieldLength = []
     this._nextId = 0
     this._frozen = false
 
     const estimated = hints?.estimatedDocumentCount
-    this._storedFields = createStoredFieldsLayout(this._options.storeFields, estimated ?? 0)
+    this._storedFields = createStoredFieldsLayout(
+      this._options.storeFields,
+      estimated ?? 0,
+    )
     if (estimated != null && estimated > 0) {
       this._externalIds = new Array(estimated)
       this._fieldLengthData = new Array(estimated * this._fieldCount).fill(0)
@@ -85,16 +89,32 @@ export class FrozenIndexBuilder<T> {
       throw new Error('FrozenIndexBuilder: cannot add after freezeParams()')
     }
 
-    const { extractField, stringifyField, tokenize, processTerm, fields, idField, storeFields } = this._options
+    const {
+      extractField,
+      stringifyField,
+      tokenize,
+      processTerm,
+      fields,
+      idField,
+      storeFields,
+    } = this._options
     const id = extractField(document, idField)
     if (id == null) {
-      throw new Error(`FrozenMiniSearch: document does not have ID field "${idField}"`)
+      throw new Error(
+        `FrozenMiniSearch: document does not have ID field "${idField}"`,
+      )
     }
     const shortId = this._nextId
     this.claimDocumentId(id, shortId)
     this._nextId = shortId + 1
     this._externalIds[shortId] = id
-    writeStoredField(this._storedFields, shortId, storeFields, extractField, document)
+    writeStoredField(
+      this._storedFields,
+      shortId,
+      storeFields,
+      extractField,
+      document,
+    )
 
     const documentCount = shortId + 1
 
@@ -102,9 +122,11 @@ export class FrozenIndexBuilder<T> {
       const fieldValue = extractField(document, field)
       if (fieldValue == null) continue
 
-      const fieldText = typeof fieldValue === 'string' && stringifyField === getFrozenDefault('stringifyField')
-        ? fieldValue
-        : stringifyField(fieldValue, field)
+      const fieldText =
+        typeof fieldValue === 'string' &&
+        stringifyField === getFrozenDefault('stringifyField')
+          ? fieldValue
+          : stringifyField(fieldValue, field)
       const fieldId = this._fieldIds[field]
       const { fieldLength } = collectFieldTermFreqsFromFieldInto(
         this._fieldTermFreqScratch,
@@ -117,7 +139,12 @@ export class FrozenIndexBuilder<T> {
       )
 
       this._fieldLengthData[shortId * this._fieldCount + fieldId] = fieldLength
-      updateAvgFieldLength(this._avgFieldLength, fieldId, documentCount - 1, fieldLength)
+      updateAvgFieldLength(
+        this._avgFieldLength,
+        fieldId,
+        documentCount - 1,
+        fieldLength,
+      )
 
       this._fieldTermFreqScratch.forEach((freq, term) => {
         let ti = this._termIndex.get(term)
@@ -173,26 +200,35 @@ export class FrozenIndexBuilder<T> {
    * @param options  Configuration options
    * @return A promise resolving to `undefined` when the indexing is done
    */
-  addAllAsync(documents: readonly T[], options: { chunkSize?: number } = {}): Promise<void> {
+  addAllAsync(
+    documents: readonly T[],
+    options: { chunkSize?: number } = {},
+  ): Promise<void> {
     const { chunkSize = 10 } = options
     if (!Number.isInteger(chunkSize) || chunkSize < 1) {
       throw new Error('FrozenMiniSearch: chunkSize must be a positive integer')
     }
-    const acc: { chunk: T[], promise: Promise<void> } = { chunk: [], promise: Promise.resolve() }
+    const acc: { chunk: T[]; promise: Promise<void> } = {
+      chunk: [],
+      promise: Promise.resolve(),
+    }
 
-    const { chunk, promise } = documents.reduce(({ chunk, promise }, document: T, i: number) => {
-      chunk.push(document)
-      if ((i + 1) % chunkSize === 0) {
-        return {
-          chunk: [],
-          promise: promise
-            .then(() => new Promise(resolve => setTimeout(resolve, 0)))
-            .then(() => this.addAll(chunk)),
+    const { chunk, promise } = documents.reduce(
+      ({ chunk, promise }, document: T, i: number) => {
+        chunk.push(document)
+        if ((i + 1) % chunkSize === 0) {
+          return {
+            chunk: [],
+            promise: promise
+              .then(() => new Promise((resolve) => setTimeout(resolve, 0)))
+              .then(() => this.addAll(chunk)),
+          }
+        } else {
+          return { chunk, promise }
         }
-      } else {
-        return { chunk, promise }
-      }
-    }, acc)
+      },
+      acc,
+    )
 
     return promise.then(() => this.addAll(chunk))
   }
@@ -256,11 +292,15 @@ export class FrozenIndexBuilder<T> {
 
     this._fieldLengthData.length = documentCount * this._fieldCount
 
-    const externalIds = this._externalIds.length > documentCount
-      ? this._externalIds.slice(0, documentCount)
-      : this._externalIds
+    const externalIds =
+      this._externalIds.length > documentCount
+        ? this._externalIds.slice(0, documentCount)
+        : this._externalIds
     const storedFields = resizeStoredFields(this._storedFields, documentCount)
-    const fieldLengthMatrix = materializeFieldLengthMatrix(this._fieldLengthData, documentCount * this._fieldCount)
+    const fieldLengthMatrix = materializeFieldLengthMatrix(
+      this._fieldLengthData,
+      documentCount * this._fieldCount,
+    )
 
     const idLookup = createIdToShortIdLookup(externalIds, documentCount)
 

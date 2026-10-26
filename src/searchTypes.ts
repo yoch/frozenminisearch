@@ -10,7 +10,10 @@ export type BM25Params = {
 }
 
 export type LowercaseCombinationOperator = 'or' | 'and' | 'and_not'
-export type CombinationOperator = LowercaseCombinationOperator | Uppercase<LowercaseCombinationOperator> | Capitalize<LowercaseCombinationOperator>
+export type CombinationOperator =
+  | LowercaseCombinationOperator
+  | Uppercase<LowercaseCombinationOperator>
+  | Capitalize<LowercaseCombinationOperator>
 
 /**
  * Search options to customize the search behavior.
@@ -48,7 +51,7 @@ export type SearchOptions = {
    * Relative weights to assign to prefix search results and fuzzy search
    * results. Exact matches are assigned a weight of 1.
    */
-  weights?: { fuzzy: number, prefix: number }
+  weights?: { fuzzy: number; prefix: number }
 
   /**
    * Function to calculate a boost factor for documents. It takes as arguments
@@ -56,7 +59,11 @@ export type SearchOptions = {
    * the value of the stored fields for the document (if any). A falsy value
    * skips the search result completely.
    */
-  boostDocument?: (documentId: any, term: string, storedFields?: Record<string, unknown>) => number
+  boostDocument?: (
+    documentId: any,
+    term: string,
+    storedFields?: Record<string, unknown>,
+  ) => number
 
   /**
    * Controls whether to perform prefix search. Either a boolean, or a function
@@ -69,7 +76,10 @@ export type SearchOptions = {
    * fuzziness), a number (explicit edit distance ≥ 1, or fractional 0–1 of the
    * term length), or a function returning either.
    */
-  fuzzy?: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
+  fuzzy?:
+    | boolean
+    | number
+    | ((term: string, index: number, terms: string[]) => boolean | number)
 
   /**
    * Maximum fuzziness when using a fractional fuzzy value. Defaults to 6.
@@ -136,7 +146,10 @@ export interface SearchPage {
  * Options of `matchIds`: the search options that select documents. Scoring
  * options are left out because they do not change which documents match.
  */
-export type MatchIdsOptions = Omit<SearchOptions, 'filter' | 'limit' | 'boost' | 'boostTerm' | 'weights' | 'bm25'> & {
+export type MatchIdsOptions = Omit<
+  SearchOptions,
+  'filter' | 'limit' | 'boost' | 'boostTerm' | 'weights' | 'bm25'
+> & {
   /** Only `undefined` is accepted: it disables a filter set in the index-level search options. */
   filter?: undefined
 }
@@ -192,9 +205,12 @@ export interface ScoredSearchPage {
  */
 export type SearchOptionsWithDefaults = SearchOptions & {
   boost: { [fieldName: string]: number }
-  weights: { fuzzy: number, prefix: number }
+  weights: { fuzzy: number; prefix: number }
   prefix: boolean | ((term: string, index: number, terms: string[]) => boolean)
-  fuzzy: boolean | number | ((term: string, index: number, terms: string[]) => boolean | number)
+  fuzzy:
+    | boolean
+    | number
+    | ((term: string, index: number, terms: string[]) => boolean | number)
   maxFuzzy: number
   combineWith: CombinationOperator
   bm25: BM25Params
@@ -219,7 +235,10 @@ export type Options<T = any> = {
   /** Function used to split a field value into individual terms to be indexed. */
   tokenize?: (text: string, fieldName?: string) => string[]
   /** Function used to process a term before indexing or search (e.g. stemming). */
-  processTerm?: (term: string, fieldName?: string) => string | string[] | null | undefined | false
+  processTerm?: (
+    term: string,
+    fieldName?: string,
+  ) => string | string[] | null | undefined | false
   /** Default search options. */
   searchOptions?: SearchOptions
   /** Default auto-suggest options. */
@@ -237,7 +256,10 @@ export type OptionsWithDefaults<T = any> = Options<T> & {
   extractField: (document: T, fieldName: string) => any
   stringifyField: (fieldValue: any, fieldName: string) => string
   tokenize: (text: string, fieldName: string) => string[]
-  processTerm: (term: string, fieldName: string) => string | string[] | null | undefined | false
+  processTerm: (
+    term: string,
+    fieldName: string,
+  ) => string | string[] | null | undefined | false
   searchOptions: SearchOptionsWithDefaults
   autoSuggestOptions: SearchOptions
 }

@@ -6,7 +6,12 @@ import {
 import { FLAG_SPARSE_LAYOUT } from './binaryMsv5Constants'
 import { readU32LE } from '../binaryBytes'
 
-function densePostings(offsets, lengths, docIds = new Uint32Array([0, 1]), freqs = new Uint8Array([1, 1])) {
+function densePostings(
+  offsets,
+  lengths,
+  docIds = new Uint32Array([0, 1]),
+  freqs = new Uint8Array([1, 1]),
+) {
   const fieldCount = 1
   const termCount = offsets.length
   return {
@@ -68,24 +73,27 @@ describe('binaryMsv5Postings wire metadata widths', () => {
     ['u8', new Uint8Array([0, 1]), new Uint8Array([1, 1]), Uint8Array],
     ['u16', new Uint16Array([0, 256]), new Uint16Array([1, 2]), Uint16Array],
     ['u32', new Uint32Array([0, 1]), new Uint32Array([1, 1]), Uint32Array],
-  ])('dense round-trips %s metadata columns', (_label, offsets, lengths, Ctor) => {
-    const postings = densePostings(offsets, lengths)
-    const wire = buildMsv5PostingsSections(postings)
-    const slotCount = postings.termCount * postings.fieldCount
+  ])(
+    'dense round-trips %s metadata columns',
+    (_label, offsets, lengths, Ctor) => {
+      const postings = densePostings(offsets, lengths)
+      const wire = buildMsv5PostingsSections(postings)
+      const slotCount = postings.termCount * postings.fieldCount
 
-    expect(wire.meta.byteLength).toBe(offsets.byteLength)
-    expect(wire.fields.byteLength).toBe(lengths.byteLength)
-    if (Ctor === Uint8Array) {
-      expect(wire.meta.byteLength).toBe(slotCount)
-      expect(wire.fields.byteLength).toBe(slotCount)
-    }
+      expect(wire.meta.byteLength).toBe(offsets.byteLength)
+      expect(wire.fields.byteLength).toBe(lengths.byteLength)
+      if (Ctor === Uint8Array) {
+        expect(wire.meta.byteLength).toBe(slotCount)
+        expect(wire.fields.byteLength).toBe(slotCount)
+      }
 
-    const decoded = decodeWire(wire, postings)
-    expect(decoded.denseOffsets).toBeInstanceOf(Ctor)
-    expect(decoded.denseLengths).toBeInstanceOf(Ctor)
-    expect(Array.from(decoded.denseOffsets)).toEqual(Array.from(offsets))
-    expect(Array.from(decoded.denseLengths)).toEqual(Array.from(lengths))
-  })
+      const decoded = decodeWire(wire, postings)
+      expect(decoded.denseOffsets).toBeInstanceOf(Ctor)
+      expect(decoded.denseLengths).toBeInstanceOf(Ctor)
+      expect(Array.from(decoded.denseOffsets)).toEqual(Array.from(offsets))
+      expect(Array.from(decoded.denseLengths)).toEqual(Array.from(lengths))
+    },
+  )
 
   test('sparse round-trips compact u8 metadata columns', () => {
     const postings = sparsePostings({
@@ -104,9 +112,15 @@ describe('binaryMsv5Postings wire metadata widths', () => {
     expect(decoded.sparseTermStarts).toBeInstanceOf(Uint8Array)
     expect(decoded.sparseOffsets).toBeInstanceOf(Uint8Array)
     expect(decoded.sparseLengths).toBeInstanceOf(Uint8Array)
-    expect(Array.from(decoded.sparseTermStarts)).toEqual(Array.from(postings.sparseTermStarts))
-    expect(Array.from(decoded.sparseOffsets)).toEqual(Array.from(postings.sparseOffsets))
-    expect(Array.from(decoded.sparseLengths)).toEqual(Array.from(postings.sparseLengths))
+    expect(Array.from(decoded.sparseTermStarts)).toEqual(
+      Array.from(postings.sparseTermStarts),
+    )
+    expect(Array.from(decoded.sparseOffsets)).toEqual(
+      Array.from(postings.sparseOffsets),
+    )
+    expect(Array.from(decoded.sparseLengths)).toEqual(
+      Array.from(postings.sparseLengths),
+    )
   })
 
   test('sparse round-trips legacy u32 metadata columns', () => {
@@ -128,7 +142,12 @@ describe('binaryMsv5Postings wire metadata widths', () => {
   })
 
   test('decodes empty dense metadata sections', () => {
-    const postings = densePostings(new Uint8Array(0), new Uint8Array(0), new Uint8Array(0), new Uint8Array(0))
+    const postings = densePostings(
+      new Uint8Array(0),
+      new Uint8Array(0),
+      new Uint8Array(0),
+      new Uint8Array(0),
+    )
     postings.termCount = 0
     postings.nextId = 0
     const wire = buildMsv5PostingsSections(postings)
@@ -138,32 +157,39 @@ describe('binaryMsv5Postings wire metadata widths', () => {
   })
 
   test('rejects dense metadata sections with invalid byte length ratios', () => {
-    const postings = densePostings(new Uint8Array([0, 1]), new Uint8Array([1, 1]))
+    const postings = densePostings(
+      new Uint8Array([0, 1]),
+      new Uint8Array([1, 1]),
+    )
     const wire = buildMsv5PostingsSections(postings)
     const badMeta = new Uint8Array([0, 1, 99])
     const badFields = new Uint8Array([1, 1, 99])
-    expect(() => decodeMsv5PostingsSections(
-      msv5PostingsFlags(postings),
-      postings.fieldCount,
-      postings.termCount,
-      postings.nextId,
-      badMeta,
-      wire.fields,
-      wire.optional,
-      wire.docIds,
-      wire.freqs,
-    )).toThrow(/postings denseOffsets size mismatch/)
-    expect(() => decodeMsv5PostingsSections(
-      msv5PostingsFlags(postings),
-      postings.fieldCount,
-      postings.termCount,
-      postings.nextId,
-      wire.meta,
-      badFields,
-      wire.optional,
-      wire.docIds,
-      wire.freqs,
-    )).toThrow(/postings denseLengths size mismatch/)
+    expect(() =>
+      decodeMsv5PostingsSections(
+        msv5PostingsFlags(postings),
+        postings.fieldCount,
+        postings.termCount,
+        postings.nextId,
+        badMeta,
+        wire.fields,
+        wire.optional,
+        wire.docIds,
+        wire.freqs,
+      ),
+    ).toThrow(/postings denseOffsets size mismatch/)
+    expect(() =>
+      decodeMsv5PostingsSections(
+        msv5PostingsFlags(postings),
+        postings.fieldCount,
+        postings.termCount,
+        postings.nextId,
+        wire.meta,
+        badFields,
+        wire.optional,
+        wire.docIds,
+        wire.freqs,
+      ),
+    ).toThrow(/postings denseLengths size mismatch/)
   })
 
   test('rejects sparse optional metadata sections with invalid byte length ratios', () => {
@@ -176,16 +202,18 @@ describe('binaryMsv5Postings wire metadata widths', () => {
     const wire = buildMsv5PostingsSections(postings)
     const badOptional = wire.optional.slice()
     badOptional[0] = 4
-    expect(() => decodeMsv5PostingsSections(
-      wire.flags,
-      postings.fieldCount,
-      postings.termCount,
-      postings.nextId,
-      wire.meta,
-      wire.fields,
-      badOptional,
-      wire.docIds,
-      wire.freqs,
-    )).toThrow(/postings sparseOffsets size mismatch/)
+    expect(() =>
+      decodeMsv5PostingsSections(
+        wire.flags,
+        postings.fieldCount,
+        postings.termCount,
+        postings.nextId,
+        wire.meta,
+        wire.fields,
+        badOptional,
+        wire.docIds,
+        wire.freqs,
+      ),
+    ).toThrow(/postings sparseOffsets size mismatch/)
   })
 })

@@ -1,0 +1,5 @@
+# Bun tooling. `bun fmt` owns formatting; the style matches the project's
+# historical ESLint/stylistic setup (no semicolons, single quotes).
+[fmt]
+semi = false
+singleQuote = true

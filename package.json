@@ -1,6 +1,6 @@
 {
   "name": "@yoch/frozenminisearch",
-  "version": "1.12.1",
+  "version": "1.12.2",
   "description": "Low-memory, read-only full-text search for Node.js and browsers: MiniSearch-compatible API on frozen, compact indexes and binary snapshots",
   "main": "dist/cjs/index.require.cjs",
   "module": "dist/es/index.js",

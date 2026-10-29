@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## v1.12.2 — `@yoch/frozenminisearch`
+
+Patch release: algorithmic optimization of fuzzy search in `PackedRadixTree` and BM25 scoring inner loops, bringing a >2x speedup on Node.js and Bun JIT and >2.5x in Bun AOT binaries. Fixes two declared-type mismatches reported by Bun AOT diagnostics. Search results, scores and ordering are unchanged; no changes to the public API, runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.
+
+### Changed
+
+- **Fuzzy search exact-suffix tail shortcut** — in `PackedRadixTree.fuzzy`, when the Levenshtein distance boundary reaches `minDistance === maxDistance`, the error budget is exhausted and remaining valid completions are matched directly as exact suffixes via `nodeEdgeOffset`, eliminating ~79% of DP matrix cell computations and ~86% of recursive edge explorations on realistic vocabularies.
+- **Fast path for zero-distance fuzzy** — `packedRadixVisitFuzzyRefs` delegates `maxDistance === 0` queries directly to `walkExactSuffix` without allocating or initializing a dynamic programming matrix.
+- **Scoring and traversal optimizations** — register-cached inner loops for DP cell evaluation, direct typed array indexing in hot postings loops, inlining of BM25 score calculation, and elimination of boxing in field length lookups.
+- **Typing diagnostics** — preinitialized builder average field lengths to 0 and typed per-field boost lookups as `number | undefined` to resolve mismatches flagged by `bun --aot-log-type-mismatches`.
+
 ## v1.12.1 — `@yoch/frozenminisearch`
 
 Patch release: an indexed field named `__proto__` now behaves like any other field, as in MiniSearch, and the package metadata points to the documentation site. Other search results, scores and ordering are unchanged; no changes to the public API, runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.

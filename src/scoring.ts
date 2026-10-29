@@ -1,5 +1,4 @@
 import {
-  readDocId,
   SegmentPostingList,
   findDocIndexInSortedSegment,
   shouldSeekAllowedDocs,
@@ -104,11 +103,13 @@ function calcBm25TfWithConstants(
   constants: Bm25FieldConstants,
   idf: number,
 ): number {
-  const { k, d, k1, oneMinusB, bOverAvg } = constants
   return (
     idf *
-    (d +
-      (termFreq * k1) / (termFreq + k * (oneMinusB + bOverAvg * fieldLength)))
+    (constants.d +
+      (termFreq * constants.k1) /
+        (termFreq +
+          constants.k *
+            (constants.oneMinusB + constants.bOverAvg * fieldLength)))
   )
 }
 
@@ -370,7 +371,7 @@ function aggregateSegmentPostingList(
   }
 
   for (let i = 0; i < length; i++) {
-    const docId = readDocId(docIds, offset + i)
+    const docId = docIds[offset + i]
     const termFreq = freqs[offset + i]
 
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
@@ -500,7 +501,7 @@ function collectDocIdsFromSegmentPostingList(
   }
 
   for (let i = 0; i < length; i++) {
-    const docId = readDocId(ids, offset + i)
+    const docId = ids[offset + i]
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
     docIds.add(docId)
   }

@@ -158,7 +158,7 @@ function findSparseSlotByFieldId(
   fieldId: number,
 ): number {
   for (let i = start; i < end; i++) {
-    const fid = readFieldId(fieldIds, i)
+    const fid = fieldIds[i]
     if (fid === fieldId) return i
     if (fid > fieldId) break
   }
@@ -267,7 +267,7 @@ function collectDocIdsFromFrozenSegment(
   }
 
   for (let i = 0; i < length; i++) {
-    const docId = readDocId(allDocIds, offset + i)
+    const docId = allDocIds[offset + i]
     if (allowedDocs != null && !allowedDocs.has(docId)) continue
     docIds.add(docId)
   }

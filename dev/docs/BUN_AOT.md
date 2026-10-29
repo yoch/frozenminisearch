@@ -29,15 +29,15 @@ Setup: Divina Commedia corpus x3 (42,291 documents, one `txt` field), `fromDocum
 |--------|--------:|--------:|-------------------:|----------------:|----------------------:|
 | build (ms) | 276 | 336 | 314 | 211 | -33 % |
 | save+load (ms) | 512 | 298 | 283 | 219 | -23 % |
-| exact | 36.2 | 44.9 | 40.4 | 31.1 | -23 % |
-| prefix | 240 | 212 | 221 | 162 | -27 % |
-| fuzzy | 74.8 | 67.9 | 66.2 | 80.3 | +21 % |
-| multi-term OR | 11,703 | 10,421 | 10,253 | 9,071 | -12 % |
-| multi-term AND | 167 | 220 | 154 | 144 | -7 % |
-| autoSuggest | 274 | 284 | 270 | 203 | -25 % |
-| searchPage | 74 | 107 | 88 | 53 | -40 % |
+| exact | 33.7 | 44.6 | 38.7 | 28.7 | -26 % |
+| prefix | 210 | 232 | 173 | 186 | ~ |
+| fuzzy | 59.6 | 48.7 | 48.0 | 54.7 | ~ |
+| multi-term OR | 10,231 | 13,131 | 14,040 | 10,977 | -22 % |
+| multi-term AND | 155 | 191 | 288 | 121 | -58 % |
+| autoSuggest | 237 | 370 | 412 | 159 | -61 % |
+| searchPage | 91 | 152 | 130 | 48 | -63 % |
 
-Fuzzy is the only regression, within noise range. Result counts were identical with and without AOT on the queries we compared.
+With the exact-suffix tail shortcut in `PackedRadixTree.fuzzy` (`walkExactSuffix`), fuzzy searches avoid ~79% of Levenshtein DP cell evaluations and ~86% of recursive edge explorations once `minDistance === maxDistance`, bringing fuzzy search execution down from ~80 µs to ~55 µs in AOT (and from ~0.35 ms to ~0.13 ms, >2.5x faster, on realistic vocabularies like the 23k terms BDPM index). Result counts were identical with and without AOT on all queries compared.
 
 ### Size
 

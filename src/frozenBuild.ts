@@ -61,7 +61,7 @@ export class FrozenIndexBuilder<T> {
       estimatedTotalPostings:
         estimatedDocs > 0 ? estimatedDocs * perSlot : undefined,
     })
-    this._avgFieldLength = []
+    this._avgFieldLength = new Array<number>(this._fieldCount).fill(0)
     this._nextId = 0
     this._frozen = false
 

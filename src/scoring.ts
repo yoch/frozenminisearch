@@ -161,11 +161,11 @@ export function fieldBoostsForQuery(
   const searchFields = options.fields || fields
   const boosts: { [field: string]: number } = Object.create(null)
   for (const field of searchFields) {
-    boosts[field] =
-      (getOwnProperty(
-        options.boost as Record<string, unknown>,
-        field,
-      ) as number) || 1
+    const boost = getOwnProperty(
+      options.boost as Record<string, unknown>,
+      field,
+    ) as number | undefined
+    boosts[field] = boost || 1
   }
   return { names: Object.keys(boosts), boosts }
 }

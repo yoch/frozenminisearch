@@ -9,5 +9,6 @@ Reference documents for internal mechanisms — **not** included in the public n
 | [NAMING_POSTINGS.md](./NAMING_POSTINGS.md) | Postings / wire naming glossary (internal vs public API) |
 | [MEMORY_AUDIT.md](./MEMORY_AUDIT.md) | Retention audit, lifecycle fixes, measurements and remaining allocation pressure |
 | [SEARCH_AUDIT.md](./SEARCH_AUDIT.md) | 1.12.0 search/bitset parity, prototype-key fix and retention follow-up |
+| [BUN_AOT.md](./BUN_AOT.md) | Compiling with Bun canary `--aot`: commands, speed/size/memory measurements |
 
 These files are **internal developer notes** in the repository only; they are not copied to the published GitHub Pages site.

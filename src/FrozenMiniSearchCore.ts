@@ -236,11 +236,14 @@ export default class FrozenMiniSearchCore<T = any> {
     this._fieldTermFlyweight = createFrozenFieldTermFlyweight(this._postings)
     this._hasStoredFields = this._storedFields.kind !== 'none'
 
+    const fieldLengthMatrix = this._fieldLengthMatrix
+    const fieldCount = this._fieldCount
     const aggregateContext: AggregateContext = {
       documentCount: this._documentCount,
       avgFieldLength: this._avgFieldLength,
       fieldIds: this._fieldIds,
-      getFieldLength: (docId, fieldId) => this._getFieldLength(docId, fieldId),
+      getFieldLength: (docId, fieldId) =>
+        fieldLengthMatrix[docId * fieldCount + fieldId] | 0,
       getExternalId: this._getExternalId,
       getStoredFields: this._hasStoredFields
         ? (docId) => readStoredFields(this._storedFields, docId)
@@ -681,9 +684,5 @@ export default class FrozenMiniSearchCore<T = any> {
       fieldLengthMatrix: this._fieldLengthMatrix,
       postings: this._postings,
     })
-  }
-
-  private _getFieldLength(docId: number, fieldId: number): number {
-    return this._fieldLengthMatrix[docId * this._fieldCount + fieldId] ?? 0
   }
 }

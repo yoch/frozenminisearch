@@ -23,7 +23,7 @@ export function findDocIndexInSortedSegment(
   let hi = length - 1
   while (lo <= hi) {
     const mid = (lo + hi) >>> 1
-    const v = readDocId(docIds, offset + mid)
+    const v = docIds[offset + mid]
     if (v < docId) lo = mid + 1
     else if (v > docId) hi = mid - 1
     else return offset + mid

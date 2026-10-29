@@ -3,15 +3,6 @@
  * Only prunes when the dictionary prefix cannot be a prefix of any match.
  */
 
-/** Dictionary prefix length already exceeds any term within edit distance k. */
-function isDictPrefixTooLong(
-  dictPrefixLen: number,
-  queryLen: number,
-  maxDistance: number,
-): boolean {
-  return dictPrefixLen > queryLen + maxDistance
-}
-
 /**
  * @param prefixLen Dictionary characters on the path before this edge
  * @param edgeLen Compressed edge label length
@@ -22,5 +13,5 @@ export function shouldPruneFuzzyEdge(
   queryLen: number,
   maxDistance: number,
 ): boolean {
-  return isDictPrefixTooLong(prefixLen + edgeLen, queryLen, maxDistance)
+  return prefixLen + edgeLen > queryLen + maxDistance
 }

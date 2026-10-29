@@ -1,22 +1,20 @@
 {
   "metadata": {
-    "capturedAt": "2026-05-31T21:09:55.144Z",
-    "node": "v22.22.0",
-    "packageVersion": "8.2.3",
+    "capturedAt": "2026-10-29T14:57:59.603Z",
+    "node": "v24.18.0",
+    "packageVersion": "1.12.2",
+    "minisearchVersion": "7.2.0",
     "gcExposed": true,
     "git": {
-      "commit": "fe59f5da362c50cfaf675620e80d9eeda7c352d5",
-      "commitShort": "fe59f5d",
+      "commit": "d1a4020c01768bfcb6ad00c4e696da4a92e377d0",
+      "commitShort": "d1a4020",
       "branch": "master",
-      "dirty": false,
-      "trackedDirty": false,
-      "commitDate": "2026-06-01T00:09:13+03:00",
-      "subject": "PackedRadixTree: drop leaf sentinel, adapt all node/edge columns.",
-      "parentCommit": "4ae36260a38ae7b44acc739f09201b937aa381c7"
+      "dirty": true,
+      "trackedDirty": true
     },
-    "recordKind": "clean-commit",
+    "recordKind": "forced-dirty",
     "role": "golden",
-    "baselineCommit": "fe59f5da362c50cfaf675620e80d9eeda7c352d5"
+    "baselineCommit": "d1a4020c01768bfcb6ad00c4e696da4a92e377d0"
   },
   "corpora": {
     "small": {
@@ -33,11 +31,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 3704,
+        "heapBytes": 3976,
         "externalBytes": 0,
         "arrayBuffersBytes": 0,
         "rssBytes": 0,
-        "totalResidentApproxBytes": 3704
+        "totalResidentApproxBytes": 3976
       },
       "timings": null
     },
@@ -55,11 +53,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 4360,
+        "heapBytes": 4080,
         "externalBytes": 0,
         "arrayBuffersBytes": 0,
         "rssBytes": 0,
-        "totalResidentApproxBytes": 4360
+        "totalResidentApproxBytes": 4080
       },
       "timings": null
     },
@@ -77,24 +75,32 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 663952,
+        "heapBytes": 43840,
         "externalBytes": 26517,
         "arrayBuffersBytes": 26517,
-        "rssBytes": 1572864,
-        "totalResidentApproxBytes": 690469
+        "rssBytes": 262144,
+        "totalResidentApproxBytes": 70357
       },
       "timings": {
         "get(hit)": {
-          "hz": 5881509.039167818,
-          "meanMs": 0.00017002439226744626
+          "hz": 4584536.978210305,
+          "meanMs": 0.00021812453574981882
         },
         "get(miss)": {
-          "hz": 4086454.3306890745,
-          "meanMs": 0.00024471092029343096
+          "hz": 4734900.475111203,
+          "meanMs": 0.0002111976809769194
         },
         "prefix(short)": {
-          "hz": 19092.408678635664,
-          "meanMs": 0.052376838189044025
+          "hz": 30673.950493503875,
+          "meanMs": 0.032600952401347194
+        },
+        "fuzzy(\"geeoeyop\",1)": {
+          "hz": 113935.82549757863,
+          "meanMs": 0.008776870625484273
+        },
+        "fuzzy(\"geeoeyop\",2)": {
+          "hz": 12177.813403831764,
+          "meanMs": 0.0821165480894418
         }
       }
     },
@@ -112,11 +118,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 300176,
+        "heapBytes": 82856,
         "externalBytes": 78763,
         "arrayBuffersBytes": 78763,
         "rssBytes": 0,
-        "totalResidentApproxBytes": 378939
+        "totalResidentApproxBytes": 161619
       },
       "timings": null,
       "meta": {
@@ -148,11 +154,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 619568,
+        "heapBytes": 70248,
         "externalBytes": 133827,
         "arrayBuffersBytes": 133827,
-        "rssBytes": 655360,
-        "totalResidentApproxBytes": 753395
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 204075
       },
       "timings": null,
       "meta": {
@@ -176,11 +182,11 @@
       },
       "runtime": {
         "runs": 3,
-        "heapBytes": 633744,
+        "heapBytes": 93544,
         "externalBytes": 108927,
         "arrayBuffersBytes": 108927,
-        "rssBytes": 131072,
-        "totalResidentApproxBytes": 633744
+        "rssBytes": 5365760,
+        "totalResidentApproxBytes": 202471
       },
       "timings": null,
       "meta": {
@@ -189,6 +195,377 @@
         "keyLength": 5,
         "alphabetSize": 800,
         "alphabetStartCodePoint": 256
+      }
+    },
+    "bdpm-presentations": {
+      "size": 37275,
+      "nodeCount": 50909,
+      "edgeCount": 50908,
+      "bytes": {
+        "nodeBytes": 254547,
+        "edgeBytes": 356356,
+        "labelBytesUtf16Estimate": 203454,
+        "labelCodeUnits": 101727,
+        "totalStructuredBytes": 814357,
+        "packedByteLength": 814357
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 1124800,
+        "externalBytes": 7483186,
+        "arrayBuffersBytes": 3231597,
+        "rssBytes": 4063232,
+        "totalResidentApproxBytes": 8622682
+      },
+      "timings": {
+        "get(hit)": {
+          "hz": 4336234.141771863,
+          "meanMs": 0.00023061485318949637
+        },
+        "get(miss)": {
+          "hz": 5932378.623737801,
+          "meanMs": 0.0001685664492145871
+        },
+        "prefix(short)": {
+          "hz": 595764.003690028,
+          "meanMs": 0.0016785169862667522
+        },
+        "fuzzy(\"ziegles\",1)": {
+          "hz": 150517.61749738554,
+          "meanMs": 0.006643740557595325
+        },
+        "fuzzy(\"ziegles\",2)": {
+          "hz": 23276.189052421723,
+          "meanMs": 0.04296235942008544
+        }
+      },
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "bdpm",
+        "manifestKey": "presentations",
+        "file": "bdpm_presentations.msbin",
+        "fileBytes": 995654,
+        "documentCount": 20905,
+        "manifestTermCount": 37275,
+        "termCount": 37275,
+        "avgTermLen": 7.32,
+        "maxTermLen": 27,
+        "longestTerm": "polytrifluorochloroethylene",
+        "firstTerm": "quik",
+        "fuzzySeed": "ziegler",
+        "nodeCount": 50909,
+        "edgeCount": 50908,
+        "bytes": {
+          "nodeBytes": 254547,
+          "edgeBytes": 356356,
+          "labelBytesUtf16Estimate": 203454,
+          "labelCodeUnits": 101727,
+          "totalStructuredBytes": 814357,
+          "packedByteLength": 814357
+        }
+      }
+    },
+    "bdpm-specialites": {
+      "size": 23015,
+      "nodeCount": 32049,
+      "edgeCount": 32048,
+      "bytes": {
+        "nodeBytes": 160247,
+        "edgeBytes": 224336,
+        "labelBytesUtf16Estimate": 173860,
+        "labelCodeUnits": 86930,
+        "totalStructuredBytes": 558443,
+        "packedByteLength": 558443
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 851600,
+        "externalBytes": 4927376,
+        "arrayBuffersBytes": 2143676,
+        "rssBytes": 2097152,
+        "totalResidentApproxBytes": 5792384
+      },
+      "timings": {
+        "get(hit)": {
+          "hz": 4697334.654440305,
+          "meanMs": 0.00021288668437849495
+        },
+        "get(miss)": {
+          "hz": 7776651.802977682,
+          "meanMs": 0.00012859004431921457
+        },
+        "prefix(short)": {
+          "hz": 163251.4602725873,
+          "meanMs": 0.00612551947976613
+        },
+        "fuzzy(\"yuflymb\",1)": {
+          "hz": 106508.11294018733,
+          "meanMs": 0.009388956131084385
+        },
+        "fuzzy(\"yuflymb\",2)": {
+          "hz": 10837.431006242627,
+          "meanMs": 0.09227279042643735
+        }
+      },
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "bdpm",
+        "manifestKey": "specialites",
+        "file": "bdpm_specialites.msbin",
+        "fileBytes": 658493,
+        "documentCount": 15848,
+        "manifestTermCount": 23015,
+        "termCount": 23015,
+        "avgTermLen": 7.89,
+        "maxTermLen": 23,
+        "longestTerm": "trimethylphloroglucinol",
+        "firstTerm": "µg",
+        "fuzzySeed": "yuflyma",
+        "nodeCount": 32049,
+        "edgeCount": 32048,
+        "bytes": {
+          "nodeBytes": 160247,
+          "edgeBytes": 224336,
+          "labelBytesUtf16Estimate": 173860,
+          "labelCodeUnits": 86930,
+          "totalStructuredBytes": 558443,
+          "packedByteLength": 558443
+        }
+      }
+    },
+    "bdpm-compositions": {
+      "size": 20796,
+      "nodeCount": 28896,
+      "edgeCount": 28895,
+      "bytes": {
+        "nodeBytes": 144482,
+        "edgeBytes": 202265,
+        "labelBytesUtf16Estimate": 158586,
+        "labelCodeUnits": 79293,
+        "totalStructuredBytes": 505333,
+        "packedByteLength": 505333
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 1636672,
+        "externalBytes": 6171445,
+        "arrayBuffersBytes": 2684792,
+        "rssBytes": 524288,
+        "totalResidentApproxBytes": 7808117
+      },
+      "timings": null,
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "bdpm",
+        "manifestKey": "compositions",
+        "file": "bdpm_compositions.msbin",
+        "fileBytes": 774237,
+        "documentCount": 32389,
+        "manifestTermCount": 20796,
+        "termCount": 20796,
+        "avgTermLen": 7.98,
+        "maxTermLen": 36,
+        "longestTerm": "cyclohexylphenylparaphenylenediamine",
+        "firstTerm": "µmol",
+        "fuzzySeed": "yohimbine",
+        "nodeCount": 28896,
+        "edgeCount": 28895,
+        "bytes": {
+          "nodeBytes": 144482,
+          "edgeBytes": 202265,
+          "labelBytesUtf16Estimate": 158586,
+          "labelCodeUnits": 79293,
+          "totalStructuredBytes": 505333,
+          "packedByteLength": 505333
+        }
+      }
+    },
+    "bdpm-mitm": {
+      "size": 11703,
+      "nodeCount": 16163,
+      "edgeCount": 16162,
+      "bytes": {
+        "nodeBytes": 80817,
+        "edgeBytes": 80810,
+        "labelBytesUtf16Estimate": 91048,
+        "labelCodeUnits": 45524,
+        "totalStructuredBytes": 252675,
+        "packedByteLength": 252675
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 418544,
+        "externalBytes": 2091271,
+        "arrayBuffersBytes": 887637,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 2509815
+      },
+      "timings": null,
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "bdpm",
+        "manifestKey": "mitm",
+        "file": "bdpm_mitm.msbin",
+        "fileBytes": 336907,
+        "documentCount": 7711,
+        "manifestTermCount": 11703,
+        "termCount": 11703,
+        "avgTermLen": 7.81,
+        "maxTermLen": 21,
+        "longestTerm": "endotracheobronchique",
+        "firstTerm": "µg",
+        "fuzzySeed": "yargesa",
+        "nodeCount": 16163,
+        "edgeCount": 16162,
+        "bytes": {
+          "nodeBytes": 80817,
+          "edgeBytes": 80810,
+          "labelBytesUtf16Estimate": 91048,
+          "labelCodeUnits": 45524,
+          "totalStructuredBytes": 252675,
+          "packedByteLength": 252675
+        }
+      }
+    },
+    "bdpm-substances": {
+      "size": 3815,
+      "nodeCount": 5312,
+      "edgeCount": 5311,
+      "bytes": {
+        "nodeBytes": 26562,
+        "edgeBytes": 26555,
+        "labelBytesUtf16Estimate": 44046,
+        "labelCodeUnits": 22023,
+        "totalStructuredBytes": 97163,
+        "packedByteLength": 97163
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 211424,
+        "externalBytes": 637599,
+        "arrayBuffersBytes": 266729,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 849023
+      },
+      "timings": null,
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "bdpm",
+        "manifestKey": "substances",
+        "file": "bdpm_substances.msbin",
+        "fileBytes": 103215,
+        "documentCount": 3896,
+        "manifestTermCount": 3815,
+        "termCount": 3815,
+        "avgTermLen": 9.03,
+        "maxTermLen": 36,
+        "longestTerm": "cyclohexylphenylparaphenylenediamine",
+        "firstTerm": "q23",
+        "fuzzySeed": "quizartinib",
+        "nodeCount": 5312,
+        "edgeCount": 5311,
+        "bytes": {
+          "nodeBytes": 26562,
+          "edgeBytes": 26555,
+          "labelBytesUtf16Estimate": 44046,
+          "labelCodeUnits": 22023,
+          "totalStructuredBytes": 97163,
+          "packedByteLength": 97163
+        }
+      }
+    },
+    "bdpm-generiques": {
+      "size": 1999,
+      "nodeCount": 2727,
+      "edgeCount": 2726,
+      "bytes": {
+        "nodeBytes": 13637,
+        "edgeBytes": 13630,
+        "labelBytesUtf16Estimate": 21864,
+        "labelCodeUnits": 10932,
+        "totalStructuredBytes": 49131,
+        "packedByteLength": 49131
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 527168,
+        "externalBytes": 1492125,
+        "arrayBuffersBytes": 704426,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 2020477
+      },
+      "timings": null,
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "bdpm",
+        "manifestKey": "generiques",
+        "file": "bdpm_generiques.msbin",
+        "fileBytes": 128964,
+        "documentCount": 10704,
+        "manifestTermCount": 1999,
+        "termCount": 1999,
+        "avgTermLen": 8.21,
+        "maxTermLen": 23,
+        "longestTerm": "trimethylphloroglucinol",
+        "firstTerm": "yondelis",
+        "fuzzySeed": "yondelis",
+        "nodeCount": 2727,
+        "edgeCount": 2726,
+        "bytes": {
+          "nodeBytes": 13637,
+          "edgeBytes": 13630,
+          "labelBytesUtf16Estimate": 21864,
+          "labelCodeUnits": 10932,
+          "totalStructuredBytes": 49131,
+          "packedByteLength": 49131
+        }
+      }
+    },
+    "vet-medicaments": {
+      "size": 5852,
+      "nodeCount": 8176,
+      "edgeCount": 8175,
+      "bytes": {
+        "nodeBytes": 40882,
+        "edgeBytes": 40875,
+        "labelBytesUtf16Estimate": 41054,
+        "labelCodeUnits": 20527,
+        "totalStructuredBytes": 122811,
+        "packedByteLength": 122811
+      },
+      "runtime": {
+        "runs": 3,
+        "heapBytes": 177376,
+        "externalBytes": 945772,
+        "arrayBuffersBytes": 385333,
+        "rssBytes": 0,
+        "totalResidentApproxBytes": 1123148
+      },
+      "timings": null,
+      "meta": {
+        "kind": "medicaments-binary",
+        "source": "vet",
+        "manifestKey": "medicaments",
+        "file": "vet_medicaments.msbin",
+        "fileBytes": 159315,
+        "documentCount": 3213,
+        "manifestTermCount": 5852,
+        "termCount": 5852,
+        "avgTermLen": 6.96,
+        "maxTermLen": 17,
+        "longestTerm": "rt+ibm+nd+gm+reom",
+        "firstTerm": "yurvac",
+        "fuzzySeed": "yurvac",
+        "nodeCount": 8176,
+        "edgeCount": 8175,
+        "bytes": {
+          "nodeBytes": 40882,
+          "edgeBytes": 40875,
+          "labelBytesUtf16Estimate": 41054,
+          "labelCodeUnits": 20527,
+          "totalStructuredBytes": 122811,
+          "packedByteLength": 122811
+        }
       }
     }
   }

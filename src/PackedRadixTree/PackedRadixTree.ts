@@ -91,7 +91,7 @@ export default class PackedRadixTree
 
   private findEdge(node: number, firstChar: number): number {
     const end = this.nodeEdgeOffset[node + 1]
-    const heap = this.labelHeap
+    const heap = String(this.labelHeap)
     for (let ei = this.nodeEdgeOffset[node]; ei < end; ei++) {
       if (heap.charCodeAt(this.edgeLabelStart[ei]) === firstChar) return ei
     }

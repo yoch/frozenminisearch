@@ -88,6 +88,29 @@ test('SearchableMap _tree adapter matches SearchableMap packing', () => {
   expectFuzzyMultiset(viaAdapterTree, map, 'acqua', 2)
 })
 
+function visitedFuzzy(packed, query, maxDistance) {
+  const visited = []
+  packed.visitFuzzyRefs(query, maxDistance, (termIndex, length, d, cursor) => {
+    const term = cursor.term()
+    expect(term.length).toBe(length)
+    visited.push([term, termIndex, d])
+  })
+  return visited
+}
+
+function upstreamFuzzy(map, query, maxDistance) {
+  return Array.from(map.fuzzyGet(query, maxDistance)).map(
+    ([term, [value, d]]) => [term, value, d],
+  )
+}
+
+// Only trees packed from a SearchableMap share its sibling order.
+function expectFuzzyOrder(packed, map, query, maxDistance) {
+  expect(visitedFuzzy(packed, query, maxDistance)).toEqual(
+    upstreamFuzzy(map, query, maxDistance),
+  )
+}
+
 function expectFuzzyMultiset(packed, map, query, maxDistance) {
   const refsAsEntries = Array.from(packed.fuzzyRefs(query, maxDistance)).map(
     ({ termIndex, distance }) => [
@@ -140,10 +163,9 @@ function expectPackedParity(entries, probes = {}) {
       sortedEntries(m.atPrefix(prefix).entries()),
     )
   }
-  // fuzzyRefs: same match set as fuzzyGet; iteration order is not compared.
   for (const query of fuzzyQueries) {
     for (const distance of fuzzyDistances) {
-      expectFuzzyMultiset(p, m, query, distance)
+      expectFuzzyOrder(p, m, query, distance)
       expectFuzzyMultiset(built, m, query, distance)
     }
   }
@@ -301,6 +323,50 @@ describe('PackedRadixTree module', () => {
     }
   })
 
+  test('visitFuzzyRefs follows SearchableMap fuzzyGet order', () => {
+    let seed = 7
+    const random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0
+      return seed / 2 ** 32
+    }
+    const word = (alphabet, maxLength) => {
+      let w = ''
+      const length = 1 + Math.floor(random() * maxLength)
+      for (let i = 0; i < length; i++) {
+        w += alphabet[Math.floor(random() * alphabet.length)]
+      }
+      return w
+    }
+    // Long words cross the 30-character bit-mask limit.
+    const profiles = [
+      ['ab', 8],
+      ['abcde', 6],
+      ['aβé€', 6],
+      ['ab', 40],
+    ]
+    for (let round = 0; round < 80; round++) {
+      const [alphabet, maxLength] = profiles[round % profiles.length]
+      const terms = new Set([''])
+      for (let i = 0; i < 150; i++) terms.add(word(alphabet, maxLength))
+      const m = SearchableMap.from([...terms].map((t, i) => [t, i]))
+      const p = packSearchableMap(m)
+      for (let q = 0; q < 6; q++) {
+        const query = q === 0 ? '' : word(alphabet + 'x', maxLength)
+        for (const distance of [0, 1, 2, 3, 4]) {
+          expectFuzzyOrder(p, m, query, distance)
+        }
+      }
+    }
+  })
+
+  test('visitFuzzyRefs matches fuzzyGet for non-integer distances', () => {
+    for (const query of ['acqua', 'aqua', 'qu', 'summers']) {
+      for (const distance of [1.5, 2.5, 3.9]) {
+        expectFuzzyOrder(packed, map, query, distance)
+      }
+    }
+  })
+
   test('termByIndex and termLengthByIndex rebuild terms from lazy metadata', () => {
     for (const [term, index] of map.entries()) {
       expect(packed.termByIndex(index)).toBe(term)
@@ -364,16 +430,7 @@ describe('PackedRadixTree module', () => {
       expect(visited).toEqual(Array.from(map.atPrefix(prefix).entries()))
     }
     for (const distance of [0, 1, 2, 3]) {
-      const visited = []
-      tree.visitFuzzyRefs('acqua', distance, (termIndex, length, d, cursor) => {
-        const term = cursor.term()
-        expect(term.length).toBe(length)
-        visited.push([term, termIndex, d])
-      })
-      const expected = Array.from(map.fuzzyGet('acqua', distance)).map(
-        ([term, [value, d]]) => [term, value, d],
-      )
-      expect(visited.sort()).toEqual(expected.sort())
+      expectFuzzyOrder(tree, map, 'acqua', distance)
     }
     expect(tree._lazyTermMetadata).toBeUndefined()
   })
@@ -391,12 +448,10 @@ describe('PackedRadixTree module', () => {
     const fuzzy = []
     tree.visitFuzzyRefs('acqua', 2, (termIndex, length, distance, cursor) => {
       tree.visitPrefixRefs('', (_ti, _len, inner) => inner.term())
+      expectFuzzyOrder(tree, map, 'aqua', 1)
       fuzzy.push([cursor.term(), termIndex, distance])
     })
-    const expected = Array.from(map.fuzzyGet('acqua', 2)).map(
-      ([term, [value, d]]) => [term, value, d],
-    )
-    expect(fuzzy.sort()).toEqual(expected.sort())
+    expect(fuzzy).toEqual(upstreamFuzzy(map, 'acqua', 2))
   })
 
   test('validateFrozenTermIndexLeaves rejects wrong leaf count', () => {

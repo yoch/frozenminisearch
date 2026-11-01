@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+## v1.12.3 — `@yoch/frozenminisearch`
+
+Patch release: fuzzy search again visits matching terms in tree order, restoring the 1.12.1 order that 1.12.2 changed. Ids, terms and scores are unchanged; the order of tied results, the order of `terms` within a result, and the wording of `autoSuggest` phrases match 1.12.1 again. Query terms of up to 30 characters use a bit-parallel Levenshtein automaton and visit matches faster than 1.12.2. No changes to the public API, runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.
+
 ### Fixed
 
 - **Fuzzy match order** — 1.12.2 changed the order in which fuzzy search visits matching terms, contrary to its release notes. Ids, terms and scores were unaffected, but the order of tied results, the order of `terms` within a result and the wording of `autoSuggest` phrases could differ from 1.12.1 (on Divina Commedia fuzzy queries, about 9% of `search()` results and 5% of `autoSuggest()` calls). Fuzzy matches are again visited in tree order, as in 1.12.1 and in MiniSearch's `SearchableMap.fuzzyGet`, and tests now check that order.
+
 ### Changed
 
 - **Bit-parallel fuzzy search** — for query terms of up to 30 characters, `PackedRadixTree` fuzzy search runs a bit-parallel Levenshtein automaton instead of a dynamic programming matrix. Once the error budget is spent, it follows every remaining candidate suffix at once, in tree order. On the Divina Commedia vocabulary, visiting fuzzy matches is 4–15% faster than 1.12.2 at distance 1, about 24% faster at distance 2 and about 35% faster at distance 3 on Node.js 24, and 1%, 19% and 29% faster on Bun. Longer query terms and non-integer `fuzzy` distances of 1 or more keep the 1.12.1 matrix traversal, so they behave as before. No changes to the public API, runtime dependencies or the MSv5 wire format.
+- **Development tools** — refresh patch and minor versions of the development dependencies within their current majors, including ESLint 10.14, Vitest 5.0.5, Knip 6.44, Rollup 4.67 and `@types/node` 26.6.6.
 
 ## v1.12.2 — `@yoch/frozenminisearch`
 

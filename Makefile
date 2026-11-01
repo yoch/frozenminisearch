@@ -52,6 +52,7 @@ clean-build:
 build: clean-build
 	NODE_ENV=production $(RUN) rollup -c
 	node scripts/postbuild-cjs.cjs
+	node scripts/build-aot-source.cjs
 	node scripts/assert-public-bundles.cjs
 
 # Specialised build for PackedRadixTree benchmarks (rollup in bench mode).
@@ -67,6 +68,7 @@ $(DIST_MARKER): $(BUILD_SOURCES)
 	rm -rf dist
 	NODE_ENV=production $(RUN) rollup -c
 	node scripts/postbuild-cjs.cjs
+	node scripts/build-aot-source.cjs
 	node scripts/assert-public-bundles.cjs
 
 # Marker for the packed-radix bench build.
@@ -77,7 +79,7 @@ benchmarks/dist/packedRadixTree.cjs: $(PACKED_SOURCES)
 # Tests
 # ----------------------------------------------------------------------------
 
-.PHONY: test test-watch test-browser test-runtime test-fuzzysearch test-benchmarks coverage
+.PHONY: test test-watch test-browser test-runtime test-aot test-fuzzysearch test-benchmarks coverage
 test:
 	$(RUN) vitest run src/ dev/parity/
 
@@ -92,6 +94,11 @@ test-browser: $(DIST_MARKER)
 # CI builds once on the tooling Node version and tests these bundles on Node 20+.
 test-runtime:
 	$(NODE) --test dev/runtime/*.test.mjs
+
+# Pack the existing build, install it outside the repository and compile a consumer with
+# `bun build --compile --aot`, which selects the "aot" export condition. Needs Bun.
+test-aot:
+	$(NODE) dev/aot/run.mjs
 
 test-fuzzysearch:
 	$(RUN) vitest run dev/internal/
@@ -330,6 +337,7 @@ prepublish-only:
 	$(MAKE) build
 	node scripts/assert-public-bundles.cjs
 	node scripts/verify-npm-pack.cjs
+	$(MAKE) test-aot
 
 release-beta:
 	node scripts/publish-beta.cjs
@@ -352,6 +360,7 @@ help:
 	@echo "Tests:"
 	@echo "  make test                   vitest run (src + dev/parity)"
 	@echo "  make test-runtime           published bundle compatibility (Node 20+, build first)"
+	@echo "  make test-aot               Bun --aot consumer of the packed package (build first)"
 	@echo "  make test-browser           assert-browser-bundle + vitest dev/browser/"
 	@echo "  make test-fuzzysearch       vitest run dev/internal/"
 	@echo "  make coverage               build + browser bundle check + vitest --coverage (src, parity, browser)"

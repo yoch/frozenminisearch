@@ -1,5 +1,4 @@
 import zlib from 'node:zlib'
-import type { Transform } from 'node:stream'
 import { crc32Buffer, crc32Update } from '../binaryIo'
 import type { BinaryCompression } from '../searchTypes'
 import type {
@@ -577,12 +576,19 @@ function loadMsv5SectionsFromZlibStream(
   )
 }
 
+// Derived from zlib rather than imported from node:stream: inside node_modules, Bun's
+// AOT type checker rejects node:stream classes as types (TS2709) and then compiles the
+// whole package without its types.
+type DecompressStream =
+  | ReturnType<typeof zlib.createInflate>
+  | ReturnType<typeof zlib.createZstdDecompress>
+
 function loadMsv5SectionsFromCompressedStream(
   compressed: Buffer,
   directory: Msv5SectionEntry[],
   uncompressedLength: number,
   payloadCrc32: number,
-  createStream: () => Transform,
+  createStream: () => DecompressStream,
 ): Promise<Buffer[]> {
   return new Promise((resolve, reject) => {
     const collector = collectCompressedPayloadSections(

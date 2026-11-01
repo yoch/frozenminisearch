@@ -583,7 +583,11 @@ export function combineResults(
   if (results.length === 0) return new Map()
   const combinator = combinatorFor(combineWith)
   if (results.length === 1) return results[0]
-  return results.reduce(combinator)
+  let combined = results[0]
+  for (let i = 1; i < results.length; i++) {
+    combined = combinator(combined, results[i])
+  }
+  return combined
 }
 
 function combinatorFor(combineWith: CombinationOperator): CombinatorFunction {

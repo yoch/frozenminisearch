@@ -173,9 +173,9 @@ function normalizeStringQuery(
   }
 
   const toSpec = termToQuerySpec(options)
-  const specs: QuerySpec[] = new Array(terms.length)
+  const specs: QuerySpec[] = []
   for (let i = 0; i < terms.length; i++) {
-    specs[i] = toSpec(terms[i], i, terms)
+    specs.push(toSpec(terms[i], i, terms))
   }
 
   const { fuzzy: fuzzyWeight, prefix: prefixWeight } = {

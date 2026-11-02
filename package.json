@@ -84,6 +84,7 @@
   ],
   "scripts": {
     "test": "make test",
+    "test:bun": "make test-bun",
     "test:browser": "make test-browser",
     "test:runtime": "make test-runtime",
     "test:watch": "make test-watch",

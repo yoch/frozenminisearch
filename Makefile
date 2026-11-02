@@ -77,9 +77,14 @@ benchmarks/dist/packedRadixTree.cjs: $(PACKED_SOURCES)
 # Tests
 # ----------------------------------------------------------------------------
 
-.PHONY: test test-watch test-browser test-runtime test-fuzzysearch test-benchmarks coverage
+.PHONY: test test-bun test-watch test-browser test-runtime test-fuzzysearch test-benchmarks coverage
 test:
 	$(RUN) vitest run src/ dev/parity/
+
+# Experimental: same scope as `test`, on Bun's runner (needs Bun canary).
+# Bun reads neither `parallel` nor `timeout` from bunfig.toml (oven-sh/bun#38728).
+test-bun:
+	bun test --parallel --timeout=30000 ./src ./dev/parity
 
 test-watch:
 	$(RUN) vitest src/ dev/parity/
@@ -351,6 +356,7 @@ help:
 	@echo ""
 	@echo "Tests:"
 	@echo "  make test                   vitest run (src + dev/parity)"
+	@echo "  make test-bun               bun test --parallel (src + dev/parity, experimental, no coverage)"
 	@echo "  make test-runtime           published bundle compatibility (Node 20+, build first)"
 	@echo "  make test-browser           assert-browser-bundle + vitest dev/browser/"
 	@echo "  make test-fuzzysearch       vitest run dev/internal/"

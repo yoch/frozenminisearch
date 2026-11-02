@@ -3,3 +3,27 @@
 [fmt]
 semi = false
 singleQuote = true
+
+# `bun test` mirrors vitest.config.ts (experimental, see `make test-bun`).
+# Bun ignores `timeout` and `parallel` here (oven-sh/bun#38728, #7789), so
+# `make test-bun` passes `--parallel --timeout=30000` on the CLI.
+[test]
+globals = "vitest"
+pathIgnorePatterns = [
+  "dev/poc-mcp/**",
+  "dev/poc-vocs/**",
+  # node:test files, run by `make test-runtime` against the built bundles
+  "dev/runtime/**",
+  # spawns `node --trace-gc-nvp`, a V8 flag; stays on vitest
+  "benchmarks/gcAudit.test.js",
+]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+  "benchmarks/**",
+  "dev/**",
+  "dist/**",
+  "testSupport/**",
+  "scripts/**",
+  "src/browser.ts",
+  "*.config.*",
+]

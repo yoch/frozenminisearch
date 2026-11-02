@@ -56,15 +56,10 @@ function sparsePostings({
 
 function decodeWire(wire, postings) {
   return decodeMsv5PostingsSections(
-    wire.flags,
+    wire,
     postings.fieldCount,
     postings.termCount,
     postings.nextId,
-    wire.meta,
-    wire.fields,
-    wire.optional,
-    wire.docIds,
-    wire.freqs,
   )
 }
 
@@ -166,28 +161,18 @@ describe('binaryMsv5Postings wire metadata widths', () => {
     const badFields = new Uint8Array([1, 1, 99])
     expect(() =>
       decodeMsv5PostingsSections(
-        msv5PostingsFlags(postings),
+        { ...wire, flags: msv5PostingsFlags(postings), meta: badMeta },
         postings.fieldCount,
         postings.termCount,
         postings.nextId,
-        badMeta,
-        wire.fields,
-        wire.optional,
-        wire.docIds,
-        wire.freqs,
       ),
     ).toThrow(/postings denseOffsets size mismatch/)
     expect(() =>
       decodeMsv5PostingsSections(
-        msv5PostingsFlags(postings),
+        { ...wire, flags: msv5PostingsFlags(postings), fields: badFields },
         postings.fieldCount,
         postings.termCount,
         postings.nextId,
-        wire.meta,
-        badFields,
-        wire.optional,
-        wire.docIds,
-        wire.freqs,
       ),
     ).toThrow(/postings denseLengths size mismatch/)
   })
@@ -204,15 +189,10 @@ describe('binaryMsv5Postings wire metadata widths', () => {
     badOptional[0] = 4
     expect(() =>
       decodeMsv5PostingsSections(
-        wire.flags,
+        { ...wire, optional: badOptional },
         postings.fieldCount,
         postings.termCount,
         postings.nextId,
-        wire.meta,
-        wire.fields,
-        badOptional,
-        wire.docIds,
-        wire.freqs,
       ),
     ).toThrow(/postings sparseOffsets size mismatch/)
   })

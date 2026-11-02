@@ -133,15 +133,17 @@ export function decodeMsv5Sections(
   )
 
   const postings = decodeMsv5PostingsSections(
-    globalFlags,
+    {
+      flags: globalFlags,
+      meta: sections[Msv5SectionId.PostMeta],
+      fields: sections[Msv5SectionId.PostFields],
+      optional: sections[Msv5SectionId.PostOptional],
+      docIds: sections[Msv5SectionId.AllDocIds],
+      freqs: sections[Msv5SectionId.AllFreqs],
+    },
     fieldCount,
     termCount,
     nextId,
-    sections[Msv5SectionId.PostMeta],
-    sections[Msv5SectionId.PostFields],
-    sections[Msv5SectionId.PostOptional],
-    sections[Msv5SectionId.AllDocIds],
-    sections[Msv5SectionId.AllFreqs],
   )
 
   if (postings.termCount !== termCount) {

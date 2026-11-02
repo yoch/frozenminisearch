@@ -9,17 +9,29 @@ import type PackedRadixTree from './PackedRadixTree'
 import type { PackedTermPath } from './termPath'
 import type { PackedTermCursor } from './types'
 
+type MatrixVisit = (
+  termIndex: number,
+  length: number,
+  distance: number,
+  cursor: PackedTermCursor,
+) => void
+
+type MatrixSearch = {
+  tree: PackedRadixTree
+  queryLen: number
+  queryCodes: Uint16Array
+  maxDistance: number
+  matrix: Uint8Array
+  path: PackedTermPath
+  visit: MatrixVisit
+}
+
 /** Banded Levenshtein matrix traversal, for queries too long for bit masks. */
 export function visitFuzzyRefsByMatrix(
   tree: PackedRadixTree,
   query: string,
   maxDistance: number,
-  visit: (
-    termIndex: number,
-    length: number,
-    distance: number,
-    cursor: PackedTermCursor,
-  ) => void,
+  visit: MatrixVisit,
 ): void {
   const n = query.length + 1
   const m = n + maxDistance
@@ -32,43 +44,30 @@ export function visitFuzzyRefsByMatrix(
   for (let j = 0; j < queryLen; j++) queryCodes[j] = query.charCodeAt(j)
 
   const path = tree.termPaths.acquire('')
+  const search: MatrixSearch = {
+    tree,
+    queryLen,
+    queryCodes,
+    maxDistance,
+    matrix,
+    path,
+    visit,
+  }
   try {
-    visitRecurse(
-      tree,
-      queryLen,
-      queryCodes,
-      maxDistance,
-      matrix,
-      1,
-      0,
-      0,
-      0,
-      path,
-      visit,
-    )
+    visitRecurse(search, 1, 0, 0, 0)
   } finally {
     tree.termPaths.release(path)
   }
 }
 
 function visitRecurse(
-  tree: PackedRadixTree,
-  queryLen: number,
-  queryCodes: Uint16Array,
-  maxDistance: number,
-  matrix: Uint8Array,
+  search: MatrixSearch,
   rowStart: number,
   node: number,
   termLength: number,
   depth: number,
-  path: PackedTermPath,
-  visit: (
-    termIndex: number,
-    length: number,
-    distance: number,
-    cursor: PackedTermCursor,
-  ) => void,
 ): void {
+  const { tree, queryLen, queryCodes, maxDistance, matrix, path } = search
   const heap = tree.labelHeap
   const n = queryLen + 1
   const offset = rowStart * n
@@ -84,7 +83,7 @@ function visitRecurse(
       const distance = matrix[offset - 1]
       if (distance <= maxDistance) {
         path.depth = depth
-        visit(tree.nodeValue[node], termLength, distance, path)
+        search.visit(tree.nodeValue[node], termLength, distance, path)
       }
       continue
     }
@@ -130,17 +129,11 @@ function visitRecurse(
 
     path.edges[depth] = ei
     visitRecurse(
-      tree,
-      queryLen,
-      queryCodes,
-      maxDistance,
-      matrix,
+      search,
       i,
       tree.edgeChild[ei],
       termLength + labelLen,
       depth + 1,
-      path,
-      visit,
     )
   }
 }

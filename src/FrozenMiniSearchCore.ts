@@ -79,7 +79,12 @@ import {
   getFrozenDefault,
   type FrozenDefaultOptionName,
 } from './searchDefaults'
-import { frozenRuntimeOptions } from './frozenOptions'
+import {
+  frozenRuntimeOptions,
+  mergeSearchOptions,
+  resolveBoostDocument,
+  resolveSearchFilter,
+} from './frozenOptions'
 
 const noStoredFields = (): undefined => undefined
 type FrozenMiniSearchCtor<T, I extends FrozenMiniSearchCore<T>> = new (
@@ -256,6 +261,7 @@ export default class FrozenMiniSearchCore<T = any> {
       processTerm: this._options.processTerm,
       indexView: this._createQueryIndexView(this._fieldTermFlyweight),
       aggregateContext,
+      trackMatch: true,
     }
   }
 
@@ -297,16 +303,24 @@ export default class FrozenMiniSearchCore<T = any> {
     run: (params: QueryEngineParams) => R,
     trackMatch = true,
   ): R {
-    let params =
-      this._activeQueries === 0
-        ? this._queryEngineParams
+    const base = this._queryEngineParams
+    const params: QueryEngineParams =
+      this._activeQueries === 0 && trackMatch
+        ? base
         : {
-            ...this._queryEngineParams,
-            indexView: this._createQueryIndexView(
-              createFrozenFieldTermFlyweight(this._postings),
-            ),
+            fields: base.fields,
+            globalSearchOptions: base.globalSearchOptions,
+            tokenize: base.tokenize,
+            processTerm: base.processTerm,
+            indexView:
+              this._activeQueries === 0
+                ? base.indexView
+                : this._createQueryIndexView(
+                    createFrozenFieldTermFlyweight(this._postings),
+                  ),
+            aggregateContext: base.aggregateContext,
+            trackMatch,
           }
-    if (!trackMatch) params = { ...params, trackMatch }
     this._activeQueries++
     try {
       return run(params)
@@ -384,9 +398,14 @@ export default class FrozenMiniSearchCore<T = any> {
     if (limit === 0) return []
     const matchInfo = searchOptions.matchInfo !== false
     if (limit !== undefined && query === WILDCARD_QUERY) {
-      const options = { ...this._options.searchOptions, ...searchOptions }
-      if (options.boostDocument == null)
-        return this._searchLimitedWildcard(limit, options.filter, matchInfo)
+      const globalSearchOptions = this._options.searchOptions
+      if (resolveBoostDocument(globalSearchOptions, searchOptions) == null) {
+        return this._searchLimitedWildcard(
+          limit,
+          resolveSearchFilter(globalSearchOptions, searchOptions),
+          matchInfo,
+        )
+      }
     }
     return finalizeRawSearchResults(
       this._runQuery(query, searchOptions, matchInfo),
@@ -431,13 +450,17 @@ export default class FrozenMiniSearchCore<T = any> {
     if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0) {
       throw new Error('FrozenMiniSearch: offset must be a non-negative integer')
     }
-    const options = { ...this._options.searchOptions, ...searchOptions }
+    const globalSearchOptions = this._options.searchOptions
+    const filter = resolveSearchFilter(globalSearchOptions, searchOptions)
     const matchInfo = searchOptions.matchInfo !== false
-    if (query === WILDCARD_QUERY && options.boostDocument == null) {
+    if (
+      query === WILDCARD_QUERY &&
+      resolveBoostDocument(globalSearchOptions, searchOptions) == null
+    ) {
       return this._searchWildcardPage(
         offset,
         limit ?? Infinity,
-        options.filter,
+        filter,
         matchInfo,
       )
     }
@@ -446,7 +469,7 @@ export default class FrozenMiniSearchCore<T = any> {
         rawResults: this._runQuery(query, searchOptions, matchInfo),
         getExternalId: this._getExternalId,
         storedFieldsLayout: this._storedFields,
-        filter: options.filter,
+        filter,
         matchInfo,
       },
       offset,
@@ -539,7 +562,7 @@ export default class FrozenMiniSearchCore<T = any> {
    */
   matchIds(query: Query, searchOptions: MatchIdsOptions = {}): unknown[] {
     const local = searchOptions as SearchOptions
-    if ({ ...this._options.searchOptions, ...local }.filter != null) {
+    if (resolveSearchFilter(this._options.searchOptions, local) != null) {
       throw new Error(
         'FrozenMiniSearch: matchIds does not support filter (pass filter: undefined to disable an index-level filter)',
       )
@@ -569,18 +592,13 @@ export default class FrozenMiniSearchCore<T = any> {
    * With a `filter`, uses {@link search} so stored fields are available to the predicate.
    */
   autoSuggest(queryString: string, options: SearchOptions = {}): Suggestion[] {
-    const merged = { ...this._options.autoSuggestOptions, ...options }
-    const { filter } = { ...this._options.searchOptions, ...merged }
-    if (filter == null) {
+    const merged = mergeSearchOptions(this._options.autoSuggestOptions, options)
+    if (merged.filter == null) {
       return suggestFromRawResults(this._runQuery(queryString, merged))
     }
-    return suggestFromSearchResults(
-      this.search(queryString, {
-        ...merged,
-        limit: undefined,
-        matchInfo: undefined,
-      }),
-    )
+    const unlimited = mergeSearchOptions(merged)
+    unlimited.limit = undefined
+    return suggestFromSearchResults(this.search(queryString, unlimited))
   }
 
   /** Built-in default for indexing / load options (`tokenize`, `processTerm`, `extractField`, …). */

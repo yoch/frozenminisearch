@@ -602,20 +602,28 @@ export function finalizeRawSearchResults(
   storedFieldsLayout?: StoredFieldsLayout,
   matchInfo = true,
 ): SearchResult[] {
-  const searchOptionsWithDefaults: SearchOptionsWithDefaults = {
-    ...globalSearchOptions,
-    ...searchOptions,
-  }
-  const skipSort =
-    isWildcardQuery(query) && searchOptionsWithDefaults.boostDocument == null
+  const boostDocument =
+    searchOptions.boostDocument !== undefined ||
+    Object.hasOwn(searchOptions, 'boostDocument')
+      ? searchOptions.boostDocument
+      : globalSearchOptions.boostDocument
+  const filter =
+    searchOptions.filter !== undefined || Object.hasOwn(searchOptions, 'filter')
+      ? searchOptions.filter
+      : globalSearchOptions.filter
+  const rawLimit =
+    searchOptions.limit !== undefined || Object.hasOwn(searchOptions, 'limit')
+      ? searchOptions.limit
+      : globalSearchOptions.limit
+  const skipSort = isWildcardQuery(query) && boostDocument == null
   return finalizeSearchResults({
     rawResults,
     getExternalId,
     getStoredFields,
     storedFieldsLayout,
-    filter: searchOptionsWithDefaults.filter,
+    filter,
     skipSort,
-    limit: resolveResultLimit(searchOptionsWithDefaults.limit),
+    limit: resolveResultLimit(rawLimit),
     matchInfo,
   })
 }
@@ -898,8 +906,21 @@ export function finalizeSearchPage(
 
   const total = rawResults.size
   if (offset >= total || limit === 0) return { results: [], total }
-  if (offset === 0)
-    return { results: finalizeSearchResults({ ...params, limit }), total }
+  if (offset === 0) {
+    return {
+      results: finalizeSearchResults({
+        rawResults: params.rawResults,
+        getExternalId: params.getExternalId,
+        getStoredFields: params.getStoredFields,
+        storedFieldsLayout: params.storedFieldsLayout,
+        filter: params.filter,
+        skipSort: params.skipSort,
+        limit,
+        matchInfo: params.matchInfo,
+      }),
+      total,
+    }
+  }
   const end = Math.min(total, offset + (limit ?? total))
   if (skipSort) {
     const results: SearchResult[] = []

@@ -123,7 +123,7 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   if (options.fields?.length) {
     assertFieldsMatchSnapshot(fields, snapshot.fieldIds)
   }
-  const opts = resolveFrozenOptions({ ...options, fields })
+  const opts = resolveFrozenOptions(options, fields)
 
   const fieldCount = opts.fields.length
   const documentCount = assertNonNegativeInteger(

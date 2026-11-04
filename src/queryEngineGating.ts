@@ -228,6 +228,11 @@ export function collectCombinedDocIds<T>(
  * AND_NOT: score the positive branch only; negated branches are collected as docId sets and
  * subtracted without scoring. Large cheap-estimated exclusions may collect survivors first.
  */
+export type BranchPostingEstimates<T> = {
+  branchPostingLength?: (branch: T) => number
+  twoPhasePostingLength?: (branch: T) => number | undefined
+}
+
 export function executeCombinedBranches<T>(
   branches: readonly T[],
   operator: CombinationOperator,
@@ -236,10 +241,11 @@ export function executeCombinedBranches<T>(
   collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
   run?: QueryEngineRunOptions,
-  estimateBranchPostingLength?: (branch: T) => number,
-  estimateTwoPhasePostingLength?: (branch: T) => number | undefined,
+  estimates?: BranchPostingEstimates<T>,
 ): RawResult {
   if (branches.length === 0) return new Map()
+  const estimateBranchPostingLength = estimates?.branchPostingLength
+  const estimateTwoPhasePostingLength = estimates?.twoPhasePostingLength
 
   const op = operator.toLowerCase()
   if (op === 'or') {

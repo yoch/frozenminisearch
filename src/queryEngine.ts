@@ -44,6 +44,11 @@ import {
   visitQuerySpecForScoring,
 } from './queryTermRefs'
 import { defaultSearchOptions } from './searchDefaults'
+import {
+  mergeSearchOptions,
+  mergeSearchOptionsWithDefaults,
+  resolveBoostDocument,
+} from './frozenOptions'
 import type { PackedTermCursor } from './PackedRadixTree/types'
 
 /**
@@ -129,6 +134,16 @@ function isQueryCombination(query: Query): query is QueryCombination {
   )
 }
 
+function mergeQueryCombinationOptions(
+  searchOptions: SearchOptions,
+  query: QueryCombination,
+  globalSearchOptions: SearchOptionsWithDefaults,
+): SearchOptions {
+  const base = mergeSearchOptions(globalSearchOptions, searchOptions)
+  base.combineWith = searchOptions.combineWith
+  return mergeSearchOptions(base, query)
+}
+
 function combinationHasWildcard(query: QueryCombination): boolean {
   return query.queries.some(
     (q) =>
@@ -153,16 +168,32 @@ function normalizeStringQuery(
   searchOptions: SearchOptions,
   params: QueryEngineParams,
 ): NormalizedStringQuery {
+  const merged = mergeSearchOptionsWithDefaults(
+    params.globalSearchOptions,
+    searchOptions,
+  )
+  const tokenize = merged.tokenize ?? params.tokenize
+  const processTerm = merged.processTerm ?? params.processTerm
   const options = {
-    tokenize: params.tokenize,
-    processTerm: params.processTerm,
-    ...params.globalSearchOptions,
-    ...searchOptions,
+    fields: merged.fields,
+    filter: merged.filter,
+    boost: merged.boost,
+    boostTerm: merged.boostTerm,
+    weights: merged.weights,
+    boostDocument: merged.boostDocument,
+    prefix: merged.prefix,
+    fuzzy: merged.fuzzy,
+    maxFuzzy: merged.maxFuzzy,
+    combineWith: merged.combineWith,
+    tokenize,
+    processTerm,
+    bm25: merged.bm25,
+    limit: merged.limit,
   }
-  const tokens = options.tokenize(query)
+  const tokens = tokenize(query)
   const terms: string[] = []
   for (const token of tokens) {
-    const processed = options.processTerm(token)
+    const processed = processTerm(token)
     if (Array.isArray(processed)) {
       for (const term of processed) {
         if (term) terms.push(term)
@@ -178,10 +209,9 @@ function normalizeStringQuery(
     specs.push(toSpec(terms[i], i, terms))
   }
 
-  const { fuzzy: fuzzyWeight, prefix: prefixWeight } = {
-    ...defaultSearchOptions.weights,
-    ...options.weights,
-  }
+  const weights = options.weights
+  const fuzzyWeight = weights?.fuzzy ?? defaultSearchOptions.weights.fuzzy
+  const prefixWeight = weights?.prefix ?? defaultSearchOptions.weights.prefix
 
   return {
     options,
@@ -241,7 +271,11 @@ function estimateMaxPostingLengthForQuery(
   }
 
   if (isQueryCombination(query)) {
-    const options = { ...searchOptions, ...query, queries: undefined }
+    const options = mergeQueryCombinationOptions(
+      searchOptions,
+      query,
+      params.globalSearchOptions,
+    )
     let maxLen = 0
     for (const branch of query.queries) {
       maxLen = Math.max(
@@ -384,7 +418,11 @@ function collectDocIdsForQueryInternal(
   }
 
   if (isQueryCombination(query)) {
-    const options = { ...searchOptions, ...query, queries: undefined }
+    const options = mergeQueryCombinationOptions(
+      searchOptions,
+      query,
+      params.globalSearchOptions,
+    )
     const operator = options.combineWith ?? OR
     return collectCombinedDocIds(
       query.queries,
@@ -461,11 +499,10 @@ function executeWildcardQuery(
   params: QueryEngineParams,
 ): RawResult {
   const results = new Map() as RawResult
-  const options: SearchOptionsWithDefaults = {
-    ...params.globalSearchOptions,
-    ...searchOptions,
-  }
-  const { boostDocument } = options
+  const boostDocument = resolveBoostDocument(
+    params.globalSearchOptions,
+    searchOptions,
+  )
   const trackMatch = params.trackMatch !== false
 
   params.indexView.forEachActiveDoc((shortId, id, storedFields) => {
@@ -493,7 +530,11 @@ function executeQueryInternal(
 
   if (isQueryCombination(query)) {
     // Spread inherits parent combineWith into child branches; global searchOptions do not apply (MiniSearch 7.2).
-    const options = { ...searchOptions, ...query, queries: undefined }
+    const options = mergeQueryCombinationOptions(
+      searchOptions,
+      query,
+      params.globalSearchOptions,
+    )
     const operator = options.combineWith ?? OR
 
     if (
@@ -514,7 +555,10 @@ function executeQueryInternal(
           collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
         allowedDocs,
         run,
-        (branch) => estimateMaxPostingLengthForQuery(branch, options, params),
+        {
+          branchPostingLength: (branch) =>
+            estimateMaxPostingLengthForQuery(branch, options, params),
+        },
       )
     }
 
@@ -542,13 +586,16 @@ function executeQueryInternal(
         collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
       allowedDocs,
       run,
-      (spec) => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
-      (spec) =>
-        estimateCheapTwoPhasePostingLengthForQuerySpec(
-          spec,
-          normalized,
-          params,
-        ),
+      {
+        branchPostingLength: (spec) =>
+          estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
+        twoPhasePostingLength: (spec) =>
+          estimateCheapTwoPhasePostingLengthForQuerySpec(
+            spec,
+            normalized,
+            params,
+          ),
+      },
     )
   }
 

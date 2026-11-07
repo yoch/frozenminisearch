@@ -171,7 +171,10 @@ export function collectAndDocIdsByEstimatedLength<T>(
   collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
 ): DocIdSet {
-  const order = branches.map((_, i) => i)
+  const order: number[] = []
+  for (let i = 0; i < branches.length; i++) {
+    order.push(i)
+  }
   order.sort(
     (a, b) => branchPostingLengths[a] - branchPostingLengths[b] || a - b,
   )
@@ -249,10 +252,11 @@ export function executeCombinedBranches<T>(
 
   const op = operator.toLowerCase()
   if (op === 'or') {
-    return combineResults(
-      branches.map((branch) => executeBranch(branch, allowedDocs)),
-      operator,
-    )
+    const branchResults: RawResult[] = []
+    for (let i = 0; i < branches.length; i++) {
+      branchResults.push(executeBranch(branches[i], allowedDocs))
+    }
+    return combineResults(branchResults, operator)
   }
 
   if (op === 'and') {

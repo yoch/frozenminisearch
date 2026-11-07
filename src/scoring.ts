@@ -1134,20 +1134,26 @@ export type QuerySpec = {
   termBoost: number
 }
 
-export const termToQuerySpec =
-  (options: SearchOptions) =>
-  (term: string, i: number, terms: string[]): QuerySpec => {
-    const fuzzy =
-      typeof options.fuzzy === 'function'
-        ? options.fuzzy(term, i, terms)
-        : options.fuzzy || false
-    const prefix =
-      typeof options.prefix === 'function'
-        ? options.prefix(term, i, terms)
-        : options.prefix === true
-    const termBoost =
-      typeof options.boostTerm === 'function'
-        ? options.boostTerm(term, i, terms)
-        : 1
-    return { term, fuzzy, prefix, termBoost }
-  }
+export function termToQuerySpec(
+  options: SearchOptions,
+  term: string,
+  i: number,
+  terms: string[],
+): QuerySpec {
+  const {
+    fuzzy: optFuzzy,
+    prefix: optPrefix,
+    boostTerm: optBoostTerm,
+  } = options
+  const fuzzy =
+    typeof optFuzzy === 'function'
+      ? optFuzzy(term, i, terms)
+      : optFuzzy || false
+  const prefix =
+    typeof optPrefix === 'function'
+      ? optPrefix(term, i, terms)
+      : optPrefix === true
+  const termBoost =
+    typeof optBoostTerm === 'function' ? optBoostTerm(term, i, terms) : 1
+  return { term, fuzzy, prefix, termBoost }
+}

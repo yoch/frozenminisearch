@@ -129,7 +129,7 @@ export type SearchOptions = {
 }
 
 /** Options for a page in the native score ordering, with an exact filtered total. */
-export interface SearchPageOptions extends SearchOptions {
+export type SearchPageOptions = SearchOptions & {
   /** Number of matching results to skip. Defaults to zero. */
   offset?: number
   /** Explicit page size. Infinity returns all remaining matches. */
@@ -137,7 +137,7 @@ export interface SearchPageOptions extends SearchOptions {
 }
 
 /** A page of matches and their count before pagination, after filtering. */
-export interface SearchPage {
+export type SearchPage = {
   results: SearchResult[]
   total: number
 }
@@ -194,7 +194,7 @@ export type ScoredSearchPageOptions = Omit<SearchPageOptions, 'filter'> & {
 }
 
 /** A page of {@link ScoredResult}s and their count before pagination, after filtering. */
-export interface ScoredSearchPage {
+export type ScoredSearchPage = {
   results: ScoredResult[]
   total: number
 }

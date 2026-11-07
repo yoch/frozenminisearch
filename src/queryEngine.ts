@@ -144,11 +144,17 @@ function mergeQueryCombinationOptions(
 }
 
 function combinationHasWildcard(query: QueryCombination): boolean {
-  return query.queries.some(
-    (q) =>
+  const { queries } = query
+  for (let i = 0; i < queries.length; i++) {
+    const q = queries[i]
+    if (
       isWildcardQuery(q) ||
-      (isQueryCombination(q) && combinationHasWildcard(q)),
-  )
+      (isQueryCombination(q) && combinationHasWildcard(q))
+    ) {
+      return true
+    }
+  }
+  return false
 }
 
 function shouldUseGatedEvaluation(
@@ -202,10 +208,9 @@ function normalizeStringQuery(
     }
   }
 
-  const toSpec = termToQuerySpec(options)
   const specs: QuerySpec[] = []
   for (let i = 0; i < terms.length; i++) {
-    specs.push(toSpec(terms[i], i, terms))
+    specs.push(termToQuerySpec(options, terms[i], i, terms))
   }
 
   const weights = options.weights
@@ -275,11 +280,12 @@ function estimateMaxPostingLengthForQuery(
       query,
       params.globalSearchOptions,
     )
+    const { queries } = query
     let maxLen = 0
-    for (const branch of query.queries) {
+    for (let i = 0; i < queries.length; i++) {
       maxLen = Math.max(
         maxLen,
-        estimateMaxPostingLengthForQuery(branch, options, params),
+        estimateMaxPostingLengthForQuery(queries[i], options, params),
       )
     }
     return maxLen
@@ -288,11 +294,12 @@ function estimateMaxPostingLengthForQuery(
   if (typeof query !== 'string') return 0
 
   const normalized = normalizeStringQuery(query, searchOptions, params)
+  const { specs } = normalized
   let maxLen = 0
-  for (const spec of normalized.specs) {
+  for (let i = 0; i < specs.length; i++) {
     maxLen = Math.max(
       maxLen,
-      estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
+      estimateMaxPostingLengthForQuerySpec(specs[i], normalized, params),
     )
   }
   return maxLen
@@ -465,14 +472,16 @@ function collectDocIdsForQueryInternal(
     )
   if (operator.toLowerCase() === 'and') {
     // Start from the most selective exact terms, so a broad first term is only read under a gate.
-    const lengths = specs.map(
-      (spec) =>
+    const lengths: number[] = []
+    for (let i = 0; i < specs.length; i++) {
+      lengths.push(
         estimateCheapTwoPhasePostingLengthForQuerySpec(
-          spec,
+          specs[i],
           normalized,
           params,
         ) ?? Number.MAX_SAFE_INTEGER,
-    )
+      )
+    }
     return collectAndDocIdsByEstimatedLength(
       specs,
       lengths,
@@ -557,9 +566,13 @@ function executeQueryInternal(
       )
     }
 
-    const results = query.queries.map((subquery) =>
-      executeQueryInternal(subquery, options, params, allowedDocs, run),
-    )
+    const { queries } = query
+    const results: RawResult[] = []
+    for (let i = 0; i < queries.length; i++) {
+      results.push(
+        executeQueryInternal(queries[i], options, params, allowedDocs, run),
+      )
+    }
     return combineResults(results, operator)
   }
 
@@ -594,9 +607,12 @@ function executeQueryInternal(
     )
   }
 
-  const results = specs.map((spec) =>
-    executeQuerySpecInternal(spec, normalized, params, allowedDocs),
-  )
+  const results: RawResult[] = []
+  for (let i = 0; i < specs.length; i++) {
+    results.push(
+      executeQuerySpecInternal(specs[i], normalized, params, allowedDocs),
+    )
+  }
   return combineResults(results, operator)
 }
 

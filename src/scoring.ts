@@ -6,10 +6,12 @@ import {
 import type {
   MatchInfo,
   Query,
+  ScoredResult,
   SearchOptions,
   SearchOptionsWithDefaults,
   SearchResult,
   SearchPage,
+  Suggestion,
   CombinationOperator,
   LowercaseCombinationOperator,
   BM25Params,
@@ -21,6 +23,7 @@ import {
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import type { PackedTermCursor } from './PackedRadixTree/types'
+import type { DocIdBitSet } from './docIdBitSet'
 
 export type {
   BM25Params,
@@ -42,16 +45,15 @@ export interface RawResultValue {
 export type RawResult = Map<number, RawResultValue>
 
 /** Minimal docId membership view used by gated query execution. */
-export interface DocIdGate extends Iterable<number> {
+export interface DocIdGateLike extends Iterable<number> {
   readonly size: number
   has(docId: number): boolean
 }
 
 /** DocIds filled by collection: a `Set` for search gates, a `DocIdBitSet` for `matchIds`. */
-export interface DocIdSet extends DocIdGate {
-  add(docId: number): unknown
-  delete(docId: number): unknown
-}
+export type DocIdSet = Set<number> | DocIdBitSet
+
+export type DocIdGate = DocIdSet | DocIdGateLike
 
 /** Posting list for one (term, field): docId -> term frequency */
 export interface PostingListLike {
@@ -186,7 +188,11 @@ const assignUniqueTerms = (
   }
 }
 
-export type Scored = { score: number }
+export type Scored =
+  | Pick<SearchResult, 'score' | 'terms'>
+  | ScoredResult
+  | SearchResult
+  | Suggestion
 export const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
 /** Eager materialized term, or a traversal cursor resolved at most once per posting list. */
@@ -603,18 +609,26 @@ export function finalizeRawSearchResults(
   matchInfo = true,
 ): SearchResult[] {
   const boostDocument =
-    searchOptions.boostDocument !== undefined ||
-    Object.hasOwn(searchOptions, 'boostDocument')
+    globalSearchOptions.boostDocument === undefined
       ? searchOptions.boostDocument
-      : globalSearchOptions.boostDocument
+      : searchOptions.boostDocument !== undefined ||
+          Object.hasOwn(searchOptions, 'boostDocument')
+        ? searchOptions.boostDocument
+        : globalSearchOptions.boostDocument
   const filter =
-    searchOptions.filter !== undefined || Object.hasOwn(searchOptions, 'filter')
+    globalSearchOptions.filter === undefined
       ? searchOptions.filter
-      : globalSearchOptions.filter
+      : searchOptions.filter !== undefined ||
+          Object.hasOwn(searchOptions, 'filter')
+        ? searchOptions.filter
+        : globalSearchOptions.filter
   const rawLimit =
-    searchOptions.limit !== undefined || Object.hasOwn(searchOptions, 'limit')
+    globalSearchOptions.limit === undefined
       ? searchOptions.limit
-      : globalSearchOptions.limit
+      : searchOptions.limit !== undefined ||
+          Object.hasOwn(searchOptions, 'limit')
+        ? searchOptions.limit
+        : globalSearchOptions.limit
   const skipSort = isWildcardQuery(query) && boostDocument == null
   return finalizeSearchResults({
     rawResults,

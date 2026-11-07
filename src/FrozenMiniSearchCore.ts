@@ -248,7 +248,7 @@ export default class FrozenMiniSearchCore<T = any> {
       avgFieldLength: this._avgFieldLength,
       fieldIds: this._fieldIds,
       getFieldLength: (docId, fieldId) =>
-        fieldLengthMatrix[docId * fieldCount + fieldId] | 0,
+        fieldLengthMatrix[docId * fieldCount + (fieldId | 0)] | 0,
       getExternalId: this._getExternalId,
       getStoredFields: this._hasStoredFields
         ? (docId) => readStoredFields(this._storedFields, docId)

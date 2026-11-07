@@ -14,6 +14,7 @@ export function resolveSearchFilter(
   base: SearchOptions,
   override: SearchOptions,
 ): SearchOptions['filter'] {
+  if (base.filter === undefined) return override.filter
   return override.filter !== undefined || Object.hasOwn(override, 'filter')
     ? override.filter
     : base.filter
@@ -23,6 +24,7 @@ export function resolveBoostDocument(
   base: SearchOptions,
   override: SearchOptions,
 ): SearchOptions['boostDocument'] {
+  if (base.boostDocument === undefined) return override.boostDocument
   return override.boostDocument !== undefined ||
     Object.hasOwn(override, 'boostDocument')
     ? override.boostDocument
@@ -33,6 +35,7 @@ export function resolveSearchLimit(
   base: SearchOptions,
   override: SearchOptions,
 ): number | undefined {
+  if (base.limit === undefined) return override.limit
   return override.limit !== undefined || Object.hasOwn(override, 'limit')
     ? override.limit
     : base.limit

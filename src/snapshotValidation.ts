@@ -16,10 +16,10 @@ export function assertNonNegativeInteger(
   value: unknown,
   context: string,
 ): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw snapshotError(`${context} must be a non-negative integer`)
   }
-  return value as number
+  return value
 }
 
 // Validate canonical non-negative integer object keys without regex allocation.

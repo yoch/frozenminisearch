@@ -1,4 +1,4 @@
-import type { DocIdGate } from './scoring'
+import type { DocIdGateLike } from './scoring'
 
 function popcount(word: number): number {
   word -= (word >>> 1) & 0x55555555
@@ -11,7 +11,7 @@ function popcount(word: number): number {
  * order, from an array cached until the next change, so a set used as a gate is
  * listed once however many terms iterate it.
  */
-export class DocIdBitSet implements DocIdGate {
+export class DocIdBitSet implements DocIdGateLike {
   size = 0
   private readonly _limit: number
   private readonly _words: Uint32Array

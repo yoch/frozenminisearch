@@ -160,10 +160,11 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
   // MiniSearch leaves entries unset for fields no document has, and its running average can drift
   // below zero after discards; both load fine there, so only non-numbers are rejected.
   const avgFieldLength = new Float32Array(fieldCount)
-  for (let f = 0; f < snapshot.averageFieldLength.length; f++) {
-    const avg = snapshot.averageFieldLength[f]
+  const rawAvgFieldLength = snapshot.averageFieldLength as unknown[]
+  for (let f = 0; f < rawAvgFieldLength.length; f++) {
+    const avg = rawAvgFieldLength[f]
     if (avg == null) continue
-    if (!Number.isFinite(avg)) {
+    if (typeof avg !== 'number' || !Number.isFinite(avg)) {
       throw snapshotError(
         `averageFieldLength field ${f} must be a finite number`,
       )
@@ -220,9 +221,14 @@ export function buildFrozenAssembleParamsFromMiniSearchSnapshot<T>(
     }
     const row = shortIdRemap != null ? shortIdRemap[shortId] : shortId
     const rowBase = row * fieldCount
+    const rawLengths = lengths as unknown[]
     for (let f = 0; f < fieldCount; f++) {
-      const length = (lengths as number[])[f] ?? 0
-      if (!Number.isFinite(length) || length < 0) {
+      const length = rawLengths[f] ?? 0
+      if (
+        typeof length !== 'number' ||
+        !Number.isFinite(length) ||
+        length < 0
+      ) {
         throw snapshotError(
           `fieldLength shortId ${shortId} field ${f} must be a non-negative number`,
         )

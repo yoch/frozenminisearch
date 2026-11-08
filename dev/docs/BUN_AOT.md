@@ -63,6 +63,19 @@ Since the rewrite, `--aot` is **slower** than `--no-aot` for every query; only i
 
 So the report is usable to tune hot loops, but such changes (proving bounds, coercing indexes) target the compiler of the day; measure each one, and keep it only if Node and Bun JIT are unaffected.
 
+#### Where the time goes (`2596ac5d3`)
+
+AOT executables accept the profiler: `BUN_OPTIONS="--cpu-prof --cpu-prof-dir=prof" ./app` writes a `.cpuprofile` with function names and source lines (`perf` sees no symbols). On a benchmark that runs only the exact search, `finalizeSearchResults` takes 52 % of the AOT time and `scorePostingDoc` 18 %. Under `--no-aot`, JavaScriptCore inlines more, so the same work is spread over `scorePostingDoc`, `newSearchResult` and `sort`.
+
+What did not help (measured on the full benchmark, then reverted):
+
+- typing `RawResult` maps as `new Map<number, RawResultValue>()` instead of `new Map() as RawResult`: same counts in `--explain`, same times;
+- forms of the field-length index (`| 0` on either operand or on the sum, `?? 0`), or a cast to a single typed-array type: same times. Replacing the lookup with a constant halves exact-search time, but only because the BM25 arithmetic then folds: a varying value computed without memory access costs the same as the lookup;
+- filling the result array with `push` instead of `new Array(n)` before sorting: 35 % faster in a micro-benchmark sorting 20,000 results, unchanged on the library;
+- the earlier fixed-shape options and parameters (`08892a5`): same times as master.
+
+Taken separately, the operations of that path (iterating the result `Map` with destructuring, `Object.keys` on the match object, building result objects, adding a stored field, sorting with a comparator) all run faster under `--aot` than `--no-aot` in micro-benchmarks. The gap therefore comes from how the compiler handles the library's real call graph, which none of these local changes reaches. Other patterns behave erratically: `a[(offset + i) | 0]` is 4x slower than `a[offset + i]` under `--aot`, and `a[b[i] % a.length]` (an index that is `NaN` when `a` is empty) is 7.6x slower than under `--no-aot`, reported with the same `loose-type` label as in #48239 (this library has no such index). No code change is kept from this round; re-measure with the next canaries.
+
 ### Speed before the rewrite (`da867c60b` / `1.4.4`, µs/op unless noted)
 
 | Metric | Node 24 | Bun JIT | compile `--no-aot` | compile `--aot` | `--aot` vs `--no-aot` |
@@ -120,6 +133,7 @@ Workarounds for compiler limits that the rewrite already changed (spreads replac
 | [#47920](https://github.com/oven-sh/bun/issues/47920) `node:zlib` blocks `--trim` | Partly fixed: the compiler now sees every API, but a `node:zlib` import still doubles a trimmed hello world (25 → 53 MB), as in [#48182](https://github.com/oven-sh/bun/issues/48182). |
 | [#48144](https://github.com/oven-sh/bun/issues/48144) false `property-added` with `extends` | No longer reproduces; the same program now reports an `unknown-callee` at the subclass. |
 | [#48145](https://github.com/oven-sh/bun/issues/48145) `node:zlib` `crc32` not a direct call | Confirmed by Bun, now reported as `unknown-callee`; fix in progress (oven-sh/WebKit#1011). |
+| [#48239](https://github.com/oven-sh/bun/issues/48239) index that may be `undefined` labelled `loose-type` | Filed against `2596ac5d3`. |
 
 ## Caveats
 

@@ -4,7 +4,6 @@ import { type FrozenPostingsLayout } from '../frozenPostings'
 import type { OptionsWithDefaults } from '../frozenTypes'
 import type { StoredFieldsLayout } from '../storedFieldsLayout'
 import { readStoredFields } from '../storedFieldsLayout'
-import { mergeSearchOptions } from '../frozenOptions'
 import type { Query, SearchOptions } from '../searchTypes'
 import { finalizeRawSearchResults, type RawResult } from '../scoring'
 import {
@@ -55,17 +54,7 @@ export function executeRaw<T>(
   return executeQueryWithRunOptions(
     query,
     searchOptions,
-    trackMatch
-      ? params
-      : {
-          fields: params.fields,
-          globalSearchOptions: params.globalSearchOptions,
-          tokenize: params.tokenize,
-          processTerm: params.processTerm,
-          indexView: params.indexView,
-          aggregateContext: params.aggregateContext,
-          trackMatch,
-        },
+    trackMatch ? params : { ...params, trackMatch },
   )
 }
 
@@ -105,10 +94,10 @@ export function mergedAutoSuggestOptions<T>(
   frozen: FrozenMiniSearchCore<T>,
   autoSuggestOptions: SearchOptions = {},
 ): SearchOptions {
-  return mergeSearchOptions(
-    viewOf(frozen)._options.autoSuggestOptions,
-    autoSuggestOptions,
-  )
+  return {
+    ...viewOf(frozen)._options.autoSuggestOptions,
+    ...autoSuggestOptions,
+  }
 }
 
 export function searchWithRunOptions<T>(

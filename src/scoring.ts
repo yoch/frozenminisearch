@@ -6,12 +6,10 @@ import {
 import type {
   MatchInfo,
   Query,
-  ScoredResult,
   SearchOptions,
   SearchOptionsWithDefaults,
   SearchResult,
   SearchPage,
-  Suggestion,
   CombinationOperator,
   LowercaseCombinationOperator,
   BM25Params,
@@ -22,7 +20,6 @@ import {
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import type { PackedTermCursor } from './PackedRadixTree/types'
-import type { DocIdBitSet } from './docIdBitSet'
 
 export type {
   BM25Params,
@@ -44,15 +41,16 @@ export interface RawResultValue {
 export type RawResult = Map<number, RawResultValue>
 
 /** Minimal docId membership view used by gated query execution. */
-export interface DocIdGateLike extends Iterable<number> {
+export interface DocIdGate extends Iterable<number> {
   readonly size: number
   has(docId: number): boolean
 }
 
 /** DocIds filled by collection: a `Set` for search gates, a `DocIdBitSet` for `matchIds`. */
-export type DocIdSet = Set<number> | DocIdBitSet
-
-export type DocIdGate = DocIdSet | DocIdGateLike
+export interface DocIdSet extends DocIdGate {
+  add(docId: number): unknown
+  delete(docId: number): unknown
+}
 
 /** Posting list for one (term, field): docId -> term frequency */
 export interface PostingListLike {
@@ -186,11 +184,7 @@ const assignUniqueTerms = (
   }
 }
 
-export type Scored =
-  | Pick<SearchResult, 'score' | 'terms'>
-  | ScoredResult
-  | SearchResult
-  | Suggestion
+export type Scored = { score: number }
 export const byScore = ({ score: a }: Scored, { score: b }: Scored) => b - a
 
 /** Eager materialized term, or a traversal cursor resolved at most once per posting list. */
@@ -589,11 +583,7 @@ export function combineResults(
   if (results.length === 0) return new Map()
   const combinator = combinatorFor(combineWith)
   if (results.length === 1) return results[0]
-  let combined = results[0]
-  for (let i = 1; i < results.length; i++) {
-    combined = combinator(combined, results[i])
-  }
-  return combined
+  return results.reduce(combinator)
 }
 
 function combinatorFor(combineWith: CombinationOperator): CombinatorFunction {
@@ -668,36 +658,20 @@ export function finalizeRawSearchResults(
   storedFieldsLayout?: StoredFieldsLayout,
   matchInfo = true,
 ): SearchResult[] {
-  const boostDocument =
-    globalSearchOptions.boostDocument === undefined
-      ? searchOptions.boostDocument
-      : searchOptions.boostDocument !== undefined ||
-          Object.hasOwn(searchOptions, 'boostDocument')
-        ? searchOptions.boostDocument
-        : globalSearchOptions.boostDocument
-  const filter =
-    globalSearchOptions.filter === undefined
-      ? searchOptions.filter
-      : searchOptions.filter !== undefined ||
-          Object.hasOwn(searchOptions, 'filter')
-        ? searchOptions.filter
-        : globalSearchOptions.filter
-  const rawLimit =
-    globalSearchOptions.limit === undefined
-      ? searchOptions.limit
-      : searchOptions.limit !== undefined ||
-          Object.hasOwn(searchOptions, 'limit')
-        ? searchOptions.limit
-        : globalSearchOptions.limit
-  const skipSort = isWildcardQuery(query) && boostDocument == null
+  const searchOptionsWithDefaults: SearchOptionsWithDefaults = {
+    ...globalSearchOptions,
+    ...searchOptions,
+  }
+  const skipSort =
+    isWildcardQuery(query) && searchOptionsWithDefaults.boostDocument == null
   return finalizeSearchResults({
     rawResults,
     getExternalId,
     getStoredFields,
     storedFieldsLayout,
-    filter,
+    filter: searchOptionsWithDefaults.filter,
     skipSort,
-    limit: resolveResultLimit(rawLimit),
+    limit: resolveResultLimit(searchOptionsWithDefaults.limit),
     matchInfo,
   })
 }
@@ -980,21 +954,8 @@ export function finalizeSearchPage(
 
   const total = rawResults.size
   if (offset >= total || limit === 0) return { results: [], total }
-  if (offset === 0) {
-    return {
-      results: finalizeSearchResults({
-        rawResults: params.rawResults,
-        getExternalId: params.getExternalId,
-        getStoredFields: params.getStoredFields,
-        storedFieldsLayout: params.storedFieldsLayout,
-        filter: params.filter,
-        skipSort: params.skipSort,
-        limit,
-        matchInfo: params.matchInfo,
-      }),
-      total,
-    }
-  }
+  if (offset === 0)
+    return { results: finalizeSearchResults({ ...params, limit }), total }
   const end = Math.min(total, offset + (limit ?? total))
   if (skipSort) {
     const results: SearchResult[] = []
@@ -1194,26 +1155,20 @@ export type QuerySpec = {
   termBoost: number
 }
 
-export function termToQuerySpec(
-  options: SearchOptions,
-  term: string,
-  i: number,
-  terms: string[],
-): QuerySpec {
-  const {
-    fuzzy: optFuzzy,
-    prefix: optPrefix,
-    boostTerm: optBoostTerm,
-  } = options
-  const fuzzy =
-    typeof optFuzzy === 'function'
-      ? optFuzzy(term, i, terms)
-      : optFuzzy || false
-  const prefix =
-    typeof optPrefix === 'function'
-      ? optPrefix(term, i, terms)
-      : optPrefix === true
-  const termBoost =
-    typeof optBoostTerm === 'function' ? optBoostTerm(term, i, terms) : 1
-  return { term, fuzzy, prefix, termBoost }
-}
+export const termToQuerySpec =
+  (options: SearchOptions) =>
+  (term: string, i: number, terms: string[]): QuerySpec => {
+    const fuzzy =
+      typeof options.fuzzy === 'function'
+        ? options.fuzzy(term, i, terms)
+        : options.fuzzy || false
+    const prefix =
+      typeof options.prefix === 'function'
+        ? options.prefix(term, i, terms)
+        : options.prefix === true
+    const termBoost =
+      typeof options.boostTerm === 'function'
+        ? options.boostTerm(term, i, terms)
+        : 1
+    return { term, fuzzy, prefix, termBoost }
+  }

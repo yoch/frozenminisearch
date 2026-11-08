@@ -158,6 +158,29 @@ describe('FrozenMiniSearch parity with MiniSearch', () => {
     expectSameResults(ms, fr, 'zen whale')
   })
 
+  test('explicit undefined or null search options override global searchOptions', () => {
+    const globalOptions = {
+      ...options,
+      searchOptions: { prefix: true, fuzzy: 0.2, combineWith: 'AND', weights: { prefix: 0.1 } },
+    }
+    const ms = new MiniSearch(globalOptions)
+    ms.addAll(docs)
+    const fr = frozenFromMiniSearch(FrozenMiniSearch, ms, globalOptions)
+    const overrides = [
+      { prefix: undefined },
+      { prefix: null },
+      { fuzzy: undefined },
+      { fuzzy: null },
+      { combineWith: undefined },
+      { weights: undefined },
+    ]
+    for (const local of overrides) {
+      expectSameResults(ms, fr, 'zen ar', local)
+      expectSameResults(ms, fr, { ...local, queries: ['zen', 'motor'] })
+      expectSameSuggestions(fr.autoSuggest('zen ar', local), ms.autoSuggest('zen ar', local))
+    }
+  })
+
   test('AND_NOT keeps docs whose negated-term boostDocument is 0', () => {
     const boostDocument = (id, term) => (id === 4 && term === 'archery') ? 0 : 1
     expectSameResults(mutable, frozen, 'zen archery', { combineWith: 'AND_NOT', boostDocument })

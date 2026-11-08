@@ -16,7 +16,7 @@ const outFile = join(root, 'dist', 'aot', 'index.aot.ts')
 const libraryDir = mkdtempSync(join(tmpdir(), 'fms-aot-library-'))
 
 try {
-  const bunVersion = execFileSync('bun', ['--version'], { encoding: 'utf8' }).trim()
+  const bunVersion = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
   try {
     execFileSync('bun', ['compile', '--no-script', '--library', 'src/index.ts', '--outdir', libraryDir], {
       cwd: root,

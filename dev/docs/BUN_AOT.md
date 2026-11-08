@@ -54,7 +54,14 @@ Different scratch script and query set from the older table below (common Italia
 | searchPage | 98 | 96 | 102 | 173 | 135 | +32 % |
 | nested combination | 51 | 44 | 47 | 63 | 54 | +16 % |
 
-Since the rewrite, `--aot` is **slower** than `--no-aot` for every query; only indexing is faster. `--explain` reports 29 % of property accesses as typed and flags plainly typed values (for example a local `new Uint32Array(n)`) as `unknown-object` from a loose type, and `bun check --aot` reports "6 files compiled without types" without naming them. That looks like the state of a compiler merged the day before, not like something to work around in this code base: re-measure with the next canaries before tuning for it.
+Since the rewrite, `--aot` is **slower** than `--no-aot` for every query; only indexing is faster. The same holds for a consumer of the packed package (`"aot"` condition resolved, no file compiled without types). An entry point outside the repository that imports `src/` by absolute path is not representative: Bun then compiles some of the library's files without their types.
+
+`--explain` reports 28 % of the library's property accesses as typed. Read it with two things in mind:
+
+- An index that may be `undefined` makes the access a lookup by name, which is correct JavaScript semantics: `counts[slot]++` on a local `Uint32Array` is slow when `slot` comes from a `number[]` element or from a typed-array read whose bounds the compiler cannot prove, and fast when it comes from an `Int32Array` read inside `i < ids.length`. Bun labels these `unknown-object` / `loose-type`, not `element-may-be-missing`, so the label points at the wrong cause.
+- Nothing is measured: entries rank by static loop nesting, including methods that the program never calls (for example `_searchWildcardPage` in a benchmark without wildcard queries, whose `this` is then untracked). Only entries in functions on the measured path matter.
+
+So the report is usable to tune hot loops, but such changes (proving bounds, coercing indexes) target the compiler of the day; measure each one, and keep it only if Node and Bun JIT are unaffected.
 
 ### Speed before the rewrite (`da867c60b` / `1.4.4`, µs/op unless noted)
 

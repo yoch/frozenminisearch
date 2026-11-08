@@ -70,11 +70,23 @@ AOT executables accept the profiler: `BUN_OPTIONS="--cpu-prof --cpu-prof-dir=pro
 What did not help (measured on the full benchmark, then reverted):
 
 - typing `RawResult` maps as `new Map<number, RawResultValue>()` instead of `new Map() as RawResult`: same counts in `--explain`, same times;
-- forms of the field-length index (`| 0` on either operand or on the sum, `?? 0`), or a cast to a single typed-array type: same times. Replacing the lookup with a constant halves exact-search time, but only because the BM25 arithmetic then folds: a varying value computed without memory access costs the same as the lookup;
+- forms of the field-length index (`| 0` on either operand or on the sum, `?? 0`), or a cast to a single typed-array type: same times. Replacing the lookup with a constant halves exact-search time, but only because the BM25 arithmetic then folds: a varying value computed without memory access costs the same as the lookup. The TypeScript checker confirms that no index component is the problem: in all 485 numeric element accesses under `src/`, every component is `number`, with no `any`, `unknown` or possibly-`undefined` type. `node dev/scripts/inspect-index-typing.cjs --suspect-only` prints that check;
 - filling the result array with `push` instead of `new Array(n)` before sorting: 35 % faster in a micro-benchmark sorting 20,000 results, unchanged on the library;
 - the earlier fixed-shape options and parameters (`08892a5`): same times as master.
 
 Taken separately, the operations of that path (iterating the result `Map` with destructuring, `Object.keys` on the match object, building result objects, adding a stored field, sorting with a comparator) all run faster under `--aot` than `--no-aot` in micro-benchmarks. The gap therefore comes from how the compiler handles the library's real call graph, which none of these local changes reaches. Other patterns behave erratically: `a[(offset + i) | 0]` is 4x slower than `a[offset + i]` under `--aot`, and `a[b[i] % a.length]` (an index that is `NaN` when `a` is empty) is 7.6x slower than under `--no-aot`, reported with the same `loose-type` label as in #48239 (this library has no such index). No code change is kept from this round; re-measure with the next canaries.
+
+The `--explain` entries name the base of each access (`docIds`, `fieldLengthMatrix`, `states`), not its index. Those bases are typed-array views created over the snapshot buffer, or arrays carried inside objects passed across calls. One trigger explains most of them:
+
+```ts
+function make(buf: ArrayBufferLike): Uint32Array { return new Uint32Array(buf, 0, 2) }
+function sum(a: Uint32Array): number { let t = 0; for (let i = 0; i < a.length; i++) t += a[i]; return t }
+console.log(sum(make(new ArrayBuffer(8))))
+```
+
+`--explain` reports `a` in `sum` as `unknown-object` / `loose-type`. With `make(): Uint32Array { return new Uint32Array(8) }` (no buffer parameter) the same `sum` is typed; and `new Uint32Array(buf, 0, 2)` read inside the function that receives `buf` is typed too. The view becomes untyped only once it crosses a non-inlined call. Exporting the function prevents inlining and makes the same one-access body untyped. Allocating the typed array by length and filling it keeps the tracking downstream (only the read from the tainted source is flagged), but it copies each postings and matrix column and adds its memory; not worth it on an experimental compiler. The docs say an access is typed "from your types or by tracking the object from where it's created"; here the type is declared and the object is created locally, so this is a compiler gap to report, separate from #48239 (which is about how the entry is labelled).
+
+The 2,704 entries follow from this: posting and field-length arrays are views over the snapshot buffer, and the fuzzy state array travels inside the `BitSearch` object passed to `visitBits` and `visitLeafAtRow`. No rewrite of an index expression can clear them, which matches the measurements above.
 
 ### Speed before the rewrite (`da867c60b` / `1.4.4`, µs/op unless noted)
 

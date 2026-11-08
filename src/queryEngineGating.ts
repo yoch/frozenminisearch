@@ -171,10 +171,7 @@ export function collectAndDocIdsByEstimatedLength<T>(
   collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
 ): DocIdSet {
-  const order: number[] = []
-  for (let i = 0; i < branches.length; i++) {
-    order.push(i)
-  }
+  const order = branches.map((_, i) => i)
   order.sort(
     (a, b) => branchPostingLengths[a] - branchPostingLengths[b] || a - b,
   )
@@ -231,11 +228,6 @@ export function collectCombinedDocIds<T>(
  * AND_NOT: score the positive branch only; negated branches are collected as docId sets and
  * subtracted without scoring. Large cheap-estimated exclusions may collect survivors first.
  */
-export type BranchPostingEstimates<T> = {
-  branchPostingLength?: (branch: T) => number
-  twoPhasePostingLength?: (branch: T) => number | undefined
-}
-
 export function executeCombinedBranches<T>(
   branches: readonly T[],
   operator: CombinationOperator,
@@ -244,19 +236,17 @@ export function executeCombinedBranches<T>(
   collectBranch: (branch: T, allowedDocs?: DocIdGate) => DocIdSet,
   allowedDocs?: DocIdGate,
   run?: QueryEngineRunOptions,
-  estimates?: BranchPostingEstimates<T>,
+  estimateBranchPostingLength?: (branch: T) => number,
+  estimateTwoPhasePostingLength?: (branch: T) => number | undefined,
 ): RawResult {
   if (branches.length === 0) return new Map()
-  const estimateBranchPostingLength = estimates?.branchPostingLength
-  const estimateTwoPhasePostingLength = estimates?.twoPhasePostingLength
 
   const op = operator.toLowerCase()
   if (op === 'or') {
-    const branchResults: RawResult[] = []
-    for (let i = 0; i < branches.length; i++) {
-      branchResults.push(executeBranch(branches[i], allowedDocs))
-    }
-    return combineResults(branchResults, operator)
+    return combineResults(
+      branches.map((branch) => executeBranch(branch, allowedDocs)),
+      operator,
+    )
   }
 
   if (op === 'and') {

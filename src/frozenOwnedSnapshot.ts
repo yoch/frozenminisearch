@@ -3,10 +3,6 @@ import type { PackedIndexArray } from './PackedRadixTree/types'
 import type { FieldLengthArray } from './fieldLengthMatrix'
 import type { FrozenPostingsLayout } from './frozenPostings'
 import type { FrozenAssembleParams } from './frozenTypes'
-import {
-  mergeSearchOptions,
-  mergeSearchOptionsWithDefaults,
-} from './frozenOptions'
 import type { OptionsWithDefaults } from './searchTypes'
 import { cloneStoredFields } from './storedFieldsLayout'
 import { CODEC_RAW } from './msv5/binaryMsv5Constants'
@@ -59,11 +55,7 @@ function ownedPostingsLayout(
 
   if (postings.layout === 'dense') {
     return {
-      layout: 'dense',
-      fieldCount: postings.fieldCount,
-      termCount: postings.termCount,
-      nextId: postings.nextId,
-      docIdWidth: postings.docIdWidth,
+      ...postings,
       allDocIds,
       allFreqs,
       denseOffsets: ownedIndexArray(postings.denseOffsets),
@@ -77,14 +69,9 @@ function ownedPostingsLayout(
       : new Uint8Array(postings.sparseFieldIds)
 
   return {
-    layout: 'sparse',
-    fieldCount: postings.fieldCount,
-    termCount: postings.termCount,
-    nextId: postings.nextId,
-    docIdWidth: postings.docIdWidth,
+    ...postings,
     allDocIds,
     allFreqs,
-    sparseFieldIdWidth: postings.sparseFieldIdWidth,
     sparseTermStarts: ownedIndexArray(postings.sparseTermStarts),
     sparseFieldIds,
     sparseOffsets: ownedIndexArray(postings.sparseOffsets),
@@ -96,15 +83,20 @@ function shallowCopyOptions<T>(
   options: OptionsWithDefaults<T>,
 ): OptionsWithDefaults<T> {
   return {
+    ...options,
     fields: [...options.fields],
-    idField: options.idField,
-    storeFields: options.storeFields,
-    extractField: options.extractField,
-    stringifyField: options.stringifyField,
-    tokenize: options.tokenize,
-    processTerm: options.processTerm,
-    searchOptions: mergeSearchOptionsWithDefaults(options.searchOptions),
-    autoSuggestOptions: mergeSearchOptions(options.autoSuggestOptions),
+    searchOptions: { ...options.searchOptions },
+    autoSuggestOptions: { ...options.autoSuggestOptions },
+  }
+}
+
+function shallowCopyJsSnapshotFields<T>(
+  params: FrozenAssembleParams<T>,
+): Pick<FrozenAssembleParams<T>, 'fieldIds' | 'options' | 'storedFields'> {
+  return {
+    fieldIds: { ...params.fieldIds },
+    options: shallowCopyOptions(params.options),
+    storedFields: cloneStoredFields(params.storedFields),
   }
 }
 
@@ -121,21 +113,7 @@ export function materializeOwnedSnapshot<T>(
       return params
 
     case 'minisearch-json':
-      return {
-        options: shallowCopyOptions(params.options),
-        documentCount: params.documentCount,
-        nextId: params.nextId,
-        fieldIds: { ...params.fieldIds },
-        fieldCount: params.fieldCount,
-        externalIds: params.externalIds,
-        idLookup: params.idLookup,
-        storedFields: cloneStoredFields(params.storedFields),
-        fieldLengthMatrix: params.fieldLengthMatrix,
-        avgFieldLength: params.avgFieldLength,
-        index: params.index,
-        termCount: params.termCount,
-        postings: params.postings,
-      }
+      return { ...params, ...shallowCopyJsSnapshotFields(params) }
 
     // Raw MSv5 sections alias the caller's wire buffer. Compressed sections are views
     // on the decoded payload, which also holds stored fields, ids and label bytes
@@ -144,19 +122,11 @@ export function materializeOwnedSnapshot<T>(
     case 'binary-load':
     case 'binary-load-wire':
       return {
-        options: params.options,
-        documentCount: params.documentCount,
-        nextId: params.nextId,
-        fieldIds: params.fieldIds,
-        fieldCount: params.fieldCount,
-        externalIds: params.externalIds,
-        idLookup: params.idLookup,
-        storedFields: params.storedFields,
+        ...params,
+        index: ownedPackedRadixTree(params.index),
+        postings: ownedPostingsLayout(params.postings),
         fieldLengthMatrix: ownedFieldLengthMatrix(params.fieldLengthMatrix),
         avgFieldLength: new Float32Array(params.avgFieldLength),
-        index: ownedPackedRadixTree(params.index),
-        termCount: params.termCount,
-        postings: ownedPostingsLayout(params.postings),
       }
 
     default: {

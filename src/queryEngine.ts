@@ -44,11 +44,6 @@ import {
   visitQuerySpecForScoring,
 } from './queryTermRefs'
 import { defaultSearchOptions } from './searchDefaults'
-import {
-  mergeSearchOptions,
-  mergeSearchOptionsWithDefaults,
-  resolveBoostDocument,
-} from './frozenOptions'
 import type { PackedTermCursor } from './PackedRadixTree/types'
 
 /**
@@ -133,28 +128,12 @@ function isQueryCombination(query: Query): query is QueryCombination {
   )
 }
 
-function mergeQueryCombinationOptions(
-  searchOptions: SearchOptions,
-  query: QueryCombination,
-  globalSearchOptions: SearchOptionsWithDefaults,
-): SearchOptions {
-  const base = mergeSearchOptions(globalSearchOptions, searchOptions)
-  base.combineWith = searchOptions.combineWith
-  return mergeSearchOptions(base, query)
-}
-
 function combinationHasWildcard(query: QueryCombination): boolean {
-  const { queries } = query
-  for (let i = 0; i < queries.length; i++) {
-    const q = queries[i]
-    if (
+  return query.queries.some(
+    (q) =>
       isWildcardQuery(q) ||
-      (isQueryCombination(q) && combinationHasWildcard(q))
-    ) {
-      return true
-    }
-  }
-  return false
+      (isQueryCombination(q) && combinationHasWildcard(q)),
+  )
 }
 
 function shouldUseGatedEvaluation(
@@ -173,32 +152,16 @@ function normalizeStringQuery(
   searchOptions: SearchOptions,
   params: QueryEngineParams,
 ): NormalizedStringQuery {
-  const merged = mergeSearchOptionsWithDefaults(
-    params.globalSearchOptions,
-    searchOptions,
-  )
-  const tokenize = merged.tokenize ?? params.tokenize
-  const processTerm = merged.processTerm ?? params.processTerm
   const options = {
-    fields: merged.fields,
-    filter: merged.filter,
-    boost: merged.boost,
-    boostTerm: merged.boostTerm,
-    weights: merged.weights,
-    boostDocument: merged.boostDocument,
-    prefix: merged.prefix,
-    fuzzy: merged.fuzzy,
-    maxFuzzy: merged.maxFuzzy,
-    combineWith: merged.combineWith,
-    tokenize,
-    processTerm,
-    bm25: merged.bm25,
-    limit: merged.limit,
+    tokenize: params.tokenize,
+    processTerm: params.processTerm,
+    ...params.globalSearchOptions,
+    ...searchOptions,
   }
-  const tokens = tokenize(query)
+  const tokens = options.tokenize(query)
   const terms: string[] = []
   for (const token of tokens) {
-    const processed = processTerm(token)
+    const processed = options.processTerm(token)
     if (Array.isArray(processed)) {
       for (const term of processed) {
         if (term) terms.push(term)
@@ -208,14 +171,16 @@ function normalizeStringQuery(
     }
   }
 
-  const specs: QuerySpec[] = []
+  const toSpec = termToQuerySpec(options)
+  const specs: QuerySpec[] = new Array(terms.length)
   for (let i = 0; i < terms.length; i++) {
-    specs.push(termToQuerySpec(options, terms[i], i, terms))
+    specs[i] = toSpec(terms[i], i, terms)
   }
 
-  const weights = options.weights
-  const fuzzyWeight = weights?.fuzzy ?? defaultSearchOptions.weights.fuzzy
-  const prefixWeight = weights?.prefix ?? defaultSearchOptions.weights.prefix
+  const { fuzzy: fuzzyWeight, prefix: prefixWeight } = {
+    ...defaultSearchOptions.weights,
+    ...options.weights,
+  }
 
   return {
     options,
@@ -275,17 +240,12 @@ function estimateMaxPostingLengthForQuery(
   }
 
   if (isQueryCombination(query)) {
-    const options = mergeQueryCombinationOptions(
-      searchOptions,
-      query,
-      params.globalSearchOptions,
-    )
-    const { queries } = query
+    const options = { ...searchOptions, ...query, queries: undefined }
     let maxLen = 0
-    for (let i = 0; i < queries.length; i++) {
+    for (const branch of query.queries) {
       maxLen = Math.max(
         maxLen,
-        estimateMaxPostingLengthForQuery(queries[i], options, params),
+        estimateMaxPostingLengthForQuery(branch, options, params),
       )
     }
     return maxLen
@@ -294,12 +254,11 @@ function estimateMaxPostingLengthForQuery(
   if (typeof query !== 'string') return 0
 
   const normalized = normalizeStringQuery(query, searchOptions, params)
-  const { specs } = normalized
   let maxLen = 0
-  for (let i = 0; i < specs.length; i++) {
+  for (const spec of normalized.specs) {
     maxLen = Math.max(
       maxLen,
-      estimateMaxPostingLengthForQuerySpec(specs[i], normalized, params),
+      estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
     )
   }
   return maxLen
@@ -420,11 +379,7 @@ function collectDocIdsForQueryInternal(
   }
 
   if (isQueryCombination(query)) {
-    const options = mergeQueryCombinationOptions(
-      searchOptions,
-      query,
-      params.globalSearchOptions,
-    )
+    const options = { ...searchOptions, ...query, queries: undefined }
     const operator = options.combineWith ?? OR
     return collectCombinedDocIds(
       query.queries,
@@ -472,16 +427,14 @@ function collectDocIdsForQueryInternal(
     )
   if (operator.toLowerCase() === 'and') {
     // Start from the most selective exact terms, so a broad first term is only read under a gate.
-    const lengths: number[] = []
-    for (let i = 0; i < specs.length; i++) {
-      lengths.push(
+    const lengths = specs.map(
+      (spec) =>
         estimateCheapTwoPhasePostingLengthForQuerySpec(
-          specs[i],
+          spec,
           normalized,
           params,
         ) ?? Number.MAX_SAFE_INTEGER,
-      )
-    }
+    )
     return collectAndDocIdsByEstimatedLength(
       specs,
       lengths,
@@ -503,10 +456,11 @@ function executeWildcardQuery(
   params: QueryEngineParams,
 ): RawResult {
   const results = new Map() as RawResult
-  const boostDocument = resolveBoostDocument(
-    params.globalSearchOptions,
-    searchOptions,
-  )
+  const options: SearchOptionsWithDefaults = {
+    ...params.globalSearchOptions,
+    ...searchOptions,
+  }
+  const { boostDocument } = options
   const trackMatch = params.trackMatch !== false
 
   params.indexView.forEachActiveDoc((shortId, id, storedFields) => {
@@ -534,11 +488,7 @@ function executeQueryInternal(
 
   if (isQueryCombination(query)) {
     // Spread inherits parent combineWith into child branches; global searchOptions do not apply (MiniSearch 7.2).
-    const options = mergeQueryCombinationOptions(
-      searchOptions,
-      query,
-      params.globalSearchOptions,
-    )
+    const options = { ...searchOptions, ...query, queries: undefined }
     const operator = options.combineWith ?? OR
 
     if (
@@ -559,20 +509,13 @@ function executeQueryInternal(
           collectDocIdsForQueryInternal(branch, options, params, branchAllowed),
         allowedDocs,
         run,
-        {
-          branchPostingLength: (branch) =>
-            estimateMaxPostingLengthForQuery(branch, options, params),
-        },
+        (branch) => estimateMaxPostingLengthForQuery(branch, options, params),
       )
     }
 
-    const { queries } = query
-    const results: RawResult[] = []
-    for (let i = 0; i < queries.length; i++) {
-      results.push(
-        executeQueryInternal(queries[i], options, params, allowedDocs, run),
-      )
-    }
+    const results = query.queries.map((subquery) =>
+      executeQueryInternal(subquery, options, params, allowedDocs, run),
+    )
     return combineResults(results, operator)
   }
 
@@ -594,25 +537,19 @@ function executeQueryInternal(
         collectDocIdsForQuerySpec(spec, normalized, params, branchAllowed),
       allowedDocs,
       run,
-      {
-        branchPostingLength: (spec) =>
-          estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
-        twoPhasePostingLength: (spec) =>
-          estimateCheapTwoPhasePostingLengthForQuerySpec(
-            spec,
-            normalized,
-            params,
-          ),
-      },
+      (spec) => estimateMaxPostingLengthForQuerySpec(spec, normalized, params),
+      (spec) =>
+        estimateCheapTwoPhasePostingLengthForQuerySpec(
+          spec,
+          normalized,
+          params,
+        ),
     )
   }
 
-  const results: RawResult[] = []
-  for (let i = 0; i < specs.length; i++) {
-    results.push(
-      executeQuerySpecInternal(specs[i], normalized, params, allowedDocs),
-    )
-  }
+  const results = specs.map((spec) =>
+    executeQuerySpecInternal(spec, normalized, params, allowedDocs),
+  )
   return combineResults(results, operator)
 }
 

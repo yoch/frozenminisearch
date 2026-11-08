@@ -84,7 +84,7 @@ try {
   }
   if (Object.keys(jit).length !== Object.keys(aot).length) fail('the AOT executable and Bun JIT report different checks')
 
-  const bunVersion = execFileSync('bun', ['--version'], { encoding: 'utf8' }).trim()
+  const bunVersion = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
   console.log(`test-aot: ok (Bun ${bunVersion}, ${Object.keys(aot).length} checks identical to Bun JIT)`)
 } finally {
   if (process.env.KEEP_AOT_CONSUMER) console.log(`test-aot: kept ${work}`)

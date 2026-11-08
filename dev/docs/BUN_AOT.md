@@ -1,19 +1,24 @@
 # Compiling with Bun `--aot` (experimental)
 
-Bun canary (tested: `1.4.4-canary.1+da867c60b`, later `1.4.4-canary.1+447ff870b`; the stable 1.4.4 release ignores `--aot` and has no `bun compile`) can compile TypeScript/JavaScript to machine code at build time. This note explains how to try it with FrozenMiniSearch and what we measured. It applies to **standalone Bun executables** only: Node, browsers and Bun without `--aot` keep using the Rollup bundles.
+Bun can compile TypeScript/JavaScript to machine code at build time. This note explains how to try it with FrozenMiniSearch and what we measured. It applies to **standalone Bun executables** only: Node, browsers and Bun without `--aot` keep using the Rollup bundles.
+
+Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, then `1.4.4-canary.1+2596ac5d3`. The last one is the merge of [oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which rewrote the compiler: flags, `--explain` output and performance all changed (see [Measurements](#measurements)).
 
 ## Commands
 
 | Command | Effect |
 |---------|--------|
 | `bun --aot app.ts` | Type-checks like `bun compile`, then runs with built-in objects read-only. **No speed-up.** Useful as a guard. |
-| `bun build --compile --aot app.ts --outfile app` | Real AOT: standalone executable with machine code. |
+| `bun build --compile --aot app.ts --outfile app` (or `bun compile app.ts`) | Real AOT: standalone executable with machine code. |
 | `bun build --compile --no-aot app.ts --outfile app` | Classic bundle + JIT executable (baseline). |
-| `bun --aot-log-type-mismatches app.ts` | Logs every value that does not match its declared type. |
-| `bun build --compile --aot --explain=missed-optimizations app.ts --outfile app` | Reports slow paths (not-inlined calls, heap allocations, unhoisted guards). |
+| `bun compile app.ts --outfile app --explain` | Lists the slow paths, worst first. `--explain=json` lists all of them; `allocations`, `guards` and `trim` are other reports. |
+| `bun check --aot --explain app.ts` | The same report without building. |
+| `bun test --aot src/ dev/parity/` | Compiles the tests and the code they import, then runs them. |
 | `bun check --no-script` | Type check. AOT needs a type-correct program. |
 
-`--aot-log-type-mismatches` found two declared-type mismatches in this repo (fixed in `src/frozenBuild.ts` and `src/scoring.ts`). It is worth re-running when touching typed hot paths.
+`bun --aot-log-type-mismatches` and `--explain=missed-optimizations` no longer exist since the rewrite. Before it, the first one found two declared-type mismatches in this repo (fixed in `src/frozenBuild.ts` and `src/scoring.ts`).
+
+`bun test --aot` passes the whole suite except one test: a `vi.spyOn` (imported from `vitest`) on a function that another module imports. Bun only sees such a spy at build time when it is written `spyOn` or `jest.spyOn`/`vi.spyOn` from `bun:test`. The test still passes under Vitest and plain `bun test`.
 
 ## Distributing the library
 
@@ -23,17 +28,35 @@ The package does this:
 
 - `make build` runs `scripts/build-aot-source.cjs`, which calls `bun compile --library src/index.ts` and keeps only its `index.aot.ts`, written to `dist/aot/index.aot.ts` (about 250 KB) with the Bun version in its header. The `index.js`, `.d.ts` files and `package.json` that `--library` also emits are dropped: Rollup and the root `package.json` already provide them. Only the Node entry has an AOT source; `./browser` has none.
 - `package.json` lists `"aot": "./dist/aot/index.aot.ts"` first in the `.` export, because resolvers take the first matching condition. `scripts/verify-npm-pack.cjs` checks this order and that every export target is in the tarball; `scripts/assert-public-bundles.cjs` scans the file like the other bundles.
-- `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles `dev/aot/consumer.ts` with `--aot`. It fails if Bun reports a type error in `index.aot.ts`, if the build did not resolve the `"aot"` condition, or if the executable's results differ from the same consumer under Bun JIT (`dist/es`), bit for bit, across `fromDocuments`, the builder, `fromJSON` and every binary compression. CI runs it on Bun `canary` (the stable release has no AOT yet), and `prepublishOnly` runs it before every release.
+- `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles `dev/aot/consumer.ts` with `--aot`. It fails if Bun reports a type error in `index.aot.ts`, if the build did not resolve the `"aot"` condition, or if the executable's results differ from the same consumer under Bun JIT (`dist/es`), bit for bit, across `fromDocuments`, the builder, `fromJSON` and every binary compression. CI runs it on Bun `latest` and `canary`, and `prepublishOnly` runs it before every release.
 
-Bun reports type errors inside a dependency only when a build has other diagnostics, and then compiles the whole package without its types, which still works but runs slower. `make test-aot` therefore also compiles a probe with a deliberate type error. Inside `node_modules`, Bun's checker rejects `node:stream` classes such as `Transform` as types (TS2709) while `bun check` in the repository accepts them, so derive stream types from `node:zlib` instead.
+Bun reports type errors inside a dependency only when a build has other diagnostics, and then compiles the whole package without its types, which still works but runs slower. `make test-aot` therefore also compiles a probe with a deliberate type error. Inside `node_modules`, Bun's checker rejects `node:stream` classes such as `Transform` as types (TS2709) while `bun check` in the repository accepts them, so derive stream types from `node:zlib` instead. Bun checks the AOT source under the `compilerOptions` of the package's `package.json`, or as `strict` when there are none (our case, and `tsconfig.json` is strict too).
 
-With the same consumer compiled with `--aot` on the Divina Commedia x3, the `"aot"` condition made exact, prefix and fuzzy search, `AND`, `autoSuggest` and `searchPage` 1.8-2.8x faster than the plain JavaScript bundle, with identical results. Against Node, ids and ordering are identical; some scores differ in the last bit (relative difference up to 5e-16), as they already do between Bun JIT and Node (JavaScriptCore and V8 math functions).
+Before the rewrite, with the same consumer compiled with `--aot` on the Divina Commedia x3, the `"aot"` condition made exact, prefix and fuzzy search, `AND`, `autoSuggest` and `searchPage` 1.8-2.8x faster than the plain JavaScript bundle. With `2596ac5d3` the gain is 0-25 % (see below). Results are identical in both cases. Against Node, ids and ordering are identical; some scores differ in the last bit (relative difference up to 5e-16), as they already do between Bun JIT and Node (JavaScriptCore and V8 math functions).
 
 ## Measurements
 
 Setup: Divina Commedia corpus x3 (42,291 documents, one `txt` field), `fromDocuments`, then `saveBinarySync` / `loadBinarySync` (1.7 MB), queries on the reloaded index. Median of 5 process runs, each metric being the best of 5 passes. One machine, no CPU isolation: expect 10-20 % noise. Scripts were scratch files, not committed.
 
-### Speed (µs/op unless noted)
+### Speed with `1.4.4-canary.1+2596ac5d3` (µs/op unless noted)
+
+Different scratch script and query set from the older table below (common Italian words, so the absolute numbers are higher); compare columns, not tables.
+
+| Metric | Node 24 | Bun JIT | compile `--no-aot` | `--aot`, JS bundle | `--aot`, `"aot"` condition | `--aot` vs `--no-aot` |
+|--------|--------:|--------:|-------------------:|-------------------:|---------------------------:|----------------------:|
+| build (ms) | 209 | 220 | 219 | 193 | 177 | -19 % |
+| exact | 82 | 73 | 75 | 157 | 149 | +99 % |
+| prefix | 339 | 321 | 326 | 485 | 474 | +45 % |
+| fuzzy | 179 | 175 | 177 | 297 | 287 | +63 % |
+| multi-term OR | 32,546 | 26,146 | 26,868 | 31,707 | 29,475 | +10 % |
+| multi-term AND | 46 | 42 | 43 | 67 | 54 | +24 % |
+| autoSuggest | 254 | 210 | 222 | 428 | 402 | +81 % |
+| searchPage | 98 | 96 | 102 | 173 | 135 | +32 % |
+| nested combination | 51 | 44 | 47 | 63 | 54 | +16 % |
+
+Since the rewrite, `--aot` is **slower** than `--no-aot` for every query; only indexing is faster. `--explain` reports 29 % of property accesses as typed and flags plainly typed values (for example a local `new Uint32Array(n)`) as `unknown-object` from a loose type, and `bun check --aot` reports "6 files compiled without types" without naming them. That looks like the state of a compiler merged the day before, not like something to work around in this code base: re-measure with the next canaries before tuning for it.
+
+### Speed before the rewrite (`da867c60b` / `1.4.4`, µs/op unless noted)
 
 | Metric | Node 24 | Bun JIT | compile `--no-aot` | compile `--aot` | `--aot` vs `--no-aot` |
 |--------|--------:|--------:|-------------------:|----------------:|----------------------:|
@@ -58,9 +81,9 @@ With the exact-suffix tail shortcut in `PackedRadixTree.fuzzy` (`walkExactSuffix
 | benchmark executable (lib + script), `--aot` | 70 MB |
 | `dist/es/index.js` | 237 KB |
 
-The library adds roughly 2 MB to an AOT executable; the Bun runtime is most of the weight.
+Before the rewrite, the library added roughly 2 MB to an AOT executable; the Bun runtime is most of the weight. With `2596ac5d3`, hello world is 65 MB (`--aot`) and 134 MB (`--no-aot`), but the benchmark executable is 114 MB with `--aot`.
 
-### Memory (RSS, MB, after forced GC)
+### Memory (RSS, MB, after forced GC, before the rewrite)
 
 | Phase | Bun JIT | `--no-aot` | `--aot` |
 |-------|--------:|-----------:|--------:|
@@ -70,36 +93,28 @@ The library adds roughly 2 MB to an AOT executable; the Bun runtime is most of t
 
 No leak up to 200,000 queries in any configuration (two runs each). AOT has a lower resting RSS but a **higher peak between GCs**: size container limits on the peak, not on the post-GC value. Cause not investigated (`--explain` reports many heap allocations in the query path).
 
-## Re-measurement on a later canary
+## Code changes made for AOT
 
-Bun AOT changes almost daily: the tables above describe the canary they were taken on and nothing else. Re-measure before relying on any of them.
+Only changes that are neutral or better under Node and Bun JIT are kept:
 
-Same corpus (Divina Commedia x3, 42,291 documents, one stored field), Bun `1.4.4-canary.1+447ff870b`, Node 22.23, median of 5 process runs, each metric the best of 9 passes over 150 queries. Shared 4-core machine, about 10 % noise. The library is installed from the packed tarball in both AOT columns: "JS bundle" is a release without the `"aot"` condition (the compiler sees `dist/es/index.js`), "typed" is this package.
+- the stream type derived from `node:zlib` (above), without which the AOT source is compiled without its types;
+- `visitRecurse` in `fuzzyMatrix.ts` takes its invariant state in one object, like the bit-parallel walk;
+- `decodeMsv5PostingsSections` takes the wire object that the encoder builds;
+- JSON snapshot validation checks `typeof` before narrowing instead of casting.
 
-| µs/op | Node 22 | Bun JIT | AOT, JS bundle | AOT, typed |
-|-------|--------:|--------:|---------------:|-----------:|
-| exact | 45 | 41 | 46 | 39 |
-| exact, `limit: 10` | 25 | 28 | 28 | 22 |
-| prefix (3 letters) | 562 | 337 | 466 | 445 |
-| fuzzy 0.2 | 156 | 152 | 200 | 157 |
-| OR, two terms | 102 | 82 | 99 | 87 |
-| AND, two terms | 31 | 29 | 30 | 25 |
-| AND + prefix | 178 | 124 | 208 | 115 |
-| searchPage | 63 | 59 | 65 | 55 |
-| autoSuggest | 297 | 244 | 324 | 244 |
-| matchIds | 16 | 29 | 20 | 19 |
-| search with `filter` | 492 | 339 | 424 | 376 |
-| RSS at exit (MB) | 272 | 241 | 177 | 179 |
+Workarounds for compiler limits that the rewrite already changed (spreads replaced by hand-written fixed-shape objects, callbacks grouped into objects to stay under 8 arguments, `map`/`reduce` replaced by loops, union types for `Set` gates) were dropped. The fixed-shape option merge also changed behaviour: an option passed explicitly as `undefined` or `null` no longer overrode the index-level `searchOptions`, unlike MiniSearch (`dev/parity/functional-parity.test.js` now covers it).
 
-What this run shows:
+## Bun issues found along the way
 
-- The `"aot"` condition is worth 10 to 45 % on most queries over compiling the plain bundle, not the 1.8-2.8x measured earlier.
-- Typed AOT and Bun JIT are close on queries; AOT uses about 25 % less memory than Bun JIT and a third less than Node.
-- Compiled from the same typed sources, the code before and after the fixed-shape and closure-free rewrites of `queryEngine`, `scoring` and `frozenOptions` measured the same within noise. Those rewrites follow the compiler's own reports (`--explain`, `--aot-log-type-mismatches`); they are kept for that reason, not for a measured gain on this canary.
-- Node and Bun JIT are unchanged by all of the above.
+| Issue | Status with `2596ac5d3` |
+|-------|-------------------------|
+| [#47764](https://github.com/oven-sh/bun/issues/47764) arguments past the 8th not tracked | No longer reproduces: the 8- and 9-argument variants give the same report. |
+| [#47919](https://github.com/oven-sh/bun/issues/47919) `--trim-without=<name>` rejects every name | Still reproduces (the flag is no longer listed in `--help`). |
+| [#47920](https://github.com/oven-sh/bun/issues/47920) `node:zlib` blocks `--trim` | Partly fixed: the compiler now sees every API, but a `node:zlib` import still doubles a trimmed hello world (25 → 53 MB), as in [#48182](https://github.com/oven-sh/bun/issues/48182). |
+| [#48144](https://github.com/oven-sh/bun/issues/48144) false `property-added` with `extends` | No longer reproduces; the same program now reports an `unknown-callee` at the subclass. |
+| [#48145](https://github.com/oven-sh/bun/issues/48145) `node:zlib` `crc32` not a direct call | Confirmed by Bun, now reported as `unknown-callee`; fix in progress (oven-sh/WebKit#1011). |
 
 ## Caveats
 
 - Bun canary feature, flags may change.
 - Single corpus, single machine.
-- The full test suite was not run under `--aot`; only `bun check` and the regular vitest suite on the committed code.

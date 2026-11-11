@@ -17,6 +17,11 @@ export type CombinationOperator =
 
 /**
  * Search options to customize the search behavior.
+ *
+ * Per-call options override the index-level `searchOptions`. An option passed as
+ * `undefined` or `null` inherits the index-level value (MiniSearch clears it instead),
+ * except `filter`, `boostDocument` and `limit`: passing one of them explicitly as
+ * `undefined` disables the index-level value.
  */
 export type SearchOptions = {
   /**

@@ -70,6 +70,34 @@ The library adds roughly 2 MB to an AOT executable; the Bun runtime is most of t
 
 No leak up to 200,000 queries in any configuration (two runs each). AOT has a lower resting RSS but a **higher peak between GCs**: size container limits on the peak, not on the post-GC value. Cause not investigated (`--explain` reports many heap allocations in the query path).
 
+## Re-measurement on a later canary
+
+Bun AOT changes almost daily: the tables above describe the canary they were taken on and nothing else. Re-measure before relying on any of them.
+
+Same corpus (Divina Commedia x3, 42,291 documents, one stored field), Bun `1.4.4-canary.1+447ff870b`, Node 22.23, median of 5 process runs, each metric the best of 9 passes over 150 queries. Shared 4-core machine, about 10 % noise. The library is installed from the packed tarball in both AOT columns: "JS bundle" is a release without the `"aot"` condition (the compiler sees `dist/es/index.js`), "typed" is this package.
+
+| µs/op | Node 22 | Bun JIT | AOT, JS bundle | AOT, typed |
+|-------|--------:|--------:|---------------:|-----------:|
+| exact | 45 | 41 | 46 | 39 |
+| exact, `limit: 10` | 25 | 28 | 28 | 22 |
+| prefix (3 letters) | 562 | 337 | 466 | 445 |
+| fuzzy 0.2 | 156 | 152 | 200 | 157 |
+| OR, two terms | 102 | 82 | 99 | 87 |
+| AND, two terms | 31 | 29 | 30 | 25 |
+| AND + prefix | 178 | 124 | 208 | 115 |
+| searchPage | 63 | 59 | 65 | 55 |
+| autoSuggest | 297 | 244 | 324 | 244 |
+| matchIds | 16 | 29 | 20 | 19 |
+| search with `filter` | 492 | 339 | 424 | 376 |
+| RSS at exit (MB) | 272 | 241 | 177 | 179 |
+
+What this run shows:
+
+- The `"aot"` condition is worth 10 to 45 % on most queries over compiling the plain bundle, not the 1.8-2.8x measured earlier.
+- Typed AOT and Bun JIT are close on queries; AOT uses about 25 % less memory than Bun JIT and a third less than Node.
+- Compiled from the same typed sources, the code before and after the fixed-shape and closure-free rewrites of `queryEngine`, `scoring` and `frozenOptions` measured the same within noise. Those rewrites follow the compiler's own reports (`--explain`, `--aot-log-type-mismatches`); they are kept for that reason, not for a measured gain on this canary.
+- Node and Bun JIT are unchanged by all of the above.
+
 ## Caveats
 
 - Bun canary feature, flags may change.

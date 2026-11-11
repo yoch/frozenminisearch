@@ -2,7 +2,7 @@
 
 Bun can compile TypeScript/JavaScript to machine code at build time. This note explains how to try it with FrozenMiniSearch and what we measured. It applies to **standalone Bun executables** only: Node, browsers and Bun without `--aot` keep using the Rollup bundles.
 
-Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3` and `1.4.4-canary.1+2596ac5d3`. The last one is the merge of [oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which rewrote the compiler: flags, `--explain` output and performance all changed (see [Measurements](#measurements)). The one before it is the last canary with the old compiler and the baseline for the before/after numbers. Bun `1.4.4` stable has no `--aot` at all, so it cannot serve as that baseline.
+Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3`, `1.4.4-canary.1+2596ac5d3` and `1.4.4-canary.1+447ff870b`. `2596ac5d3` is the merge of [oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which rewrote the compiler: flags, `--explain` output and performance all changed (see [Measurements](#measurements)). `7ca0042d3`, the one before it, is the last canary with the old compiler and the baseline for the before/after numbers. `447ff870b` is six commits after the rewrite and the last canary measured. Bun `1.4.4` stable has no `--aot` at all, so it cannot serve as that baseline.
 
 ## Commands
 
@@ -28,19 +28,48 @@ The package does this:
 
 - `make build` runs `scripts/build-aot-source.cjs`, which calls `bun compile --library src/index.ts` and keeps only its `index.aot.ts`, written to `dist/aot/index.aot.ts` (about 250 KB) with the Bun version in its header. The `index.js`, `.d.ts` files and `package.json` that `--library` also emits are dropped: Rollup and the root `package.json` already provide them. Only the Node entry has an AOT source; `./browser` has none.
 - `package.json` lists `"aot": "./dist/aot/index.aot.ts"` first in the `.` export, because resolvers take the first matching condition. `scripts/verify-npm-pack.cjs` checks this order and that every export target is in the tarball; `scripts/assert-public-bundles.cjs` scans the file like the other bundles.
-- `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles `dev/aot/consumer.ts` with `--aot`. It fails if Bun reports a type error in `index.aot.ts`, if the build did not resolve the `"aot"` condition, or if the executable's results differ from the same consumer under Bun JIT (`dist/es`), bit for bit, across `fromDocuments`, the builder, `fromJSON` and every binary compression. CI runs it on Bun `latest` and `canary`, and `prepublishOnly` runs it before every release.
+- `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles `dev/aot/consumer.ts` with `--aot`. It fails if Bun reports a type error in `index.aot.ts`, if the build did not resolve the `"aot"` condition, or if the executable's results differ from the same consumer under Bun JIT (`dist/es`), bit for bit, across `fromDocuments`, the builder, `fromJSON` and every binary compression. CI runs it on Bun `canary` (the stable release has no AOT yet), and `prepublishOnly` runs it before every release.
 
 Bun reports type errors inside a dependency only when a build has other diagnostics, and then compiles the whole package without its types, which still works but runs slower. `make test-aot` therefore also compiles a probe with a deliberate type error. Inside `node_modules`, Bun's checker rejects `node:stream` classes such as `Transform` as types (TS2709) while `bun check` in the repository accepts them, so derive stream types from `node:zlib` instead. Bun checks the AOT source under the `compilerOptions` of the package's `package.json`, or as `strict` when there are none (our case, and `tsconfig.json` is strict too).
 
-Before the rewrite, with the same consumer compiled with `--aot` on the Divina Commedia x3, the `"aot"` condition made exact, prefix and fuzzy search, `AND`, `autoSuggest` and `searchPage` 1.8-2.8x faster than the plain JavaScript bundle. With `2596ac5d3` the gain is 0-25 % (see below). Results are identical in both cases. Against Node, ids and ordering are identical; some scores differ in the last bit (relative difference up to 5e-16), as they already do between Bun JIT and Node (JavaScriptCore and V8 math functions).
+Before the rewrite, with the same consumer compiled with `--aot` on the Divina Commedia x3, the `"aot"` condition made exact, prefix and fuzzy search, `AND`, `autoSuggest` and `searchPage` 1.8-2.8x faster than the plain JavaScript bundle. With `2596ac5d3` the gain is 0-25 %, and with `447ff870b` 10-45 % on another script (see below). Results are identical in every case. Against Node, ids and ordering are identical; some scores differ in the last bit (relative difference up to 5e-16), as they already do between Bun JIT and Node (JavaScriptCore and V8 math functions).
 
 ## Measurements
 
 Setup: Divina Commedia corpus x3 (42,291 documents, one `txt` field), `fromDocuments`, then `saveBinarySync` / `loadBinarySync` (1.7 MB), queries on the reloaded index. Median of 5 process runs, each metric being the best of 5 passes. One machine, no CPU isolation: expect 10-20 % noise. Scripts were scratch files, not committed.
 
+### Speed with `1.4.4-canary.1+447ff870b` (µs/op unless noted)
+
+Bun AOT changes almost daily: each table describes the canary it was taken on and nothing else. Re-measure before relying on any of them.
+
+This run comes from another machine, script and query set than the other tables; compare columns, not tables. Same corpus with one stored field, Node 22.23, median of 5 process runs, each metric the best of 9 passes over 150 queries. Shared 4-core machine, about 10 % noise. The library is installed from the packed tarball in both AOT columns: "JS bundle" is a release without the `"aot"` condition (the compiler sees `dist/es/index.js`), "typed" is this package.
+
+| Metric | Node 22 | Bun JIT | `--aot`, JS bundle | `--aot`, `"aot"` condition |
+|--------|--------:|--------:|-------------------:|---------------------------:|
+| exact | 45 | 41 | 46 | 39 |
+| exact, `limit: 10` | 25 | 28 | 28 | 22 |
+| prefix (3 letters) | 562 | 337 | 466 | 445 |
+| fuzzy 0.2 | 156 | 152 | 200 | 157 |
+| OR, two terms | 102 | 82 | 99 | 87 |
+| AND, two terms | 31 | 29 | 30 | 25 |
+| AND + prefix | 178 | 124 | 208 | 115 |
+| searchPage | 63 | 59 | 65 | 55 |
+| autoSuggest | 297 | 244 | 324 | 244 |
+| matchIds | 16 | 29 | 20 | 19 |
+| search with `filter` | 492 | 339 | 424 | 376 |
+| RSS at exit (MB) | 272 | 241 | 177 | 179 |
+
+What this run shows:
+
+- The `"aot"` condition is worth 10 to 45 % on most queries over compiling the plain bundle (0-25 % on `2596ac5d3`, 1.8-2.8x before the rewrite).
+- Typed AOT and Bun JIT are close on queries (exact: 39 against 41). The `2596ac5d3` table below disagrees: there typed AOT is about twice as slow as Bun JIT (exact: 149 against 73). The cause is unknown: the six commits in between, the script and query set, or the machine could each explain it. Not re-measured on one script; this run also has no `--no-aot` executable.
+- AOT uses about 25 % less memory than Bun JIT and a third less than Node.
+- The table was taken with the fixed-shape and closure-free rewrites of `queryEngine`, `scoring` and `frozenOptions` still in the code. Compiled from the same typed sources, the code with and without them measured the same within noise, as on `2596ac5d3`; they have since been dropped (see [Code changes made for AOT](#code-changes-made-for-aot)).
+- Node and Bun JIT are unchanged by all of the above.
+
 ### Speed with `1.4.4-canary.1+2596ac5d3` (µs/op unless noted)
 
-Different scratch script and query set from the older table below (common Italian words, so the absolute numbers are higher); compare columns, not tables.
+Different scratch script and query set from the older table below (common Italian words, so the absolute numbers are higher); compare columns, not tables. This section and the following ones use the setup given at the top of [Measurements](#measurements).
 
 | Metric | Node 24 | Bun JIT | compile `--no-aot` | `--aot`, JS bundle | `--aot`, `"aot"` condition | `--aot` vs `--no-aot` |
 |--------|--------:|--------:|-------------------:|-------------------:|---------------------------:|----------------------:|
@@ -173,7 +202,7 @@ Only changes that are neutral or better under Node and Bun JIT are kept:
 - `decodeMsv5PostingsSections` takes the wire object that the encoder builds;
 - JSON snapshot validation checks `typeof` before narrowing instead of casting.
 
-Workarounds for compiler limits that the rewrite already changed (spreads replaced by hand-written fixed-shape objects, callbacks grouped into objects to stay under 8 arguments, `map`/`reduce` replaced by loops, union types for `Set` gates) were dropped. The fixed-shape option merge also changed behaviour: an option passed explicitly as `undefined` or `null` no longer overrode the index-level `searchOptions`, unlike MiniSearch (`dev/parity/functional-parity.test.js` now covers it).
+Workarounds for compiler limits that the rewrite already changed (spreads replaced by hand-written fixed-shape objects, callbacks grouped into objects to stay under 8 arguments, `map`/`reduce` replaced by loops, union types for `Set` gates) were dropped. The fixed-shape option merge also changed behaviour: an option passed explicitly as `undefined` or `null` no longer overrode the index-level `searchOptions`, unlike MiniSearch (`dev/parity/functional-parity.test.js` and `dev/parity/explicitUndefinedOptions.test.js` now cover it).
 
 ## Bun issues found along the way
 

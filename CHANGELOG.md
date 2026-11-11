@@ -6,7 +6,7 @@
 
 Minor release: binary snapshots can be loaded from untrusted sources, saving is about 4x faster, and Bun AOT executables can compile the library with its types. Loading rejects forged snapshots that could exhaust memory or alter results, and the MSv5 reader is stricter about what it accepts. `saveBinarySync` / `saveBinaryAsync` write the same bytes about 4x faster on an index with stored fields. An experimental `"aot"` export condition ships a typed source for `bun build --compile --aot`.
 
-Compatibility: search results, scores and ordering are unchanged, with one deliberate exception: a per-call search option passed as `undefined` or `null` now inherits the index-level value instead of clearing it (`filter`, `boostDocument` and `limit` passed as `undefined` still disable it). The MSv5 wire format is unchanged and saved bytes are identical; snapshots written by earlier releases load, but a snapshot held in a buffer larger than the file must be passed as a view of its exact length. No new runtime dependencies; the published package still supports Node 20+.
+Compatibility: search results, scores and ordering are unchanged. The MSv5 wire format is unchanged and saved bytes are identical; snapshots written by earlier releases load, but a snapshot held in a buffer larger than the file must be passed as a view of its exact length. No new runtime dependencies; the published package still supports Node 20+.
 
 ### Added
 
@@ -27,7 +27,6 @@ Compatibility: search results, scores and ordering are unchanged, with one delib
 
 ### Changed
 
-- **Search options passed as `undefined` or `null` inherit the index-level value** — `search(query, { prefix: undefined })` on an index built with `searchOptions: { prefix: true }` now searches with the prefix. MiniSearch, and earlier releases, clear the index-level value in that case; this is a deliberate divergence, and it lets options be merged with a fixed shape. `filter`, `boostDocument` and `limit` keep their documented behaviour: passing them explicitly as `undefined` disables the index-level value.
 - **Stricter MSv5 container** — a snapshot with unknown flag bits, non-zero reserved directory bytes or bytes after the payload is rejected. Files written by this library are unaffected; a snapshot held in a larger buffer must be passed as a view of its exact length.
 - **Snapshot input** — `loadBinarySync` / `loadBinaryAsync` accept an `ArrayBuffer` or any typed-array view, and throw a `TypeError` for anything else.
 - Saving or loading a binary snapshot on a big-endian host throws instead of producing or reading byte-swapped data.

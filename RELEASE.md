@@ -11,6 +11,9 @@ HTML; the versioned site is produced from the tagged commit.
 ## Prerequisites
 
 - Node 24 and the pnpm version pinned in `package.json` (`packageManager`).
+- Bun canary (`bun upgrade --canary`): `pnpm build` generates the Bun AOT source
+  and `prepublishOnly` compiles a consumer with `bun build --compile --aot`,
+  which the stable Bun release does not have yet.
 - An npm account with publish rights on the `@yoch` scope, with two-factor
   authentication enabled.
 - Push access to `master` and to release tags on `origin`.

@@ -556,9 +556,9 @@ function loadMsv5SectionsFromZlibStream(
   )
 }
 
-// Derived from zlib rather than imported from node:stream: inside node_modules, Bun's
-// AOT type checker rejects node:stream classes as types (TS2709) and then compiles the
-// whole package without its types.
+// Derived from zlib rather than imported from node:stream: the type is exactly what
+// the two factories return, and stricter type checkers reject node:stream classes as
+// types when the package is checked from node_modules (TS2709).
 type DecompressStream =
   | ReturnType<typeof zlib.createInflate>
   | ReturnType<typeof zlib.createZstdDecompress>

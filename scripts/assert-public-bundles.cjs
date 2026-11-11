@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Ensure published bundles (ES, CJS, browser, Bun AOT source) do not embed test/bench-only
- * helpers or legacy Map-radix encode fallbacks.
+ * Ensure published bundles (ES, CJS, browser) do not embed test/bench-only helpers
+ * or legacy Map-radix encode fallbacks.
  */
 const { accessSync, readFileSync } = require('node:fs')
 const { join } = require('node:path')
@@ -11,7 +11,6 @@ const bundlePaths = [
   join(root, 'dist', 'es', 'index.js'),
   join(root, 'dist', 'cjs', 'index.cjs'),
   join(root, 'dist', 'browser', 'index.js'),
-  join(root, 'dist', 'aot', 'index.aot.ts'),
 ]
 
 const forbiddenPatterns = [

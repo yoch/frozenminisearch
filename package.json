@@ -7,7 +7,6 @@
   "type": "module",
   "exports": {
     ".": {
-      "aot": "./dist/aot/index.aot.ts",
       "types": "./dist/es/index.d.ts",
       "require": "./dist/cjs/index.require.cjs",
       "import": "./dist/es/index.js",
@@ -88,7 +87,6 @@
     "test:bun": "make test-bun",
     "test:browser": "make test-browser",
     "test:runtime": "make test-runtime",
-    "test:aot": "make test-aot",
     "test:watch": "make test-watch",
     "test:fuzzysearch": "make test-fuzzysearch",
     "test:benchmarks": "make test-benchmarks",

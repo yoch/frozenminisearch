@@ -60,6 +60,10 @@ jobs:
         with:
           node-version: '24.x'
           cache: 'pnpm'
+      # `pnpm build` generates dist/aot/index.aot.ts with `bun compile --library`.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: canary
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm docs:build
@@ -98,6 +102,10 @@ jobs:
         with:
           node-version: '24.x'
           cache: 'pnpm'
+      # `pnpm build` generates dist/aot/index.aot.ts with `bun compile --library`.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: canary
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Set docs version

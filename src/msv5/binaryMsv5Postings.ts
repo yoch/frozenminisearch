@@ -101,16 +101,12 @@ export function buildMsv5PostingsSections(
 }
 
 export function decodeMsv5PostingsSections(
-  flags: number,
+  wire: Msv5PostingsWire,
   fieldCount: number,
   termCount: number,
   nextId: number,
-  meta: Uint8Array,
-  fields: Uint8Array,
-  optional: Uint8Array,
-  docIds: Uint8Array,
-  freqs: Uint8Array,
 ): FrozenPostingsLayout {
+  const { flags, meta, fields, optional, docIds, freqs } = wire
   const sparse = (flags & FLAG_SPARSE_LAYOUT) !== 0
   const docId16 = (flags & FLAG_DOC_ID_16) !== 0
   const fieldId16 = (flags & FLAG_FIELD_ID_16) !== 0

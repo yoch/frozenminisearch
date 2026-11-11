@@ -33,11 +33,10 @@ function parseIndexIntegerKey(
 }
 
 function readPostingFrequency(value: unknown): number {
-  const freq = value as number
-  if (!Number.isSafeInteger(freq) || freq <= 0) {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
     throw snapshotError('index posting frequency must be a positive integer')
   }
-  return freq
+  return value
 }
 
 function accumulateSnapshotIndexV2(
@@ -54,7 +53,7 @@ function accumulateSnapshotIndexV2(
     const entry = entries[termIndex]!
     const term = entry[0] as string
     terms[termIndex] = term
-    const dataRecord = entry[1] as Record<string, Record<string, number>>
+    const dataRecord = entry[1] as Record<string, Record<string, unknown>>
     for (const fieldId in dataRecord) {
       const parsedFieldId = parseIndexIntegerKey(fieldId, 'fieldId')
       assertFieldIdInRange(parsedFieldId, fieldCount, 'index')
@@ -96,11 +95,12 @@ function accumulateSnapshotIndexV1(
     for (const fieldId in dataRecord) {
       const parsedFieldId = parseIndexIntegerKey(fieldId, 'fieldId')
       assertFieldIdInRange(parsedFieldId, fieldCount, 'index')
-      const raw = dataRecord[fieldId]
-      const indexEntryRecord =
-        raw != null && typeof raw === 'object' && 'ds' in raw
-          ? (raw as { ds: Record<string, number> }).ds
-          : (raw as Record<string, number>)
+      const raw = dataRecord[fieldId] as Record<string, unknown> | undefined
+      const indexEntryRecord = (
+        raw != null && typeof raw === 'object' && raw.ds !== undefined
+          ? raw.ds
+          : raw
+      ) as Record<string, unknown>
       for (const docId in indexEntryRecord) {
         const shortId = parseIndexIntegerKey(docId, 'shortId')
         assertShortIdInRange(shortId, nextId, 'index')

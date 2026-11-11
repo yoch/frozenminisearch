@@ -4,7 +4,7 @@
 
 ## v1.13.0 — `@yoch/frozenminisearch`
 
-Minor release: binary snapshots can be loaded from untrusted sources and saving is about 4x faster. Loading rejects forged snapshots that could exhaust memory or alter results, and the MSv5 reader is stricter about what it accepts. `saveBinarySync` / `saveBinaryAsync` write the same bytes about 4x faster on an index with stored fields.
+Minor release: loading binary snapshots is hardened against forged files and saving is about 4x faster. Loading rejects forged snapshots that could exhaust memory or alter results, and the MSv5 reader is stricter about what it accepts. `saveBinarySync` / `saveBinaryAsync` write the same bytes about 4x faster on an index with stored fields.
 
 Compatibility: search results, scores and ordering are unchanged. The MSv5 wire format is unchanged and saved bytes are identical; snapshots written by earlier releases load, but a snapshot held in a buffer larger than the file must be passed as a view of its exact length. No new runtime dependencies; the published package still supports Node 20+.
 
@@ -12,13 +12,13 @@ Compatibility: search results, scores and ordering are unchanged. The MSv5 wire 
 
 - **Binary snapshots from untrusted sources** — loading now rejects forged files that could exhaust memory or alter results:
   - stored-field rows must follow each other in document order with no gap or overlap, so a small file can no longer make every document decode the same large row;
-  - decompression (zlib and zstd, sync, async and browser) stops at the length the header declares;
+  - decompression (zlib and zstd, sync, async and browser) stops at the length the header declares, itself capped at 1 GiB;
   - a stored-field row must be a JSON object, and a `__proto__` key in a row becomes an own property of the search result instead of replacing its prototype;
   - posting runs must not overlap and their document ids must be strictly ascending.
 
 ### Performance
 
-- **Binary save** — document ids and stored fields are written into one growing buffer instead of one allocation per value: `saveBinarySync` / `saveBinaryAsync` are about 4x faster on an index with stored fields (282k documents: 770 ms to 180 ms raw). Saved bytes are identical.
+- **Binary save** — document ids and stored fields are written into one growing buffer instead of one allocation per value: `saveBinarySync` / `saveBinaryAsync` are about 4x faster on an index with stored fields (282k documents: 770 ms to about 200 ms raw). Saved bytes are identical.
 - **Browser CRC-32** — the pure-JS checksum used by the browser bundle (and by Node before 20.15) processes eight bytes per step, about 2.4x faster.
 
 ### Changed

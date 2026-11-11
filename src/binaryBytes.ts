@@ -17,19 +17,6 @@ export function utf8Bytes(str: string): Uint8Array {
   return textEncoder.encode(str)
 }
 
-/** Concatenate byte chunks. Accepts an array to avoid spread stack limits on large corpora. */
-export function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
-  let total = 0
-  for (const part of parts) total += part.length
-  const out = new Uint8Array(total)
-  let off = 0
-  for (const part of parts) {
-    out.set(part, off)
-    off += part.length
-  }
-  return out
-}
-
 export function readU8(buf: BinaryBytes, offset: number): number {
   return buf[offset]
 }
@@ -226,4 +213,81 @@ export function snapshotBytes(input: unknown): Uint8Array {
   throw new TypeError(
     'FrozenMiniSearch: a binary snapshot must be a typed array or an ArrayBuffer',
   )
+}
+
+/** Longer strings are encoded apart, so the writer never over-reserves more than 3x this. */
+const ENCODE_IN_PLACE_MAX_LENGTH = 16384
+
+/**
+ * Append-only byte sink for sections made of many small values (ids, stored rows):
+ * one growing buffer instead of an allocation per value, and strings encoded in place.
+ */
+export class ByteWriter {
+  private _buf: Uint8Array
+  private _length = 0
+
+  constructor(capacity = 256) {
+    this._buf = new Uint8Array(Math.max(16, capacity))
+  }
+
+  get length(): number {
+    return this._length
+  }
+
+  private reserve(extra: number): void {
+    const needed = this._length + extra
+    if (needed <= this._buf.length) return
+    const grown = new Uint8Array(Math.max(needed, this._buf.length * 2))
+    grown.set(this._buf.subarray(0, this._length))
+    this._buf = grown
+  }
+
+  /** Append `count` zero bytes and return their offset, to fill in with {@link setU32}. */
+  skip(count: number): number {
+    this.reserve(count)
+    // Bytes past `_length` are never written, so they are still zero.
+    const offset = this._length
+    this._length = offset + count
+    return offset
+  }
+
+  u8(value: number): void {
+    this.reserve(1)
+    this._buf[this._length++] = value
+  }
+
+  setU32(offset: number, value: number): void {
+    writeU32LE(this._buf, offset, value)
+  }
+
+  f64(value: number): void {
+    this.reserve(8)
+    writeDoubleLE(this._buf, this._length, value)
+    this._length += 8
+  }
+
+  /** u32 byte length, then the string as UTF-8. Returns the UTF-8 byte length. */
+  lengthPrefixedUtf8(str: string): number {
+    if (str.length > ENCODE_IN_PLACE_MAX_LENGTH) {
+      // Encoding in place reserves the worst case; a large string gets its exact size.
+      const body = textEncoder.encode(str)
+      this.reserve(4 + body.length)
+      writeU32LE(this._buf, this._length, body.length)
+      this._buf.set(body, this._length + 4)
+      this._length += 4 + body.length
+      return body.length
+    }
+    // A UTF-16 code unit takes at most 3 UTF-8 bytes.
+    this.reserve(4 + str.length * 3)
+    const start = this._length + 4
+    const { written } = textEncoder.encodeInto(str, this._buf.subarray(start))
+    writeU32LE(this._buf, this._length, written)
+    this._length = start + written
+    return written
+  }
+
+  /** The bytes written, in a buffer of their exact length. */
+  finish(): Uint8Array {
+    return this._buf.slice(0, this._length)
+  }
 }

@@ -82,6 +82,8 @@ export const MSV5_TREE_COLUMN_COUNT = 6
 // Error message constants shared between Node (binaryMsv5Compression.ts) and
 // Browser (binaryMsv5CompressionBrowser.ts) MSv5 code.
 // ---------------------------------------------------------------------------
+/** Largest uncompressed payload a snapshot may declare or a save may produce. */
+export const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 export const MSV5_ERR_PAYLOAD_EXCEEDS_1GIB = 'MSv5 payload exceeds 1 GiB limit'
 export const MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER =
   'MSv5 buffer too short for header'

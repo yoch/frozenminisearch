@@ -25,6 +25,7 @@ import {
   MSV5_FORMAT_REV_UTF16_LABELS,
   MSV5_HEADER_SIZE,
   MSV5_KNOWN_FLAGS,
+  MSV5_MAX_UNCOMPRESSED_BYTES,
   MSV5_PAYLOAD_CODEC_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
@@ -41,7 +42,7 @@ import type {
   Msv5SnapshotCompressionMeta,
 } from './binaryMsv5Types'
 
-export const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
+export { MSV5_MAX_UNCOMPRESSED_BYTES }
 
 export interface PreparedMsv5Payload {
   payloadCodec: number

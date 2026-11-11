@@ -117,11 +117,7 @@ function concatAndValidateSections(rawSections: BinaryBytes[]): {
   payloadCrc32: number
 } {
   assertRawSectionCount(rawSections)
-  const result = concatRawSectionsWithCrc(rawSections, allocBytes)
-  if (result.uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
-  }
-  return result
+  return concatRawSectionsWithCrc(rawSections, allocBytes)
 }
 
 function assembleMsv5FileRawDirect(

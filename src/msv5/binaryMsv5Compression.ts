@@ -95,9 +95,6 @@ function concatAndValidateSections(rawSections: Array<Buffer | Uint8Array>): {
     (size) => Buffer.alloc(size),
     crc32Update,
   )
-  if (uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
-  }
   return { uncompressed: uncompressed as Buffer, entries, payloadCrc32 }
 }
 

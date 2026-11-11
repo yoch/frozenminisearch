@@ -1,10 +1,8 @@
 import {
   allocBytes,
-  concatBytes,
+  ByteWriter,
   readU32LE,
   readUtf8,
-  utf8Bytes,
-  writeU32LE,
   type BinaryBytes,
 } from './binaryBytes'
 import { invalidFrozenIndex, parseSnapshotJson } from './frozenErrors'
@@ -13,43 +11,35 @@ import {
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 
-function appendStoredFieldJsonEntry(
-  table: BinaryBytes,
-  heapChunks: BinaryBytes[],
-  heapOffRef: { value: number },
-  docIndex: number,
-  jsonUtf8: BinaryBytes,
-): void {
-  writeU32LE(table, docIndex * 4, heapOffRef.value + 1)
-  const entry = allocBytes(4 + jsonUtf8.length)
-  writeU32LE(entry, 0, jsonUtf8.length)
-  entry.set(jsonUtf8, 4)
-  heapChunks.push(entry)
-  heapOffRef.value += entry.length
+/**
+ * Table of `nextId` u32 (heap offset + 1, 0 for no row), then the heap of
+ * length-prefixed JSON rows in document order.
+ */
+function writeStoredFieldsSection(
+  nextId: number,
+  rowJson: (shortId: number) => string | undefined,
+): BinaryBytes {
+  const tableBytes = nextId * 4
+  const writer = new ByteWriter(tableBytes)
+  writer.skip(tableBytes)
+  for (let i = 0; i < nextId; i++) {
+    const json = rowJson(i)
+    if (json === undefined) continue
+    writer.setU32(i * 4, writer.length - tableBytes + 1)
+    writer.lengthPrefixedUtf8(json)
+  }
+  return writer.finish()
 }
 
 export function buildStoredFieldsRowsWireSection(
   storedFields: (Record<string, unknown> | undefined)[],
   nextId: number,
 ): BinaryBytes {
-  const table = allocBytes(nextId * 4)
-  const heapChunks: BinaryBytes[] = []
-  const heapOffRef = { value: 0 }
-  for (let i = 0; i < nextId; i++) {
+  return writeStoredFieldsSection(nextId, (i) => {
     const row = storedFields[i]
-    if (row == null) {
-      writeU32LE(table, i * 4, 0)
-      continue
-    }
-    appendStoredFieldJsonEntry(
-      table,
-      heapChunks,
-      heapOffRef,
-      i,
-      utf8Bytes(JSON.stringify(row)),
-    )
-  }
-  return heapChunks.length === 0 ? table : concatBytes([table, ...heapChunks])
+    // A row that serialises to nothing is written as the text `undefined`, as before.
+    return row == null ? undefined : String(JSON.stringify(row))
+  })
 }
 
 /** MSv5 StoredFields section from {@link StoredFieldsLayout} (no intermediate row array). */
@@ -58,26 +48,15 @@ export function buildStoredFieldsWireSection(
   nextId: number,
 ): BinaryBytes {
   if (layout.kind === 'multi') {
-    const rows =
-      layout.rows.length >= nextId
-        ? layout.rows
-        : layout.rows.concat(new Array(nextId - layout.rows.length))
-    return buildStoredFieldsRowsWireSection(rows, nextId)
+    return buildStoredFieldsRowsWireSection(layout.rows, nextId)
   }
+  if (layout.kind === 'none') return allocBytes(nextId * 4)
 
-  const table = allocBytes(nextId * 4)
-  if (layout.kind === 'none') return table
-
-  const heapChunks: BinaryBytes[] = []
-  const heapOffRef = { value: 0 }
   const { field, values } = layout
-  for (let i = 0; i < nextId; i++) {
+  return writeStoredFieldsSection(nextId, (i) => {
     const value = values[i]
-    if (value === undefined) continue
-    const jsonUtf8 = utf8Bytes(JSON.stringify({ [field]: value }))
-    appendStoredFieldJsonEntry(table, heapChunks, heapOffRef, i, jsonUtf8)
-  }
-  return heapChunks.length === 0 ? table : concatBytes([table, ...heapChunks])
+    return value === undefined ? undefined : JSON.stringify({ [field]: value })
+  })
 }
 
 function storedFieldsTableEnd(

@@ -8,7 +8,7 @@ import {
   writeExternalId,
 } from './binaryWireIo'
 import { readStoredFieldsRowsSection } from './storedFieldsWire'
-import { allocBytes, concatBytes, writeU32LE } from './binaryBytes'
+import { allocBytes, ByteWriter, writeU32LE } from './binaryBytes'
 import { packTermsFromList } from './PackedRadixTree/packTermList'
 
 function densePostings(termCount, nextId) {
@@ -162,9 +162,9 @@ describe('readStoredFieldsRowsSection', () => {
 
 describe('readExternalId', () => {
   test('rejects malformed JSON ids', () => {
-    const chunks = []
-    writeExternalId(chunks, { a: 1 })
-    const buf = concatBytes(chunks)
+    const writer = new ByteWriter()
+    writeExternalId(writer, { a: 1 })
+    const buf = writer.finish()
     buf[buf.length - 1] = 0x20
     expect(() => readExternalId(buf, 0)).toThrow(
       /Invalid frozen index: external id is not valid JSON/,

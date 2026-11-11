@@ -27,7 +27,7 @@ import {
   loadMsv5Sections,
   readMsv5SectionDirectory,
 } from './msv5/binaryMsv5Compression'
-import { concatBytes } from './binaryBytes'
+import { ByteWriter } from './binaryBytes'
 import { readExternalId, writeExternalId } from './binaryWireIo'
 function densePostings(
   fieldCount,
@@ -441,9 +441,9 @@ describe('binaryFormat corruption guards', () => {
 
   test('rejects corrupted external id payloads', () => {
     const encodeId = (id) => {
-      const chunks = []
-      writeExternalId(chunks, id)
-      return concatBytes(chunks)
+      const writer = new ByteWriter()
+      writeExternalId(writer, id)
+      return writer.finish()
     }
 
     expect(() => readExternalId(new Uint8Array(0), 0)).toThrow(

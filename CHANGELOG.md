@@ -10,6 +10,11 @@
   - a stored-field row must be a JSON object, and a `__proto__` key in a row becomes an own property of the search result instead of replacing its prototype;
   - posting runs must not overlap and their document ids must be strictly ascending.
 
+### Performance
+
+- **Binary save** — document ids and stored fields are written into one growing buffer instead of one allocation per value: `saveBinarySync` / `saveBinaryAsync` are about 4x faster on an index with stored fields (282k documents: 770 ms to 180 ms raw). Saved bytes are identical.
+- **Browser CRC-32** — the pure-JS checksum used by the browser bundle (and by Node before 20.15) processes eight bytes per step, about 2.4x faster.
+
 ### Changed
 
 - **Stricter MSv5 container** — a snapshot with unknown flag bits, non-zero reserved directory bytes or bytes after the payload is rejected. Files written by this library are unaffected; a snapshot held in a larger buffer must be passed as a view of its exact length.

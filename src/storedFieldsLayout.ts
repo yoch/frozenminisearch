@@ -69,11 +69,41 @@ export function assignStoredFields(
   if (layout.kind === 'none') return
   if (layout.kind === 'single') {
     const value = layout.values[shortId]
-    if (value !== undefined) target[layout.field] = value
+    if (value === undefined) return
+    if (layout.field === '__proto__') defineOwn(target, layout.field, value)
+    else target[layout.field] = value
     return
   }
   const row = layout.rows[shortId]
-  if (row != null) Object.assign(target, row)
+  if (row != null) assignStoredRow(target, row)
+}
+
+function defineOwn(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  Object.defineProperty(target, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  })
+}
+
+/**
+ * `Object.assign(target, row)`, except that a `__proto__` key becomes an own property
+ * instead of going through the setter and swapping the target's prototype.
+ */
+export function assignStoredRow(
+  target: Record<string, unknown>,
+  row: Record<string, unknown>,
+): void {
+  if (!Object.hasOwn(row, '__proto__')) {
+    Object.assign(target, row)
+    return
+  }
+  for (const key of Object.keys(row)) defineOwn(target, key, row[key])
 }
 
 export function resizeStoredFields(

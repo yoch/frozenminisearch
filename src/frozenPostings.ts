@@ -67,6 +67,38 @@ export function choosePostingsLayout(
   return denseBytes <= sparseBytes ? 'dense' : 'sparse'
 }
 
+/**
+ * One non-empty posting run: it starts at or after the previous run's end (runs are
+ * stored in slot order, so none is read twice), and its doc ids are strictly
+ * ascending, as the binary search in gated scoring requires.
+ * @returns the end of the run
+ */
+function validatePostingSlot(
+  allDocIds: DocIdArray,
+  off: number,
+  len: number,
+  previousEnd: number,
+  nextId: number,
+  slot: number,
+  fail: (detail: string) => never,
+): number {
+  if (off < previousEnd) fail(`posting slot ${slot} overlaps a previous slot`)
+  const end = off + len
+  if (end > allDocIds.length) {
+    fail(`posting slot ${slot} exceeds allDocIds bounds`)
+  }
+  let previous = -1
+  for (let i = off; i < end; i++) {
+    const docId = readDocId(allDocIds, i)
+    if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
+    if (docId <= previous) {
+      fail(`posting slot ${slot} doc ids are not strictly ascending`)
+    }
+    previous = docId
+  }
+  return end
+}
+
 export function validateFrozenPostingsLayout(
   layout: FrozenPostingsLayout,
   documentCount: number,
@@ -89,16 +121,19 @@ export function validateFrozenPostingsLayout(
     ) {
       fail('dense postings slot count mismatch')
     }
+    let end = 0
     for (let slot = 0; slot < slotCount; slot++) {
-      const off = layout.denseOffsets[slot]
       const len = layout.denseLengths[slot]
-      if (off + len > layout.allDocIds.length) {
-        fail(`posting slot ${slot} exceeds allDocIds bounds`)
-      }
-      for (let i = 0; i < len; i++) {
-        const docId = readDocId(layout.allDocIds, off + i)
-        if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
-      }
+      if (len === 0) continue
+      end = validatePostingSlot(
+        layout.allDocIds,
+        layout.denseOffsets[slot],
+        len,
+        end,
+        nextId,
+        slot,
+        fail,
+      )
     }
   } else if (layout.layout === 'sparse') {
     const expectedFieldIdWidth = chooseSparseFieldIdWidth(layout.fieldCount)
@@ -116,20 +151,23 @@ export function validateFrozenPostingsLayout(
     ) {
       fail('sparse slot count mismatch')
     }
+    let end = 0
     for (let slot = 0; slot < slotCount; slot++) {
       const fieldId = readFieldId(layout.sparseFieldIds, slot)
       if (fieldId >= layout.fieldCount) {
         fail(`sparse fieldId ${fieldId} >= fieldCount ${layout.fieldCount}`)
       }
-      const off = layout.sparseOffsets[slot]
       const len = layout.sparseLengths[slot]
-      if (off + len > layout.allDocIds.length) {
-        fail(`sparse slot ${slot} exceeds allDocIds bounds`)
-      }
-      for (let i = 0; i < len; i++) {
-        const docId = readDocId(layout.allDocIds, off + i)
-        if (docId >= nextId) fail(`posting docId ${docId} >= nextId ${nextId}`)
-      }
+      if (len === 0) continue
+      end = validatePostingSlot(
+        layout.allDocIds,
+        layout.sparseOffsets[slot],
+        len,
+        end,
+        nextId,
+        slot,
+        fail,
+      )
     }
   } else {
     const _exhaustive: never = layout

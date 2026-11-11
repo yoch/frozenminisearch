@@ -24,6 +24,7 @@ import {
   MSV5_FORMAT_REV_PAYLOAD,
   MSV5_FORMAT_REV_UTF16_LABELS,
   MSV5_HEADER_SIZE,
+  MSV5_KNOWN_FLAGS,
   MSV5_PAYLOAD_CODEC_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
@@ -137,9 +138,20 @@ export function readMsv5SectionDirectory(buf: BinaryBytes): Msv5SectionEntry[] {
     throw new Error(`MSv5 section count mismatch: ${sectionCount}`)
   }
   assertPayloadFormatRev(buf)
+  const unknownFlags = readMsv5GlobalFlags(buf) & ~MSV5_KNOWN_FLAGS
+  if (unknownFlags !== 0) {
+    throw new Error(`MSv5 unknown flags 0x${unknownFlags.toString(16)}`)
+  }
   const entries: Msv5SectionEntry[] = []
   let dirOff = MSV5_SECTION_DIR_OFFSET
   for (let i = 0; i < sectionCount; i++) {
+    // Reserved for future use: a writer that sets them needs a reader that knows why.
+    if (
+      readU32LE(buf, dirOff + 12) !== 0 ||
+      readU32LE(buf, dirOff + 16) !== 0
+    ) {
+      throw new Error(`MSv5 section ${i} reserved bytes are not zero`)
+    }
     entries.push({
       fileOffset: readU32LE(buf, dirOff),
       uncompressedLength: readU32LE(buf, dirOff + 4),
@@ -213,14 +225,15 @@ export function preparePayload(
   }
   validatePayloadDirectory(directory, uncompressedLength)
 
-  if (
-    payloadOffset !== MSV5_HEADER_SIZE ||
-    payloadOffset + compressedLength > fileBuf.length
-  ) {
-    throw new Error(MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS)
-  }
   if (payloadCodec === CODEC_RAW && compressedLength !== uncompressedLength) {
     throw new Error(MSV5_ERR_RAW_PAYLOAD_LENGTH)
+  }
+  // The payload ends the file: trailing bytes would escape both CRCs.
+  if (
+    payloadOffset !== MSV5_HEADER_SIZE ||
+    payloadOffset + compressedLength !== fileBuf.length
+  ) {
+    throw new Error(MSV5_ERR_PAYLOAD_OUT_OF_BOUNDS)
   }
 
   return {

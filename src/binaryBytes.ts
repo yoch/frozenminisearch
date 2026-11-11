@@ -190,3 +190,40 @@ export function readUtf16LE(
   }
   return out
 }
+
+const HOST_IS_LITTLE_ENDIAN =
+  new Uint8Array(new Uint16Array([1]).buffer)[0] === 1
+
+/**
+ * Snapshot columns are little-endian on the wire and read through typed-array views,
+ * which use the host byte order: saving or loading on a big-endian host would
+ * silently swap every multi-byte value.
+ */
+export function assertLittleEndianHost(
+  isLittleEndian = HOST_IS_LITTLE_ENDIAN,
+): void {
+  if (!isLittleEndian) {
+    throw new Error(
+      'FrozenMiniSearch: binary snapshots require a little-endian host',
+    )
+  }
+}
+
+/**
+ * Bytes of a snapshot given as any buffer view or (Shared)ArrayBuffer, without copying.
+ * Checks by tag rather than `instanceof`, so buffers from another realm are accepted.
+ */
+export function snapshotBytes(input: unknown): Uint8Array {
+  if (ArrayBuffer.isView(input)) {
+    return input instanceof Uint8Array
+      ? input
+      : new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
+  }
+  const tag = Object.prototype.toString.call(input)
+  if (tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]') {
+    return new Uint8Array(input as ArrayBuffer)
+  }
+  throw new TypeError(
+    'FrozenMiniSearch: a binary snapshot must be a Buffer, typed array or ArrayBuffer',
+  )
+}

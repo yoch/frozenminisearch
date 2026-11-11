@@ -1,4 +1,4 @@
-import { readU16LE, readU32LE } from '../binaryBytes'
+import { assertLittleEndianHost, readU16LE, readU32LE } from '../binaryBytes'
 import {
   readExternalIdsSection,
   readFieldNamesSection,
@@ -68,6 +68,7 @@ export function decodeMsv5Sections(
   sections: Uint8Array[],
   hints?: FrozenDecodeHints,
 ): FrozenSnapshot {
+  assertLittleEndianHost()
   const core = sections[Msv5SectionId.Core]
   if (core.length !== 16) {
     throw invalidFrozenIndex('core section size mismatch')

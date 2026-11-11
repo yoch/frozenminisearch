@@ -17,6 +17,7 @@ import type {
 import { isWildcardQuery } from './symbols'
 import {
   assignStoredFields,
+  assignStoredRow,
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import type { PackedTermCursor } from './PackedRadixTree/types'
@@ -643,7 +644,7 @@ function writeStoredFieldsOntoResult(
   }
   if (getStoredFields != null) {
     const storedFields = getStoredFields(docId)
-    if (storedFields != null) Object.assign(result, storedFields)
+    if (storedFields != null) assignStoredRow(result, storedFields)
   }
 }
 

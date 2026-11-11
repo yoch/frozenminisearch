@@ -3,6 +3,7 @@ import {
   encodeFrozenSnapshotPacked,
   encodeFrozenSnapshotPackedAsync,
 } from './binaryEncodePacked'
+import { snapshotBytes } from './binaryBytes'
 import { defaultFrozenLoadOptions } from './searchDefaults'
 import type { SaveBinaryOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
@@ -12,10 +13,10 @@ import FrozenMiniSearchCore, {
 } from './FrozenMiniSearchCore'
 import { type FrozenIndexBuilder } from './frozenBuild'
 
-function asBuffer(bytes: Buffer | Uint8Array): Buffer {
-  return Buffer.isBuffer(bytes)
-    ? bytes
-    : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+function asBuffer(input: Buffer | Uint8Array | ArrayBuffer): Buffer {
+  if (Buffer.isBuffer(input)) return input
+  const bytes = snapshotBytes(input)
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 
 /** Build a read-only Node index in one pass from documents. */
@@ -54,7 +55,7 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
 
   /** Load a frozen binary snapshot. */
   static loadBinarySync<T>(
-    bytes: Buffer | Uint8Array,
+    bytes: Buffer | Uint8Array | ArrayBuffer,
     options: Options<T> = {} as Options<T>,
   ): FrozenMiniSearch<T> {
     const buffer = asBuffer(bytes)
@@ -66,7 +67,7 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
 
   /** Load a frozen binary snapshot with streaming decompression when needed (bounded memory). */
   static async loadBinaryAsync<T>(
-    bytes: Buffer | Uint8Array,
+    bytes: Buffer | Uint8Array | ArrayBuffer,
     options: Options<T> = {} as Options<T>,
   ): Promise<FrozenMiniSearch<T>> {
     const buffer = asBuffer(bytes)

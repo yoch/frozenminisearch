@@ -275,8 +275,8 @@ async function decompressPayloadAsync(
     throw zstdUnavailableReadError()
   }
   if (payloadCodec === CODEC_ZLIB) {
-    const decoded = await browserZlibInflateAsync(slice)
-    if (decoded.length !== uncompressedLength) {
+    const decoded = await browserZlibInflateAsync(slice, uncompressedLength)
+    if (decoded === undefined) {
       throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
     return decoded

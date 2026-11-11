@@ -54,9 +54,8 @@ export interface Msv5AssembledFile {
 
 /** Hard cap on the uncompressed payload, rejected before allocation (compressed-bomb guard).
  *  This is the single trust boundary for untrusted snapshots: {@link preparePayload} rejects
- *  headers above this size; sync decompress uses the same cap via `maxOutputLength`.
- *  A malicious header can still declare up to 1 GiB — no tighter native limit helps without
- *  trusting `uncompressedLength` from that same header. Semantic integrity (length match,
+ *  headers above this size, and decompression never outputs more than the length the header
+ *  declares. A malicious header can still declare up to 1 GiB. Semantic integrity (length match,
  *  payload CRC, per-section CRC) is enforced after decode. */
 
 // zstd landed in node:zlib at Node 22.15.0 (22.x line) / 23.8.0, where the whole family
@@ -644,6 +643,29 @@ function preparePayload(
   }
 }
 
+/** Output is capped at the declared length, so a forged stream cannot allocate more. */
+function decompressBounded(
+  decompress: (input: Buffer, options: { maxOutputLength: number }) => Buffer,
+  slice: Buffer,
+  uncompressedLength: number,
+): Buffer {
+  let decoded: Buffer
+  try {
+    decoded = decompress(slice, {
+      maxOutputLength: Math.max(1, uncompressedLength),
+    })
+  } catch (error) {
+    if ((error as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE') {
+      throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+    }
+    throw error
+  }
+  if (decoded.length !== uncompressedLength) {
+    throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
+  }
+  return decoded
+}
+
 function decompressPayloadSync(
   payloadCodec: number,
   slice: Buffer,
@@ -653,22 +675,10 @@ function decompressPayloadSync(
     if (!zstdAvailable()) {
       throw zstdUnavailableReadError()
     }
-    const decoded = zlib.zstdDecompressSync(slice, {
-      maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
-    })
-    if (decoded.length !== uncompressedLength) {
-      throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
-    }
-    return decoded
+    return decompressBounded(zlib.zstdDecompressSync, slice, uncompressedLength)
   }
   if (payloadCodec === CODEC_ZLIB) {
-    const decoded = zlib.inflateSync(slice, {
-      maxOutputLength: MSV5_MAX_UNCOMPRESSED_BYTES,
-    })
-    if (decoded.length !== uncompressedLength) {
-      throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
-    }
-    return decoded
+    return decompressBounded(zlib.inflateSync, slice, uncompressedLength)
   }
   throw new Error(`MSv5 unknown payload codec ${payloadCodec}`)
 }

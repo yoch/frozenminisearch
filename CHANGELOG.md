@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Security
+
+- **Binary snapshots from untrusted sources** — loading now rejects forged files that could exhaust memory or alter results:
+  - stored-field rows must follow each other in document order with no gap or overlap, so a small file can no longer make every document decode the same large row;
+  - decompression (zlib and zstd, sync, async and browser) stops at the length the header declares;
+  - a stored-field row must be a JSON object, and a `__proto__` key in a row becomes an own property of the search result instead of replacing its prototype;
+  - posting runs must not overlap and their document ids must be strictly ascending.
+
+### Changed
+
+- **Stricter MSv5 container** — a snapshot with unknown flag bits, non-zero reserved directory bytes or bytes after the payload is rejected. Files written by this library are unaffected; a snapshot held in a larger buffer must be passed as a view of its exact length.
+- **Snapshot input** — `loadBinarySync` / `loadBinaryAsync` accept an `ArrayBuffer` or any typed-array view, and throw a `TypeError` for anything else.
+- Saving or loading a binary snapshot on a big-endian host throws instead of producing or reading byte-swapped data.
+- Error messages: `stored fields row is null` is now `stored fields row is not an object`; `sparse slot N exceeds allDocIds bounds` is now `posting slot N exceeds allDocIds bounds`.
+
 ## v1.12.3 — `@yoch/frozenminisearch`
 
 Patch release: fuzzy search again visits matching terms in tree order, restoring the 1.12.1 order that 1.12.2 changed. Ids, terms and scores are unchanged; the order of tied results, the order of `terms` within a result, and the wording of `autoSuggest` phrases match 1.12.1 again. Query terms of up to 30 characters use a bit-parallel Levenshtein automaton and visit matches faster than 1.12.2. No changes to the public API, runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.

@@ -147,7 +147,7 @@ describe('readStoredFieldsRowsSection', () => {
 
   test.each([
     ['{"txt"', /Invalid frozen index: stored fields row is not valid JSON/],
-    ['null', /Invalid frozen index: stored fields row is null/],
+    ['null', /Invalid frozen index: stored fields row is not an object/],
   ])('rejects stored row %s', (json, error) => {
     const body = new TextEncoder().encode(json)
     const section = allocBytes(8 + body.length)

@@ -224,6 +224,6 @@ export function snapshotBytes(input: unknown): Uint8Array {
     return new Uint8Array(input as ArrayBuffer)
   }
   throw new TypeError(
-    'FrozenMiniSearch: a binary snapshot must be a Buffer, typed array or ArrayBuffer',
+    'FrozenMiniSearch: a binary snapshot must be a typed array or an ArrayBuffer',
   )
 }

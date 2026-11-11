@@ -10,6 +10,8 @@ import {
   type BinaryBytes,
 } from '../binaryBytes'
 import {
+  BINARY_MAGIC_V5,
+  BINARY_VERSION_V5,
   CODEC_RAW,
   FLAG_LABEL_HEAP_UTF16,
   MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER,
@@ -109,8 +111,8 @@ export function writeMsv5FileHeader(
   codec: number,
   zstdLevel: number,
 ): void {
-  writeAscii(out, 0, 'MSv5')
-  writeU16LE(out, 4, 5)
+  writeAscii(out, 0, BINARY_MAGIC_V5)
+  writeU16LE(out, 4, BINARY_VERSION_V5)
   writeU16LE(out, 6, globalFlags & 0xffff)
   writeU8(out, MSV5_PAYLOAD_CODEC_OFFSET, codec)
   writeU8(out, MSV5_ZSTD_LEVEL_OFFSET, zstdLevel)
@@ -163,6 +165,7 @@ export function readMsv5SectionDirectory(buf: BinaryBytes): Msv5SectionEntry[] {
   return entries
 }
 
+/** @testonly */
 export function readMsv5SnapshotCompressionMeta(
   buf: BinaryBytes,
 ): Msv5SnapshotCompressionMeta {
@@ -246,7 +249,7 @@ export function preparePayload(
 }
 
 export function isMsv5Bytes(buf: BinaryBytes): boolean {
-  return buf.length >= 4 && readAscii(buf, 0, 4) === 'MSv5'
+  return buf.length >= 4 && readAscii(buf, 0, 4) === BINARY_MAGIC_V5
 }
 
 export function readMsv5GlobalFlags(buf: BinaryBytes): number {

@@ -21,6 +21,11 @@
 - **Snapshot input** — `loadBinarySync` / `loadBinaryAsync` accept an `ArrayBuffer` or any typed-array view, and throw a `TypeError` for anything else.
 - Saving or loading a binary snapshot on a big-endian host throws instead of producing or reading byte-swapped data.
 - Error messages: `stored fields row is null` is now `stored fields row is not an object`; `sparse slot N exceeds allDocIds bounds` is now `posting slot N exceeds allDocIds bounds`.
+- Error messages: bytes that are not a snapshot report `not a frozen binary snapshot` (was `Unsupported frozen binary snapshot`, or `buffer too short` under 8 bytes).
+
+### Internal
+
+- Removed pass-through modules of the binary layer (`binaryEncode`, `binaryEncodePacked`, `binaryDecode`, `binaryConstants`) and code that only tests reached. `knip` no longer treats test files as entry points, so product code kept alive by a test alone is reported.
 
 ## v1.12.3 — `@yoch/frozenminisearch`
 

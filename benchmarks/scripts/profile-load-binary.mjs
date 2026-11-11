@@ -5,18 +5,13 @@
  *   NODE_OPTIONS='--expose-gc' pnpm exec tsx benchmarks/scripts/profile-load-binary.mjs --scenario=giant
  */
 import FrozenMiniSearch from '../../dist/es/index.js'
-import { decodeFrozenSnapshot } from '../../src/binaryDecode.ts'
+import { decodeFrozenSnapshotMsv5 as decodeFrozenSnapshot } from '../../src/msv5/binaryMsv5Decode.ts'
 import { validateFrozenSnapshot } from '../../src/binaryStructures.ts'
 import { validateFrozenTermIndexLeaves } from '../../src/frozenTermIndex.ts'
 import { materializeOwnedSnapshot } from '../../src/frozenOwnedSnapshot.ts'
 import { assembleParamsFromBinarySnapshot } from '../../src/frozenBinaryShared.ts'
 import { readPackedTermTreeSectionColumnar } from '../../src/msv5/packedRadixBinaryMsv5.ts'
-import {
-  isMsv5Buffer,
-  loadMsv5Sections,
-  readMsv5GlobalFlags,
-  readMsv5SectionDirectory,
-} from '../../src/msv5/binaryMsv5Compression.ts'
+import { loadMsv5Sections } from '../../src/msv5/binaryMsv5Compression.ts'
 import { decodeMsv5Sections, validateMsv5Container } from '../../src/msv5/binaryMsv5DecodeShared.ts'
 import { readU32LE } from '../../src/binaryBytes.ts'
 import { Msv5SectionId } from '../../src/msv5/binaryMsv5Constants.ts'
@@ -62,11 +57,7 @@ async function main() {
   const { name, buf, options } = await build()
   const storeFields = options.storeFields ?? []
 
-  const { globalFlags, directory } = validateMsv5Container(buf, {
-    isMsv5Buffer,
-    readMsv5GlobalFlags,
-    readMsv5SectionDirectory,
-  })
+  const { globalFlags, directory } = validateMsv5Container(buf)
   const sections = loadMsv5Sections(buf, directory)
   const core = sections[Msv5SectionId.Core]
   const termCount = readU32LE(core, 12)

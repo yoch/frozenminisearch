@@ -1,5 +1,5 @@
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
-import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodePacked'
+import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodeBrowser'
 import { snapshotBytes } from './binaryBytes'
 import { defaultFrozenLoadOptions } from './searchDefaults'
 import type { BrowserSaveBinaryAsyncOptions, Options } from './searchTypes'

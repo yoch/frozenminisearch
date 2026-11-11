@@ -15,13 +15,15 @@ import {
 } from './binaryMsv5Constants'
 import {
   assembleMsv5FileBrowser,
-  isMsv5Bytes,
   loadMsv5SectionsBrowser,
-  readMsv5GlobalFlagsBrowser,
-  readMsv5SectionDirectory,
-  readMsv5SnapshotCompressionMetaBrowser,
 } from './binaryMsv5CompressionBrowser'
 import { loadMsv5Sections } from './binaryMsv5Compression'
+import {
+  isMsv5Bytes,
+  readMsv5GlobalFlags,
+  readMsv5SectionDirectory,
+  readMsv5SnapshotCompressionMeta,
+} from './binaryMsv5ContainerShared'
 
 const options = { fields: ['title', 'text'] }
 const docs = [
@@ -39,7 +41,7 @@ function smallIndexRawSections() {
   ).saveBinarySync({ compression: 'raw' })
   const directory = readMsv5SectionDirectory(buf)
   return {
-    globalFlags: readMsv5GlobalFlagsBrowser(buf),
+    globalFlags: readMsv5GlobalFlags(buf),
     rawSections: loadMsv5Sections(buf, directory),
   }
 }
@@ -59,7 +61,7 @@ function bigCompressibleRawSections() {
   ).saveBinarySync({ compression: 'raw' })
   const directory = readMsv5SectionDirectory(buf)
   return {
-    globalFlags: readMsv5GlobalFlagsBrowser(buf),
+    globalFlags: readMsv5GlobalFlags(buf),
     rawSections: loadMsv5Sections(buf, directory),
   }
 }
@@ -105,7 +107,7 @@ describe('binaryMsv5CompressionBrowser', () => {
         rawSections,
         compression,
       )
-      const meta = readMsv5SnapshotCompressionMetaBrowser(assembled.buffer)
+      const meta = readMsv5SnapshotCompressionMeta(assembled.buffer)
       expect(meta.formatRev).toBeGreaterThan(0)
       if (compression === 'raw') {
         expect(meta.payloadCodec).toBe(CODEC_RAW)
@@ -128,9 +130,9 @@ describe('binaryMsv5CompressionBrowser', () => {
       rawSections,
       'auto',
     )
-    expect(
-      readMsv5SnapshotCompressionMetaBrowser(assembled.buffer).payloadCodec,
-    ).toBe(CODEC_ZLIB)
+    expect(readMsv5SnapshotCompressionMeta(assembled.buffer).payloadCodec).toBe(
+      CODEC_ZLIB,
+    )
   })
 
   test('assemble rejects zstd compression', async () => {
@@ -168,9 +170,9 @@ describe('binaryMsv5CompressionBrowser', () => {
       tinyRawSections(48),
       'auto',
     )
-    expect(
-      readMsv5SnapshotCompressionMetaBrowser(assembled.buffer).payloadCodec,
-    ).toBe(CODEC_RAW)
+    expect(readMsv5SnapshotCompressionMeta(assembled.buffer).payloadCodec).toBe(
+      CODEC_RAW,
+    )
   })
 
   test('auto keeps raw when zlib does not shrink the payload', async () => {
@@ -179,9 +181,9 @@ describe('binaryMsv5CompressionBrowser', () => {
       incompressibleRawSections(200),
       'auto',
     )
-    expect(
-      readMsv5SnapshotCompressionMetaBrowser(assembled.buffer).payloadCodec,
-    ).toBe(CODEC_RAW)
+    expect(readMsv5SnapshotCompressionMeta(assembled.buffer).payloadCodec).toBe(
+      CODEC_RAW,
+    )
   })
 
   test('readMsv5SectionDirectory rejects a truncated header', () => {
@@ -241,7 +243,7 @@ describe('binaryMsv5CompressionBrowser', () => {
       rawSections,
       'raw',
     )
-    const meta = readMsv5SnapshotCompressionMetaBrowser(assembled.buffer)
+    const meta = readMsv5SnapshotCompressionMeta(assembled.buffer)
     const buf = new Uint8Array(assembled.buffer)
     writeU32LE(
       buf,

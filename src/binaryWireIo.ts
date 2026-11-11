@@ -1,11 +1,5 @@
 import type { FieldIdArray } from './frozenPostings'
 import {
-  ID_TAG_EMPTY,
-  ID_TAG_JSON,
-  ID_TAG_NUMBER,
-  ID_TAG_STRING,
-} from './binaryConstants'
-import {
   allocBytes,
   ByteWriter,
   isWellFormedUtf16,
@@ -19,6 +13,12 @@ import {
 } from './binaryBytes'
 import { invalidFrozenIndex, parseSnapshotJson } from './frozenErrors'
 import { buildStoredFieldsRowsWireSection } from './storedFieldsWire'
+
+/** First byte of an external id on the wire. */
+const ID_TAG_EMPTY = 0
+const ID_TAG_NUMBER = 1
+const ID_TAG_STRING = 2
+const ID_TAG_JSON = 3
 
 export function readLengthPrefixedUtf8(
   buf: BinaryBytes,

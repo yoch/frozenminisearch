@@ -87,6 +87,7 @@ export function writeU32LE(
   buf[offset + 3] = (value >>> 24) & 0xff
 }
 
+/** @testonly */
 export function writeFloatLE(
   buf: BinaryBytes,
   offset: number,

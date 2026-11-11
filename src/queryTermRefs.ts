@@ -162,11 +162,7 @@ export function estimateMaxPostingLengthForQuerySpec(
     )
   }
 
-  forEachQuerySpecTermRef(query, normalized, params, (kind, termIndex) => {
-    if (kind === 'exact') {
-      if (termIndex != null) consider(indexView.fieldTermData(termIndex))
-      return
-    }
+  forEachQuerySpecTermRef(query, normalized, params, (_kind, termIndex) => {
     if (termIndex != null) consider(indexView.fieldTermData(termIndex))
   })
   return maxLen

@@ -8,11 +8,6 @@ export type StoredFieldsLayout =
   | { kind: 'single'; field: string; values: unknown[] }
   | { kind: 'multi'; rows: (Record<string, unknown> | undefined)[] }
 
-export {
-  storedFieldsJsonBytes,
-  storedFieldsSlotCount,
-} from './storedFieldsLayoutMetrics.js'
-
 export function createStoredFieldsLayout(
   storeFields: readonly string[],
   capacity = 0,
@@ -158,6 +153,7 @@ export function storedFieldsFromRows(
   return { kind: 'multi', rows }
 }
 
+/** @testonly */
 export function storedFieldsToWireRows(
   layout: StoredFieldsLayout,
   nextId: number,

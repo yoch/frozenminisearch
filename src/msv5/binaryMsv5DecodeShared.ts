@@ -14,7 +14,14 @@ import {
 } from '../storedFieldsWire'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 import {
+  isMsv5Bytes,
+  readMsv5GlobalFlags,
+  readMsv5SectionDirectory,
+} from './binaryMsv5ContainerShared'
+import {
+  BINARY_VERSION_V5,
   FLAG_LABEL_HEAP_UTF16,
+  MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER,
   MSV5_HEADER_SIZE,
   MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET,
   MSV5_PAYLOAD_COMPRESSED_OFFSET,
@@ -27,29 +34,23 @@ export type FrozenDecodeHints = {
   storeFields: readonly string[]
 }
 
-type Msv5ContainerReaders = {
-  isMsv5Buffer: (buf: Uint8Array) => boolean
-  readMsv5GlobalFlags: (buf: Uint8Array) => number
-  readMsv5SectionDirectory: (buf: Uint8Array) => Msv5SectionEntry[]
-}
-
-export function validateMsv5Container(
-  buf: Uint8Array,
-  readers: Msv5ContainerReaders,
-): {
+export function validateMsv5Container(buf: Uint8Array): {
   globalFlags: number
   directory: Msv5SectionEntry[]
 } {
-  if (!readers.isMsv5Buffer(buf)) {
+  if (!isMsv5Bytes(buf)) {
     throw invalidFrozenIndex('not a frozen binary snapshot')
   }
+  if (buf.length < MSV5_HEADER_SIZE) {
+    throw new Error(MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER)
+  }
   const version = readU16LE(buf, 4)
-  if (version !== 5) {
+  if (version !== BINARY_VERSION_V5) {
     throw invalidFrozenIndex(`unsupported frozen snapshot version=${version}`)
   }
 
-  const globalFlags = readers.readMsv5GlobalFlags(buf)
-  const directory = readers.readMsv5SectionDirectory(buf)
+  const globalFlags = readMsv5GlobalFlags(buf)
+  const directory = readMsv5SectionDirectory(buf)
 
   const payloadOff = readU32LE(buf, MSV5_PAYLOAD_COMPRESSED_OFFSET)
   const compressedLen = readU32LE(buf, MSV5_PAYLOAD_COMPRESSED_LENGTH_OFFSET)

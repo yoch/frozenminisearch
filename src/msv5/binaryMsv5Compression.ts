@@ -27,12 +27,8 @@ import {
 import {
   assertRawSectionCount,
   buildMsv5CompressionMeta,
-  isMsv5Bytes,
   MSV5_MAX_UNCOMPRESSED_BYTES,
   preparePayload as prepareMsv5Payload,
-  readMsv5GlobalFlags as readMsv5GlobalFlagsShared,
-  readMsv5SectionDirectory as readMsv5SectionDirectoryShared,
-  readMsv5SnapshotCompressionMeta as readMsv5SnapshotCompressionMetaShared,
   writeMsv5FileHeader,
 } from './binaryMsv5ContainerShared'
 import {
@@ -403,18 +399,6 @@ export async function assembleMsv5FileAsync(
   )
 }
 
-export function readMsv5SectionDirectory(
-  buf: Buffer | Uint8Array,
-): Msv5SectionEntry[] {
-  return readMsv5SectionDirectoryShared(buf)
-}
-
-export function readMsv5SnapshotCompressionMeta(
-  buf: Buffer | Uint8Array,
-): Msv5SnapshotCompressionMeta {
-  return readMsv5SnapshotCompressionMetaShared(buf)
-}
-
 function verifySectionCrc(section: Buffer, expected: number): void {
   if (crc32Buffer(section) !== expected) {
     throw new Error(MSV5_ERR_SECTION_CRC_MISMATCH)
@@ -726,12 +710,4 @@ export async function loadMsv5SectionsAsync(
     )
   }
   throw new Error(`MSv5 unknown payload codec ${payloadCodec}`)
-}
-
-export function isMsv5Buffer(buf: Buffer | Uint8Array): boolean {
-  return isMsv5Bytes(buf)
-}
-
-export function readMsv5GlobalFlags(buf: Buffer | Uint8Array): number {
-  return readMsv5GlobalFlagsShared(buf)
 }

@@ -1,8 +1,12 @@
-import { decodeFrozenSnapshot, decodeFrozenSnapshotAsync } from './binaryFormat'
 import {
-  encodeFrozenSnapshotPacked,
-  encodeFrozenSnapshotPackedAsync,
-} from './binaryEncodePacked'
+  decodeFrozenSnapshotMsv5,
+  decodeFrozenSnapshotMsv5Async,
+} from './msv5/binaryMsv5Decode'
+import {
+  encodeFrozenSnapshotMsv5Packed,
+  encodeFrozenSnapshotMsv5PackedAsync,
+} from './msv5/binaryMsv5EncodePacked'
+import { snapshotBytes } from './binaryBytes'
 import { defaultFrozenLoadOptions } from './searchDefaults'
 import type { SaveBinaryOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
@@ -12,10 +16,10 @@ import FrozenMiniSearchCore, {
 } from './FrozenMiniSearchCore'
 import { type FrozenIndexBuilder } from './frozenBuild'
 
-function asBuffer(bytes: Buffer | Uint8Array): Buffer {
-  return Buffer.isBuffer(bytes)
-    ? bytes
-    : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+function asBuffer(input: Buffer | Uint8Array | ArrayBuffer): Buffer {
+  if (Buffer.isBuffer(input)) return input
+  const bytes = snapshotBytes(input)
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 
 /** Build a read-only Node index in one pass from documents. */
@@ -36,7 +40,7 @@ export function freezeFrozenIndexBuilder<T>(
 export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
   /** Serialize this index as a frozen binary snapshot (synchronous). */
   saveBinarySync(saveOptions: SaveBinaryOptions = {}): Buffer {
-    return encodeFrozenSnapshotPacked(
+    return encodeFrozenSnapshotMsv5Packed(
       this._binarySnapshotInput(),
       this._index,
       saveOptions.compression,
@@ -45,7 +49,7 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
 
   /** Non-blocking snapshot serialization with the selected compression codec. */
   async saveBinaryAsync(saveOptions: SaveBinaryOptions = {}): Promise<Buffer> {
-    return encodeFrozenSnapshotPackedAsync(
+    return encodeFrozenSnapshotMsv5PackedAsync(
       this._binarySnapshotInput(),
       this._index,
       saveOptions.compression,
@@ -54,30 +58,30 @@ export default class FrozenMiniSearch<T = any> extends FrozenMiniSearchCore<T> {
 
   /** Load a frozen binary snapshot. */
   static loadBinarySync<T>(
-    bytes: Buffer | Uint8Array,
+    bytes: Buffer | Uint8Array | ArrayBuffer,
     options: Options<T> = {} as Options<T>,
   ): FrozenMiniSearch<T> {
     const buffer = asBuffer(bytes)
     const storeFields =
       options.storeFields ?? defaultFrozenLoadOptions.storeFields
-    const snap = decodeFrozenSnapshot(buffer, { storeFields })
+    const snap = decodeFrozenSnapshotMsv5(buffer, { storeFields })
     return FrozenMiniSearch._fromBinarySnapshot(snap, options, buffer)
   }
 
   /** Load a frozen binary snapshot with streaming decompression when needed (bounded memory). */
   static async loadBinaryAsync<T>(
-    bytes: Buffer | Uint8Array,
+    bytes: Buffer | Uint8Array | ArrayBuffer,
     options: Options<T> = {} as Options<T>,
   ): Promise<FrozenMiniSearch<T>> {
     const buffer = asBuffer(bytes)
     const storeFields =
       options.storeFields ?? defaultFrozenLoadOptions.storeFields
-    const snap = await decodeFrozenSnapshotAsync(buffer, { storeFields })
+    const snap = await decodeFrozenSnapshotMsv5Async(buffer, { storeFields })
     return FrozenMiniSearch._fromBinarySnapshot(snap, options, buffer)
   }
 
   private static _fromBinarySnapshot<T>(
-    snap: ReturnType<typeof decodeFrozenSnapshot>,
+    snap: ReturnType<typeof decodeFrozenSnapshotMsv5>,
     options: Options<T>,
     buffer: Buffer | Uint8Array,
   ): FrozenMiniSearch<T> {

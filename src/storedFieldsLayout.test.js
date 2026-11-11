@@ -6,11 +6,13 @@ import {
   readStoredFields,
   resizeStoredFields,
   storedFieldsFromRows,
-  storedFieldsJsonBytes,
-  storedFieldsSlotCount,
   storedFieldsToWireRows,
   writeStoredField,
 } from './storedFieldsLayout'
+import {
+  storedFieldsJsonBytes,
+  storedFieldsSlotCount,
+} from './storedFieldsLayoutMetrics.js'
 import { allocBytes, writeU32LE } from './binaryBytes'
 import {
   buildStoredFieldsRowsWireSection,

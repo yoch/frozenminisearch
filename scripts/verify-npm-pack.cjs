@@ -44,4 +44,14 @@ for (const p of paths) {
   }
 }
 
-console.log(`verify-npm-pack: ok (${paths.length} files, no dev-only paths)`)
+const { exports: packageExports } = require(join(root, 'package.json'))
+for (const [subpath, conditions] of Object.entries(packageExports)) {
+  for (const target of typeof conditions === 'string' ? [conditions] : Object.values(conditions)) {
+    if (!paths.includes(target.replace(/^\.\//, ''))) {
+      console.error(`verify-npm-pack: export ${subpath} points to ${target}, which is not in the tarball`)
+      process.exit(1)
+    }
+  }
+}
+
+console.log(`verify-npm-pack: ok (${paths.length} files, no dev-only paths, export targets present)`)

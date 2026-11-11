@@ -23,12 +23,10 @@ import {
   MSV5_SECTION_DIR_OFFSET,
   Msv5SectionId,
 } from './msv5/binaryMsv5Constants'
-import {
-  loadMsv5Sections,
-  readMsv5SectionDirectory,
-} from './msv5/binaryMsv5Compression'
-import { concatBytes } from './binaryBytes'
+import { loadMsv5Sections } from './msv5/binaryMsv5Compression'
+import { ByteWriter } from './binaryBytes'
 import { readExternalId, writeExternalId } from './binaryWireIo'
+import { readMsv5SectionDirectory } from './msv5/binaryMsv5ContainerShared'
 function densePostings(
   fieldCount,
   termCount,
@@ -441,9 +439,9 @@ describe('binaryFormat corruption guards', () => {
 
   test('rejects corrupted external id payloads', () => {
     const encodeId = (id) => {
-      const chunks = []
-      writeExternalId(chunks, id)
-      return concatBytes(chunks)
+      const writer = new ByteWriter()
+      writeExternalId(writer, id)
+      return writer.finish()
     }
 
     expect(() => readExternalId(new Uint8Array(0), 0)).toThrow(
@@ -706,6 +704,6 @@ describe('crc32Buffer verification', () => {
   test('decodeFrozenSnapshotAsync rejects an unsupported frozen binary snapshot', async () => {
     await expect(
       decodeFrozenSnapshotAsync(Buffer.alloc(8), {}),
-    ).rejects.toThrow(/Unsupported frozen binary snapshot/)
+    ).rejects.toThrow(/not a frozen binary snapshot/)
   })
 })

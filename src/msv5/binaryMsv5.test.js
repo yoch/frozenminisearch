@@ -29,8 +29,6 @@ import {
   assembleMsv5File,
   loadMsv5Sections,
   loadMsv5SectionsAsync,
-  readMsv5GlobalFlags,
-  readMsv5SectionDirectory,
 } from './binaryMsv5Compression'
 import {
   computeSectionDirectory,
@@ -39,6 +37,10 @@ import {
 import { crc32Update as crc32UpdateWire } from '../crc32Wire'
 import { buildMsv5EncodePrepared } from './binaryMsv5EncodeSections'
 import PackedRadixTree from '../PackedRadixTree'
+import {
+  readMsv5GlobalFlags,
+  readMsv5SectionDirectory,
+} from './binaryMsv5ContainerShared'
 
 const options = { fields: ['title', 'text'] }
 const hasZstd = typeof zlib.zstdCompressSync === 'function'

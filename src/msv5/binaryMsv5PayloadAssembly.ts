@@ -1,5 +1,9 @@
 import type { BinaryBytes } from '../binaryBytes'
 import { crc32Update as crc32UpdateWire } from '../crc32Wire'
+import {
+  MSV5_ERR_PAYLOAD_EXCEEDS_1GIB,
+  MSV5_MAX_UNCOMPRESSED_BYTES,
+} from './binaryMsv5Constants'
 import type { Msv5SectionEntry } from './binaryMsv5Types'
 
 /** Incremental CRC-32 IEEE update; Node passes the native `zlib.crc32` wrapper, browsers the JS table. */
@@ -73,6 +77,10 @@ export function concatRawSectionsWithCrc(
     rawSections,
     crc32Update,
   )
+  // Checked before the payload is allocated and copied.
+  if (uncompressedLength > MSV5_MAX_UNCOMPRESSED_BYTES) {
+    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
+  }
   const uncompressed = alloc(uncompressedLength)
   const payloadCrc32 = writeRawSectionsIntoPayload(
     uncompressed,

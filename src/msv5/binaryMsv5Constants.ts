@@ -12,6 +12,16 @@ export const FLAG_FREQ_U16 = 32
 /** Term tree label heap stored as UTF-16LE code units because it holds unpaired surrogates. */
 export const FLAG_LABEL_HEAP_UTF16 = 64
 
+/** Every flag bit this reader understands; a file with any other bit set is rejected. */
+export const MSV5_KNOWN_FLAGS =
+  FLAG_DOC_ID_16 |
+  FLAG_SPARSE_LAYOUT |
+  FLAG_FIELD_ID_16 |
+  FLAG_FL_U8 |
+  FLAG_FL_U16 |
+  FLAG_FREQ_U16 |
+  FLAG_LABEL_HEAP_UTF16
+
 export const CODEC_RAW = 0
 /** Deflate/inflate (`node:zlib`) on the whole payload. */
 export const CODEC_ZLIB = 1
@@ -72,6 +82,8 @@ export const MSV5_TREE_COLUMN_COUNT = 6
 // Error message constants shared between Node (binaryMsv5Compression.ts) and
 // Browser (binaryMsv5CompressionBrowser.ts) MSv5 code.
 // ---------------------------------------------------------------------------
+/** Largest uncompressed payload a snapshot may declare or a save may produce. */
+export const MSV5_MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 export const MSV5_ERR_PAYLOAD_EXCEEDS_1GIB = 'MSv5 payload exceeds 1 GiB limit'
 export const MSV5_ERR_BUFFER_TOO_SHORT_FOR_HEADER =
   'MSv5 buffer too short for header'

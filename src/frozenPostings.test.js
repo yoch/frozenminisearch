@@ -217,8 +217,37 @@ describe('validateFrozenPostingsLayout', () => {
       { ...layout, sparseLengths },
       2,
       10,
-      /sparse slot 0 exceeds allDocIds bounds/,
+      /posting slot 0 exceeds allDocIds bounds/,
     )
+  })
+
+  test('rejects overlapping sparse slots', () => {
+    const layout = buildLayout(4, sparsePostings)
+    const sparseOffsets = new Uint32Array(layout.sparseOffsets)
+    sparseOffsets.fill(0)
+    expectValidateFail(
+      { ...layout, sparseOffsets },
+      2,
+      10,
+      /posting slot \d+ overlaps a previous slot/,
+    )
+  })
+
+  test('rejects doc ids that are not strictly ascending in a slot', () => {
+    const layout = buildLayout(1, [
+      { termIndex: 0, fieldId: 0, docId: 1, freq: 1 },
+      { termIndex: 0, fieldId: 0, docId: 2, freq: 1 },
+    ])
+    for (const second of [1, 0]) {
+      const allDocIds = layout.allDocIds.slice()
+      allDocIds[1] = second
+      expectValidateFail(
+        { ...layout, allDocIds },
+        2,
+        10,
+        /doc ids are not strictly ascending/,
+      )
+    }
   })
 
   test('rejects sparse posting docId >= nextId', () => {

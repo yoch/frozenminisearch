@@ -59,15 +59,42 @@ export async function browserZlibDeflateAsync(
   )
 }
 
+/**
+ * Inflate a stream declared to hold `expectedLength` bytes. Returns `undefined` when it
+ * holds any other count; it is cancelled as soon as it overflows.
+ */
 export async function browserZlibInflateAsync(
   compressed: BinaryBytes,
-): Promise<BinaryBytes> {
+  expectedLength: number,
+): Promise<BinaryBytes | undefined> {
   const DecompressionStreamCtor = requireDecompressionStream()
-  return await streamToBytes(
-    readStreamFromBytes(compressed).pipeThrough(
+  const reader = readStreamFromBytes(compressed)
+    .pipeThrough(
       new DecompressionStreamCtor(
         'deflate',
       ) as unknown as NativeCompressionTransform,
-    ),
-  )
+    )
+    .getReader()
+  // Nothing is sized from the declared length until the stream has produced it.
+  const chunks: Uint8Array[] = []
+  let length = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const chunk = value as Uint8Array
+    length += chunk.length
+    if (length > expectedLength) {
+      await reader.cancel()
+      return undefined
+    }
+    chunks.push(chunk)
+  }
+  if (length !== expectedLength) return undefined
+  const out = new Uint8Array(length)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.length
+  }
+  return out
 }

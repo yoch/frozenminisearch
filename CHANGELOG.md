@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+## v1.13.0 — `@yoch/frozenminisearch`
+
+Minor release: loading binary snapshots is hardened against forged files and saving is about 4x faster. Loading rejects forged snapshots that could exhaust memory or alter results, and the MSv5 reader is stricter about what it accepts. `saveBinarySync` / `saveBinaryAsync` write the same bytes about 4x faster on an index with stored fields.
+
+Compatibility: search results, scores and ordering are unchanged. The MSv5 wire format is unchanged and saved bytes are identical; snapshots written by earlier releases load, but a snapshot held in a buffer larger than the file must be passed as a view of its exact length. No new runtime dependencies; the published package still supports Node 20+.
+
+### Security
+
+- **Binary snapshots from untrusted sources** — loading now rejects forged files that could exhaust memory or alter results:
+  - stored-field rows must follow each other in document order with no gap or overlap, so a small file can no longer make every document decode the same large row;
+  - decompression (zlib and zstd, sync, async and browser) stops at the length the header declares, itself capped at 1 GiB;
+  - a stored-field row must be a JSON object, and a `__proto__` key in a row becomes an own property of the search result instead of replacing its prototype;
+  - posting runs must not overlap and their document ids must be strictly ascending.
+
+### Performance
+
+- **Binary save** — document ids and stored fields are written into one growing buffer instead of one allocation per value: `saveBinarySync` / `saveBinaryAsync` are about 4x faster on an index with stored fields (282k documents: 770 ms to about 200 ms raw). Saved bytes are identical.
+- **Browser CRC-32** — the pure-JS checksum used by the browser bundle (and by Node before 20.15) processes eight bytes per step, about 2.4x faster.
+
+### Changed
+
+- **Stricter MSv5 container** — a snapshot with unknown flag bits, non-zero reserved directory bytes or bytes after the payload is rejected. Files written by this library are unaffected; a snapshot held in a larger buffer must be passed as a view of its exact length.
+- **Snapshot input** — `loadBinarySync` / `loadBinaryAsync` accept an `ArrayBuffer` or any typed-array view, and throw a `TypeError` for anything else.
+- Saving or loading a binary snapshot on a big-endian host throws instead of producing or reading byte-swapped data.
+- Error messages: `stored fields row is null` is now `stored fields row is not an object`; `sparse slot N exceeds allDocIds bounds` is now `posting slot N exceeds allDocIds bounds`.
+- Error messages: bytes that are not a snapshot report `not a frozen binary snapshot` (was `Unsupported frozen binary snapshot`, or `buffer too short` under 8 bytes).
+
+### Internal
+
+- Removed pass-through modules of the binary layer (`binaryEncode`, `binaryEncodePacked`, `binaryDecode`, `binaryConstants`) and code that only tests reached. `knip` no longer treats test files as entry points, so product code kept alive by a test alone is reported.
+
 ## v1.12.3 — `@yoch/frozenminisearch`
 
 Patch release: fuzzy search again visits matching terms in tree order, restoring the 1.12.1 order that 1.12.2 changed. Ids, terms and scores are unchanged; the order of tied results, the order of `terms` within a result, and the wording of `autoSuggest` phrases match 1.12.1 again. Query terms of up to 30 characters use a bit-parallel Levenshtein automaton and visit matches faster than 1.12.2. No changes to the public API, runtime dependencies or the MSv5 wire format; the published package still supports Node 20+.

@@ -1,5 +1,6 @@
 import { decodeFrozenSnapshotMsv5Browser } from './msv5/binaryMsv5DecodeBrowser'
-import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodePacked'
+import { encodeFrozenSnapshotMsv5PackedBrowser } from './msv5/binaryMsv5EncodeBrowser'
+import { snapshotBytes } from './binaryBytes'
 import { defaultFrozenLoadOptions } from './searchDefaults'
 import type { BrowserSaveBinaryAsyncOptions, Options } from './searchTypes'
 import FrozenMiniSearchCore, {
@@ -42,9 +43,10 @@ export default class FrozenMiniSearchBrowser<
   }
 
   static async loadBinaryAsync<T>(
-    buffer: Uint8Array,
+    bytes: Uint8Array | ArrayBuffer,
     options: Options<T> = {} as Options<T>,
   ): Promise<FrozenMiniSearchBrowser<T>> {
+    const buffer = snapshotBytes(bytes)
     const storeFields =
       options.storeFields ?? defaultFrozenLoadOptions.storeFields
     const snap = await decodeFrozenSnapshotMsv5Browser(buffer, { storeFields })

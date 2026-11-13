@@ -2,7 +2,7 @@
 
 Bun can compile TypeScript/JavaScript to machine code at build time. This note explains how to try it with FrozenMiniSearch and what we measured. It applies to **standalone Bun executables** only: Node, browsers and Bun without `--aot` keep using the Rollup bundles.
 
-Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3` and `1.4.4-canary.1+2596ac5d3`. The last one is the merge of [oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which rewrote the compiler: flags, `--explain` output and performance all changed (see [Measurements](#measurements)). The one before it is the last canary with the old compiler and the baseline for the before/after numbers. Bun `1.4.4` stable has no `--aot` at all, so it cannot serve as that baseline.
+Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3`, `1.4.4-canary.1+2596ac5d3`, and `1.4.4-canary.1+8aa496e1d`. `2596ac5d3` is the merge of [oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which rewrote the compiler: flags, `--explain` output and performance all changed (see [Measurements](#measurements)). `7ca0042d3` is the last canary with the old compiler and the baseline for the before/after numbers. `8aa496e1d` recovers (and mostly improves upon) the pre-rewrite speed, memory, executable size, and `bun test --aot` pass rate. Bun `1.4.4` stable has no `--aot` at all, so it cannot serve as that baseline.
 
 ## Commands
 
@@ -11,14 +11,14 @@ Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3` and 
 | `bun --aot app.ts` | Type-checks like `bun compile`, then runs with built-in objects read-only. **No speed-up.** Useful as a guard. |
 | `bun build --compile --aot app.ts --outfile app` (or `bun compile app.ts`) | Real AOT: standalone executable with machine code. |
 | `bun build --compile --no-aot app.ts --outfile app` | Classic bundle + JIT executable (baseline). |
-| `bun compile app.ts --outfile app --explain` | Lists the slow paths, worst first. `--explain=json` lists all of them; `allocations`, `guards` and `trim` are other reports. |
+| `bun compile app.ts --outfile app --explain` | Lists the slow paths, worst first. `--explain=json` lists all of them; `allocations`, `guards`, `guards-json` and `trim` are other reports. |
 | `bun check --aot --explain app.ts` | The same report without building. |
 | `bun test --aot src/ dev/parity/` | Compiles the tests and the code they import, then runs them. |
 | `bun check --no-script` | Type check. AOT needs a type-correct program. |
 
 `bun --aot-log-type-mismatches` and `--explain=missed-optimizations` no longer exist since the rewrite. Before it, the first one found two declared-type mismatches in this repo (fixed in `src/frozenBuild.ts` and `src/scoring.ts`).
 
-`bun test --aot` passes the whole suite except one test: a `vi.spyOn` (imported from `vitest`) on a function that another module imports. Bun only sees such a spy at build time when it is written `spyOn` or `jest.spyOn`/`vi.spyOn` from `bun:test`. The test still passes under Vitest and plain `bun test`.
+On `8aa496e1d`, `bun test --aot src/ dev/parity/` (and with `--parallel`) passes all 845 tests across 47 files. Earlier on `2596ac5d3`, one test failed (`vi.spyOn` imported from `vitest` in `src/msv5/binaryMsv5DecodeShared.test.js`); that now passes too.
 
 ## Distributing the library
 
@@ -30,15 +30,40 @@ The package does this:
 - `package.json` lists `"aot": "./dist/aot/index.aot.ts"` first in the `.` export, because resolvers take the first matching condition. `scripts/verify-npm-pack.cjs` checks this order and that every export target is in the tarball; `scripts/assert-public-bundles.cjs` scans the file like the other bundles.
 - `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles `dev/aot/consumer.ts` with `--aot`. It fails if Bun reports a type error in `index.aot.ts`, if the build did not resolve the `"aot"` condition, or if the executable's results differ from the same consumer under Bun JIT (`dist/es`), bit for bit, across `fromDocuments`, the builder, `fromJSON` and every binary compression. CI runs it on Bun `latest` and `canary`, and `prepublishOnly` runs it before every release.
 
-Bun reports type errors inside a dependency only when a build has other diagnostics, and then compiles the whole package without its types, which still works but runs slower. `make test-aot` therefore also compiles a probe with a deliberate type error. Inside `node_modules`, Bun's checker rejects `node:stream` classes such as `Transform` as types (TS2709) while `bun check` in the repository accepts them, so derive stream types from `node:zlib` instead. Bun checks the AOT source under the `compilerOptions` of the package's `package.json`, or as `strict` when there are none (our case, and `tsconfig.json` is strict too).
+Bun reports type errors inside a dependency only when a build has other diagnostics, and then compiles the whole package without its types, which still works but runs slower. `make test-aot` therefore also compiles a probe with a deliberate type error. Earlier, inside `node_modules`, Bun's checker rejected `node:stream` classes such as `Transform` as types (TS2709) while `bun check` in the repository accepted them, so stream types in `src/msv5/binaryMsv5Compression.ts` are derived from `node:zlib` instead; on `8aa496e1d`, `import type { Transform } from 'node:stream'` inside `node_modules` no longer triggers TS2709 (with or without `@types/node`), though keeping the `node:zlib`-derived type avoids the dependency altogether. Bun checks the AOT source under the `compilerOptions` of the package's `package.json`, or as `strict` when there are none (our case, and `tsconfig.json` is strict too).
 
-Before the rewrite, with the same consumer compiled with `--aot` on the Divina Commedia x3, the `"aot"` condition made exact, prefix and fuzzy search, `AND`, `autoSuggest` and `searchPage` 1.8-2.8x faster than the plain JavaScript bundle. With `2596ac5d3` the gain is 0-25 % (see below). Results are identical in both cases. Against Node, ids and ordering are identical; some scores differ in the last bit (relative difference up to 5e-16), as they already do between Bun JIT and Node (JavaScriptCore and V8 math functions).
+Before the rewrite, with the same consumer compiled with `--aot` on the Divina Commedia x3, the `"aot"` condition made exact, prefix and fuzzy search, `AND`, `autoSuggest` and `searchPage` 1.8-2.8x faster than the plain JavaScript bundle. On `2596ac5d3` that gain shrank to 0-25 %. On `8aa496e1d`, the `"aot"` condition again beats the plain JavaScript bundle on every metric (by 11 % on build and 21-29 % on queries; see below). Results are identical in both cases. Against Node, ids and ordering are identical; some scores differ in the last bit (relative difference up to 5e-16), as they already do between Bun JIT and Node (JavaScriptCore and V8 math functions).
 
 ## Measurements
 
 Setup: Divina Commedia corpus x3 (42,291 documents, one `txt` field), `fromDocuments`, then `saveBinarySync` / `loadBinarySync` (1.7 MB), queries on the reloaded index. Median of 5 process runs, each metric being the best of 5 passes. One machine, no CPU isolation: expect 10-20 % noise. Scripts were scratch files, not committed.
 
-### Speed with `1.4.4-canary.1+2596ac5d3` (µs/op unless noted)
+### Speed with `1.4.4-canary.1+8aa496e1d` (µs/op unless noted)
+
+| Metric | Node 24 | Bun JIT | `bun --aot` (script) | compile `--no-aot` | `--aot`, JS bundle | `--aot`, `"aot"` condition | `--aot --trim` | `--aot` vs `--no-aot` |
+|--------|--------:|--------:|---------------------:|-------------------:|-------------------:|---------------------------:|---------------:|----------------------:|
+| build (ms) | 226.6 | 208.6 | 217.9 | 239.5 | 166.4 | 147.7 | 155.7 | -38 % |
+| save+load (ms) | 303.1 | 169.1 | 175.1 | 173.1 | 156.2 | 155.3 | 157.0 | -10 % |
+| exact | 26.7 | 32.2 | 28.1 | 27.9 | 28.2 | 22.3 | 22.5 | -20 % |
+| prefix | 122.0 | 105.6 | 107.1 | 105.7 | 107.7 | 84.5 | 85.8 | -20 % |
+| fuzzy | 45.3 | 40.8 | 41.4 | 41.5 | 58.1 | 41.0 | 40.7 | ~ |
+| multi-term OR | 157.7 | 126.1 | 135.4 | 126.9 | 138.8 | 107.5 | 109.2 | -15 % |
+| multi-term AND | 50.1 | 35.4 | 35.1 | 34.9 | 43.2 | 32.5 | 32.2 | -7 % |
+| autoSuggest | 144.6 | 121.2 | 119.9 | 115.5 | 143.8 | 105.0 | 105.2 | -9 % |
+| searchPage | 49.7 | 42.4 | 43.7 | 40.5 | 48.4 | 37.9 | 36.6 | -6 % |
+| nested combination | 67.3 | 49.4 | 49.2 | 47.5 | 56.0 | 39.8 | 38.3 | -16 % |
+
+On `8aa496e1d`, `--aot` with the `"aot"` condition **beats `--no-aot` and Node 24 across the board** (with `fuzzy` at parity with `--no-aot` and faster than Node 24). `--aot --trim` runs at the same speed while cutting executable size nearly in half, and `bun --aot` (script mode) remains at JIT speed.
+
+Re-checking the earlier regression cases on `8aa496e1d`:
+
+- **100,000 exact searches pinned to one core (`taskset -c 0`, minimum of 3 runs)**: `--aot` now beats `--no-aot` even on common words where `finalizeSearchResults` dominates — `"amore"` (168 hits): `44.8` vs `56.2` µs (-20 %, `limit: 10`: `33.4` vs `31.6` µs); `"come"` (1,896 hits): `618.1` vs `865.5` µs (-29 %), `limit: 10`: `334.7` vs `426.6` µs (-22 %).
+- **Standalone `Map` / object / `sort` microbenchmarks (2,000 entries, 10k calls, `sort` 1k calls, `taskset -c 0`)**: `--aot` is `3.36x` faster than `--no-aot` on `Map` iteration (`88.9` vs `298.4` ms), `1.78x` faster on object creation (`690.6` vs `1229.5` ms), `3.28x` faster on sorting (`86.5` vs `284.0` ms), and `2.17x` faster on full finalization (`2011.2` vs `4364.4` ms). Only `Map.get` remains slower under `--aot` (`183.2` vs `126.5` ms, `1.45x`, improved from `2.6x` on `2596ac5d3`).
+- **CPU profile (`BUN_OPTIONS="--cpu-prof"`) on 100,000 `"come"` searches**: `scorePostingDoc` `32.5 %`, `sort` `11.1 %`, `keyedSingleMatch` `9.8 %`, `byScore` `7.8 %`, `finalizeSearchResults` `7.3 %` (`finalizeSearchResults + sort + byScore` = `26.2 %`, down from `57 %` on `2596ac5d3`).
+- **`--explain` on `dev/aot/consumer.ts`**: `563` causes (down from `2,704` on `2596ac5d3`), `439` by-name dependency accesses (down from `1,569`), and `49.7 %` of dependency property accesses compiled to a single fixed-offset load (`1,326` free, `900` tested, `439` by name; up from `28 %`).
+- **Index expressions and `ArrayBufferLike` views**: `a[(offset + i) | 0]` matches `a[offset + i]` (`167.4` vs `171.1` ms under `--aot`, vs `190.4` / `187.4` ms under `--no-aot`), and `a[b[i] % a.length]` no longer triggers `loose-type` (`393.2` vs `346.9` ms, +13 % instead of 7.6x). Passing a `new Uint32Array(buf, 0, 2)` view over `ArrayBufferLike` across an exported non-inlined call now keeps `a[i]` typed (`free`): only `a.length` inside the loop condition warns (`read it outside your loops`), and hoisting `const len = a.length` yields `100 %` typed accesses.
+
+### Speed with `1.4.4-canary.1+2596ac5d3` (historical, µs/op unless noted)
 
 Different scratch script and query set from the older table below (common Italian words, so the absolute numbers are higher); compare columns, not tables.
 
@@ -143,32 +168,38 @@ The 2,704 entries follow from this: posting and field-length arrays are views ov
 
 With the exact-suffix tail shortcut in `PackedRadixTree.fuzzy` (`walkExactSuffix`), fuzzy searches avoid ~79% of Levenshtein DP cell evaluations and ~86% of recursive edge explorations once `minDistance === maxDistance`, bringing fuzzy search execution down from ~80 µs to ~55 µs in AOT (and from ~0.35 ms to ~0.13 ms, >2.5x faster, on realistic vocabularies like the 23k terms BDPM index). Result counts were identical with and without AOT on all queries compared.
 
-### Size
+### Size (`1.4.4-canary.1+8aa496e1d`, MiB on disk unless noted)
 
 | Artifact | Size |
 |----------|-----:|
-| hello world, `--aot` | 68 MB |
-| hello world, `--no-aot` | 140 MB |
-| benchmark executable (lib + script), `--aot` | 70 MB |
-| `dist/es/index.js` | 237 KB |
+| hello world, `--aot` | 66.9 MiB |
+| hello world, `--aot --trim` | 24.5 MiB |
+| hello world + `node:zlib`, `--aot --trim` | 38.4 MiB |
+| hello world, `--no-aot` | 148.1 MiB |
+| benchmark executable (lib + script), `--aot` | 70.2 MiB |
+| benchmark executable, `--aot --trim` | 39.7 MiB |
+| benchmark executable, `--no-aot` | 148.3 MiB |
+| `dist/aot/index.aot.ts` | 249 KB |
 
-Before the rewrite, the library added roughly 2 MB to an AOT executable; the Bun runtime is most of the weight. With `2596ac5d3`, hello world is 65 MB (`--aot`) and 134 MB (`--no-aot`), but the benchmark executable is 114 MB with `--aot`.
+Before the rewrite, the library added roughly 2 MB to an AOT executable (`da867c60b`: 68 MB hello, 70 MB benchmark, 140 MB `--no-aot`). With `2596ac5d3`, hello world was 65 MB (`--aot`) and 134 MB (`--no-aot`), while the benchmark executable swelled to 114 MB with `--aot`. On `8aa496e1d`, the benchmark executable is back to 70.2 MiB (`39.7 MiB` with `--trim`).
 
-### Memory (RSS, MB, after forced GC, before the rewrite)
+### Memory (RSS, MiB, after forced GC)
+
+On `1.4.4-canary.1+8aa496e1d` (Divina Commedia x3, 200,000 queries across 8 terms, 2 runs each):
 
 | Phase | Bun JIT | `--no-aot` | `--aot` |
 |-------|--------:|-----------:|--------:|
-| index loaded | 64 | 63-64 | 61 |
-| steady state, 50k-200k queries | 99-104 | 96-99 | **82-85** |
-| peak between GCs, steady state | 120-135 | 120-125 | **148-155** |
+| index loaded | 102–107 | 105.6–109.7 | **72.4–72.5** |
+| steady state, 50k–200k queries | 97.4–103.0 | 98.0–104.8 | **69.7–71.6** |
+| peak between GCs, steady state | 156.2–162.7 | 158.3–161.3 | **103.3–104.1** |
 
-No leak up to 200,000 queries in any configuration (two runs each). AOT has a lower resting RSS but a **higher peak between GCs**: size container limits on the peak, not on the post-GC value. Cause not investigated (`--explain` reports many heap allocations in the query path).
+No leak up to 200,000 queries in any configuration. Unlike before the rewrite (when `--aot` had a lower resting RSS of 82–85 MB vs 96–104 MB, but a higher peak between GCs of 148–155 MB vs 120–135 MB), `--aot` on `8aa496e1d` is ~30–35 % lower in **both** steady state and peak RSS between GCs.
 
 ## Code changes made for AOT
 
 Only changes that are neutral or better under Node and Bun JIT are kept:
 
-- the stream type derived from `node:zlib` (above), without which the AOT source is compiled without its types;
+- the stream type derived from `node:zlib` (above), originally required so the AOT source was not compiled without its types;
 - `visitRecurse` in `fuzzyMatrix.ts` takes its invariant state in one object, like the bit-parallel walk;
 - `decodeMsv5PostingsSections` takes the wire object that the encoder builds;
 - JSON snapshot validation checks `typeof` before narrowing instead of casting.
@@ -177,15 +208,15 @@ Workarounds for compiler limits that the rewrite already changed (spreads replac
 
 ## Bun issues found along the way
 
-| Issue | Status with `2596ac5d3` |
-|-------|-------------------------|
-| [#47764](https://github.com/oven-sh/bun/issues/47764) arguments past the 8th not tracked | No longer reproduces: the 8- and 9-argument variants give the same report. |
-| [#47919](https://github.com/oven-sh/bun/issues/47919) `--trim-without=<name>` rejects every name | Still reproduces (the flag is no longer listed in `--help`). |
-| [#47920](https://github.com/oven-sh/bun/issues/47920) `node:zlib` blocks `--trim` | Partly fixed: the compiler now sees every API, but a `node:zlib` import still doubles a trimmed hello world (25 → 53 MB), as in [#48182](https://github.com/oven-sh/bun/issues/48182). |
-| [#48144](https://github.com/oven-sh/bun/issues/48144) false `property-added` with `extends` | No longer reproduces; the same program now reports an `unknown-callee` at the subclass. |
-| [#48145](https://github.com/oven-sh/bun/issues/48145) `node:zlib` `crc32` not a direct call | Confirmed by Bun, now reported as `unknown-callee`; fix in progress (oven-sh/WebKit#1011). |
-| [#48239](https://github.com/oven-sh/bun/issues/48239) index that may be `undefined` labelled `loose-type` | Filed against `2596ac5d3`. |
-| [#48283](https://github.com/oven-sh/bun/issues/48283) `Map`/`Set` iteration, `Map.get` and array reads 2-4x slower since the rewrite | Filed against `2596ac5d3`, with a single-file repro compared to `7ca0042d3`. |
+| Issue | Status with `2596ac5d3` | Status with `8aa496e1d` |
+|-------|-------------------------|-------------------------|
+| [#47764](https://github.com/oven-sh/bun/issues/47764) arguments past the 8th not tracked | No longer reproduces: the 8- and 9-argument variants give the same report. | Still fixed (identical `--explain` on `args8`, `args9`, `args9first`). |
+| [#47919](https://github.com/oven-sh/bun/issues/47919) `--trim-without=<name>` rejects every name | Still reproduces (the flag is no longer listed in `--help`). | Parser fixed for PascalCase feature names (e.g. `Fetch`, `Profilers`, `Sqlite`; lowercase `--explain=trim` tags like `profiler` / `fetch` trigger `Did you mean "Profilers"?` / `"Fetch"?`). Flag still omitted from `--help`. |
+| [#47920](https://github.com/oven-sh/bun/issues/47920) `node:zlib` blocks `--trim` | Partly fixed: the compiler now sees every API, but a `node:zlib` import still doubles a trimmed hello world (25 → 53 MB), as in [#48182](https://github.com/oven-sh/bun/issues/48182). | Improved (`24.5 → 38.4 MiB`, still +14 MiB over `Bun.hash.crc32` / bare hello; keeps `locales: all` via `BigInt.prototype.toLocaleString`, `profiler`, etc.). |
+| [#48144](https://github.com/oven-sh/bun/issues/48144) false `property-added` with `extends` | No longer reproduces; the same program now reports an `unknown-callee` at the subclass. | **Fixed**: `repro_subclass.ts` reports `Every property access is typed. Nothing to fix.` |
+| [#48145](https://github.com/oven-sh/bun/issues/48145) `node:zlib` `crc32` not a direct call | Confirmed by Bun, now reported as `unknown-callee`; fix in progress (oven-sh/WebKit#1011). | Still reproduces (`unknown-callee` for both `zlib.crc32` and named `crc32`). |
+| [#48239](https://github.com/oven-sh/bun/issues/48239) index that may be `undefined` labelled `loose-type` | Filed against `2596ac5d3`. | **Fixed**: `from-array.ts` is 100 % typed (`3 free`), and `total-items.ts` reports `unknown-object` (`element may be missing` wording, `2 tested, 0 by name`), with no `loose-type` or `lost-track`. |
+| [#48283](https://github.com/oven-sh/bun/issues/48283) `Map`/`Set` iteration, `Map.get` and array reads 2-4x slower since the rewrite | Filed against `2596ac5d3`, with a single-file repro compared to `7ca0042d3`. | **Largely recovered**: exact `repro.ts` now beats `--no-aot` (`map-iter` 22.7 vs 130.8 ms, `map-get` 24.5 vs 43.7 ms, `set-iter` 19.2 vs 28.3 ms); only `map.get(keys[i])` with an `Int32Array` key remains slower than `--no-aot` (183.2 vs 126.5 ms). |
 
 ## Caveats
 

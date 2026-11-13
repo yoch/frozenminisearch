@@ -105,22 +105,15 @@ const packedRadixEmitSubtreeBench = {
   plugins: packedRadixBenchPlugins,
 }
 
-function rollupExports () {
-  if (process.env.PACKED_RADIX_BENCH === 'true') {
-    return [packedRadixBench, packedRadixFuzzyBench, packedRadixFuzzySweepBench, packedRadixEmitSubtreeBench]
-  }
-  return [
-  config({ format: 'es', input: 'src/index.ts', output: 'es6', dir: 'es' }),
-  config({ format: 'cjs', input: 'src/index.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),
-  config({ format: 'es', input: 'src/index.ts', output: 'dts', dir: 'es', extension: 'd.ts' }),
-  {
-    input: 'src/browser.ts',
+function browserConfig ({ input, file }) {
+  return {
+    input,
     treeshake: {
       moduleSideEffects: false,
     },
     output: {
       sourcemap: !production,
-      file: 'dist/browser/index.js',
+      file,
       format: 'es',
       plugins: production ? [terserPlugin] : [],
     },
@@ -132,15 +125,38 @@ function rollupExports () {
         ? { sourceMap: false, compilerOptions: { outDir: 'dist/browser', sourceMap: false } }
         : { sourceMap: true, compilerOptions: { outDir: 'dist/browser', sourceMap: true } }),
     ],
-  },
-  {
-    input: 'src/browser.ts',
+  }
+}
+
+function browserDtsConfig ({ input, file }) {
+  return {
+    input,
     output: {
-      file: 'dist/browser/index.d.ts',
+      file,
       format: 'es',
     },
     plugins: [dts()],
-  },
+  }
+}
+
+function rollupExports () {
+  if (process.env.PACKED_RADIX_BENCH === 'true') {
+    return [packedRadixBench, packedRadixFuzzyBench, packedRadixFuzzySweepBench, packedRadixEmitSubtreeBench]
+  }
+  return [
+    config({ format: 'es', input: 'src/index.ts', output: 'es6', dir: 'es' }),
+    config({ format: 'cjs', input: 'src/index.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),
+    config({ format: 'es', input: 'src/index.ts', output: 'dts', dir: 'es', extension: 'd.ts' }),
+    config({ format: 'es', input: 'src/vectors.ts', output: 'es6', dir: 'es' }),
+    config({ format: 'cjs', input: 'src/vectors.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),
+    config({ format: 'es', input: 'src/vectors.ts', output: 'dts', dir: 'es', extension: 'd.ts' }),
+    config({ format: 'es', input: 'src/vectorsTrain.ts', output: 'es6', dir: 'es' }),
+    config({ format: 'cjs', input: 'src/vectorsTrain.ts', output: 'cjs', dir: 'cjs', extension: 'cjs', exports: 'named' }),
+    config({ format: 'es', input: 'src/vectorsTrain.ts', output: 'dts', dir: 'es', extension: 'd.ts' }),
+    browserConfig({ input: 'src/browser.ts', file: 'dist/browser/index.js' }),
+    browserDtsConfig({ input: 'src/browser.ts', file: 'dist/browser/index.d.ts' }),
+    browserConfig({ input: 'src/vectors.ts', file: 'dist/browser/vectors.js' }),
+    browserDtsConfig({ input: 'src/vectors.ts', file: 'dist/browser/vectors.d.ts' }),
   ]
 }
 

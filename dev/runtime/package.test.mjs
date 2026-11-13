@@ -4,6 +4,8 @@ import { test } from 'node:test'
 import zlib from 'node:zlib'
 import * as esm from '@yoch/frozenminisearch'
 import * as browser from '@yoch/frozenminisearch/browser'
+import * as vectors from '@yoch/frozenminisearch/vectors'
+import * as vectorsTrain from '@yoch/frozenminisearch/vectors/train'
 
 const require = createRequire(import.meta.url)
 const cjs = require('@yoch/frozenminisearch')
@@ -81,4 +83,52 @@ test('Node and browser exchange zlib snapshots', async () => {
   const inNode = esm.default.loadBinarySync(await browserIndex.saveBinaryAsync({ compression: 'zlib' }), options)
   assert.deepEqual(inBrowser.search('zen'), nodeIndex.search('zen'))
   assert.deepEqual(inNode.search('zen'), browserIndex.search('zen'))
+})
+
+test('vectors and vectors/train subpaths work across ESM, CJS and browser host with FXV1 v2 invariants', () => {
+  const cjsVectors = require('@yoch/frozenminisearch/vectors')
+  const cjsTrain = require('@yoch/frozenminisearch/vectors/train')
+  assert.equal(esm.FrozenVectorIndex, undefined)
+  assert.equal(cjs.FrozenVectorIndex, undefined)
+  assert.equal(browser.FrozenVectorIndex, undefined)
+
+  const nodeHost = esm.default.fromDocuments(documents, options)
+  const browserHost = browser.default.fromDocuments(documents, options)
+  const meta = { representationVersion: 'runtime:v1', snapshotId: 'docs:v1' }
+  const entries = [
+    ['book-1', [1, 0, 0, 0]],
+    ['book-2', [0, 1, 0, 0]],
+    ['book-3', [0.7, 0.7, 0, 0]],
+  ]
+
+  const i8 = vectors.FrozenVectorIndex.fromDocumentVectors(nodeHost, entries, {
+    dim: 4,
+    quantization: 'int8',
+    normalize: true,
+    ...meta,
+  })
+  const loadedCjs = cjsVectors.FrozenVectorIndex.loadBinary(
+    i8.saveBinary(),
+    browserHost,
+    meta,
+  )
+  assert.equal(loadedCjs.topK([0, 1, 0, 0], { k: 1 })[0].id, 'book-2')
+
+  const pqBytes = cjsTrain.encodeDocumentVectorPack(nodeHost, entries, {
+    dim: 4,
+    quantization: 'pq',
+    pqSubspaces: 2,
+    normalize: true,
+    ...meta,
+  })
+  const loadedPq = vectors.FrozenVectorIndex.loadBinary(
+    pqBytes,
+    nodeHost,
+    meta,
+  )
+  assert.equal(loadedPq.topK([1, 0, 0, 0], { k: 1 })[0].id, 'book-1')
+  assert.equal(
+    vectorsTrain.selectPqSampleIndices(new Int32Array([0, 1, 2, 3, 4]), 3).length,
+    3,
+  )
 })

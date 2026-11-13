@@ -5,6 +5,8 @@ const { pathToFileURL } = require('node:url')
 
 const bundlePath = join(__dirname, '..', 'dist', 'browser', 'index.js')
 const dtsPath = join(__dirname, '..', 'dist', 'browser', 'index.d.ts')
+const vectorsBundlePath = join(__dirname, '..', 'dist', 'browser', 'vectors.js')
+const vectorsDtsPath = join(__dirname, '..', 'dist', 'browser', 'vectors.d.ts')
 const forbiddenBundlePatterns = [
   { name: 'Node builtin imports', pattern: /\b(?:from\s*|import\s*\(|require\s*\()\s*['"]node:/ },
   { name: 'Buffer runtime usage', pattern: /\bBuffer\b/ },
@@ -17,6 +19,8 @@ const requiredAsyncBinaryApis = ['saveBinaryAsync', 'loadBinaryAsync']
 try {
   accessSync(bundlePath)
   accessSync(dtsPath)
+  accessSync(vectorsBundlePath)
+  accessSync(vectorsDtsPath)
 } catch {
   console.error('test:browser: missing dist/browser output — run pnpm build first')
   process.exit(1)
@@ -24,12 +28,21 @@ try {
 
 const bundle = readFileSync(bundlePath, 'utf8')
 const dts = readFileSync(dtsPath, 'utf8')
+const vectorsBundle = readFileSync(vectorsBundlePath, 'utf8')
 
 for (const { name, pattern } of forbiddenBundlePatterns) {
   if (pattern.test(bundle)) {
     console.error(`test:browser: forbidden ${name} found in dist/browser/index.js`)
     process.exit(1)
   }
+  if (pattern.test(vectorsBundle)) {
+    console.error(`test:browser: forbidden ${name} found in dist/browser/vectors.js`)
+    process.exit(1)
+  }
+}
+if (bundle.includes('FrozenVectorIndex') || bundle.includes('FXV1')) {
+  console.error('test:browser: forbidden vector runtime found in lexical dist/browser/index.js')
+  process.exit(1)
 }
 
 for (const apiName of forbiddenSyncBinaryApis) {

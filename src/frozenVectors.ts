@@ -1,516 +1,265 @@
-import {
-  assertLittleEndianHost,
-  readAscii,
-  readU16LE,
-  readU32LE,
-  readU8,
-  snapshotBytes,
-  utf8Bytes,
-  writeAscii,
-  writeU16LE,
-  writeU32LE,
-  writeU8,
-} from './binaryBytes'
 import { crc32Update } from './crc32Wire'
 import {
-  VECTOR_CORPUS_BINDING,
   type VectorCorpusBinding,
   type VectorCorpusHost,
 } from './frozenVectorBinding'
+import {
+  assertDim,
+  assertLittleEndianHost,
+  assertMetadataString,
+  assertMetric,
+  buildInt8Payload,
+  computeMappingFingerprint,
+  computePayloadBytes,
+  computeReconstructedRowNorms,
+  countMaskBits,
+  FLAG_HAS_PRESENT_MASK,
+  FLAG_HAS_ROW_NORMS,
+  FLAG_METRIC_COSINE,
+  FLAG_NORMALIZED,
+  type FromDocumentVectorsOptions,
+  type FrozenVectorIndexStats,
+  ingestDenseVectors,
+  ingestDocumentVectors,
+  isLiveShortId,
+  isMaskBitSet,
+  KIND_FLOAT32,
+  KIND_INT8,
+  KIND_PQ_U8,
+  KNOWN_FLAGS,
+  presentMaskByteLength,
+  readAndNormalizeVector,
+  readAscii,
+  readCorpusBinding,
+  readExpectation,
+  readOwnedFloat32Slice,
+  readPackMetadata,
+  readU16LE,
+  readU32LE,
+  readU8,
+  resolveExternalId,
+  safeProduct,
+  serializeVectorPack,
+  snapshotBytes,
+  VECTOR_HEADER_SIZE,
+  VECTOR_MAGIC,
+  VECTOR_VERSION,
+  type VectorExpectation,
+  type VectorIndexOptions,
+  type VectorMetric,
+  type VectorPayload,
+  type VectorQuantization,
+  type VectorSearchHit,
+  type VectorSearchOptions,
+  type DocumentVectorEntry,
+} from './frozenVectorsShared'
 
-const VECTOR_MAGIC = 'FXV1'
-const VECTOR_VERSION = 1
-const VECTOR_HEADER_SIZE = 40
-
-const KIND_FLOAT32 = 1
-const KIND_INT8 = 2
-const KIND_PQ_U8 = 3
-
-const FLAG_NORMALIZED = 1 << 0
-const FLAG_HAS_PRESENT_MASK = 1 << 1
-const FLAG_HAS_ROW_NORMS = 1 << 2
-const FLAG_METRIC_COSINE = 1 << 3
-const KNOWN_FLAGS =
-  FLAG_NORMALIZED |
-  FLAG_HAS_PRESENT_MASK |
-  FLAG_HAS_ROW_NORMS |
-  FLAG_METRIC_COSINE
-
-const MAX_DIM = 65536
-const MAX_PAYLOAD_BYTES = 0x7fffffff
-
-const FP_TAG_HOLE = 0
-const FP_TAG_STRING = 1
-const FP_TAG_NUMBER = 2
-const FP_TAG_OTHER = 3
-
-const FLOAT_SCRATCH = new ArrayBuffer(8)
-const FLOAT_SCRATCH_VIEW = new DataView(FLOAT_SCRATCH)
-const FLOAT_SCRATCH_BYTES = new Uint8Array(FLOAT_SCRATCH)
-const U32_SCRATCH = new Uint8Array(9)
-const FP_HEADER_SCRATCH = new Uint8Array(10)
-
-export type VectorQuantization = 'float32' | 'int8' | 'pq'
-export type VectorMetric = 'cosine' | 'dot'
-
-export interface VectorIndexOptions {
-  /** Embedding dimensionality (`1 <= dim <= 65536`). */
-  dim: number
-  /** Compression mode (`'float32'`, `'int8'`, or `'pq'`). Defaults to `'int8'`. */
-  quantization?: VectorQuantization
-  /** Similarity metric (`'cosine'` or `'dot'`). Defaults to `'cosine'`. */
-  metric?: VectorMetric
-  /** L2-normalize each live vector prior to quantization. Defaults to `false`. */
-  normalize?: boolean
-  /** Number of PQ subspaces dividing `dim` (`quantization: 'pq'`). */
-  pqSubspaces?: number
-  /** K-means iterations per subspace (`quantization: 'pq'`). Defaults to `12`. */
-  pqIterations?: number
-  /** Deterministic sample cap per PQ subspace (`quantization: 'pq'`). Defaults to `4096`. */
-  pqSampleSize?: number
+export type {
+  DocumentVectorEntry,
+  FromDocumentVectorsOptions,
+  FrozenVectorIndexStats,
+  VectorExpectation,
+  VectorIndexOptions,
+  VectorMetric,
+  VectorQuantization,
+  VectorSearchHit,
+  VectorSearchOptions,
 }
 
-export type DocumentVectorEntry<Id = unknown> =
-  { id: Id; vector: ArrayLike<number> } | readonly [Id, ArrayLike<number>]
-
-export interface FromDocumentVectorsOptions extends VectorIndexOptions {
-  /** Reject missing vectors for any live document in the corpus. Defaults to `true`. */
-  requireAllLiveDocs?: boolean
-}
-
-export interface VectorSearchOptions<Id = unknown> {
-  /** Maximum number of hits to return (`0` returns `[]`). Defaults to `10`. */
-  k?: number
-  /** Override query metric (`'cosine'` or `'dot'`). Defaults to the index metric. */
-  metric?: VectorMetric
-  /** Minimum similarity threshold (`score >= minScore`). Defaults to `-Infinity`. */
-  minScore?: number
-  /** Pre-k document predicate evaluated before heap insertion. */
-  filter?: (id: Id, shortId: number) => boolean
-}
-
-export interface VectorSearchHit<Id = unknown> {
-  id: Id
-  shortId: number
-  score: number
-}
-
-export interface FrozenVectorIndexStats {
-  quantization: VectorQuantization
-  metric: VectorMetric
-  dim: number
-  documentCount: number
-  nextId: number
-  corpusFingerprint: number
-  presentCount: number
-  pqSubspaces: number
-  pqCentroidsPerSubspace: number
-  normalized: boolean
-  hasReconstructedNorms: boolean
-  byteLength: number
-}
-
-type VectorPayload =
-  | { kind: typeof KIND_FLOAT32; vectors: Float32Array }
-  | { kind: typeof KIND_INT8; scales: Float32Array; codes: Int8Array }
-  | {
-      kind: typeof KIND_PQ_U8
-      subspaces: number
-      centroidsPerSubspace: number
-      subDim: number
-      centroids: Float32Array
-      codes: Uint8Array
-    }
-
-function assertNonNegInt(value: number, label: string): void {
-  if (!Number.isInteger(value) || value < 0) {
-    throw new RangeError(
-      `FrozenVectorIndex: ${label} must be a non-negative integer`,
-    )
+function buildInvNorms(rowNorms: Float32Array | null): Float32Array | null {
+  if (rowNorms === null) return null
+  const inv = new Float32Array(rowNorms.length)
+  for (let i = 0; i < rowNorms.length; i++) {
+    const n = rowNorms[i]
+    inv[i] = n > 1e-30 ? 1 / n : 0
   }
+  return inv
 }
 
-function assertDim(dim: number): void {
-  if (!Number.isInteger(dim) || dim < 1 || dim > MAX_DIM) {
-    throw new RangeError(
-      `FrozenVectorIndex: dim must be an integer in [1, ${MAX_DIM}]`,
-    )
-  }
-}
-
-function assertMetric(metric: VectorMetric): void {
-  if (metric !== 'cosine' && metric !== 'dot') {
-    throw new TypeError(
-      `FrozenVectorIndex: unsupported metric "${String(metric)}"`,
-    )
-  }
-}
-
-function readCorpusBinding(host: unknown): VectorCorpusBinding {
-  if (
-    host == null ||
-    typeof host !== 'object' ||
-    typeof (host as VectorCorpusHost)[VECTOR_CORPUS_BINDING] !== 'function'
-  ) {
-    throw new TypeError(
-      'FrozenVectorIndex: expected a FrozenMiniSearch instance',
-    )
-  }
-  const binding = (host as VectorCorpusHost)[VECTOR_CORPUS_BINDING]()
-  assertNonNegInt(binding.documentCount, 'documentCount')
-  assertNonNegInt(binding.nextId, 'nextId')
-  if (binding.documentCount > binding.nextId) {
-    throw new RangeError(
-      'FrozenVectorIndex: documentCount exceeds nextId on host corpus',
-    )
-  }
-  if (
-    binding.externalIds !== null &&
-    binding.externalIds.length < binding.nextId
-  ) {
-    throw new RangeError(
-      'FrozenVectorIndex: host externalIds shorter than nextId',
-    )
-  }
-  return binding
-}
-
-function resolveExternalId(
-  binding: VectorCorpusBinding,
-  shortId: number,
-): unknown {
-  return binding.externalIds === null ? shortId : binding.externalIds[shortId]
-}
-
-function isLiveShortId(binding: VectorCorpusBinding, shortId: number): boolean {
-  return (
-    binding.externalIds === null || binding.externalIds[shortId] !== undefined
-  )
-}
-
-function writeU32At(buf: Uint8Array, pos: number, value: number): void {
-  buf[pos] = value & 0xff
-  buf[pos + 1] = (value >>> 8) & 0xff
-  buf[pos + 2] = (value >>> 16) & 0xff
-  buf[pos + 3] = (value >>> 24) & 0xff
-}
-
-function hashTagShortId(seed: number, tag: number, shortId: number): number {
-  U32_SCRATCH[0] = tag & 0xff
-  writeU32At(U32_SCRATCH, 1, shortId)
-  return crc32Update(seed, U32_SCRATCH, 0, 5)
-}
-
-/** Compute deterministic CRC-32 fingerprint binding document slots and external IDs. */
-function computeCorpusFingerprint(binding: VectorCorpusBinding): number {
-  FP_HEADER_SCRATCH[0] = 1
-  FP_HEADER_SCRATCH[1] = binding.externalIds === null ? 1 : 2
-  writeU32At(FP_HEADER_SCRATCH, 2, binding.documentCount)
-  writeU32At(FP_HEADER_SCRATCH, 6, binding.nextId)
-  let seed = crc32Update(0, FP_HEADER_SCRATCH, 0, FP_HEADER_SCRATCH.length)
-  if (binding.externalIds === null) {
-    return seed >>> 0
-  }
-
-  const externalIds = binding.externalIds
-  for (let shortId = 0; shortId < binding.nextId; shortId++) {
-    const ext = externalIds[shortId]
-    if (ext === undefined) {
-      seed = hashTagShortId(seed, FP_TAG_HOLE, shortId)
-      continue
-    }
-    if (typeof ext === 'string') {
-      const encoded = utf8Bytes(ext)
-      U32_SCRATCH[0] = FP_TAG_STRING
-      writeU32At(U32_SCRATCH, 1, shortId)
-      writeU32At(U32_SCRATCH, 5, encoded.length)
-      seed = crc32Update(seed, U32_SCRATCH, 0, 9)
-      seed = crc32Update(seed, encoded, 0, encoded.length)
-    } else if (typeof ext === 'number') {
-      seed = hashTagShortId(seed, FP_TAG_NUMBER, shortId)
-      FLOAT_SCRATCH_VIEW.setFloat64(0, ext, true)
-      seed = crc32Update(seed, FLOAT_SCRATCH_BYTES, 0, 8)
-    } else {
-      const encoded = utf8Bytes(String(ext))
-      U32_SCRATCH[0] = FP_TAG_OTHER
-      writeU32At(U32_SCRATCH, 1, shortId)
-      writeU32At(U32_SCRATCH, 5, encoded.length)
-      seed = crc32Update(seed, U32_SCRATCH, 0, 9)
-      seed = crc32Update(seed, encoded, 0, encoded.length)
-    }
-  }
-  return seed >>> 0
-}
-
-function presentMaskByteLength(nextId: number): number {
-  return (nextId + 7) >>> 3
-}
-
-function isMaskBitSet(mask: Uint8Array, index: number): boolean {
-  return ((mask[index >>> 3] >>> (index & 7)) & 1) !== 0
-}
-
-function setMaskBit(mask: Uint8Array, index: number): void {
-  mask[index >>> 3] |= 1 << (index & 7)
-}
-
-function countMaskBits(mask: Uint8Array, nextId: number): number {
-  let count = 0
-  for (let i = 0; i < nextId; i++) {
-    if (isMaskBitSet(mask, i)) count++
-  }
-  return count
-}
-
-function resolvePqSubspaces(dim: number, requested?: number): number {
-  if (requested !== undefined) {
-    if (!Number.isInteger(requested) || requested < 1 || requested > dim) {
-      throw new RangeError(
-        `FrozenVectorIndex: pqSubspaces must be an integer in [1, ${dim}]`,
-      )
-    }
-    if (dim % requested !== 0) {
-      throw new RangeError(
-        `FrozenVectorIndex: dim (${dim}) must be divisible by pqSubspaces (${requested})`,
-      )
-    }
-    return requested
-  }
-  for (const candidate of [16, 32, 8, 4, 2, 1]) {
-    if (dim % candidate === 0 && (dim / candidate >= 4 || candidate === 1)) {
-      return candidate
-    }
-  }
-  for (let m = Math.min(16, dim); m >= 1; m--) {
-    if (dim % m === 0) return m
-  }
-  return 1
-}
-
-function normalizeOrCopyRow(
-  src: ArrayLike<number>,
-  srcOffset: number,
-  dst: Float32Array,
-  dstOffset: number,
-  dim: number,
-  normalize: boolean,
-  docLabel: string | number,
+function assertValidPackFlags(
+  kind: number,
+  normalized: boolean,
+  hasMask: boolean,
+  hasRowNorms: boolean,
+  metric: VectorMetric,
+  documentCount: number,
+  nextId: number,
 ): void {
-  let norm2 = 0
-  for (let d = 0; d < dim; d++) {
-    const val = src[srcOffset + d]
-    if (!Number.isFinite(val)) {
-      throw new RangeError(
-        `FrozenVectorIndex: non-finite value at ${docLabel}, dim ${d}`,
-      )
-    }
-    dst[dstOffset + d] = val
-    norm2 += val * val
+  if (kind === KIND_FLOAT32 && normalized && hasRowNorms) {
+    throw new Error(
+      'FrozenVectorIndex: normalized float32 pack must not declare stored row norms',
+    )
   }
-  if (normalize && norm2 > 1e-24) {
-    const inv = 1 / Math.sqrt(norm2)
-    for (let d = 0; d < dim; d++) {
-      dst[dstOffset + d] *= inv
-    }
+  if (metric === 'dot' && hasRowNorms) {
+    throw new Error(
+      'FrozenVectorIndex: dot-metric pack must not declare stored row norms',
+    )
+  }
+  if (
+    metric === 'cosine' &&
+    !(kind === KIND_FLOAT32 && normalized) &&
+    !hasRowNorms
+  ) {
+    throw new Error(
+      'FrozenVectorIndex: cosine pack without unit float32 vectors must include reconstructed row norms',
+    )
+  }
+  if (documentCount < nextId && !hasMask) {
+    throw new Error(
+      'FrozenVectorIndex: corpus contains deleted slots but pack omits presentMask',
+    )
   }
 }
 
-function buildInt8Payload(
+function validateFloat32Payload(
   vectors: Float32Array,
   nextId: number,
   dim: number,
   presentMask: Uint8Array | null,
-): VectorPayload {
-  const scales = new Float32Array(nextId)
-  const codes = new Int8Array(nextId * dim)
+): void {
+  if (presentMask === null) return
+  for (let i = 0; i < nextId; i++) {
+    if (isMaskBitSet(presentMask, i)) continue
+    const base = i * dim
+    for (let d = 0; d < dim; d++) {
+      if (vectors[base + d] !== 0) {
+        throw new Error(
+          `FrozenVectorIndex: non-zero float32 component in absent slot ${i}`,
+        )
+      }
+    }
+  }
+}
 
+function validateInt8Payload(
+  scales: Float32Array,
+  codes: Int8Array,
+  nextId: number,
+  dim: number,
+  presentMask: Uint8Array | null,
+): void {
+  for (let i = 0; i < scales.length; i++) {
+    if (scales[i] < 0) {
+      throw new RangeError(
+        `FrozenVectorIndex: negative int8 scale at index ${i}`,
+      )
+    }
+  }
+  for (let i = 0; i < nextId; i++) {
+    const present = presentMask === null || isMaskBitSet(presentMask, i)
+    const scale = scales[i]
+    if (!present && scale !== 0) {
+      throw new Error(
+        `FrozenVectorIndex: non-zero int8 scale in absent slot ${i}`,
+      )
+    }
+    const base = i * dim
+    for (let d = 0; d < dim; d++) {
+      const code = codes[base + d]
+      if (code < -127) {
+        throw new RangeError(
+          `FrozenVectorIndex: int8 code ${code} outside symmetric [-127, 127] at index ${i}`,
+        )
+      }
+      if ((!present || scale === 0) && code !== 0) {
+        throw new Error(
+          `FrozenVectorIndex: non-zero int8 code with zero/absent scale at index ${i}`,
+        )
+      }
+    }
+  }
+}
+
+function validatePqPayload(
+  codes: Uint8Array,
+  nextId: number,
+  subspaces: number,
+  pqCentroids: number,
+  presentMask: Uint8Array | null,
+): void {
+  if (pqCentroids < 256) {
+    for (let i = 0; i < codes.length; i++) {
+      if (codes[i] >= pqCentroids) {
+        throw new RangeError(
+          `FrozenVectorIndex: PQ code ${codes[i]} exceeds centroid count ${pqCentroids}`,
+        )
+      }
+    }
+  }
+  if (presentMask === null) return
+  for (let i = 0; i < nextId; i++) {
+    if (isMaskBitSet(presentMask, i)) continue
+    const base = i * subspaces
+    for (let m = 0; m < subspaces; m++) {
+      if (codes[base + m] !== 0) {
+        throw new Error(
+          `FrozenVectorIndex: non-zero PQ code in absent slot ${i}`,
+        )
+      }
+    }
+  }
+}
+
+function verifyNormalizedFloat32Norms(
+  reconstructed: Float32Array,
+  nextId: number,
+  presentMask: Uint8Array | null,
+): void {
   for (let i = 0; i < nextId; i++) {
     if (presentMask !== null && !isMaskBitSet(presentMask, i)) continue
-    const base = i * dim
-    let maxAbs = 0
-    for (let d = 0; d < dim; d++) {
-      const a = Math.abs(vectors[base + d])
-      if (a > maxAbs) maxAbs = a
+    const n = reconstructed[i]
+    if (n !== 0 && Math.abs(n - 1) > 1e-4) {
+      throw new Error(
+        `FrozenVectorIndex: unnormalized float32 vector at index ${i} (norm=${n})`,
+      )
     }
-    if (maxAbs <= 1e-12) {
-      scales[i] = 0
+  }
+}
+
+function verifyStoredRowNorms(
+  storedNorms: Float32Array,
+  reconstructed: Float32Array,
+  nextId: number,
+  presentMask: Uint8Array | null,
+): void {
+  for (let i = 0; i < nextId; i++) {
+    const present = presentMask === null || isMaskBitSet(presentMask, i)
+    const stored = storedNorms[i]
+    if (!present) {
+      if (stored !== 0) {
+        throw new Error(
+          `FrozenVectorIndex: non-zero stored row norm ${stored} for absent slot ${i}`,
+        )
+      }
       continue
     }
-    const scale = maxAbs / 127
-    scales[i] = scale
-    const inv = 1 / scale
-    for (let d = 0; d < dim; d++) {
-      const q = Math.round(vectors[base + d] * inv)
-      codes[base + d] = q > 127 ? 127 : q < -127 ? -127 : q
+    const expected = reconstructed[i]
+    const tol = Math.max(1e-5, 1e-4 * expected)
+    if (Math.abs(stored - expected) > tol) {
+      throw new Error(
+        `FrozenVectorIndex: row norm mismatch at index ${i} (expected ${expected}, got ${stored})`,
+      )
     }
-  }
-  return { kind: KIND_INT8, scales, codes }
-}
-
-function buildPqPayload(
-  vectors: Float32Array,
-  nextId: number,
-  dim: number,
-  presentMask: Uint8Array | null,
-  presentCount: number,
-  options: VectorIndexOptions,
-): VectorPayload {
-  const subspaces = resolvePqSubspaces(dim, options.pqSubspaces)
-  const subDim = dim / subspaces
-  const iters = options.pqIterations ?? 12
-  if (!Number.isInteger(iters) || iters < 1) {
-    throw new RangeError('FrozenVectorIndex: pqIterations must be integer >= 1')
-  }
-  const maxSamples = options.pqSampleSize ?? 4096
-  if (!Number.isInteger(maxSamples) || maxSamples < 1) {
-    throw new RangeError('FrozenVectorIndex: pqSampleSize must be integer >= 1')
-  }
-
-  const liveShortIds = new Int32Array(presentCount)
-  let li = 0
-  for (let i = 0; i < nextId; i++) {
-    if (presentMask === null || isMaskBitSet(presentMask, i)) {
-      liveShortIds[li++] = i
-    }
-  }
-
-  const centroidsPerSubspace =
-    presentCount > 0 ? Math.min(256, presentCount) : 1
-  const centroids = new Float32Array(subspaces * centroidsPerSubspace * subDim)
-  const codes = new Uint8Array(nextId * subspaces)
-  if (presentCount === 0) {
-    return {
-      kind: KIND_PQ_U8,
-      subspaces,
-      centroidsPerSubspace,
-      subDim,
-      centroids,
-      codes,
-    }
-  }
-
-  const sampleStep = Math.max(1, Math.floor(presentCount / maxSamples))
-  const sampleIds: number[] = []
-  for (let i = 0; i < presentCount; i += sampleStep) {
-    sampleIds.push(liveShortIds[i])
-  }
-  const S = sampleIds.length
-
-  let seed = 0x1234567
-  const sums = new Float64Array(centroidsPerSubspace * subDim)
-  const counts = new Int32Array(centroidsPerSubspace)
-
-  for (let m = 0; m < subspaces; m++) {
-    const cBase = m * centroidsPerSubspace * subDim
-    const colOffset = m * subDim
-
-    for (let k = 0; k < centroidsPerSubspace; k++) {
-      let docIdx: number
-      if (centroidsPerSubspace === presentCount) {
-        docIdx = liveShortIds[k]
-      } else {
-        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
-        docIdx = sampleIds[seed % S]
-      }
-      const src = docIdx * dim + colOffset
-      const dst = cBase + k * subDim
-      for (let d = 0; d < subDim; d++) {
-        centroids[dst + d] = vectors[src + d]
-      }
-    }
-
-    for (let it = 0; it < iters; it++) {
-      sums.fill(0)
-      counts.fill(0)
-      for (let si = 0; si < S; si++) {
-        const docBase = sampleIds[si] * dim + colOffset
-        let bestK = 0
-        let bestDist = Infinity
-        for (let k = 0; k < centroidsPerSubspace; k++) {
-          const kb = cBase + k * subDim
-          let dist = 0
-          for (let d = 0; d < subDim; d++) {
-            const diff = vectors[docBase + d] - centroids[kb + d]
-            dist += diff * diff
-          }
-          if (dist < bestDist) {
-            bestDist = dist
-            bestK = k
-          }
-        }
-        counts[bestK]++
-        const sb = bestK * subDim
-        for (let d = 0; d < subDim; d++) {
-          sums[sb + d] += vectors[docBase + d]
-        }
-      }
-      for (let k = 0; k < centroidsPerSubspace; k++) {
-        const cnt = counts[k]
-        if (cnt > 0) {
-          const kb = cBase + k * subDim
-          const sb = k * subDim
-          const inv = 1 / cnt
-          for (let d = 0; d < subDim; d++) {
-            centroids[kb + d] = sums[sb + d] * inv
-          }
-        }
-      }
-    }
-
-    for (let liIdx = 0; liIdx < presentCount; liIdx++) {
-      const docId = liveShortIds[liIdx]
-      const docBase = docId * dim + colOffset
-      let bestK = 0
-      let bestDist = Infinity
-      for (let k = 0; k < centroidsPerSubspace; k++) {
-        const kb = cBase + k * subDim
-        let dist = 0
-        for (let d = 0; d < subDim; d++) {
-          const diff = vectors[docBase + d] - centroids[kb + d]
-          dist += diff * diff
-        }
-        if (dist < bestDist) {
-          bestDist = dist
-          bestK = k
-        }
-      }
-      codes[docId * subspaces + m] = bestK
-    }
-  }
-
-  return {
-    kind: KIND_PQ_U8,
-    subspaces,
-    centroidsPerSubspace,
-    subDim,
-    centroids,
-    codes,
   }
 }
 
-function buildPayloadFromFloat32(
-  vectors: Float32Array,
+function buildRuntimePayloadFromWork(
+  work: Float32Array,
   nextId: number,
   dim: number,
-  presentMask: Uint8Array | null,
-  presentCount: number,
+  mask: Uint8Array | null,
   options: VectorIndexOptions,
 ): VectorPayload {
   const quant = options.quantization ?? 'int8'
   if (quant === 'float32') {
-    return { kind: KIND_FLOAT32, vectors }
+    return { kind: KIND_FLOAT32, vectors: work }
   }
   if (quant === 'int8') {
-    return buildInt8Payload(vectors, nextId, dim, presentMask)
+    return buildInt8Payload(work, nextId, dim, mask)
   }
   if (quant === 'pq') {
-    return buildPqPayload(
-      vectors,
-      nextId,
-      dim,
-      presentMask,
-      presentCount,
-      options,
+    throw new TypeError(
+      'FrozenVectorIndex: PQ codebook training is separated into @yoch/frozenminisearch/vectors/train (use encodeDenseVectorPack / encodeDocumentVectorPack + FrozenVectorIndex.loadBinary)',
     )
   }
   throw new TypeError(
@@ -519,199 +268,20 @@ function buildPayloadFromFloat32(
 }
 
 /**
- * Compute exact L2 norms of the reconstructed vectors (NOT pre-rounding input norms)
- * so cosine queries reflect true post-quantization norms and PQ centroid shrinkage.
- */
-function computeReconstructedRowNorms(
-  payload: VectorPayload,
-  nextId: number,
-  dim: number,
-  presentMask: Uint8Array | null,
-): Float32Array {
-  const norms = new Float32Array(nextId)
-  if (payload.kind === KIND_FLOAT32) {
-    const vecs = payload.vectors
-    for (let i = 0; i < nextId; i++) {
-      if (presentMask !== null && !isMaskBitSet(presentMask, i)) continue
-      const base = i * dim
-      let n2 = 0
-      for (let d = 0; d < dim; d++) {
-        const v = vecs[base + d]
-        n2 += v * v
-      }
-      norms[i] = Math.sqrt(n2)
-    }
-    return norms
-  }
-
-  if (payload.kind === KIND_INT8) {
-    const { scales, codes } = payload
-    for (let i = 0; i < nextId; i++) {
-      if (presentMask !== null && !isMaskBitSet(presentMask, i)) continue
-      const s = scales[i]
-      if (s === 0) continue
-      const base = i * dim
-      let c2 = 0
-      for (let d = 0; d < dim; d++) {
-        const c = codes[base + d]
-        c2 += c * c
-      }
-      norms[i] = s * Math.sqrt(c2)
-    }
-    return norms
-  }
-
-  const {
-    subspaces: M,
-    centroidsPerSubspace: K,
-    subDim,
-    centroids,
-    codes,
-  } = payload
-  const centroidSq = new Float64Array(M * K)
-  for (let m = 0; m < M; m++) {
-    const cBase = m * K * subDim
-    const sBase = m * K
-    for (let k = 0; k < K; k++) {
-      const kb = cBase + k * subDim
-      let sq = 0
-      for (let d = 0; d < subDim; d++) {
-        const v = centroids[kb + d]
-        sq += v * v
-      }
-      centroidSq[sBase + k] = sq
-    }
-  }
-  for (let i = 0; i < nextId; i++) {
-    if (presentMask !== null && !isMaskBitSet(presentMask, i)) continue
-    const codeBase = i * M
-    let sq = 0
-    for (let m = 0; m < M; m++) {
-      sq += centroidSq[m * K + codes[codeBase + m]]
-    }
-    norms[i] = Math.sqrt(sq)
-  }
-  return norms
-}
-
-function buildInvNorms(rowNorms: Float32Array | null): Float32Array | null {
-  if (rowNorms === null) return null
-  const inv = new Float32Array(rowNorms.length)
-  for (let i = 0; i < rowNorms.length; i++) {
-    const n = rowNorms[i]
-    inv[i] = n > 1e-12 ? 1 / n : 0
-  }
-  return inv
-}
-
-function copyTypedBytes(
-  src: Uint8Array,
-  dst: Uint8Array,
-  offset: number,
-): number {
-  dst.set(src, offset)
-  return offset + src.byteLength
-}
-
-function safeProduct(values: readonly number[], label: string): number {
-  let prod = 1
-  for (const v of values) {
-    prod *= v
-    if (!Number.isSafeInteger(prod) || prod > MAX_PAYLOAD_BYTES) {
-      throw new RangeError(
-        `FrozenVectorIndex: ${label} byte length exceeds safe limit`,
-      )
-    }
-  }
-  return prod
-}
-
-function assertAllFiniteF32(arr: Float32Array, label: string): void {
-  for (let i = 0; i < arr.length; i++) {
-    if (!Number.isFinite(arr[i])) {
-      throw new RangeError(
-        `FrozenVectorIndex: non-finite ${label} value at index ${i}`,
-      )
-    }
-  }
-}
-
-function readOwnedFloat32Slice(
-  bytes: Uint8Array,
-  offset: number,
-  count: number,
-  label: string,
-): { arr: Float32Array; nextOffset: number } {
-  const byteLength = count * 4
-  const slice = bytes.subarray(offset, offset + byteLength)
-  const copy = new Uint8Array(byteLength)
-  copy.set(slice)
-  const arr = new Float32Array(copy.buffer)
-  assertAllFiniteF32(arr, label)
-  return { arr, nextOffset: offset + byteLength }
-}
-
-function prepareVectorIndexInit(
-  binding: VectorCorpusBinding,
-  work: Float32Array,
-  dim: number,
-  normalize: boolean,
-  mask: Uint8Array | null,
-  presentCount: number,
-  options: VectorIndexOptions,
-): {
-  binding: VectorCorpusBinding
-  fp: number
-  dim: number
-  metric: VectorMetric
-  normalize: boolean
-  mask: Uint8Array | null
-  presentCount: number
-  rowNorms: Float32Array | null
-  payload: VectorPayload
-  payloadBytes: number
-} {
-  const metric: VectorMetric = options.metric ?? 'cosine'
-  assertMetric(metric)
-  const nextId = binding.nextId
-  const payload = buildPayloadFromFloat32(
-    work,
-    nextId,
-    dim,
-    mask,
-    presentCount,
-    options,
-  )
-  // Always compute exact post-quantization norms when cosine similarity is requested
-  // so Int8 rounding or PQ centroid shrinkage cannot skew inter-query thresholds.
-  const storeNorms =
-    metric === 'cosine' && !(payload.kind === KIND_FLOAT32 && normalize)
-  const rowNorms = storeNorms
-    ? computeReconstructedRowNorms(payload, nextId, dim, mask)
-    : null
-  const fp = computeCorpusFingerprint(binding)
-  const payloadBytes = computePayloadBytes(nextId, dim, mask, rowNorms, payload)
-  return {
-    binding,
-    fp,
-    dim,
-    metric,
-    normalize,
-    mask,
-    presentCount,
-    rowNorms,
-    payload,
-    payloadBytes,
-  }
-}
-
-/**
  * Auxiliary quantized or dense vector representation bound to a {@link FrozenMiniSearch} corpus.
  * Zero-dependency, Node + Browser compatible, and non-invasive to lexical indexing.
+ *
+ * Raw query vectors passed to {@link topK} or {@link scoreDocument} are checked only for
+ * dimensionality, finiteness, and float32 range/normalization; verifying that a query vector
+ * came from the same upstream model, tokenizer, and preprocessing as {@link representationVersion}
+ * is enforced via {@link assertCompatibleWith} and {@link loadBinary} metadata rather than inferred
+ * from raw numbers.
  */
 export class FrozenVectorIndex<Id = unknown> {
   private readonly _binding: VectorCorpusBinding
-  private readonly _corpusFingerprint: number
+  private readonly _mappingFingerprint: number
+  private readonly _representationVersion: string
+  private readonly _snapshotId: string
   private readonly _dim: number
   private readonly _metric: VectorMetric
   private readonly _normalized: boolean
@@ -724,7 +294,9 @@ export class FrozenVectorIndex<Id = unknown> {
 
   private constructor(
     binding: VectorCorpusBinding,
-    corpusFingerprint: number,
+    mappingFingerprint: number,
+    representationVersion: string,
+    snapshotId: string,
     dim: number,
     metric: VectorMetric,
     normalized: boolean,
@@ -735,7 +307,9 @@ export class FrozenVectorIndex<Id = unknown> {
     payloadBytes: number,
   ) {
     this._binding = binding
-    this._corpusFingerprint = corpusFingerprint
+    this._mappingFingerprint = mappingFingerprint
+    this._representationVersion = representationVersion
+    this._snapshotId = snapshotId
     this._dim = dim
     this._metric = metric
     this._normalized = normalized
@@ -747,7 +321,7 @@ export class FrozenVectorIndex<Id = unknown> {
     this._payloadBytes = payloadBytes
   }
 
-  private static fromWorkVectors<Id = unknown>(
+  private static fromWorkVectors<Id>(
     binding: VectorCorpusBinding,
     work: Float32Array,
     dim: number,
@@ -756,30 +330,51 @@ export class FrozenVectorIndex<Id = unknown> {
     presentCount: number,
     options: VectorIndexOptions,
   ): FrozenVectorIndex<Id> {
-    const init = prepareVectorIndexInit(
-      binding,
+    const representationVersion = assertMetadataString(
+      options.representationVersion,
+      'representationVersion',
+    )
+    const snapshotId = assertMetadataString(options.snapshotId, 'snapshotId')
+    const metric: VectorMetric = options.metric ?? 'cosine'
+    assertMetric(metric)
+    const nextId = binding.nextId
+    const mappingFp = computeMappingFingerprint(binding)
+    const payload = buildRuntimePayloadFromWork(
       work,
+      nextId,
       dim,
+      mask,
+      options,
+    )
+    const storeNorms =
+      metric === 'cosine' && !(payload.kind === KIND_FLOAT32 && normalize)
+    const rowNorms = storeNorms
+      ? computeReconstructedRowNorms(payload, nextId, dim, mask)
+      : null
+    const payloadBytes = computePayloadBytes(
+      mask,
+      rowNorms,
+      payload,
+      representationVersion,
+      snapshotId,
+    )
+    return new FrozenVectorIndex<Id>(
+      binding,
+      mappingFp,
+      representationVersion,
+      snapshotId,
+      dim,
+      metric,
       normalize,
       mask,
       presentCount,
-      options,
-    )
-    return new FrozenVectorIndex<Id>(
-      init.binding,
-      init.fp,
-      init.dim,
-      init.metric,
-      init.normalize,
-      init.mask,
-      init.presentCount,
-      init.rowNorms,
-      init.payload,
-      init.payloadBytes,
+      rowNorms,
+      payload,
+      payloadBytes,
     )
   }
 
-  /** Build an auxiliary vector index from a `shortId`-aligned `Float32Array` of length `nextId * dim`. */
+  /** Build a `float32` or `int8` vector index from a `shortId`-aligned `Float32Array` of length `nextId * dim`. */
   static fromDenseFloat32<Id = unknown>(
     host: VectorCorpusHost,
     vectors: Float32Array,
@@ -791,124 +386,74 @@ export class FrozenVectorIndex<Id = unknown> {
       )
     }
     assertDim(options.dim)
+    assertMetadataString(options.representationVersion, 'representationVersion')
+    assertMetadataString(options.snapshotId, 'snapshotId')
     const dim = options.dim
     const binding = readCorpusBinding(host)
-    const nextId = binding.nextId
-    const expectedLen = nextId * dim
-    if (vectors.length !== expectedLen) {
-      throw new RangeError(
-        `FrozenVectorIndex: expected Float32Array length ${expectedLen} (nextId=${nextId} * dim=${dim}), got ${vectors.length}`,
-      )
-    }
-
     const normalize = options.normalize === true
-    const hasHoles = binding.documentCount < nextId
-    const mask = hasHoles ? new Uint8Array(presentMaskByteLength(nextId)) : null
-    const work = new Float32Array(expectedLen)
-
-    for (let shortId = 0; shortId < nextId; shortId++) {
-      if (!isLiveShortId(binding, shortId)) continue
-      if (mask !== null) setMaskBit(mask, shortId)
-      const base = shortId * dim
-      normalizeOrCopyRow(vectors, base, work, base, dim, normalize, shortId)
-    }
-
+    const { work, mask, presentCount } = ingestDenseVectors(
+      binding,
+      vectors,
+      dim,
+      normalize,
+    )
     return FrozenVectorIndex.fromWorkVectors<Id>(
       binding,
       work,
       dim,
       normalize,
       mask,
-      binding.documentCount,
+      presentCount,
       options,
     )
   }
 
-  /** Build an auxiliary vector index from `{ id, vector }` or `[id, vector]` entries keyed by external document id. */
+  /** Build a `float32` or `int8` vector index from `{ id, vector }` or `[id, vector]` entries keyed by external document id. */
   static fromDocumentVectors<Id = unknown>(
     host: VectorCorpusHost,
     entries: Iterable<DocumentVectorEntry<Id>>,
     options: FromDocumentVectorsOptions,
   ): FrozenVectorIndex<Id> {
     assertDim(options.dim)
+    assertMetadataString(options.representationVersion, 'representationVersion')
+    assertMetadataString(options.snapshotId, 'snapshotId')
     const dim = options.dim
     const normalize = options.normalize === true
     const requireAll = options.requireAllLiveDocs !== false
     const binding = readCorpusBinding(host)
-    const nextId = binding.nextId
-
-    const seen = new Uint8Array(presentMaskByteLength(nextId))
-    const work = new Float32Array(nextId * dim)
-    let presentCount = 0
-
-    for (const entry of entries) {
-      if (entry == null || typeof entry !== 'object') {
-        throw new TypeError('FrozenVectorIndex: invalid document vector entry')
-      }
-      let id: Id
-      let vec: ArrayLike<number>
-      if (Array.isArray(entry)) {
-        id = entry[0] as Id
-        vec = entry[1] as ArrayLike<number>
-      } else {
-        id = (entry as { id: Id }).id
-        vec = (entry as { vector: ArrayLike<number> }).vector
-      }
-
-      const shortId = binding.lookup.get(id)
-      if (shortId === undefined) {
-        throw new RangeError(
-          `FrozenVectorIndex: unknown document id ${String(id)}`,
-        )
-      }
-      if (isMaskBitSet(seen, shortId)) {
-        throw new RangeError(
-          `FrozenVectorIndex: duplicate vector for document id ${String(id)}`,
-        )
-      }
-      if (vec == null || vec.length !== dim) {
-        throw new RangeError(
-          `FrozenVectorIndex: vector length mismatch for document id ${String(id)} (expected ${dim}, got ${vec?.length})`,
-        )
-      }
-
-      setMaskBit(seen, shortId)
-      normalizeOrCopyRow(
-        vec,
-        0,
-        work,
-        shortId * dim,
-        dim,
-        normalize,
-        String(id),
-      )
-      presentCount++
-    }
-
-    if (requireAll && presentCount !== binding.documentCount) {
-      throw new RangeError(
-        `FrozenVectorIndex: expected ${binding.documentCount} live document vectors, got ${presentCount}`,
-      )
-    }
-
-    const useMask = presentCount < nextId ? seen : null
+    const { work, mask, presentCount } = ingestDocumentVectors(
+      binding,
+      entries,
+      dim,
+      normalize,
+      requireAll,
+    )
     return FrozenVectorIndex.fromWorkVectors<Id>(
       binding,
       work,
       dim,
       normalize,
-      useMask,
+      mask,
       presentCount,
       options,
     )
   }
 
-  /** Decode a binary `FXV1` vector pack and verify cryptographic integrity & corpus binding. */
+  /**
+   * Decode a binary `FXV1` (v2) vector pack and verify CRC-32 corruption checks,
+   * numerical invariants (reconstructed norms, unit norm flag, scale/code bounds),
+   * expected representation/snapshot metadata, and host mapping compatibility.
+   *
+   * Note: CRC-32 checksums detect accidental corruption only and provide no
+   * cryptographic authenticity against adversarial tampering.
+   */
   static loadBinary<Id = unknown>(
     input: unknown,
     host: VectorCorpusHost,
+    expected: VectorExpectation,
   ): FrozenVectorIndex<Id> {
     assertLittleEndianHost()
+    const exp = readExpectation(expected)
     const bytes = snapshotBytes(input)
     if (bytes.byteLength < VECTOR_HEADER_SIZE) {
       throw new RangeError('FrozenVectorIndex: binary buffer too short')
@@ -951,11 +496,21 @@ export class FrozenVectorIndex<Id = unknown> {
         `FrozenVectorIndex: corrupt counts (documentCount=${documentCount} > nextId=${nextId})`,
       )
     }
-    const corpusFingerprint = readU32LE(bytes, 20)
+    const mappingFingerprint = readU32LE(bytes, 20)
     const pqSubspaces = readU16LE(bytes, 24)
     const pqCentroids = readU16LE(bytes, 26)
     const payloadByteLength = readU32LE(bytes, 28)
     const storedPayloadCrc = readU32LE(bytes, 32)
+
+    assertValidPackFlags(
+      kind,
+      normalized,
+      hasMask,
+      hasRowNorms,
+      metric,
+      documentCount,
+      nextId,
+    )
 
     if (bytes.byteLength - VECTOR_HEADER_SIZE !== payloadByteLength) {
       throw new RangeError(
@@ -999,9 +554,26 @@ export class FrozenVectorIndex<Id = unknown> {
       dataBytesLen = centroidLen + codesLen
     }
 
-    if (maskBytesLen + normBytesLen + dataBytesLen !== payloadByteLength) {
+    const fixedPayloadLen = maskBytesLen + normBytesLen + dataBytesLen
+    if (fixedPayloadLen + 4 > payloadByteLength) {
       throw new RangeError(
-        `FrozenVectorIndex: payload size mismatch (expected ${maskBytesLen + normBytesLen + dataBytesLen}, got ${payloadByteLength})`,
+        `FrozenVectorIndex: payload size mismatch (need >= ${fixedPayloadLen + 4}, got ${payloadByteLength})`,
+      )
+    }
+
+    const meta = readPackMetadata(
+      bytes,
+      VECTOR_HEADER_SIZE + fixedPayloadLen,
+      VECTOR_HEADER_SIZE + payloadByteLength,
+    )
+    if (meta.representationVersion !== exp.representationVersion) {
+      throw new Error(
+        `FrozenVectorIndex: representationVersion mismatch (pack="${meta.representationVersion}", expected="${exp.representationVersion}")`,
+      )
+    }
+    if (meta.snapshotId !== exp.snapshotId) {
+      throw new Error(
+        `FrozenVectorIndex: snapshotId mismatch (pack="${meta.snapshotId}", expected="${exp.snapshotId}")`,
       )
     }
 
@@ -1011,10 +583,10 @@ export class FrozenVectorIndex<Id = unknown> {
         `FrozenVectorIndex: corpus shape mismatch (pack documentCount=${documentCount}, nextId=${nextId}; host documentCount=${binding.documentCount}, nextId=${binding.nextId})`,
       )
     }
-    const hostFp = computeCorpusFingerprint(binding)
-    if (hostFp !== corpusFingerprint) {
+    const hostFp = computeMappingFingerprint(binding)
+    if (hostFp !== mappingFingerprint) {
       throw new Error(
-        `FrozenVectorIndex: corpus fingerprint mismatch (pack=0x${corpusFingerprint.toString(16)}, host=0x${hostFp.toString(16)})`,
+        `FrozenVectorIndex: corpus fingerprint mismatch (pack=0x${mappingFingerprint.toString(16)}, host=0x${hostFp.toString(16)})`,
       )
     }
 
@@ -1036,13 +608,9 @@ export class FrozenVectorIndex<Id = unknown> {
       if (presentCount > documentCount) {
         throw new Error('FrozenVectorIndex: presentCount exceeds documentCount')
       }
-    } else if (documentCount < nextId) {
-      throw new Error(
-        'FrozenVectorIndex: corpus contains deleted slots but pack omits presentMask',
-      )
     }
 
-    let rowNorms: Float32Array | null = null
+    let storedRowNorms: Float32Array | null = null
     if (hasRowNorms) {
       const normRes = readOwnedFloat32Slice(bytes, cursor, nextId, 'row norm')
       for (let i = 0; i < normRes.arr.length; i++) {
@@ -1052,7 +620,7 @@ export class FrozenVectorIndex<Id = unknown> {
           )
         }
       }
-      rowNorms = normRes.arr
+      storedRowNorms = normRes.arr
       cursor = normRes.nextOffset
     }
 
@@ -1064,6 +632,7 @@ export class FrozenVectorIndex<Id = unknown> {
         nextId * dim,
         'float32 vector',
       )
+      validateFloat32Payload(res.arr, nextId, dim, presentMask)
       payload = { kind: KIND_FLOAT32, vectors: res.arr }
     } else if (kind === KIND_INT8) {
       const scalesRes = readOwnedFloat32Slice(
@@ -1072,19 +641,13 @@ export class FrozenVectorIndex<Id = unknown> {
         nextId,
         'int8 scale',
       )
-      for (let i = 0; i < scalesRes.arr.length; i++) {
-        if (scalesRes.arr[i] < 0) {
-          throw new RangeError(
-            `FrozenVectorIndex: negative int8 scale at index ${i}`,
-          )
-        }
-      }
       cursor = scalesRes.nextOffset
       const codeLen = nextId * dim
       const codeBytes = new Int8Array(codeLen)
       codeBytes.set(
         new Int8Array(bytes.buffer, bytes.byteOffset + cursor, codeLen),
       )
+      validateInt8Payload(scalesRes.arr, codeBytes, nextId, dim, presentMask)
       payload = { kind: KIND_INT8, scales: scalesRes.arr, codes: codeBytes }
     } else {
       const subDim = dim / pqSubspaces
@@ -1099,15 +662,13 @@ export class FrozenVectorIndex<Id = unknown> {
       const codeLen = nextId * pqSubspaces
       const codeBytes = new Uint8Array(codeLen)
       codeBytes.set(bytes.subarray(cursor, cursor + codeLen))
-      if (pqCentroids < 256) {
-        for (let i = 0; i < codeLen; i++) {
-          if (codeBytes[i] >= pqCentroids) {
-            throw new RangeError(
-              `FrozenVectorIndex: PQ code ${codeBytes[i]} exceeds centroid count ${pqCentroids}`,
-            )
-          }
-        }
-      }
+      validatePqPayload(
+        codeBytes,
+        nextId,
+        pqSubspaces,
+        pqCentroids,
+        presentMask,
+      )
       payload = {
         kind: KIND_PQ_U8,
         subspaces: pqSubspaces,
@@ -1118,23 +679,50 @@ export class FrozenVectorIndex<Id = unknown> {
       }
     }
 
+    const needNormCheck = hasRowNorms || (kind === KIND_FLOAT32 && normalized)
+    if (needNormCheck) {
+      const reconstructed = computeReconstructedRowNorms(
+        payload,
+        nextId,
+        dim,
+        presentMask,
+      )
+      if (kind === KIND_FLOAT32 && normalized) {
+        verifyNormalizedFloat32Norms(reconstructed, nextId, presentMask)
+      }
+      if (storedRowNorms !== null) {
+        verifyStoredRowNorms(storedRowNorms, reconstructed, nextId, presentMask)
+      }
+    }
+
     return new FrozenVectorIndex<Id>(
       binding,
-      corpusFingerprint,
+      mappingFingerprint,
+      meta.representationVersion,
+      meta.snapshotId,
       dim,
       metric,
       normalized,
       presentMask,
       presentCount,
-      rowNorms,
+      storedRowNorms,
       payload,
       payloadByteLength,
     )
   }
 
-  /** Compute deterministic unsigned CRC-32 corpus identity fingerprint for a {@link FrozenMiniSearch} instance. */
+  /**
+   * Compute structural slot + external-ID mapping CRC-32 fingerprint for a {@link FrozenMiniSearch} host.
+   * Note: covers slot counts, holes, and typed (`string | finite number`) IDs only; does not cover
+   * document text, entity ordering behind `0..N-1` IDs, model, or preprocessing.
+   */
+  static mappingFingerprint(host: VectorCorpusHost): number {
+    return computeMappingFingerprint(readCorpusBinding(host))
+  }
+
+  /** @see {@link mappingFingerprint} */
   static corpusFingerprint(host: VectorCorpusHost): number {
-    return computeCorpusFingerprint(readCorpusBinding(host))
+    return FrozenVectorIndex.mappingFingerprint(host)
   }
 
   get quantization(): VectorQuantization {
@@ -1159,8 +747,20 @@ export class FrozenVectorIndex<Id = unknown> {
     return this._binding.nextId
   }
 
+  get mappingFingerprint(): number {
+    return this._mappingFingerprint
+  }
+
   get corpusFingerprint(): number {
-    return this._corpusFingerprint
+    return this._mappingFingerprint
+  }
+
+  get representationVersion(): string {
+    return this._representationVersion
+  }
+
+  get snapshotId(): string {
+    return this._snapshotId
   }
 
   get presentCount(): number {
@@ -1195,9 +795,12 @@ export class FrozenVectorIndex<Id = unknown> {
       quantization: this.quantization,
       metric: this._metric,
       dim: this._dim,
-      documentCount: this.documentCount,
-      nextId: this.nextId,
-      corpusFingerprint: this._corpusFingerprint,
+      documentCount: this._binding.documentCount,
+      nextId: this._binding.nextId,
+      corpusFingerprint: this._mappingFingerprint,
+      mappingFingerprint: this._mappingFingerprint,
+      representationVersion: this._representationVersion,
+      snapshotId: this._snapshotId,
       presentCount: this._presentCount,
       pqSubspaces: this.pqSubspaces,
       pqCentroidsPerSubspace: this.pqCentroidsPerSubspace,
@@ -1207,7 +810,6 @@ export class FrozenVectorIndex<Id = unknown> {
     }
   }
 
-  /** Return `true` when `id` exists on the bound corpus and has a vector row. */
   hasVector(id: Id): boolean {
     const shortId = this._binding.lookup.get(id)
     if (shortId === undefined) return false
@@ -1216,8 +818,25 @@ export class FrozenVectorIndex<Id = unknown> {
     )
   }
 
-  /** Assert that another {@link FrozenMiniSearch} instance has identical corpus identity. */
-  assertCompatibleWith(host: VectorCorpusHost): void {
+  /**
+   * Verify that this vector index matches the given lexical host mapping AND
+   * consumer-supplied `expected` representation/snapshot identifiers.
+   */
+  assertCompatibleWith(
+    host: VectorCorpusHost,
+    expected: VectorExpectation,
+  ): void {
+    const exp = readExpectation(expected)
+    if (exp.representationVersion !== this._representationVersion) {
+      throw new Error(
+        `FrozenVectorIndex: representationVersion mismatch (vector="${this._representationVersion}", expected="${exp.representationVersion}")`,
+      )
+    }
+    if (exp.snapshotId !== this._snapshotId) {
+      throw new Error(
+        `FrozenVectorIndex: snapshotId mismatch (vector="${this._snapshotId}", expected="${exp.snapshotId}")`,
+      )
+    }
     const other = readCorpusBinding(host)
     if (
       other.documentCount !== this._binding.documentCount ||
@@ -1227,89 +846,30 @@ export class FrozenVectorIndex<Id = unknown> {
         `FrozenVectorIndex: corpus shape mismatch (vector documentCount=${this._binding.documentCount}, nextId=${this._binding.nextId}; host documentCount=${other.documentCount}, nextId=${other.nextId})`,
       )
     }
-    const otherFp = computeCorpusFingerprint(other)
-    if (otherFp !== this._corpusFingerprint) {
+    const otherFp = computeMappingFingerprint(other)
+    if (otherFp !== this._mappingFingerprint) {
       throw new Error(
-        `FrozenVectorIndex: corpus fingerprint mismatch (vector=0x${this._corpusFingerprint.toString(16)}, host=0x${otherFp.toString(16)})`,
+        `FrozenVectorIndex: corpus fingerprint mismatch (vector=0x${this._mappingFingerprint.toString(16)}, host=0x${otherFp.toString(16)})`,
       )
     }
   }
 
-  /** Serialize this vector index to portable little-endian `FXV1` bytes (Node + Browser). */
+  /** Serialize this vector index to portable little-endian `FXV1` (v2) bytes (Node + Browser). */
   saveBinary(): Uint8Array {
-    assertLittleEndianHost()
-    const totalBytes = VECTOR_HEADER_SIZE + this._payloadBytes
-    const out = new Uint8Array(totalBytes)
-    const flags =
-      (this._normalized ? FLAG_NORMALIZED : 0) |
-      (this._presentMask !== null ? FLAG_HAS_PRESENT_MASK : 0) |
-      (this._rowNorms !== null ? FLAG_HAS_ROW_NORMS : 0) |
-      (this._metric === 'cosine' ? FLAG_METRIC_COSINE : 0)
-
-    writeAscii(out, 0, VECTOR_MAGIC)
-    writeU16LE(out, 4, VECTOR_VERSION)
-    writeU8(out, 6, this._payload.kind)
-    writeU8(out, 7, flags)
-    writeU32LE(out, 8, this._dim)
-    writeU32LE(out, 12, this._binding.nextId)
-    writeU32LE(out, 16, this._binding.documentCount)
-    writeU32LE(out, 20, this._corpusFingerprint)
-    writeU16LE(out, 24, this.pqSubspaces)
-    writeU16LE(out, 26, this.pqCentroidsPerSubspace)
-    writeU32LE(out, 28, this._payloadBytes)
-
-    let offset = VECTOR_HEADER_SIZE
-    if (this._presentMask !== null) {
-      offset = copyTypedBytes(this._presentMask, out, offset)
-    }
-    if (this._rowNorms !== null) {
-      const rn = this._rowNorms
-      offset = copyTypedBytes(
-        new Uint8Array(rn.buffer, rn.byteOffset, rn.byteLength),
-        out,
-        offset,
-      )
-    }
-    if (this._payload.kind === KIND_FLOAT32) {
-      const v = this._payload.vectors
-      offset = copyTypedBytes(
-        new Uint8Array(v.buffer, v.byteOffset, v.byteLength),
-        out,
-        offset,
-      )
-    } else if (this._payload.kind === KIND_INT8) {
-      const s = this._payload.scales
-      const c = this._payload.codes
-      offset = copyTypedBytes(
-        new Uint8Array(s.buffer, s.byteOffset, s.byteLength),
-        out,
-        offset,
-      )
-      copyTypedBytes(
-        new Uint8Array(c.buffer, c.byteOffset, c.byteLength),
-        out,
-        offset,
-      )
-    } else {
-      const cen = this._payload.centroids
-      const c = this._payload.codes
-      offset = copyTypedBytes(
-        new Uint8Array(cen.buffer, cen.byteOffset, cen.byteLength),
-        out,
-        offset,
-      )
-      copyTypedBytes(
-        new Uint8Array(c.buffer, c.byteOffset, c.byteLength),
-        out,
-        offset,
-      )
-    }
-
-    const payloadCrc = crc32Update(0, out, VECTOR_HEADER_SIZE, out.length) >>> 0
-    writeU32LE(out, 32, payloadCrc)
-    const headerCrc = crc32Update(0, out, 0, 36) >>> 0
-    writeU32LE(out, 36, headerCrc)
-    return out
+    return serializeVectorPack({
+      nextId: this._binding.nextId,
+      documentCount: this._binding.documentCount,
+      mappingFingerprint: this._mappingFingerprint,
+      dim: this._dim,
+      metric: this._metric,
+      normalized: this._normalized,
+      presentMask: this._presentMask,
+      rowNorms: this._rowNorms,
+      payload: this._payload,
+      payloadBytes: this._payloadBytes,
+      representationVersion: this._representationVersion,
+      snapshotId: this._snapshotId,
+    })
   }
 
   private resolveQueryMetric(requested?: VectorMetric): VectorMetric {
@@ -1327,7 +887,11 @@ export class FrozenVectorIndex<Id = unknown> {
     return metric
   }
 
-  /** Score a single document by external ID (`undefined` if unknown or missing vector). */
+  /**
+   * Score a single document by external ID (`undefined` if unknown or missing vector).
+   * Note: raw query vectors are validated only for dimension, finiteness, and float32 conversion/normalization;
+   * callers must ensure query vectors were encoded using the matching {@link representationVersion}.
+   */
   scoreDocument(
     queryVector: ArrayLike<number>,
     id: Id,
@@ -1376,7 +940,11 @@ export class FrozenVectorIndex<Id = unknown> {
     return score
   }
 
-  /** Find top-`k` documents matching `queryVector` with optional `minScore`, `metric`, and pre-`k` predicate `filter`. */
+  /**
+   * Find top-`k` documents matching `queryVector` with optional `minScore`, `metric`, and pre-`k` predicate `filter`.
+   * Note: raw query vectors are checked for dimension, finiteness, and float32 range/normalization only;
+   * matching the upstream encoder/tokenizer/preprocessing indicated by {@link representationVersion} is the caller's contract.
+   */
   topK(
     queryVector: ArrayLike<number>,
     options: VectorSearchOptions<Id> = {},
@@ -1496,29 +1064,6 @@ export class FrozenVectorIndex<Id = unknown> {
   }
 }
 
-function computePayloadBytes(
-  nextId: number,
-  dim: number,
-  mask: Uint8Array | null,
-  rowNorms: Float32Array | null,
-  payload: VectorPayload,
-): number {
-  const maskBytes = mask !== null ? mask.byteLength : 0
-  const normBytes = rowNorms !== null ? rowNorms.byteLength : 0
-  if (payload.kind === KIND_FLOAT32) {
-    return maskBytes + normBytes + nextId * dim * 4
-  }
-  if (payload.kind === KIND_INT8) {
-    return maskBytes + normBytes + nextId * 4 + nextId * dim
-  }
-  return (
-    maskBytes +
-    normBytes +
-    payload.centroids.byteLength +
-    payload.codes.byteLength
-  )
-}
-
 function prepareQueryVector(
   queryVector: ArrayLike<number>,
   dim: number,
@@ -1530,25 +1075,16 @@ function prepareQueryVector(
     )
   }
   const q = new Float32Array(dim)
-  let norm2 = 0
-  for (let d = 0; d < dim; d++) {
-    const val = queryVector[d]
-    if (!Number.isFinite(val)) {
-      throw new RangeError(
-        `FrozenVectorIndex: non-finite queryVector value at dim ${d}`,
-      )
-    }
-    q[d] = val
-    norm2 += val * val
-  }
-  if (norm2 <= 1e-24) {
-    return { vec: q, isZero: true }
-  }
-  if (normalize) {
-    const inv = 1 / Math.sqrt(norm2)
-    for (let d = 0; d < dim; d++) q[d] *= inv
-  }
-  return { vec: q, isZero: false }
+  const isZero = readAndNormalizeVector(
+    queryVector,
+    0,
+    q,
+    0,
+    dim,
+    normalize,
+    'queryVector',
+  )
+  return { vec: q, isZero }
 }
 
 function dotFloat32Row(
@@ -1585,15 +1121,15 @@ function buildPqLut(
   const lut = new Float32Array(M * K)
   for (let m = 0; m < M; m++) {
     const qBase = m * subDim
+    const lutBase = m * K
     const cBase = m * K * subDim
-    const lBase = m * K
-    for (let c = 0; c < K; c++) {
-      const cb = cBase + c * subDim
+    for (let k = 0; k < K; k++) {
+      const kb = cBase + k * subDim
       let dot = 0
       for (let d = 0; d < subDim; d++) {
-        dot += q[qBase + d] * centroids[cb + d]
+        dot += q[qBase + d] * centroids[kb + d]
       }
-      lut[lBase + c] = dot
+      lut[lutBase + k] = dot
     }
   }
   return lut
@@ -1606,69 +1142,55 @@ function scorePqRow(
   M: number,
   K: number,
 ): number {
-  let sum = 0
+  let score = 0
   for (let m = 0; m < M; m++) {
-    sum += lut[m * K + codes[codeBase + m]]
+    score += lut[m * K + codes[codeBase + m]]
   }
-  return sum
+  return score
 }
 
-/** True when hit A outranks hit B (higher score, or lower shortId on tie). */
 function isBetterHit(
-  idA: number,
-  scoreA: number,
-  idB: number,
-  scoreB: number,
+  shortId: number,
+  score: number,
+  rootId: number,
+  rootScore: number,
 ): boolean {
-  return scoreA > scoreB || (scoreA === scoreB && idA < idB)
+  return score > rootScore || (score === rootScore && shortId < rootId)
 }
 
-function siftUp(
-  heapIds: Int32Array,
-  heapScores: Float64Array,
-  idx: number,
-): void {
-  const id = heapIds[idx]
-  const score = heapScores[idx]
+function siftUp(ids: Int32Array, scores: Float64Array, idx: number): void {
+  const targetId = ids[idx]
+  const targetScore = scores[idx]
   while (idx > 0) {
     const parent = (idx - 1) >>> 1
-    if (!isBetterHit(heapIds[parent], heapScores[parent], id, score)) break
-    heapIds[idx] = heapIds[parent]
-    heapScores[idx] = heapScores[parent]
+    if (!isBetterHit(ids[parent], scores[parent], targetId, targetScore)) break
+    ids[idx] = ids[parent]
+    scores[idx] = scores[parent]
     idx = parent
   }
-  heapIds[idx] = id
-  heapScores[idx] = score
+  ids[idx] = targetId
+  scores[idx] = targetScore
 }
 
-function siftDown(
-  heapIds: Int32Array,
-  heapScores: Float64Array,
-  size: number,
-): void {
+function siftDown(ids: Int32Array, scores: Float64Array, size: number): void {
+  const targetId = ids[0]
+  const targetScore = scores[0]
   let idx = 0
-  const id = heapIds[0]
-  const score = heapScores[0]
   const half = size >>> 1
   while (idx < half) {
-    let child = (idx << 1) + 1
-    const right = child + 1
+    let worst = (idx << 1) + 1
+    const right = worst + 1
     if (
       right < size &&
-      isBetterHit(
-        heapIds[child],
-        heapScores[child],
-        heapIds[right],
-        heapScores[right],
-      )
+      isBetterHit(ids[worst], scores[worst], ids[right], scores[right])
     ) {
-      child = right
+      worst = right
     }
-    if (!isBetterHit(id, score, heapIds[child], heapScores[child])) break
-    heapIds[idx] = heapIds[child]
-    heapScores[idx] = heapScores[child]
-    idx = child
+    if (!isBetterHit(targetId, targetScore, ids[worst], scores[worst])) break
+    ids[idx] = ids[worst]
+    scores[idx] = scores[worst]
+    idx = worst
   }
-  heapIds[idx] = id
-  heapScores[idx] = score
+  ids[idx] = targetId
+  scores[idx] = targetScore
 }

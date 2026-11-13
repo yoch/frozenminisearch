@@ -1,12 +1,44 @@
 import MiniSearch from 'minisearch'
 import FrozenMiniSearch from './FrozenMiniSearch'
-import FrozenMiniSearchBrowser, {
-  FrozenVectorIndex as BrowserFrozenVectorIndex,
-} from './browser'
-import { FrozenVectorIndex } from './frozenVectors'
+import FrozenMiniSearchBrowser from './browser'
+import * as mainEntry from './index'
+import * as browserEntry from './browser'
+import { FrozenVectorIndex } from './vectors'
+import {
+  encodeDenseVectorPack,
+  encodeDocumentVectorPack,
+  selectPqSampleIndices,
+} from './vectorsTrain'
 import { crc32Buffer } from './binaryIo'
-import { writeU32LE } from './binaryBytes'
+import { writeFloatLE, writeU32LE } from './binaryBytes'
 import { frozenMemoryBreakdown } from '../testSupport/frozenMemoryBreakdown.js'
+
+const BASE_META = {
+  representationVersion: 'test-vec:v1',
+  snapshotId: 'test-snap:v1',
+}
+
+function withMeta(opts, extra = {}) {
+  return { ...BASE_META, ...opts, ...extra }
+}
+
+function buildAnyDocumentVectors(host, entries, opts) {
+  const full = withMeta(opts)
+  if (full.quantization === 'pq') {
+    const bytes = encodeDocumentVectorPack(host, entries, full)
+    return FrozenVectorIndex.loadBinary(bytes, host, full)
+  }
+  return FrozenVectorIndex.fromDocumentVectors(host, entries, full)
+}
+
+function buildAnyDenseVectors(host, vectors, opts) {
+  const full = withMeta(opts)
+  if (full.quantization === 'pq') {
+    const bytes = encodeDenseVectorPack(host, vectors, full)
+    return FrozenVectorIndex.loadBinary(bytes, host, full)
+  }
+  return FrozenVectorIndex.fromDenseFloat32(host, vectors, full)
+}
 
 function makeUnitVec(dim, seedIdx) {
   const v = new Float32Array(dim)
@@ -31,6 +63,11 @@ function resealVectorBinary(bytes) {
 }
 
 describe('FrozenVectorIndex numerical contracts (B2)', () => {
+  test('lexical entrypoints do not re-export FrozenVectorIndex', () => {
+    expect(mainEntry.FrozenVectorIndex).toBeUndefined()
+    expect(browserEntry.FrozenVectorIndex).toBeUndefined()
+  })
+
   test('dim=16 q=[127..127] vs d=[127,0..0] yields exact cosine 0.25 (not 1)', () => {
     const index = FrozenMiniSearch.fromDocuments(
       [
@@ -46,7 +83,7 @@ describe('FrozenVectorIndex numerical contracts (B2)', () => {
 
     for (const quantization of ['float32', 'int8', 'pq']) {
       for (const normalize of [false, true]) {
-        const vi = FrozenVectorIndex.fromDocumentVectors(
+        const vi = buildAnyDocumentVectors(
           index,
           [
             { id: 'target', vector: d0 },
@@ -69,7 +106,11 @@ describe('FrozenVectorIndex numerical contracts (B2)', () => {
         expect(hits.map((h) => h.id)).toEqual(['diag', 'target'])
         expect(hits[1].score).toBeCloseTo(0.25, 5)
 
-        const reloaded = FrozenVectorIndex.loadBinary(vi.saveBinary(), index)
+        const reloaded = FrozenVectorIndex.loadBinary(
+          vi.saveBinary(),
+          index,
+          BASE_META,
+        )
         expect(reloaded.scoreDocument(q, 'target')).toBeCloseTo(0.25, 5)
       }
     }
@@ -82,12 +123,12 @@ describe('FrozenVectorIndex numerical contracts (B2)', () => {
     }))
     const index = FrozenMiniSearch.fromDocuments(docs, { fields: ['text'] })
     const entries = docs.map((d, i) => [d.id, makeUnitVec(16, i)])
-    const f32 = FrozenVectorIndex.fromDocumentVectors(index, entries, {
+    const f32 = buildAnyDocumentVectors(index, entries, {
       dim: 16,
       quantization: 'float32',
       normalize: true,
     })
-    const i8 = FrozenVectorIndex.fromDocumentVectors(index, entries, {
+    const i8 = buildAnyDocumentVectors(index, entries, {
       dim: 16,
       quantization: 'int8',
       normalize: true,
@@ -114,25 +155,10 @@ describe('FrozenVectorIndex numerical contracts (B2)', () => {
     ]
     const index = FrozenMiniSearch.fromDocuments(docs, { fields: ['text'] })
     const matrix = new Float32Array([
-      2,
-      0,
-      0,
-      0, // doc 0: +x scaled 2
-      2,
-      0,
-      0,
-      0, // doc 1: tie with doc 0
-      -3,
-      0,
-      0,
-      0, // doc 2: opposite direction
-      0,
-      0,
-      0,
-      0, // doc 3: zero vector
+      2, 0, 0, 0, 2, 0, 0, 0, -3, 0, 0, 0, 0, 0, 0, 0,
     ])
 
-    const dotIdx = FrozenVectorIndex.fromDenseFloat32(index, matrix, {
+    const dotIdx = buildAnyDenseVectors(index, matrix, {
       dim: 4,
       quantization: 'float32',
       metric: 'dot',
@@ -148,7 +174,7 @@ describe('FrozenVectorIndex numerical contracts (B2)', () => {
       /dot-only/,
     )
 
-    const cosIdx = FrozenVectorIndex.fromDenseFloat32(index, matrix, {
+    const cosIdx = buildAnyDenseVectors(index, matrix, {
       dim: 4,
       quantization: 'int8',
       metric: 'cosine',
@@ -162,7 +188,7 @@ describe('FrozenVectorIndex numerical contracts (B2)', () => {
   })
 })
 
-describe('FrozenVectorIndex pre-k filter, re-entrancy & immutability (B3)', () => {
+describe('FrozenVectorIndex pre-k filter, overflow safety & pqSampleSize (B3 + P2)', () => {
   test('pre-k filter finds admissible docs past top-85 excluded candidates', () => {
     const N = 120
     const docs = Array.from({ length: N }, (_, i) => ({
@@ -172,13 +198,12 @@ describe('FrozenVectorIndex pre-k filter, re-entrancy & immutability (B3)', () =
     const index = FrozenMiniSearch.fromDocuments(docs, { fields: ['text'] })
     const mat = new Float32Array(N * 8)
     for (let i = 0; i < N; i++) {
-      // Lower i has strictly higher cosine with [1, 0, ...]
       mat[i * 8] = 1 - i * 0.005
       mat[i * 8 + 1] = Math.sqrt(Math.max(0, 1 - mat[i * 8] ** 2))
     }
 
     for (const quantization of ['float32', 'int8', 'pq']) {
-      const vi = FrozenVectorIndex.fromDenseFloat32(index, mat, {
+      const vi = buildAnyDenseVectors(index, mat, {
         dim: 8,
         quantization,
         metric: 'cosine',
@@ -194,6 +219,118 @@ describe('FrozenVectorIndex pre-k filter, re-entrancy & immutability (B3)', () =
     }
   })
 
+  test('overflow/underflow-safe normalization on [1e40,1e40] and [1e300,1e300]', () => {
+    const docs = [
+      { id: 'diag', text: 'diagonal' },
+      { id: 'ortho', text: 'orthogonal' },
+    ]
+    const index = FrozenMiniSearch.fromDocuments(docs, { fields: ['text'] })
+
+    for (const quantization of ['float32', 'int8', 'pq']) {
+      const vi = buildAnyDocumentVectors(
+        index,
+        [
+          ['diag', [1e300, 1e300, 0, 0]],
+          ['ortho', [0, 0, 1e40, 0]],
+        ],
+        {
+          dim: 4,
+          quantization,
+          metric: 'cosine',
+          normalize: true,
+          pqSubspaces: 2,
+        },
+      )
+
+      const qHuge40 = vi.topK([1e40, 1e40, 0, 0], { k: 2 })
+      expect(Number.isFinite(qHuge40[0].score)).toBe(true)
+      expect(qHuge40[0].id).toBe('diag')
+      expect(qHuge40[0].score).toBeCloseTo(1, 2)
+
+      const qHuge300 = vi.topK([1e300, 1e300, 0, 0], { k: 2 })
+      expect(Number.isFinite(qHuge300[0].score)).toBe(true)
+      expect(qHuge300[0].id).toBe('diag')
+      expect(qHuge300[0].score).toBeCloseTo(1, 2)
+
+      const qTiny = vi.topK([1e-300, 1e-300, 0, 0], { k: 2 })
+      expect(Number.isFinite(qTiny[0].score)).toBe(true)
+      expect(qTiny[0].id).toBe('diag')
+      expect(qTiny[0].score).toBeCloseTo(1, 2)
+    }
+
+    // Unnormalized overflow must throw rather than silently storing Infinity/NaN
+    expect(() =>
+      buildAnyDocumentVectors(
+        index,
+        [
+          ['diag', [1e40, 1e40, 0, 0]],
+          ['ortho', [0, 0, 1, 0]],
+        ],
+        { dim: 4, quantization: 'float32', normalize: false, metric: 'dot' },
+      ),
+    ).toThrow(/float32 overflow/)
+
+    const dotIdx = buildAnyDocumentVectors(
+      index,
+      [
+        ['diag', [1, 1, 0, 0]],
+        ['ortho', [0, 0, 1, 0]],
+      ],
+      { dim: 4, quantization: 'float32', metric: 'dot' },
+    )
+    expect(() => dotIdx.topK([1e40, 1e40, 0, 0], { metric: 'dot' })).toThrow(
+      /float32 overflow/,
+    )
+  })
+
+  test('pqSampleSize=4096 strictly caps training sample count when presentCount=5000', () => {
+    const live5000 = new Int32Array(5000)
+    for (let i = 0; i < 5000; i++) live5000[i] = i
+    const sampled4096 = selectPqSampleIndices(live5000, 4096)
+    expect(sampled4096.length).toBe(4096)
+    expect(new Set(sampled4096).size).toBe(4096)
+    expect(sampled4096[0]).toBe(0)
+    expect(sampled4096[4095]).toBeLessThan(5000)
+
+    // Verify runtime PQ pack rejects direct runtime build without vectors/train
+    const smallIdx = FrozenMiniSearch.fromDocuments(
+      [{ id: 'a', text: 'alpha' }],
+      { fields: ['text'] },
+    )
+    expect(() =>
+      FrozenVectorIndex.fromDenseFloat32(
+        smallIdx,
+        new Float32Array([1, 0, 0, 0]),
+        withMeta({ dim: 4, quantization: 'pq' }),
+      ),
+    ).toThrow(/vectors\/train/)
+
+    // End-to-end 5000-doc PQ pack with pqSampleSize: 4096 builds cleanly
+    const docs5k = Array.from({ length: 5000 }, (_, i) => ({
+      id: i,
+      text: `d${i}`,
+    }))
+    const idx5k = FrozenMiniSearch.fromDocuments(docs5k, { fields: ['text'] })
+    const mat5k = new Float32Array(5000 * 8)
+    for (let i = 0; i < 5000; i++) {
+      mat5k[i * 8 + (i % 8)] = 1
+    }
+    const pqBytes = encodeDenseVectorPack(idx5k, mat5k, {
+      dim: 8,
+      quantization: 'pq',
+      pqSubspaces: 2,
+      pqIterations: 2,
+      pqSampleSize: 4096,
+      representationVersion: 'pq-test:v1',
+      snapshotId: 'snap-5k:v1',
+    })
+    const loaded5k = FrozenVectorIndex.loadBinary(pqBytes, idx5k, {
+      representationVersion: 'pq-test:v1',
+      snapshotId: 'snap-5k:v1',
+    })
+    expect(loaded5k.presentCount).toBe(5000)
+  })
+
   test('supports nested/re-entrant searches and isolates caller buffers', () => {
     const docs = [
       { id: 'a', text: 'alpha' },
@@ -203,20 +340,18 @@ describe('FrozenVectorIndex pre-k filter, re-entrancy & immutability (B3)', () =
     const index = FrozenMiniSearch.fromDocuments(docs, { fields: ['text'] })
     const beforeMem = frozenMemoryBreakdown(index)
     const rawVecs = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
-    const vi = FrozenVectorIndex.fromDenseFloat32(index, rawVecs, {
+    const vi = buildAnyDenseVectors(index, rawVecs, {
       dim: 4,
       quantization: 'float32',
       normalize: true,
     })
-    rawVecs.fill(0) // Mutate caller's input buffer
+    rawVecs.fill(0)
     expect(vi.topK([1, 0, 0, 0], { k: 1 }).map((h) => h.id)).toEqual(['a'])
 
-    // Lexical index & memory remain completely untouched (even lazy id-map stays unallocated by topK)
     expect(frozenMemoryBreakdown(index)).toEqual(beforeMem)
     expect(index.search('alpha').map((h) => h.id)).toEqual(['a'])
     expect(vi.scoreDocument([1, 0, 0, 0], 'a')).toBeCloseTo(1, 5)
 
-    // Nested topK inside filter callback
     const nested = vi.topK([1, 0.5, 0, 0], {
       k: 2,
       filter: () => {
@@ -226,15 +361,14 @@ describe('FrozenVectorIndex pre-k filter, re-entrancy & immutability (B3)', () =
     })
     expect(nested.map((h) => h.id)).toEqual(['a', 'b'])
 
-    // Binary buffer mutation after loadBinary must not corrupt loaded index
     const packed = vi.saveBinary()
-    const loaded = FrozenVectorIndex.loadBinary(packed, index)
+    const loaded = FrozenVectorIndex.loadBinary(packed, index, BASE_META)
     packed.fill(0xff)
     expect(loaded.scoreDocument([0, 1, 0, 0], 'b')).toBeCloseTo(1, 5)
   })
 })
 
-describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardening', () => {
+describe('FrozenVectorIndex snapshot/representation binding, ID policy & binary invariants (§2 & §3)', () => {
   test('Node <-> Browser binary round-trip on float32, int8 and pq + unaligned slice', async () => {
     const docs = Array.from({ length: 24 }, (_, i) => ({
       id: `cis_${6000 + i}`,
@@ -252,7 +386,7 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
     }
 
     for (const quantization of ['float32', 'int8', 'pq']) {
-      const nodeVec = FrozenVectorIndex.fromDenseFloat32(nodeIdx, mat, {
+      const nodeVec = buildAnyDenseVectors(nodeIdx, mat, {
         dim: 16,
         quantization,
         metric: 'cosine',
@@ -262,20 +396,146 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
       const unaligned = new Uint8Array(bin.length + 3)
       unaligned.set(bin, 3)
 
-      const browserVec = BrowserFrozenVectorIndex.loadBinary(
+      const loadedBack = FrozenVectorIndex.loadBinary(
         unaligned.subarray(3),
         browserIdx,
+        BASE_META,
       )
-      expect(browserVec.stats()).toEqual(nodeVec.stats())
+      expect(loadedBack.stats()).toEqual(nodeVec.stats())
       const q = makeUnitVec(16, 7)
-      expect(browserVec.topK(q, { k: 5 })).toEqual(nodeVec.topK(q, { k: 5 }))
-
-      const rtNode = FrozenVectorIndex.loadBinary(
-        browserVec.saveBinary(),
-        nodeIdx,
-      )
-      expect(rtNode.topK(q, { k: 5 })).toEqual(nodeVec.topK(q, { k: 5 }))
+      expect(loadedBack.topK(q, { k: 5 })).toEqual(nodeVec.topK(q, { k: 5 }))
     }
+  })
+
+  test('same-cardinality N: dense 0..N-1 permutation, modified content, model change & ID types', () => {
+    const metaA = {
+      representationVersion: 'model-v1:l2',
+      snapshotId: 'sha256:corpus-order-a',
+    }
+    const metaPermuted = {
+      representationVersion: 'model-v1:l2',
+      snapshotId: 'sha256:corpus-order-b',
+    }
+    const metaModifiedContent = {
+      representationVersion: 'model-v1:l2',
+      snapshotId: 'sha256:corpus-content-modified',
+    }
+    const metaModelChanged = {
+      representationVersion: 'model-v2:l2',
+      snapshotId: 'sha256:corpus-order-a',
+    }
+
+    // 1. Dense 0..N-1 permutation (N = 2 on both!)
+    const denseA = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 0, text: 'paracetamol' },
+        { id: 1, text: 'ibuprofene' },
+      ],
+      { fields: ['text'] },
+    )
+    const densePermuted = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 0, text: 'ibuprofene' },
+        { id: 1, text: 'paracetamol' },
+      ],
+      { fields: ['text'] },
+    )
+    expect(FrozenVectorIndex.mappingFingerprint(denseA)).toBe(
+      FrozenVectorIndex.mappingFingerprint(densePermuted),
+    )
+
+    const denseVecs = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0])
+    const viDenseA = FrozenVectorIndex.fromDenseFloat32(denseA, denseVecs, {
+      dim: 4,
+      quantization: 'float32',
+      ...metaA,
+    })
+    const packDenseA = viDenseA.saveBinary()
+
+    // Permuted dense host with its snapshotId must reject (same N, same 0..N-1 mappingFingerprint!)
+    expect(() =>
+      FrozenVectorIndex.loadBinary(packDenseA, densePermuted, metaPermuted),
+    ).toThrow(/snapshotId mismatch/)
+    expect(() =>
+      viDenseA.assertCompatibleWith(densePermuted, metaPermuted),
+    ).toThrow(/snapshotId mismatch/)
+
+    // 2. Modified text content with identical stable external IDs (same N)
+    const stableV1 = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 'cis-1', text: 'amoxicilline comprimé' },
+        { id: 'cis-2', text: 'doliprane gélule' },
+      ],
+      { fields: ['text'] },
+    )
+    const stableV2 = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 'cis-1', text: 'amoxicilline sirop' },
+        { id: 'cis-2', text: 'doliprane gélule' },
+      ],
+      { fields: ['text'] },
+    )
+    const packStable = FrozenVectorIndex.fromDenseFloat32(stableV1, denseVecs, {
+      dim: 4,
+      ...metaA,
+    }).saveBinary()
+    expect(() =>
+      FrozenVectorIndex.loadBinary(packStable, stableV2, metaModifiedContent),
+    ).toThrow(/snapshotId mismatch/)
+
+    // 3. Changed model/preprocessing at equal dim (same N, same host)
+    expect(() =>
+      FrozenVectorIndex.loadBinary(packStable, stableV1, metaModelChanged),
+    ).toThrow(/representationVersion mismatch/)
+
+    // 4. Distinct ID types: numeric [0, 1] vs string ['0', '1'] vs [-0, 1]
+    const strIdsIdx = FrozenMiniSearch.fromDocuments(
+      [
+        { id: '0', text: 'paracetamol' },
+        { id: '1', text: 'ibuprofene' },
+      ],
+      { fields: ['text'] },
+    )
+    expect(FrozenVectorIndex.mappingFingerprint(denseA)).not.toBe(
+      FrozenVectorIndex.mappingFingerprint(strIdsIdx),
+    )
+    expect(() =>
+      FrozenVectorIndex.loadBinary(packDenseA, strIdsIdx, metaA),
+    ).toThrow(/fingerprint mismatch/)
+
+    // Missing expected metadata must fail closed
+    expect(() => FrozenVectorIndex.loadBinary(packStable, stableV1)).toThrow(
+      /expected metadata object/,
+    )
+
+    // 5. Unsupported external ID types rejected instead of collapsing to String(obj)
+    const objHost = FrozenMiniSearch.fromDocuments(
+      [
+        { id: { code: 1 }, text: 'one' },
+        { id: { code: 2 }, text: 'two' },
+      ],
+      { fields: ['text'] },
+    )
+    expect(() =>
+      FrozenVectorIndex.fromDenseFloat32(objHost, denseVecs, {
+        dim: 4,
+        ...metaA,
+      }),
+    ).toThrow(/unsupported external document ID type/)
+
+    // 6. Valid reload succeeds
+    const validReloaded = FrozenVectorIndex.loadBinary(
+      packStable,
+      stableV1,
+      metaA,
+    )
+    expect(validReloaded.representationVersion).toBe(
+      metaA.representationVersion,
+    )
+    expect(validReloaded.snapshotId).toBe(metaA.snapshotId)
+    expect(validReloaded.mappingFingerprint).toBe(
+      FrozenVectorIndex.mappingFingerprint(stableV1),
+    )
   })
 
   test('handles corpus holes, -0 vs +0 ids, empty corpus and partial coverage', () => {
@@ -290,9 +550,8 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
       JSON.stringify(mutable.toJSON()),
       { fields: ['text'] },
     )
-    expect(holeIndex.documentCount).toBe(2)
 
-    const vi = FrozenVectorIndex.fromDocumentVectors(
+    const vi = buildAnyDocumentVectors(
       holeIndex,
       [
         ['keep0', [1, 0, 0, 0]],
@@ -303,28 +562,32 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
     expect(vi.presentCount).toBe(2)
     expect(vi.hasVector('drop1')).toBe(false)
     expect(vi.hasVector('keep2')).toBe(true)
-    const loaded = FrozenVectorIndex.loadBinary(vi.saveBinary(), holeIndex)
+    const loaded = FrozenVectorIndex.loadBinary(
+      vi.saveBinary(),
+      holeIndex,
+      BASE_META,
+    )
     expect(loaded.topK([0, 1, 0, 0], { k: 5 }).map((h) => h.id)).toEqual([
       'keep2',
       'keep0',
     ])
 
-    // Empty corpus
     const emptyIdx = FrozenMiniSearch.fromDocuments([], { fields: ['text'] })
     for (const quantization of ['float32', 'int8', 'pq']) {
-      const emptyVec = FrozenVectorIndex.fromDenseFloat32(
-        emptyIdx,
-        new Float32Array(0),
-        { dim: 4, quantization },
-      )
+      const emptyVec = buildAnyDenseVectors(emptyIdx, new Float32Array(0), {
+        dim: 4,
+        quantization,
+      })
       expect(emptyVec.topK([1, 0, 0, 0])).toEqual([])
       expect(
-        FrozenVectorIndex.loadBinary(emptyVec.saveBinary(), emptyIdx).stats()
-          .documentCount,
+        FrozenVectorIndex.loadBinary(
+          emptyVec.saveBinary(),
+          emptyIdx,
+          BASE_META,
+        ).stats().documentCount,
       ).toBe(0)
     }
 
-    // -0 vs +0 external IDs produce distinct corpus fingerprints
     const idxPosZero = FrozenMiniSearch.fromDocuments(
       [
         { id: 0, text: 'a' },
@@ -339,14 +602,78 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
       ],
       { fields: ['text'] },
     )
-    const posPack = FrozenVectorIndex.fromDenseFloat32(
+    const posPack = buildAnyDenseVectors(
       idxPosZero,
       new Float32Array([1, 0, 0, 1]),
       { dim: 2 },
     ).saveBinary()
-    expect(() => FrozenVectorIndex.loadBinary(posPack, idxNegZero)).toThrow(
-      /fingerprint mismatch/,
+    expect(() =>
+      FrozenVectorIndex.loadBinary(posPack, idxNegZero, BASE_META),
+    ).toThrow(/fingerprint mismatch/)
+  })
+
+  test('rejects forged rowNorms on Int8 ([1,0] norm=0.5 -> cos 2) and unnormalized Float32 ([2,0] with normalize:true)', () => {
+    const idxSingle = FrozenMiniSearch.fromDocuments(
+      [{ id: 'only', text: 'unit' }],
+      { fields: ['text'] },
     )
+
+    // Counter-example 1: valid Int8 cosine pack for [1, 0] without mask;
+    // forge rowNorm[0] at byte offset 40 to 0.5 and recompute CRCs.
+    const i8SinglePack = buildAnyDenseVectors(
+      idxSingle,
+      new Float32Array([1, 0]),
+      { dim: 2, quantization: 'int8', metric: 'cosine' },
+    ).saveBinary()
+    const forgedI8Norm = new Uint8Array(i8SinglePack)
+    writeFloatLE(forgedI8Norm, 40, 0.5)
+    expect(() =>
+      FrozenVectorIndex.loadBinary(
+        resealVectorBinary(forgedI8Norm),
+        idxSingle,
+        BASE_META,
+      ),
+    ).toThrow(/row norm mismatch/)
+
+    // Counter-example 2: valid Float32 pack with normalize: true and no stored norms;
+    // overwrite [1, 0] at byte offset 40 with [2, 0] keeping flags & recomputing CRCs.
+    const f32NormPack = buildAnyDenseVectors(
+      idxSingle,
+      new Float32Array([1, 0]),
+      { dim: 2, quantization: 'float32', metric: 'cosine', normalize: true },
+    ).saveBinary()
+    const forgedF32 = new Uint8Array(f32NormPack)
+    writeFloatLE(forgedF32, 40, 2.0)
+    expect(() =>
+      FrozenVectorIndex.loadBinary(
+        resealVectorBinary(forgedF32),
+        idxSingle,
+        BASE_META,
+      ),
+    ).toThrow(/unnormalized float32/)
+
+    // Flag inconsistency checks: Float32 normalized + FLAG_HAS_ROW_NORMS (bit 2)
+    const forgedF32Flag = new Uint8Array(f32NormPack)
+    forgedF32Flag[7] |= 1 << 2
+    expect(() =>
+      FrozenVectorIndex.loadBinary(
+        resealVectorBinary(forgedF32Flag),
+        idxSingle,
+        BASE_META,
+      ),
+    ).toThrow(/must not declare stored row norms/)
+
+    // Int8 symmetric code -128 must be rejected
+    const forgedInt8Code128 = new Uint8Array(i8SinglePack)
+    // layout: 40 hdr + 4 rowNorm + 4 scale = offset 48 is codes[0]
+    forgedInt8Code128[48] = 0x80 // -128 in signed int8
+    expect(() =>
+      FrozenVectorIndex.loadBinary(
+        resealVectorBinary(forgedInt8Code128),
+        idxSingle,
+        BASE_META,
+      ),
+    ).toThrow(/outside symmetric \[-127, 127\]/)
   })
 
   test('rejects swapped doc order, forged headers, CRCs, truncation and NaN payloads', () => {
@@ -364,63 +691,64 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
       ],
       { fields: ['text'] },
     )
-    const f32Vec = FrozenVectorIndex.fromDenseFloat32(
+    const f32Vec = buildAnyDenseVectors(
       idxA,
       new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]),
       { dim: 4, quantization: 'float32', metric: 'dot' },
     )
     const pack = f32Vec.saveBinary()
 
-    // Same documentCount (2), swapped order => rejected!
-    expect(() => FrozenVectorIndex.loadBinary(pack, idxSwapped)).toThrow(
-      /fingerprint mismatch/,
-    )
-    expect(() => f32Vec.assertCompatibleWith(idxSwapped)).toThrow(
+    expect(() =>
+      FrozenVectorIndex.loadBinary(pack, idxSwapped, BASE_META),
+    ).toThrow(/fingerprint mismatch/)
+    expect(() => f32Vec.assertCompatibleWith(idxSwapped, BASE_META)).toThrow(
       /fingerprint mismatch/,
     )
 
-    // Short / invalid magic / wrong version / header CRC / payload CRC / trailing byte
     expect(() =>
-      FrozenVectorIndex.loadBinary(pack.subarray(0, 10), idxA),
+      FrozenVectorIndex.loadBinary(pack.subarray(0, 10), idxA, BASE_META),
     ).toThrow(/too short/)
     const badMagic = new Uint8Array(pack)
     badMagic[0] = 0x58
-    expect(() => FrozenVectorIndex.loadBinary(badMagic, idxA)).toThrow(/magic/)
+    expect(() =>
+      FrozenVectorIndex.loadBinary(badMagic, idxA, BASE_META),
+    ).toThrow(/magic/)
 
     const badVer = new Uint8Array(pack)
     badVer[4] = 99
     expect(() =>
-      FrozenVectorIndex.loadBinary(resealVectorBinary(badVer), idxA),
+      FrozenVectorIndex.loadBinary(resealVectorBinary(badVer), idxA, BASE_META),
     ).toThrow(/version/)
 
     const badHdrCrc = new Uint8Array(pack)
     badHdrCrc[8] ^= 1
-    expect(() => FrozenVectorIndex.loadBinary(badHdrCrc, idxA)).toThrow(
-      /header CRC-32/,
-    )
+    expect(() =>
+      FrozenVectorIndex.loadBinary(badHdrCrc, idxA, BASE_META),
+    ).toThrow(/header CRC-32/)
 
     const badPayCrc = new Uint8Array(pack)
     badPayCrc[badPayCrc.length - 1] ^= 1
-    expect(() => FrozenVectorIndex.loadBinary(badPayCrc, idxA)).toThrow(
-      /payload CRC-32/,
-    )
+    expect(() =>
+      FrozenVectorIndex.loadBinary(badPayCrc, idxA, BASE_META),
+    ).toThrow(/payload CRC-32/)
 
     const trailing = new Uint8Array(pack.length + 1)
     trailing.set(pack)
-    expect(() => FrozenVectorIndex.loadBinary(trailing, idxA)).toThrow(
-      /byte length mismatch/,
-    )
-
-    // Forged NaN into Float32 with recomputed CRCs
-    const forgedNan = new Uint8Array(pack)
-    const dv = new DataView(forgedNan.buffer)
-    dv.setFloat32(40, Number.NaN, true)
     expect(() =>
-      FrozenVectorIndex.loadBinary(resealVectorBinary(forgedNan), idxA),
+      FrozenVectorIndex.loadBinary(trailing, idxA, BASE_META),
+    ).toThrow(/byte length mismatch/)
+
+    const forgedNan = new Uint8Array(pack)
+    new DataView(forgedNan.buffer).setFloat32(40, Number.NaN, true)
+    expect(() =>
+      FrozenVectorIndex.loadBinary(
+        resealVectorBinary(forgedNan),
+        idxA,
+        BASE_META,
+      ),
     ).toThrow(/non-finite/)
 
-    // Forged negative scale into Int8 with recomputed CRCs
-    const i8Pack = FrozenVectorIndex.fromDenseFloat32(
+    const i8Pack = buildAnyDenseVectors(
       idxA,
       new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]),
       { dim: 4, quantization: 'int8', metric: 'cosine' },
@@ -428,27 +756,33 @@ describe('FrozenVectorIndex corpus binding, Node<->Browser & adversarial hardeni
     const forgedNegNorm = new Uint8Array(i8Pack)
     new DataView(forgedNegNorm.buffer).setFloat32(40, -1, true)
     expect(() =>
-      FrozenVectorIndex.loadBinary(resealVectorBinary(forgedNegNorm), idxA),
+      FrozenVectorIndex.loadBinary(
+        resealVectorBinary(forgedNegNorm),
+        idxA,
+        BASE_META,
+      ),
     ).toThrow(/negative row norm/)
 
-    // Input errors
     expect(() =>
       FrozenVectorIndex.fromDenseFloat32(
         idxA,
         new Float32Array([1, Number.NaN, 0, 0, 0, 0, 0, 0]),
-        { dim: 4 },
+        withMeta({ dim: 4 }),
       ),
     ).toThrow(/non-finite/)
     expect(() =>
-      FrozenVectorIndex.fromDocumentVectors(idxA, [['doc1', [1, 0, 0, 0]]], {
-        dim: 4,
-      }),
+      FrozenVectorIndex.fromDocumentVectors(
+        idxA,
+        [['doc1', [1, 0, 0, 0]]],
+        withMeta({ dim: 4 }),
+      ),
     ).toThrow(/expected 2 live/)
     expect(() =>
-      FrozenVectorIndex.fromDocumentVectors(idxA, [['missing', [1, 0, 0, 0]]], {
-        dim: 4,
-        requireAllLiveDocs: false,
-      }),
+      FrozenVectorIndex.fromDocumentVectors(
+        idxA,
+        [['missing', [1, 0, 0, 0]]],
+        withMeta({ dim: 4, requireAllLiveDocs: false }),
+      ),
     ).toThrow(/unknown document id/)
   })
 })

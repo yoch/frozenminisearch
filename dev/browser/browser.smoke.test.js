@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { CODEC_ZSTD, MSV5_PAYLOAD_CODEC_OFFSET } from '../../src/msv5/binaryMsv5Constants'
 
 const bundlePath = join(__dirname, '../../dist/browser/index.js')
+const vectorsBundlePath = join(__dirname, '../../dist/browser/vectors.js')
 
 beforeAll(() => {
   try {
@@ -18,12 +19,17 @@ describe('browser bundle smoke', () => {
   let createFrozenIndexBuilder
   let freezeFrozenIndexBuilder
 
+  let FrozenMiniSearchBrowserVectors
+  let NodeFrozenVectorIndex
+
   beforeAll(async () => {
     NodeFrozenMiniSearch = (await import('../../dist/es/index.js')).default
+    NodeFrozenVectorIndex = (await import('../../dist/es/vectors.js')).FrozenVectorIndex
     const mod = await import(bundlePath)
     FrozenMiniSearch = mod.default
     createFrozenIndexBuilder = mod.createFrozenIndexBuilder
     freezeFrozenIndexBuilder = mod.freezeFrozenIndexBuilder
+    FrozenMiniSearchBrowserVectors = (await import(vectorsBundlePath)).FrozenVectorIndex
   })
 
   const documents = [
@@ -165,5 +171,30 @@ describe('browser bundle smoke', () => {
     } finally {
       globalThis.DecompressionStream = savedDecompression
     }
+  })
+
+  test('browser vector bundle loads Node FXV1 snapshot cleanly and lexical bundle stays isolated', async () => {
+    const browserMainMod = await import(bundlePath)
+    expect(browserMainMod.FrozenVectorIndex).toBeUndefined()
+
+    const nodeHost = NodeFrozenMiniSearch.fromDocuments(documents, options)
+    const browserHost = FrozenMiniSearch.fromDocuments(documents, options)
+    const meta = { representationVersion: 'browser-smoke:v1', snapshotId: 'docs:v1' }
+    const nodeVec = NodeFrozenVectorIndex.fromDocumentVectors(
+      nodeHost,
+      [
+        ['1', [1, 0, 0, 0]],
+        ['2', [0, 1, 0, 0]],
+        ['3', [0, 0, 1, 0]],
+        ['4', [0, 0, 0, 1]],
+      ],
+      { dim: 4, quantization: 'int8', normalize: true, ...meta },
+    )
+    const browserVec = FrozenMiniSearchBrowserVectors.loadBinary(
+      nodeVec.saveBinary(),
+      browserHost,
+      meta,
+    )
+    expect(browserVec.topK([0, 0, 1, 0], { k: 1 })[0].id).toBe('3')
   })
 })

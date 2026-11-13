@@ -2,14 +2,14 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const distDir = path.join(__dirname, '..', 'dist', 'cjs')
-const entryFile = path.join(distDir, 'index.cjs')
-const wrapperFile = path.join(distDir, 'index.require.cjs')
 
-if (!fs.existsSync(entryFile)) {
-  process.exit(0)
-}
+for (const baseName of ['index', 'vectors', 'vectorsTrain']) {
+  const entryFile = path.join(distDir, `${baseName}.cjs`)
+  const wrapperFile = path.join(distDir, `${baseName}.require.cjs`)
+  if (!fs.existsSync(entryFile)) continue
 
-const wrapper = `'use strict'
+  const wrapper = baseName === 'index'
+    ? `'use strict'
 
 const mod = require('./index.cjs')
 const main = mod.default || mod
@@ -24,5 +24,10 @@ for (const key of Object.keys(mod)) {
   }
 }
 `
+    : `'use strict'
 
-fs.writeFileSync(wrapperFile, wrapper)
+const mod = require('./${baseName}.cjs')
+module.exports = mod
+`
+  fs.writeFileSync(wrapperFile, wrapper)
+}

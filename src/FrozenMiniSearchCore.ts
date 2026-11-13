@@ -14,6 +14,10 @@ import {
 } from './scoring'
 import type { IdToShortIdLookup } from './frozenIdLookup'
 import {
+  VECTOR_CORPUS_BINDING,
+  type VectorCorpusBinding,
+} from './frozenVectorBinding'
+import {
   createFrozenFieldTermFlyweight,
   validateFrozenPostingsLayout,
   type FrozenFieldTermFlyweight,
@@ -684,5 +688,14 @@ export default class FrozenMiniSearchCore<T = any> {
       fieldLengthMatrix: this._fieldLengthMatrix,
       postings: this._postings,
     })
+  }
+
+  [VECTOR_CORPUS_BINDING](): VectorCorpusBinding {
+    return {
+      documentCount: this._documentCount,
+      nextId: this._nextId,
+      externalIds: this._externalIds,
+      lookup: this._idLookup,
+    }
   }
 }

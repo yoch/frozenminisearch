@@ -32,3 +32,14 @@ export {
   FrozenIndexBuilder,
   type FrozenIndexBuilderHints,
 } from './frozenBuild'
+export {
+  FrozenVectorIndex,
+  type DocumentVectorEntry,
+  type FromDocumentVectorsOptions,
+  type FrozenVectorIndexStats,
+  type VectorIndexOptions,
+  type VectorMetric,
+  type VectorQuantization,
+  type VectorSearchHit,
+  type VectorSearchOptions,
+} from './frozenVectors'

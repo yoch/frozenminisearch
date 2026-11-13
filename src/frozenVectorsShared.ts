@@ -40,6 +40,8 @@ export const KNOWN_FLAGS =
 export const MAX_DIM = 65536
 export const MAX_PAYLOAD_BYTES = 0x7fffffff
 export const MAX_METADATA_BYTES = 65535
+/** Smallest positive normal IEEE-754 float32 (`2^-126`). Unnormalized cosine row norms and int8 scales must be `0` or `>= FLOAT32_MIN_NORMAL`. */
+export const FLOAT32_MIN_NORMAL = 2 ** -126
 
 const FP_TAG_HOLE = 0
 const FP_TAG_STRING = 1
@@ -72,7 +74,12 @@ export interface VectorIndexOptions {
   quantization?: VectorQuantization
   /** Similarity metric (`'cosine'` or `'dot'`). Defaults to `'cosine'`. */
   metric?: VectorMetric
-  /** L2-normalize each live vector prior to quantization. Defaults to `false`. */
+  /**
+   * L2-normalize each live vector prior to quantization (using float64 max-abs scaling so huge/tiny inputs
+   * such as `1e-300`..`1e300` remain accurate). When `false`, finite non-zero vectors must fit in normal
+   * IEEE-754 float32 range (`>= 2^-126` for unnormalized `cosine` row norms / `int8` scales, no overflow).
+   * Defaults to `false`.
+   */
   normalize?: boolean
   /** Number of PQ subspaces dividing `dim` (`quantization: 'pq'`). */
   pqSubspaces?: number
@@ -375,6 +382,7 @@ export function readAndNormalizeVector(
     return true
   }
   if (!normalize) {
+    let anyNonZero = false
     for (let d = 0; d < dim; d++) {
       const f = Math.fround(src[srcOffset + d])
       if (!Number.isFinite(f)) {
@@ -382,7 +390,13 @@ export function readAndNormalizeVector(
           `FrozenVectorIndex: float32 overflow at ${label}, dim ${d}`,
         )
       }
+      if (f !== 0) anyNonZero = true
       dst[dstOffset + d] = f
+    }
+    if (!anyNonZero) {
+      throw new RangeError(
+        `FrozenVectorIndex: float32 underflow at ${label} (all non-zero components rounded to 0; use normalize: true)`,
+      )
     }
     return false
   }
@@ -417,9 +431,14 @@ export function buildInt8Payload(
       if (a > maxAbs) maxAbs = a
     }
     const scale = Math.fround(maxAbs / 127)
-    if (maxAbs === 0 || scale === 0 || !Number.isFinite(scale)) {
+    if (maxAbs === 0) {
       scales[i] = 0
       continue
+    }
+    if (!Number.isFinite(scale) || scale < FLOAT32_MIN_NORMAL) {
+      throw new RangeError(
+        `FrozenVectorIndex: int8 scale underflows normal float32 range at index ${i} (use normalize: true)`,
+      )
     }
     scales[i] = scale
     const inv = 1 / scale
@@ -429,6 +448,21 @@ export function buildInt8Payload(
     }
   }
   return { kind: KIND_INT8, scales, codes }
+}
+
+function validateReconstructedNorm(norm: number, label: string): number {
+  const fnorm = Math.fround(norm)
+  if (!Number.isFinite(norm) || !Number.isFinite(fnorm)) {
+    throw new RangeError(
+      `FrozenVectorIndex: reconstructed ${label} norm overflows float32`,
+    )
+  }
+  if (fnorm > 0 && fnorm < FLOAT32_MIN_NORMAL) {
+    throw new RangeError(
+      `FrozenVectorIndex: reconstructed ${label} norm (${fnorm}) is below normal float32 range (${FLOAT32_MIN_NORMAL}; use normalize: true)`,
+    )
+  }
+  return fnorm
 }
 
 function safeFloat32NormFromRow(
@@ -448,13 +482,7 @@ function safeFloat32NormFromRow(
     const s = arr[base + d] / maxAbs
     scaledSq += s * s
   }
-  const norm = maxAbs * Math.sqrt(scaledSq)
-  if (!Number.isFinite(norm) || !Number.isFinite(Math.fround(norm))) {
-    throw new RangeError(
-      `FrozenVectorIndex: reconstructed ${label} norm overflows float32`,
-    )
-  }
-  return norm
+  return validateReconstructedNorm(maxAbs * Math.sqrt(scaledSq), label)
 }
 
 /**
@@ -489,13 +517,7 @@ export function computeReconstructedRowNorms(
         const c = codes[base + d]
         c2 += c * c
       }
-      const norm = s * Math.sqrt(c2)
-      if (!Number.isFinite(norm) || !Number.isFinite(Math.fround(norm))) {
-        throw new RangeError(
-          `FrozenVectorIndex: reconstructed int8 row norm overflows float32 at ${i}`,
-        )
-      }
-      norms[i] = norm
+      norms[i] = validateReconstructedNorm(s * Math.sqrt(c2), `int8 row ${i}`)
     }
     return norms
   }
@@ -528,13 +550,7 @@ export function computeReconstructedRowNorms(
     for (let m = 0; m < M; m++) {
       sq += centroidSq[m * K + codes[codeBase + m]]
     }
-    const norm = Math.sqrt(sq)
-    if (!Number.isFinite(norm) || !Number.isFinite(Math.fround(norm))) {
-      throw new RangeError(
-        `FrozenVectorIndex: reconstructed PQ row norm overflows float32 at ${i}`,
-      )
-    }
-    norms[i] = norm
+    norms[i] = validateReconstructedNorm(Math.sqrt(sq), `PQ row ${i}`)
   }
   return norms
 }

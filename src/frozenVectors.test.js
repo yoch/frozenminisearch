@@ -676,6 +676,174 @@ describe('FrozenVectorIndex snapshot/representation binding, ID policy & binary 
     ).toThrow(/outside symmetric \[-127, 127\]/)
   })
 
+  test('small/large scales: rejects forged 1e-10 / 0 norms on 1e-6 vectors across float32/int8/pq, rejects subnormal unnormalized, and computes 1e-31 cosine accurately', () => {
+    const idxSingle = FrozenMiniSearch.fromDocuments(
+      [{ id: 'only', text: 'tiny' }],
+      { fields: ['text'] },
+    )
+    const idxPair = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 'tiny', text: 'tiny' },
+        { id: 'zero', text: 'zero' },
+      ],
+      { fields: ['text'] },
+    )
+    const idxQuad = FrozenMiniSearch.fromDocuments(
+      [
+        { id: 'd0', text: 'tiny zero' },
+        { id: 'd1', text: 'tiny one' },
+        { id: 'd2', text: 'tiny two' },
+        { id: 'd3', text: 'tiny three' },
+      ],
+      { fields: ['text'] },
+    )
+
+    // 1. Tampered small stored norm (expected ~1e-6, forged to 1e-10, 0, or 1e-4 relative drift; and non-zero forged norm on 0-row)
+    const smallVec = new Float32Array([1e-6, 0, 0, 0])
+    for (const quantization of ['float32', 'int8', 'pq']) {
+      const targetIdx = quantization === 'pq' ? idxQuad : idxSingle
+      const vecMat =
+        quantization === 'pq'
+          ? new Float32Array([
+              1e-6, 0, 0, 0, 0, 1e-6, 0, 0, 0, 0, 1e-6, 0, 0, 0, 0, 1e-6,
+            ])
+          : smallVec
+      const pack = buildAnyDenseVectors(targetIdx, vecMat, {
+        dim: 4,
+        quantization,
+        metric: 'cosine',
+        normalize: false,
+        pqSubspaces: 2,
+      }).saveBinary()
+
+      for (const forgedVal of [1e-10, 0, 1e-6 * 1.001]) {
+        const forged = new Uint8Array(pack)
+        writeFloatLE(forged, 40, forgedVal)
+        expect(() =>
+          FrozenVectorIndex.loadBinary(
+            resealVectorBinary(forged),
+            targetIdx,
+            BASE_META,
+          ),
+        ).toThrow(/row norm|subnormal/)
+      }
+
+      // Within 1e-4 serialization tolerance: load succeeds, and operational score STILL uses reconstructed norm (~1, not forged!)
+      const slightlyDrifted = new Uint8Array(pack)
+      const view = new DataView(slightlyDrifted.buffer)
+      const expectedNorm = view.getFloat32(40, true)
+      writeFloatLE(slightlyDrifted, 40, expectedNorm * (1 - 5e-5))
+      const loadedDrifted = FrozenVectorIndex.loadBinary(
+        resealVectorBinary(slightlyDrifted),
+        targetIdx,
+        BASE_META,
+      )
+      expect(
+        loadedDrifted.scoreDocument(
+          smallVec,
+          quantization === 'pq' ? 'd0' : 'only',
+        ),
+      ).toBeCloseTo(1, 5)
+    }
+
+    // Zero vector must reject forged non-zero norm (even 1e-10 or 1e-6)
+    const pairF32Pack = buildAnyDenseVectors(
+      idxPair,
+      new Float32Array([1e-6, 0, 0, 0]),
+      { dim: 2, quantization: 'float32', metric: 'cosine', normalize: false },
+    ).saveBinary()
+    for (const forgedZeroNorm of [1e-10, 1e-6]) {
+      const forged = new Uint8Array(pairF32Pack)
+      writeFloatLE(forged, 44, forgedZeroNorm)
+      expect(() =>
+        FrozenVectorIndex.loadBinary(
+          resealVectorBinary(forged),
+          idxPair,
+          BASE_META,
+        ),
+      ).toThrow(/row norm|subnormal/)
+    }
+
+    // 2. Normal tiny vector [1e-31, 0] with normalize:false -> cosine MUST be ~1 (never silent 0!)
+    for (const quantization of ['float32', 'int8']) {
+      const tinyIdx = buildAnyDenseVectors(
+        idxPair,
+        new Float32Array([1e-31, 0, 0, 0]),
+        { dim: 2, quantization, metric: 'cosine', normalize: false },
+      )
+      expect(tinyIdx.scoreDocument([1e-31, 0], 'tiny')).toBeCloseTo(1, 5)
+      expect(tinyIdx.scoreDocument([1e-31, 0], 'zero')).toBe(0)
+      const top = tinyIdx.topK([1e-31, 0], { k: 2 })
+      expect(top[0].id).toBe('tiny')
+      expect(top[0].score).toBeCloseTo(1, 5)
+
+      const reloadedTiny = FrozenVectorIndex.loadBinary(
+        tinyIdx.saveBinary(),
+        idxPair,
+        BASE_META,
+      )
+      expect(reloadedTiny.scoreDocument([1e-31, 0], 'tiny')).toBeCloseTo(1, 5)
+    }
+
+    // PQ at 1e-31 without normalization also computes cosine ~1 accurately
+    const pqTiny = buildAnyDenseVectors(
+      idxQuad,
+      new Float32Array([
+        1e-31, 0, 0, 0, 0, 1e-31, 0, 0, 0, 0, 1e-31, 0, 0, 0, 0, 1e-31,
+      ]),
+      {
+        dim: 4,
+        quantization: 'pq',
+        metric: 'cosine',
+        normalize: false,
+        pqSubspaces: 2,
+      },
+    )
+    expect(pqTiny.scoreDocument([1e-31, 0, 0, 0], 'd0')).toBeCloseTo(1, 5)
+
+    // 3. Large unnormalized cosine [1e30, 0] also works accurately
+    const hugeIdx = buildAnyDenseVectors(
+      idxSingle,
+      new Float32Array([1e30, 0]),
+      { dim: 2, quantization: 'float32', metric: 'cosine', normalize: false },
+    )
+    expect(hugeIdx.scoreDocument([1e30, 0], 'only')).toBeCloseTo(1, 5)
+
+    // 4. Out-of-domain unnormalized subnormal/underflow non-zero vectors are rejected clearly
+    expect(() =>
+      buildAnyDenseVectors(idxSingle, new Float32Array([1e-40, 0]), {
+        dim: 2,
+        quantization: 'float32',
+        metric: 'cosine',
+        normalize: false,
+      }),
+    ).toThrow(/normal float32 range/)
+    expect(() =>
+      buildAnyDenseVectors(idxSingle, new Float32Array([1e-40, 0]), {
+        dim: 2,
+        quantization: 'int8',
+        metric: 'cosine',
+        normalize: false,
+      }),
+    ).toThrow(/normal float32 range/)
+    expect(() =>
+      buildAnyDocumentVectors(idxSingle, [['only', [1e-300, 0]]], {
+        dim: 2,
+        quantization: 'float32',
+        metric: 'dot',
+        normalize: false,
+      }),
+    ).toThrow(/float32 underflow/)
+
+    // Subnormal [1e-40, 0] with normalize:true is scaled in float64 and succeeds cleanly
+    const normalizedTiny = buildAnyDocumentVectors(
+      idxSingle,
+      [['only', [1e-40, 0]]],
+      { dim: 2, quantization: 'float32', metric: 'cosine', normalize: true },
+    )
+    expect(normalizedTiny.scoreDocument([1e-40, 0], 'only')).toBeCloseTo(1, 5)
+  })
+
   test('rejects swapped doc order, forged headers, CRCs, truncation and NaN payloads', () => {
     const idxA = FrozenMiniSearch.fromDocuments(
       [

@@ -17,6 +17,7 @@ import {
   FLAG_HAS_ROW_NORMS,
   FLAG_METRIC_COSINE,
   FLAG_NORMALIZED,
+  FLOAT32_MIN_NORMAL,
   type FromDocumentVectorsOptions,
   type FrozenVectorIndexStats,
   ingestDenseVectors,
@@ -66,12 +67,20 @@ export type {
   VectorSearchOptions,
 }
 
-function buildInvNorms(rowNorms: Float32Array | null): Float32Array | null {
+function buildInvNorms(rowNorms: Float32Array | null): Float64Array | null {
   if (rowNorms === null) return null
-  const inv = new Float32Array(rowNorms.length)
+  const inv = new Float64Array(rowNorms.length)
   for (let i = 0; i < rowNorms.length; i++) {
     const n = rowNorms[i]
-    inv[i] = n > 1e-30 ? 1 / n : 0
+    if (n === 0) {
+      inv[i] = 0
+    } else if (Number.isFinite(n) && n >= FLOAT32_MIN_NORMAL) {
+      inv[i] = 1 / n
+    } else {
+      throw new RangeError(
+        `FrozenVectorIndex: row norm ${n} at index ${i} is outside normal float32 range`,
+      )
+    }
   }
   return inv
 }
@@ -139,9 +148,18 @@ function validateInt8Payload(
   presentMask: Uint8Array | null,
 ): void {
   for (let i = 0; i < scales.length; i++) {
-    if (scales[i] < 0) {
+    const scale = scales[i]
+    if (scale < 0) {
       throw new RangeError(
         `FrozenVectorIndex: negative int8 scale at index ${i}`,
+      )
+    }
+    if (
+      scale !== 0 &&
+      (!Number.isFinite(scale) || scale < FLOAT32_MIN_NORMAL)
+    ) {
+      throw new RangeError(
+        `FrozenVectorIndex: int8 scale ${scale} at index ${i} is below normal float32 range`,
       )
     }
   }
@@ -225,6 +243,7 @@ function verifyStoredRowNorms(
   for (let i = 0; i < nextId; i++) {
     const present = presentMask === null || isMaskBitSet(presentMask, i)
     const stored = storedNorms[i]
+    const expected = reconstructed[i]
     if (!present) {
       if (stored !== 0) {
         throw new Error(
@@ -233,9 +252,21 @@ function verifyStoredRowNorms(
       }
       continue
     }
-    const expected = reconstructed[i]
-    const tol = Math.max(1e-5, 1e-4 * expected)
-    if (Math.abs(stored - expected) > tol) {
+    if (expected === 0) {
+      if (stored !== 0) {
+        throw new Error(
+          `FrozenVectorIndex: row norm mismatch at index ${i} (expected 0, got ${stored})`,
+        )
+      }
+      continue
+    }
+    if (expected < FLOAT32_MIN_NORMAL) {
+      throw new RangeError(
+        `FrozenVectorIndex: reconstructed row norm ${expected} at index ${i} is below normal float32 range`,
+      )
+    }
+    const tol = 1e-4 * expected
+    if (stored <= 0 || Math.abs(stored - expected) > tol) {
       throw new Error(
         `FrozenVectorIndex: row norm mismatch at index ${i} (expected ${expected}, got ${stored})`,
       )
@@ -288,7 +319,7 @@ export class FrozenVectorIndex<Id = unknown> {
   private readonly _presentMask: Uint8Array | null
   private readonly _presentCount: number
   private readonly _rowNorms: Float32Array | null
-  private readonly _invRowNorms: Float32Array | null
+  private readonly _invRowNorms: Float64Array | null
   private readonly _payload: VectorPayload
   private readonly _payloadBytes: number
 
@@ -441,8 +472,11 @@ export class FrozenVectorIndex<Id = unknown> {
 
   /**
    * Decode a binary `FXV1` (v2) vector pack and verify CRC-32 corruption checks,
-   * numerical invariants (reconstructed norms, unit norm flag, scale/code bounds),
-   * expected representation/snapshot metadata, and host mapping compatibility.
+   * numerical invariants (scale-relative reconstructed norm verification including
+   * zero vs non-zero distinction, normal float32 domain, unit norm flag, and
+   * scale/code bounds), expected representation/snapshot metadata, and host
+   * mapping compatibility. Operational cosine scoring always uses the verified
+   * reconstructed norms rather than trusting stored row norms directly.
    *
    * Note: CRC-32 checksums detect accidental corruption only and provide no
    * cryptographic authenticity against adversarial tampering.
@@ -614,9 +648,15 @@ export class FrozenVectorIndex<Id = unknown> {
     if (hasRowNorms) {
       const normRes = readOwnedFloat32Slice(bytes, cursor, nextId, 'row norm')
       for (let i = 0; i < normRes.arr.length; i++) {
-        if (normRes.arr[i] < 0) {
+        const n = normRes.arr[i]
+        if (n < 0) {
           throw new RangeError(
             `FrozenVectorIndex: negative row norm at index ${i}`,
+          )
+        }
+        if (n > 0 && n < FLOAT32_MIN_NORMAL) {
+          throw new RangeError(
+            `FrozenVectorIndex: subnormal stored row norm ${n} at index ${i} is below normal float32 range`,
           )
         }
       }
@@ -680,6 +720,7 @@ export class FrozenVectorIndex<Id = unknown> {
     }
 
     const needNormCheck = hasRowNorms || (kind === KIND_FLOAT32 && normalized)
+    let effectiveRowNorms: Float32Array | null = null
     if (needNormCheck) {
       const reconstructed = computeReconstructedRowNorms(
         payload,
@@ -692,6 +733,8 @@ export class FrozenVectorIndex<Id = unknown> {
       }
       if (storedRowNorms !== null) {
         verifyStoredRowNorms(storedRowNorms, reconstructed, nextId, presentMask)
+        // Reconstructed norms remain authoritative for scoring and subsequent saves.
+        effectiveRowNorms = reconstructed
       }
     }
 
@@ -705,7 +748,7 @@ export class FrozenVectorIndex<Id = unknown> {
       normalized,
       presentMask,
       presentCount,
-      storedRowNorms,
+      effectiveRowNorms,
       payload,
       payloadByteLength,
     )

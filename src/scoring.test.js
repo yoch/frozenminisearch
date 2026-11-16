@@ -5,7 +5,6 @@ import {
   OR,
   aggregateTerm,
   calcBM25Score,
-  collectDocIdsFromFieldTermData,
   combineResults,
   defaultBM25params,
   finalizeRawSearchResults,
@@ -376,53 +375,6 @@ describe('aggregateTerm', () => {
       { allowedDocs },
     )
     expect(Array.from(results.keys()).sort()).toEqual([42, 9999])
-  })
-})
-
-describe('collectDocIdsFromFieldTermData', () => {
-  test('collects doc ids from map postings with allowed-docs gate', () => {
-    const fieldTermData = mapPostings(0, [
-      [0, 1],
-      [1, 2],
-      [2, 1],
-      [3, 1],
-    ])
-    const docIds = new Set()
-    collectDocIdsFromFieldTermData(
-      fieldTermData,
-      fieldBoosts,
-      makeContext(),
-      docIds,
-      new Set([1, 3]),
-    )
-    expect(Array.from(docIds).sort()).toEqual([1, 3])
-  })
-
-  test('collects doc ids from segment postings via seek path', () => {
-    const docIdsArray = new Uint32Array(10_000)
-    const freqs = new Uint8Array(10_000)
-    for (let i = 0; i < docIdsArray.length; i++) {
-      docIdsArray[i] = i * 2
-      freqs[i] = 1
-    }
-    const list = new SegmentPostingList(
-      docIdsArray,
-      freqs,
-      0,
-      docIdsArray.length,
-    )
-    const fieldTermData = {
-      get: (fieldId) => (fieldId === 0 ? list : undefined),
-    }
-    const docIds = new Set()
-    collectDocIdsFromFieldTermData(
-      fieldTermData,
-      fieldBoosts,
-      makeContext(),
-      docIds,
-      new Set([4, 16, 99]),
-    )
-    expect(Array.from(docIds).sort((a, b) => a - b)).toEqual([4, 16])
   })
 })
 

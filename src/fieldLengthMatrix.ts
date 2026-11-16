@@ -17,6 +17,7 @@ export function maxInArrayLike(
   return max
 }
 
+/** @testonly */
 export function allocateFieldLengthMatrix(
   length: number,
   maxValue: number,

@@ -1,4 +1,5 @@
 import {
+  assertLittleEndianHost,
   bytesFromView,
   isWellFormedUtf16,
   type BinaryBytes,
@@ -38,6 +39,7 @@ export function buildMsv5EncodePrepared(
   snap: FrozenSnapshot,
   packedTermIndex: FrozenTermIndex,
 ): Msv5EncodePrepared {
+  assertLittleEndianHost()
   validateFrozenSnapshotNumeric(snap)
   const termCount = termCountOf(snap)
   validateFrozenTermIndexLeaves(packedTermIndex, termCount)

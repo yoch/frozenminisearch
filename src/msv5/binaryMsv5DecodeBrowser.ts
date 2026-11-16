@@ -1,9 +1,4 @@
-import {
-  isMsv5Bytes,
-  loadMsv5SectionsBrowser,
-  readMsv5GlobalFlagsBrowser,
-  readMsv5SectionDirectory,
-} from './binaryMsv5CompressionBrowser'
+import { loadMsv5SectionsBrowser } from './binaryMsv5CompressionBrowser'
 import {
   decodeMsv5Sections,
   validateMsv5Container,
@@ -15,11 +10,7 @@ export async function decodeFrozenSnapshotMsv5Browser(
   buf: Uint8Array,
   hints?: FrozenDecodeHints,
 ): Promise<FrozenSnapshot> {
-  const { globalFlags, directory } = validateMsv5Container(buf, {
-    isMsv5Buffer: isMsv5Bytes,
-    readMsv5GlobalFlags: readMsv5GlobalFlagsBrowser,
-    readMsv5SectionDirectory,
-  })
+  const { globalFlags, directory } = validateMsv5Container(buf)
   return decodeMsv5Sections(
     globalFlags,
     await loadMsv5SectionsBrowser(buf, directory),

@@ -1,10 +1,8 @@
 import {
   allocBytes,
-  concatBytes,
+  ByteWriter,
   readU32LE,
   readUtf8,
-  utf8Bytes,
-  writeU32LE,
   type BinaryBytes,
 } from './binaryBytes'
 import { invalidFrozenIndex, parseSnapshotJson } from './frozenErrors'
@@ -13,43 +11,35 @@ import {
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 
-function appendStoredFieldJsonEntry(
-  table: BinaryBytes,
-  heapChunks: BinaryBytes[],
-  heapOffRef: { value: number },
-  docIndex: number,
-  jsonUtf8: BinaryBytes,
-): void {
-  writeU32LE(table, docIndex * 4, heapOffRef.value + 1)
-  const entry = allocBytes(4 + jsonUtf8.length)
-  writeU32LE(entry, 0, jsonUtf8.length)
-  entry.set(jsonUtf8, 4)
-  heapChunks.push(entry)
-  heapOffRef.value += entry.length
+/**
+ * Table of `nextId` u32 (heap offset + 1, 0 for no row), then the heap of
+ * length-prefixed JSON rows in document order.
+ */
+function writeStoredFieldsSection(
+  nextId: number,
+  rowJson: (shortId: number) => string | undefined,
+): BinaryBytes {
+  const tableBytes = nextId * 4
+  const writer = new ByteWriter(tableBytes)
+  writer.skip(tableBytes)
+  for (let i = 0; i < nextId; i++) {
+    const json = rowJson(i)
+    if (json === undefined) continue
+    writer.setU32(i * 4, writer.length - tableBytes + 1)
+    writer.lengthPrefixedUtf8(json)
+  }
+  return writer.finish()
 }
 
 export function buildStoredFieldsRowsWireSection(
   storedFields: (Record<string, unknown> | undefined)[],
   nextId: number,
 ): BinaryBytes {
-  const table = allocBytes(nextId * 4)
-  const heapChunks: BinaryBytes[] = []
-  const heapOffRef = { value: 0 }
-  for (let i = 0; i < nextId; i++) {
+  return writeStoredFieldsSection(nextId, (i) => {
     const row = storedFields[i]
-    if (row == null) {
-      writeU32LE(table, i * 4, 0)
-      continue
-    }
-    appendStoredFieldJsonEntry(
-      table,
-      heapChunks,
-      heapOffRef,
-      i,
-      utf8Bytes(JSON.stringify(row)),
-    )
-  }
-  return heapChunks.length === 0 ? table : concatBytes([table, ...heapChunks])
+    // A row that serialises to nothing is written as the text `undefined`, as before.
+    return row == null ? undefined : String(JSON.stringify(row))
+  })
 }
 
 /** MSv5 StoredFields section from {@link StoredFieldsLayout} (no intermediate row array). */
@@ -58,26 +48,15 @@ export function buildStoredFieldsWireSection(
   nextId: number,
 ): BinaryBytes {
   if (layout.kind === 'multi') {
-    const rows =
-      layout.rows.length >= nextId
-        ? layout.rows
-        : layout.rows.concat(new Array(nextId - layout.rows.length))
-    return buildStoredFieldsRowsWireSection(rows, nextId)
+    return buildStoredFieldsRowsWireSection(layout.rows, nextId)
   }
+  if (layout.kind === 'none') return allocBytes(nextId * 4)
 
-  const table = allocBytes(nextId * 4)
-  if (layout.kind === 'none') return table
-
-  const heapChunks: BinaryBytes[] = []
-  const heapOffRef = { value: 0 }
   const { field, values } = layout
-  for (let i = 0; i < nextId; i++) {
+  return writeStoredFieldsSection(nextId, (i) => {
     const value = values[i]
-    if (value === undefined) continue
-    const jsonUtf8 = utf8Bytes(JSON.stringify({ [field]: value }))
-    appendStoredFieldJsonEntry(table, heapChunks, heapOffRef, i, jsonUtf8)
-  }
-  return heapChunks.length === 0 ? table : concatBytes([table, ...heapChunks])
+    return value === undefined ? undefined : JSON.stringify({ [field]: value })
+  })
 }
 
 function storedFieldsTableEnd(
@@ -92,12 +71,23 @@ function storedFieldsTableEnd(
   return tableEnd
 }
 
+/** Next expected heap offset (+1) while reading rows in document order. */
+type StoredFieldsCursor = { rel: number }
+
+/**
+ * Rows are laid out in document order with no gap or overlap, as the encoder writes
+ * them: a row can then be decoded once only, whatever the table says.
+ */
 function readStoredFieldJsonAt(
   buf: BinaryBytes,
   tableEnd: number,
   sectionEnd: number,
   rel: number,
+  cursor: StoredFieldsCursor,
 ): Record<string, unknown> {
+  if (rel !== cursor.rel) {
+    throw invalidFrozenIndex('stored fields entry offset out of order')
+  }
   const entryOff = tableEnd + rel - 1
   if (entryOff + 4 > sectionEnd) {
     throw invalidFrozenIndex('stored fields entry offset out of bounds')
@@ -112,10 +102,21 @@ function readStoredFieldJsonAt(
     readUtf8(buf, jsonStart, jsonEnd),
     'stored fields row',
   )
-  if (row === null) {
-    throw invalidFrozenIndex('stored fields row is null')
+  if (row === null || typeof row !== 'object' || Array.isArray(row)) {
+    throw invalidFrozenIndex('stored fields row is not an object')
   }
+  cursor.rel = rel + 4 + jsonLen
   return row as Record<string, unknown>
+}
+
+function assertStoredFieldsHeapConsumed(
+  tableEnd: number,
+  sectionEnd: number,
+  cursor: StoredFieldsCursor,
+): void {
+  if (tableEnd + cursor.rel - 1 !== sectionEnd) {
+    throw invalidFrozenIndex('stored fields section size mismatch')
+  }
 }
 
 /** MSv5 StoredFields section → layout (skips row materialization when storeFields hint allows). */
@@ -131,12 +132,14 @@ export function readStoredFieldsWireSection(
   if (storeFields.length === 1) {
     const field = storeFields[0]
     const values: unknown[] = new Array(nextId)
+    const cursor: StoredFieldsCursor = { rel: 1 }
     for (let i = 0; i < nextId; i++) {
       const rel = readU32LE(buf, storedOff + i * 4)
       if (rel === 0) continue
-      const row = readStoredFieldJsonAt(buf, tableEnd, sectionEnd, rel)
-      values[i] = row[field]
+      const row = readStoredFieldJsonAt(buf, tableEnd, sectionEnd, rel, cursor)
+      values[i] = Object.hasOwn(row, field) ? row[field] : undefined
     }
+    assertStoredFieldsHeapConsumed(tableEnd, sectionEnd, cursor)
     return { kind: 'single', field, values }
   }
 
@@ -148,7 +151,10 @@ export function readStoredFieldsWireSection(
         break
       }
     }
-    if (!hasAny) return { kind: 'none' }
+    if (!hasAny) {
+      assertStoredFieldsHeapConsumed(tableEnd, sectionEnd, { rel: 1 })
+      return { kind: 'none' }
+    }
   }
 
   const rows = readStoredFieldsRowsSection(buf, storedOff, nextId, sectionEnd)
@@ -163,13 +169,15 @@ export function readStoredFieldsRowsSection(
 ): (Record<string, unknown> | undefined)[] {
   const tableEnd = storedFieldsTableEnd(storedOff, nextId, sectionEnd)
   const rows: (Record<string, unknown> | undefined)[] = new Array(nextId)
+  const cursor: StoredFieldsCursor = { rel: 1 }
   for (let i = 0; i < nextId; i++) {
     const rel = readU32LE(buf, storedOff + i * 4)
     if (rel === 0) {
       rows[i] = undefined
       continue
     }
-    rows[i] = readStoredFieldJsonAt(buf, tableEnd, sectionEnd, rel)
+    rows[i] = readStoredFieldJsonAt(buf, tableEnd, sectionEnd, rel, cursor)
   }
+  assertStoredFieldsHeapConsumed(tableEnd, sectionEnd, cursor)
   return rows
 }

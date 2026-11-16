@@ -3,18 +3,17 @@ import FrozenMiniSearch from '../FrozenMiniSearch'
 import { frozenFromMiniSearch } from '../../testSupport/frozenImportHelpers'
 import { readU32LE, writeU16LE } from '../binaryBytes'
 import { vi } from 'vitest'
-import {
-  isMsv5Buffer,
-  loadMsv5Sections,
-  readMsv5GlobalFlags,
-  readMsv5SectionDirectory,
-} from './binaryMsv5Compression'
+import { loadMsv5Sections } from './binaryMsv5Compression'
 import {
   decodeMsv5Sections,
   validateMsv5Container,
 } from './binaryMsv5DecodeShared'
 import * as binaryMsv5Postings from './binaryMsv5Postings'
 import { Msv5SectionId } from './binaryMsv5Constants'
+import {
+  readMsv5GlobalFlags,
+  readMsv5SectionDirectory,
+} from './binaryMsv5ContainerShared'
 
 const options = { fields: ['text'] }
 
@@ -34,24 +33,18 @@ function validMsv5Snapshot() {
   }
 }
 
-const containerReaders = {
-  isMsv5Buffer,
-  readMsv5GlobalFlags,
-  readMsv5SectionDirectory,
-}
-
 describe('binaryMsv5DecodeShared', () => {
   test('validateMsv5Container rejects a non-MSv5 buffer', () => {
-    expect(() =>
-      validateMsv5Container(new Uint8Array(64), containerReaders),
-    ).toThrow(/not a frozen binary snapshot/)
+    expect(() => validateMsv5Container(new Uint8Array(64))).toThrow(
+      /not a frozen binary snapshot/,
+    )
   })
 
   test('validateMsv5Container rejects an unsupported snapshot version', () => {
     const { buf } = validMsv5Snapshot()
     const bad = new Uint8Array(buf)
     writeU16LE(bad, 4, 6)
-    expect(() => validateMsv5Container(bad, containerReaders)).toThrow(
+    expect(() => validateMsv5Container(bad)).toThrow(
       /unsupported frozen snapshot version=6/,
     )
   })

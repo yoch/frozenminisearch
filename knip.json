@@ -1,15 +1,33 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "src/**/*.test.{js,ts}",
-    "dev/parity/**/*.{js,ts}",
-    "benchmarks/**/*.{js,mjs,ts}"
+    "src/internal/frozenInternals.ts",
+    "benchmarks/**/*.{js,mjs,ts}",
+    "testSupport/**/*.{js,ts}"
   ],
-  "project": ["src/**/*.{ts,js}"],
+  "project": [
+    "src/**/*.{ts,js}"
+  ],
   "ignore": [
-    "src/binaryEncode.ts",
-    "src/msv5/binaryMsv5Constants.ts"
+    "src/**/*.test.js",
+    "src/binaryFormat.ts",
+    "src/msv5/binaryMsv5Encode.ts"
   ],
-  "ignoreBinaries": ["make"],
-  "ignoreExportsUsedInFile": true
+  "vitest": false,
+  "bun": false,
+  "tags": [
+    "-testonly"
+  ],
+  "ignoreBinaries": [
+    "make"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": [
+    "vitest",
+    "@vitest/coverage-v8",
+    "crc-32"
+  ],
+  "exclude": [
+    "duplicates"
+  ]
 }

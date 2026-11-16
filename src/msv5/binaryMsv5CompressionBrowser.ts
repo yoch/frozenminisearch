@@ -28,12 +28,8 @@ import {
 import {
   assertRawSectionCount,
   buildMsv5CompressionMeta,
-  isMsv5Bytes as isMsv5BytesShared,
   MSV5_MAX_UNCOMPRESSED_BYTES,
   preparePayload as prepareMsv5Payload,
-  readMsv5GlobalFlags as readMsv5GlobalFlagsShared,
-  readMsv5SectionDirectory as readMsv5SectionDirectoryShared,
-  readMsv5SnapshotCompressionMeta as readMsv5SnapshotCompressionMetaShared,
   writeMsv5FileHeader,
 } from './binaryMsv5ContainerShared'
 import {
@@ -117,11 +113,7 @@ function concatAndValidateSections(rawSections: BinaryBytes[]): {
   payloadCrc32: number
 } {
   assertRawSectionCount(rawSections)
-  const result = concatRawSectionsWithCrc(rawSections, allocBytes)
-  if (result.uncompressed.length > MSV5_MAX_UNCOMPRESSED_BYTES) {
-    throw new Error(MSV5_ERR_PAYLOAD_EXCEEDS_1GIB)
-  }
-  return result
+  return concatRawSectionsWithCrc(rawSections, allocBytes)
 }
 
 function assembleMsv5FileRawDirect(
@@ -229,16 +221,6 @@ export async function assembleMsv5FileBrowser(
   )
 }
 
-export function readMsv5SectionDirectory(buf: BinaryBytes): Msv5SectionEntry[] {
-  return readMsv5SectionDirectoryShared(buf)
-}
-
-export function readMsv5SnapshotCompressionMetaBrowser(
-  buf: BinaryBytes,
-): Msv5SnapshotCompressionMeta {
-  return readMsv5SnapshotCompressionMetaShared(buf)
-}
-
 function verifySectionCrc(section: BinaryBytes, expected: number): void {
   if (crc32Bytes(section) !== expected) {
     throw new Error(MSV5_ERR_SECTION_CRC_MISMATCH)
@@ -275,8 +257,8 @@ async function decompressPayloadAsync(
     throw zstdUnavailableReadError()
   }
   if (payloadCodec === CODEC_ZLIB) {
-    const decoded = await browserZlibInflateAsync(slice)
-    if (decoded.length !== uncompressedLength) {
+    const decoded = await browserZlibInflateAsync(slice, uncompressedLength)
+    if (decoded === undefined) {
       throw new Error(MSV5_ERR_DECOMPRESSED_PAYLOAD_LENGTH_MISMATCH)
     }
     return decoded
@@ -300,12 +282,4 @@ export async function loadMsv5SectionsBrowser(
     uncompressedLength,
   )
   return sectionsFromPayload(decoded, directory, payloadCrc32)
-}
-
-export function isMsv5Bytes(buf: BinaryBytes): boolean {
-  return isMsv5BytesShared(buf)
-}
-
-export function readMsv5GlobalFlagsBrowser(buf: BinaryBytes): number {
-  return readMsv5GlobalFlagsShared(buf)
 }

@@ -89,7 +89,7 @@ flowchart TD
 
 | File | Reason |
 |---------|--------|
-| [`src/binaryDecode.ts`](../../src/binaryDecode.ts) | current binary format only |
+| [`src/msv5/binaryMsv5Decode.ts`](../../src/msv5/binaryMsv5Decode.ts) | current binary format only |
 | [`src/scoring.ts`](../../src/scoring.ts) | BM25+ formula unchanged |
 
 ### Tests

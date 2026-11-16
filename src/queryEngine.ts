@@ -52,7 +52,6 @@ import type { PackedTermCursor } from './PackedRadixTree/types'
  * allocation on hot query paths.
  */
 export interface QueryIndexView {
-  getTermData(term: string): FieldTermDataLike | undefined
   /** Iterate over active documents (used by wildcard queries). */
   forEachActiveDoc(
     callback: (
@@ -351,10 +350,6 @@ export function createFrozenQueryIndexView(
         docIds,
         allowedDocs,
       )
-    },
-    getTermData(term) {
-      const ti = index.get(term)
-      return ti == null ? undefined : flyweight.bind(ti)
     },
     visitPrefixMatchesByIndex(term, visit) {
       index.visitPrefixRefs(term, visit)

@@ -17,6 +17,7 @@ import type {
 import { isWildcardQuery } from './symbols'
 import {
   assignStoredFields,
+  assignStoredRow,
   type StoredFieldsLayout,
 } from './storedFieldsLayout'
 import type { PackedTermCursor } from './PackedRadixTree/types'
@@ -128,6 +129,7 @@ function calcBM25ScoreWithConstants(
   )
 }
 
+/** @testonly */
 export const calcBM25Score = (
   termFreq: number,
   matchingCount: number,
@@ -229,7 +231,6 @@ function scorePostingDoc(
   termWeight: number,
   termBoost: number,
   fieldBoost: number,
-  matchingFields: number,
   context: AggregateContext,
   boostDocumentFn:
     | ((
@@ -241,7 +242,7 @@ function scorePostingDoc(
   bm25: Bm25FieldConstants,
   results: RawResult,
   derivedTermCache: DerivedTermState,
-  hoistedIdf?: number,
+  idf: number,
 ): void {
   const { trackMatch } = derivedTermCache
   // Without match tracking, only boostDocument needs the derived term string.
@@ -259,16 +260,7 @@ function scorePostingDoc(
   if (!docBoost) return
 
   const fieldLength = context.getFieldLength(docId, fieldId)
-  const rawScore =
-    hoistedIdf !== undefined
-      ? calcBm25TfWithConstants(termFreq, fieldLength, bm25, hoistedIdf)
-      : calcBM25ScoreWithConstants(
-          termFreq,
-          matchingFields,
-          context.documentCount,
-          fieldLength,
-          bm25,
-        )
+  const rawScore = calcBm25TfWithConstants(termFreq, fieldLength, bm25, idf)
   const weightedScore =
     termWeight * termBoost * fieldBoost * docBoost * rawScore
 
@@ -358,7 +350,6 @@ function aggregateSegmentPostingList(
         termWeight,
         termBoost,
         fieldBoost,
-        matchingFields,
         context,
         boostDocumentFn,
         bm25,
@@ -386,7 +377,6 @@ function aggregateSegmentPostingList(
       termWeight,
       termBoost,
       fieldBoost,
-      matchingFields,
       context,
       boostDocumentFn,
       bm25,
@@ -471,7 +461,6 @@ export function aggregateTerm(
         termWeight,
         termBoost,
         fieldBoost,
-        matchingFields,
         context,
         boostDocumentFn,
         bm25,
@@ -483,55 +472,6 @@ export function aggregateTerm(
   }
 
   return results
-}
-
-function collectDocIdsFromSegmentPostingList(
-  list: SegmentPostingList,
-  docIds: Set<number>,
-  allowedDocs?: DocIdGate,
-): void {
-  const { docIds: ids, offset, length } = list
-  if (allowedDocs != null && shouldSeekAllowedDocs(allowedDocs.size, length)) {
-    for (const docId of allowedDocs) {
-      if (findDocIndexInSortedSegment(ids, offset, length, docId) >= 0) {
-        docIds.add(docId)
-      }
-    }
-    return
-  }
-
-  for (let i = 0; i < length; i++) {
-    const docId = ids[offset + i]
-    if (allowedDocs != null && !allowedDocs.has(docId)) continue
-    docIds.add(docId)
-  }
-}
-
-/** Collect docIds from posting lists without scoring or term materialization. */
-export function collectDocIdsFromFieldTermData(
-  fieldTermData: FieldTermDataLike | undefined,
-  fieldBoosts: FieldBoostsForQuery,
-  context: AggregateContext,
-  docIds: Set<number>,
-  allowedDocs?: DocIdGate,
-): void {
-  if (fieldTermData == null) return
-
-  for (const field of fieldBoosts.names) {
-    const fieldId = context.fieldIds[field]
-    const postingList = fieldTermData.get(fieldId)
-    if (postingList == null) continue
-
-    if (postingList instanceof SegmentPostingList) {
-      collectDocIdsFromSegmentPostingList(postingList, docIds, allowedDocs)
-      continue
-    }
-
-    postingList.forEachDoc((docId) => {
-      if (allowedDocs != null && !allowedDocs.has(docId)) return
-      docIds.add(docId)
-    })
-  }
 }
 
 type CombinatorFunction = (a: RawResult, b: RawResult) => RawResult
@@ -643,7 +583,7 @@ function writeStoredFieldsOntoResult(
   }
   if (getStoredFields != null) {
     const storedFields = getStoredFields(docId)
-    if (storedFields != null) Object.assign(result, storedFields)
+    if (storedFields != null) assignStoredRow(result, storedFields)
   }
 }
 

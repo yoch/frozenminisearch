@@ -8,8 +8,17 @@ describe('compressionBrowser', () => {
     const input = new TextEncoder().encode('payload '.repeat(32))
     const compressed = await browserZlibDeflateAsync(input)
     expect(compressed.length).toBeLessThan(input.length)
-    const restored = await browserZlibInflateAsync(compressed)
+    const restored = await browserZlibInflateAsync(compressed, input.length)
     expect(Buffer.from(restored)).toEqual(Buffer.from(input))
+  })
+
+  test('inflate stops at the declared length', async () => {
+    const input = new Uint8Array(1 << 20)
+    const compressed = await browserZlibDeflateAsync(input)
+    expect(await browserZlibInflateAsync(compressed, 1024)).toBeUndefined()
+    expect(
+      await browserZlibInflateAsync(compressed, input.length + 1),
+    ).toBeUndefined()
   })
 
   test('deflate rejects when CompressionStream is unavailable', async () => {
@@ -29,7 +38,7 @@ describe('compressionBrowser', () => {
     globalThis.DecompressionStream = undefined
     try {
       await expect(
-        browserZlibInflateAsync(new Uint8Array([1, 2, 3])),
+        browserZlibInflateAsync(new Uint8Array([1, 2, 3]), 3),
       ).rejects.toThrow(/DecompressionStream is unavailable/)
     } finally {
       globalThis.DecompressionStream = saved

@@ -54,3 +54,36 @@ describe('binaryBytes float32 LE wire', () => {
     expect(readFloatLE(buf, 1)).not.toBe(at1)
   })
 })
+
+describe('ByteWriter', () => {
+  test('grows across small and large strings and keeps skipped bytes zero', async () => {
+    const { ByteWriter, readU32LE, readUtf8 } = await import('./binaryBytes')
+    const writer = new ByteWriter(1)
+    const table = writer.skip(8)
+    const strings = ['', 'é€😀', 'x'.repeat(20000), '\uD800', 'tail']
+    const offsets = []
+    for (const str of strings) {
+      offsets.push(writer.length)
+      writer.lengthPrefixedUtf8(str)
+    }
+    writer.setU32(table + 4, 7)
+    writer.u8(255)
+    const bytes = writer.finish()
+    expect(bytes.length).toBe(writer.length)
+    expect(readU32LE(bytes, 0)).toBe(0)
+    expect(readU32LE(bytes, 4)).toBe(7)
+    strings.forEach((str, i) => {
+      const length = readU32LE(bytes, offsets[i])
+      const expected = Buffer.from(new TextEncoder().encode(str))
+      expect(length).toBe(expected.length)
+      expect(
+        Buffer.from(bytes.subarray(offsets[i] + 4, offsets[i] + 4 + length)),
+      ).toEqual(expected)
+      if (str !== '\uD800')
+        expect(readUtf8(bytes, offsets[i] + 4, offsets[i] + 4 + length)).toBe(
+          str,
+        )
+    })
+    expect(bytes[bytes.length - 1]).toBe(255)
+  })
+})

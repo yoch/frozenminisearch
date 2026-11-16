@@ -7,11 +7,11 @@ import {
   FLAG_FL_U16,
   Msv5SectionId,
 } from './msv5/binaryMsv5Constants'
+import { loadMsv5Sections } from './msv5/binaryMsv5Compression'
 import {
-  loadMsv5Sections,
   readMsv5GlobalFlags,
   readMsv5SectionDirectory,
-} from './msv5/binaryMsv5Compression'
+} from './msv5/binaryMsv5ContainerShared'
 
 function densePostings(fieldCount, termCount, nextId) {
   return {

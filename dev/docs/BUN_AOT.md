@@ -2,7 +2,7 @@
 
 Bun can compile TypeScript/JavaScript to machine code at build time. This note explains how to try it with FrozenMiniSearch and what we measured. It applies to **standalone Bun executables** only: Node, browsers and Bun without `--aot` keep using the Rollup bundles.
 
-Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3`, `1.4.4-canary.1+2596ac5d3`, `1.4.4-canary.1+8aa496e1d`, `1.4.5-canary.1+ed4363334`, and `1.4.5-canary.1+9990f3d48`. `2596ac5d3` is the merge of [oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which rewrote the compiler: flags, `--explain` output and performance all changed (see [Measurements](#measurements)). `7ca0042d3` is the last canary with the old compiler and the baseline for the before/after numbers. `8aa496e1d` recovers (and mostly improves upon) the pre-rewrite speed, memory, executable size, and `bun test --aot` pass rate; `1.4.5-canary.1` brings `fuzzy` ahead of `--no-aot` and brings `Map.get` with an `Int32Array` key to parity with `--no-aot` in microbenchmarks. Bun `1.4.4` stable has no `--aot` at all, so it cannot serve as that baseline.
+The latest measurements use `1.4.6-canary.1+25c4fca9e` on the `docs/bun-aot` branch after the `1.13.0` merge. The historical runs cover the [compiler rewrite in oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which first landed in `1.4.4-canary.1+2596ac5d3`. Canaries `8aa496e1d` and `ed4363334` recovered much of the query throughput and executable size. The last pre-rewrite run used `7ca0042d3`. See [Measurements](#measurements).
 
 ## Commands
 
@@ -11,14 +11,14 @@ Tested with `1.4.4-canary.1+da867c60b`, `1.4.4`, `1.4.4-canary.1+7ca0042d3`, `1.
 | `bun --aot app.ts` | Type-checks like `bun compile`, then runs with built-in objects read-only. **No speed-up.** Useful as a guard. |
 | `bun build --compile --aot app.ts --outfile app` (or `bun compile app.ts`) | Real AOT: standalone executable with machine code. |
 | `bun build --compile --no-aot app.ts --outfile app` | Classic bundle + JIT executable (baseline). |
-| `bun compile app.ts --outfile app --explain` | Lists the slow paths, worst first. `--explain=json` lists all of them; `allocations`, `guards`, `guards-json` and `trim` are other reports. |
+| `bun compile app.ts --outfile app --explain` | Lists static slow-path causes. `--explain=json` lists all causes. `allocations`, `guards`, `guards-json` and `trim` are other reports. |
 | `bun check --aot --explain app.ts` | The same report without building. |
 | `bun test --aot src/ dev/parity/` | Compiles the tests and the code they import, then runs them. |
 | `bun check --no-script` | Type check. AOT needs a type-correct program. |
 
-`bun --aot-log-type-mismatches` and `--explain=missed-optimizations` no longer exist since the rewrite. Before it, the first one found two declared-type mismatches in this repo (fixed in `src/frozenBuild.ts` and `src/scoring.ts`).
+`bun --aot-log-type-mismatches` and `--explain=missed-optimizations` no longer exist since the rewrite. Before it, the first one found two declared-type mismatches in this repo (fixed in `src/frozenBuild.ts` and `src/scoring.ts`). `25c4fca9e` accepts `--explain=forms` for machine-code forms and sizes and `--explain=statistics` for compiler counters. See the [Bun explain guide](https://bun.com/docs/compiler/explain).
 
-On `1.4.5-canary.1+9990f3d48` (after merging `1.13.0`), `bun test --aot src/ dev/parity/` (with `--parallel`) passes all 880 tests across 49 files. On `8aa496e1d` (pre-`1.13.0`), all 845 tests across 47 files passed. Earlier on `2596ac5d3`, one test failed (`vi.spyOn` imported from `vitest` in `src/msv5/binaryMsv5DecodeShared.test.js`); that now passes too.
+On `25c4fca9e`, `bun test --aot --timeout=30000 ./src ./dev/parity` passed all 880 tests across 49 files. The preceding `9990f3d48` run also passed 880 tests with `--parallel`. On `8aa496e1d` (pre-`1.13.0`), all 845 tests across 47 files passed.
 
 ## Distributing the library
 
@@ -36,7 +36,95 @@ Before the rewrite, with the same consumer compiled with `--aot` on the Divina C
 
 ## Measurements
 
-Setup: Divina Commedia corpus x3 (42,291 documents, one `txt` field), `fromDocuments`, then `saveBinarySync` / `loadBinarySync` (1.7 MB), queries on the reloaded index. Median of 5 process runs, each metric being the best of 5 passes. One machine, no CPU isolation: expect 10-20 % noise. Scripts were scratch files, not committed.
+The speed suites use Divina Commedia x3 (42,291 documents, one indexed and stored `txt` field), `fromDocuments`, then `saveBinarySync` / `loadBinarySync` (1.7 MB). Queries run on the reloaded index. The tables use the median of five process runs, taking the fastest of five passes per metric within each process. The query sets differ across versions.
+
+### Measurements with `1.4.6-canary.1+25c4fca9e`
+
+The November 22 run used Linux x64 on an Intel Core i7-3770 and Node 24.18.0. It used the packed FrozenMiniSearch 1.13.0 distribution and a 1,747,243-byte snapshot. The speed suite rotates the order of the modes and pins processes to a physical core with both SMT siblings. Other processes shared the machine. Small differences need another run under quieter conditions.
+
+| Metric (µs/op unless noted) | Node 24 | Bun JIT | Bun `--aot` script | Compile `--no-aot` | AOT, JS bundle | AOT, typed export | AOT, `--trim` | Typed AOT vs. `--no-aot` |
+|-----------------------------|--------:|--------:|-------------------:|-------------------:|---------------:|------------------:|----------------:|-------------------------:|
+| Build (ms) | 201 | 261 | 218 | 213 | 253 | 192 | 192 | -10% |
+| Save + load (ms) | 261 | 183 | 165 | 171 | 194 | 176 | 181 | +3% |
+| Exact | 100.6 | 93.1 | 75.7 | 94.2 | 100.2 | 93.1 | 83.1 | -1% |
+| Prefix | 487.0 | 503.1 | 421.9 | 438.5 | 532.1 | 419.6 | 409.2 | -4% |
+| Fuzzy | 223.1 | 258.4 | 221.4 | 219.2 | 322.0 | 222.8 | 245.5 | +2% |
+| OR, five terms | 203.3 | 178.9 | 180.9 | 197.8 | 164.7 | 148.7 | 147.8 | -25% |
+| Broad OR, `limit: 10` | 25,237.8 | 21,914.3 | 20,850.1 | 20,870.8 | 22,231.0 | 20,024.1 | 20,707.9 | -4% |
+| AND | 53.7 | 47.9 | 47.1 | 47.3 | 49.2 | 41.1 | 41.4 | -13% |
+| `autoSuggest` | 347.5 | 316.5 | 248.7 | 255.0 | 349.7 | 259.5 | 251.1 | +2% |
+| `searchPage` | 121.5 | 141.3 | 115.3 | 118.4 | 141.4 | 120.9 | 113.0 | +2% |
+| Nested combination | 62.9 | 56.0 | 50.1 | 58.6 | 49.9 | 42.6 | 42.3 | -27% |
+
+Exact and fuzzy cycle through `amore`, `stelle`, `virtute`, `paradiso`, `dolore`, `occhi`, `mondo`, `luce`, `cielo` and `anima`. Prefix takes the first three characters and `autoSuggest` takes the first four. Fuzzy and `autoSuggest` use a distance ratio of 0.2. The compact OR uses the first five of those words and the broad OR uses `e la che per non di`. The AND uses `amore cielo`, and the page uses `amore luce` (offset 5, limit 10).
+
+On this workload, the most consistent AOT gains were build (10% lower median, faster in all five rounds) and five-term OR (25% lower, faster in all five). Nested search fell 27% and AND 13%, with gains in four of five rounds. Exact, prefix, fuzzy, broad OR, suggestions, pagination and save + load landed within 4% of `--no-aot` at the median. The typed export beat the JavaScript bundle under AOT on all eleven medians.
+
+The exact-search follow-up uses the same prebuilt snapshot in both executables. Three processes per mode, 6,000 calls after 1,000 warmup calls, pinned to one logical CPU.
+
+| Exact query | All hits | `--no-aot` (µs/op) | Typed AOT (µs/op) |
+|-------------|---------:|-------------------:|------------------:|
+| `amore` | 168 | 133.0 | 98.1 |
+| `amore`, limit 10 | 168 | 54.1 | 39.1 |
+| `come` | 1,896 | 1,663.8 | 1,621.1 |
+| `come`, limit 10 | 1,896 | 662.1 | 718.3 |
+
+AOT was 21–29% faster for `amore` with or without the limit in every round. For `come`, the direction varied across rounds. The medians for that term give an indication of latency on this machine.
+
+The throughput executable measured **150.7 MiB** with `--no-aot`, **68.7 MiB** with typed AOT and **39.7 MiB** with `--trim`. The parity consumer was 68.9 and 40.2 MiB with typed AOT and with trim, respectively, and both builds passed the same checks. The typed source is 250.2 KiB. A hello-world executable measured 150.5 MiB with `--no-aot`, 65.3 MiB with AOT and 24.1 MiB with trim. Calling `gzipSync` from `node:zlib` raises the trimmed hello-world size to 38.4 MiB. The consumer's trim report shows that it retains Brotli, zstd and all locales.
+
+RSS in MiB over two runs per mode, with 200,000 exact, prefix and fuzzy searches drawn from eight terms. Forced GC runs after load and every 50,000 queries. Peak RSS is sampled every 1,024 queries and at the end of each batch.
+
+| Phase | Bun JIT | `--no-aot` | Typed AOT |
+|-------|--------:|-----------:|----------:|
+| After index load and GC | 53.8–54.0 | 51.4–52.6 | 43.3 |
+| After GC, 50k–200k queries | 59.3–60.8 | 57.3–58.6 | 45.1–46.6 |
+| Peak sampled during searches | 93.9–94.7 | 91.6–92.9 | 74.2–74.9 |
+
+#### `--explain` and optimization candidates
+
+Before the scoring-weight hoist, [the parity consumer](../aot/consumer.ts) had **591 causes** and **50.0% fixed-offset dependency accesses** (1,344 free, 895 tested, 446 by name) in an external project with the packed dependency installed. These counts match `9990f3d48`. Building the same consumer from the checkout's scratch directory gave 588 causes and 893 tested accesses. The external-project counts are the historical comparison.
+
+`guards-json` emitted 1,197 guard records, of which 86 lead to the function's slow version if the guard fails. `allocations` emitted 841 records, of which 217 were marked as removed. `forms` counted 5,182 `TypeTest` sites and 1,020 `GetTypedArrayElement` sites in the generated code. These are static compiler records. Use profiles to establish which paths run frequently. The source index audit (`node dev/scripts/inspect-index-typing.cjs --suspect-only`) found zero suspect components across 488 numeric accesses and 35 string/symbol-keyed accesses.
+
+| Workload | Largest AOT self-time samples | What the report suggests checking |
+|----------|-------------------------------|-----------------------------------|
+| `come`, all 1,896 hits | `scorePostingDoc` 23%, `sort` 14%, `finalizeSearchResults` 11%, `assignStoredFields` 11%, `byScore` 9% | The report flags the sort call and result writes. Finalization, sort and comparator account for about 34% together, with stored-field assignment another 11%. |
+| `come`, `limit: 10` | `scorePostingDoc` 42%, `keyedSingleMatch` 14%, `aggregateSegmentPostingList` 10%, `calcBm25TfWithConstants` 8% | Scoring still visits the postings and builds match metadata for candidates. The report flags `Map.get` and `Map.set` in the scoring loop and loses provenance on the field-length view in the throughput harness. |
+| Broad OR, `limit: 10` | `scorePostingDoc` 29%, OR merge 28%, `keyedSingleMatch` 15%, `assignUniqueTerms` 9% | The first dependency cause in the parity consumer is `Object.assign(existing.match, match)` in the OR merge, with 58 affected accesses and 20 sites in loops. Bun associates it with `DocIdBitSet`, although the assignment target is a `MatchInfo` object. Treat the reported class attribution as suspect. |
+| Fuzzy `vertute`, distance ratio 0.2 | `scorePostingDoc` 16%, `exactSuffixMatches` 16%, `keyedSingleMatch` 8%, `visitBits` 7% | The report flags the visitor call and path writes. A separate optimization here would need to reduce work in the fuzzy traversal or suffix comparison. |
+
+Read `why` as the compiler's explanation for a loss of information and `uses` as the list of affected static sites. For a proposed fix, check whether those uses execute on the relevant workload. The profiler measures the cost of a function including its other operations. A guard record shows where a check may fail, with no failure frequency. [Bun's guide to the report](https://bun.com/docs/compiler/explain).
+
+##### Which causes can be addressed locally
+
+**Scoring.** The `builtin-property` and `many-functions` reports at `results.get(docId)` and `results.set(docId, …)` describe method resolution on a `Map`. The type of the map is already `Map<number, RawResultValue>`. The two reports at the optional boost callback concern caller-supplied code and apply when that option is present. The three weights `termWeight`, `termBoost`, and `fieldBoost` stay constant for an entire posting list. Computing their product once preserves multiplication order through `postingWeight * docBoost * rawScore`. The callback, its early return, and BM25 evaluation keep their order. [Scoring and posting loops](../../src/scoring.ts).
+
+In the initial scratch run, calculating the product separately in the segment and generic paths reduced the AOT median for `come` with `limit: 10` by 7.6% (383.7 to 354.4 µs). A fresh build of both versions from the same external project, with the same inputs and executable path, reversed the result. The median rose from 344.5 to 427.2 µs (+24.0%) for top 10 and from 660.9 to 748.2 µs (+13.2%) for all hits. Both workloads were slower in all five rounds.
+
+The selected version computes the product in `aggregateTerm` before selecting the posting path. This also reduces the segment function's argument count. In the same five-round AOT test, this version took 332.5 µs for top 10 (−3.5%) and 665.3 µs for all hits (+0.7%). A separate three-pair test saw gains of 4.2% on top 10 and 4.8% on fuzzy `vertute`, with the five-term OR within 1%. On the rebuilt package's JS bundle, five pairs gave −8.7% for top 10 and −6.9% for OR in Bun JIT, and +1.2% and −4.2% respectively in Node. Fuzzy was within 1% in both runtimes.
+
+**Match objects and OR.** The highest-ranked library cause is `changed-shape` at `Object.assign(existing.match, match)`. Terms are runtime keys, so each merge can grow a `MatchInfo` object. Bun attributes 58 accesses and 20 loop sites to the cause, with uses across scoring, fuzzy traversal, stored fields, and other modules. One use maps to `docIdBitSet.ts`. The assignment target is the match object. Initializing `DocIdBitSet._ids` explicitly left the same report and totals. Replacing both merge assignments with explicit key copies cleared that message and increased the totals to 514 / 345. Iterating OR's incoming map entries lowered by-name accesses to 336, cut the five-term OR median by 3%, and raised the broad OR median by 11%. The existing `matchInfo: false` option takes the match allocation out of the posting loop and avoids collecting its keys during result materialization. It keeps `queryTerms`, scores, result order and stored fields. Filters that read `terms` or `match` need the full result shape. [OR merge and match construction](../../src/scoring.ts), [search overloads](../../src/FrozenMiniSearchCore.ts).
+
+**Stored fields and result finalization.** The `checked-element` reports for `layout.values[shortId]` and `layout.rows[shortId]` are legitimate. Stored rows can be missing and short IDs are read in result order. The existing `undefined` checks keep absent fields absent. The dynamic write `target[layout.field]` reflects a user-chosen field name. The `Object.defineProperty` path preserves `__proto__` as an own field. Fixed result shapes would alter the public result contract. On a separate line, `results[write++] = result` gets a bounds check because the compiler cannot prove that iteration of the map matches the original allocation. Appending with `push` clears the entry. The sort reports concern builtin dispatch, and the current sort preserves iteration order when scores tie. [Stored-fields layout](../../src/storedFieldsLayout.ts), [result finalization](../../src/scoring.ts).
+
+**Typed-array access and fuzzy traversal.** The scoring harness reports `lost-track / property-read` at the field-length view captured in `getFieldLength`. The index operands are numeric. Specializing the stride to one in the constructor cleared that entry and produced `unknown-callee / many-functions` at the call in `scorePostingDoc`, where there were now two possible callees. The whole report moved from 494 / 341 to 496 / 342. In the fuzzy walker the checks at `path.edges[depth] = ei` concern a reusable JS array that grows with the path. The visitor is supplied as a callback. In the fuzzy profile `exactSuffixMatches` accounts for 16% of self-time, and its hot work is reading and comparing labels. Caching the existing column references is local. Changing the path representation or the callback interface would affect other walkers and callers. [Field-length lookup](../../src/FrozenMiniSearchCore.ts), [fuzzy walker](../../src/PackedRadixTree/fuzzy.ts), [shared path](../../src/PackedRadixTree/termPath.ts).
+
+**Import, options and ID-only queries.** `JSON.parse` has 27 affected accesses and 12 loop sites because objects from MiniSearch JSON have runtime shapes. Validation already checks the snapshot before materializing the frozen layout. Rebuilding the parsed objects solely for specialization would add an intermediate allocation on the import path. The MSv5 search workload bypasses that path. The options spread has 21 affected accesses and eight loop sites. Replacing it with `??` would change explicitly passed `undefined` or `null` overrides, and replacing it by direct reads changes which properties and getters are read. The `collectDocIdsForQueryInternal` report follows a factory returning `Set` or `DocIdBitSet`. These two implementations use different iteration orders and the bitset supports word-wise operations. This report is relevant to ID collection and query gates. The zlib CRC diagnostic is on binary I/O, and both named and default import probes still report an indirect call. The default import also preserves the fallback on early Node 20 releases. [JSON import](../../src/fromMiniSearch.ts), [option handling](../../src/scoring.ts), [ID collection](../../src/queryEngine.ts), [CRC compatibility](../../src/binaryIo.ts).
+
+The focused checks used the same snapshot and five rotating process runs on one logical CPU. The AOT medians below compare each change to its workload's baseline. The four code variants matched all 12 packaged-consumer digests, and the reduced-output call matched the full result after dropping `terms` and `match`.
+
+| Local change | Causes / by-name accesses | Timing and decision |
+|--------------|--------------------------:|---------------------|
+| Call `search` with `matchInfo: false` | Same binary | `come` fell from 723.8 to 563.5 µs (−22%). With `limit: 10`, it fell from 351.9 to 277.8 µs (−21%). It was faster in all five pairs on both workloads. Use where the consumer needs the reduced result shape. |
+| Build the match object with a computed-key literal in `keyedSingleMatch` | 494 / 340 | Full AOT search improved 1.7% and top-k slowed 3.1%. Node 24 slowed 10% on full `come` and 29% at `limit: 10`. Keep the existing keyed assignment and its special case for `__proto__`. |
+| Use `push` in the unfiltered finalizer | 493 / 341 | Full `come` improved 0.7% under AOT. The bounds diagnostic disappears, with negligible AOT impact on this workload. A second check measured improvements of 4.6% on Node and 7.3% on Bun JIT for full `come`, and a 9.9% slowdown on Bun JIT for full `amore`. |
+| Select a stride-one field-length closure for single-field indexes | 496 / 342 | Full `come` slowed 6.7% and top-k slowed 10.1%. This variant changes both address arithmetic and call dispatch. |
+| Cache the edge and leaf columns in the fuzzy walk and suffix test | 494 / 340 | The six-term fuzzy workload slowed 8.5%, with a slowdown in all five pairs. The two path-array element checks remain. |
+
+The rebuilt typed export matches the selected trial source byte for byte. The external parity consumer reports 592 causes and the original dependency access counts. All 12 packaged checks and 48 queries with fractional term, field and document boosts matched the baseline in AOT and Bun JIT. The 48 queries also matched the preceding revision under Node. The validation runs are under `tmp/aot-25c4fca9e/commit-validation/`. Callers can pass `matchInfo: false` when presenting results without match details.
+
+The local run directory is `tmp/aot-25c4fca9e/`, with the focused experiments in `quick/`. It contains the entry points, timing runs, CPU profiles, and `explain` reports. To collect comparable diagnostics, install the packed package outside the checkout and run `bun build --compile --aot --explain=json consumer.ts --outfile consumer` with [the parity consumer](../aot/consumer.ts). Repeat with `--explain=guards-json` and `--explain=allocations`. To profile the standalone search loop, set `BUN_OPTIONS="--cpu-prof"` when launching it.
 
 ### Speed with `1.4.5-canary.1+ed4363334` (µs/op unless noted)
 

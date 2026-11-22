@@ -228,9 +228,7 @@ function scorePostingDoc(
   fieldId: number,
   docId: number,
   termFreq: number,
-  termWeight: number,
-  termBoost: number,
-  fieldBoost: number,
+  postingWeight: number,
   context: AggregateContext,
   boostDocumentFn:
     | ((
@@ -261,8 +259,7 @@ function scorePostingDoc(
 
   const fieldLength = context.getFieldLength(docId, fieldId)
   const rawScore = calcBm25TfWithConstants(termFreq, fieldLength, bm25, idf)
-  const weightedScore =
-    termWeight * termBoost * fieldBoost * docBoost * rawScore
+  const weightedScore = postingWeight * docBoost * rawScore
 
   const result = results.get(docId)
   if (result) {
@@ -305,11 +302,9 @@ function keyedSingleMatch(term: string, field: string): MatchInfo {
 function aggregateSegmentPostingList(
   sourceTerm: string,
   derivedTerm: AggregateDerivedTerm,
-  termWeight: number,
-  termBoost: number,
+  postingWeight: number,
   field: string,
   fieldId: number,
-  fieldBoost: number,
   list: SegmentPostingList,
   context: AggregateContext,
   boostDocumentFn:
@@ -347,9 +342,7 @@ function aggregateSegmentPostingList(
         fieldId,
         docId,
         freqs[index],
-        termWeight,
-        termBoost,
-        fieldBoost,
+        postingWeight,
         context,
         boostDocumentFn,
         bm25,
@@ -374,9 +367,7 @@ function aggregateSegmentPostingList(
       fieldId,
       docId,
       termFreq,
-      termWeight,
-      termBoost,
-      fieldBoost,
+      postingWeight,
       context,
       boostDocumentFn,
       bm25,
@@ -418,15 +409,14 @@ export function aggregateTerm(
     const postingList = fieldTermData.get(fieldId)
     if (postingList == null) continue
 
+    const postingWeight = termWeight * termBoost * fieldBoost
     if (postingList instanceof SegmentPostingList) {
       aggregateSegmentPostingList(
         sourceTerm,
         derivedTerm,
-        termWeight,
-        termBoost,
+        postingWeight,
         field,
         fieldId,
-        fieldBoost,
         postingList,
         context,
         boostDocumentFn,
@@ -458,9 +448,7 @@ export function aggregateTerm(
         fieldId,
         docId,
         termFreq,
-        termWeight,
-        termBoost,
-        fieldBoost,
+        postingWeight,
         context,
         boostDocumentFn,
         bm25,

@@ -43,3 +43,4 @@ FrozenMiniSearch-v2 (1).png
 # Local agent instructions (not versioned)
 /AGENTS.md
 /CLAUDE.md
+bun.lock

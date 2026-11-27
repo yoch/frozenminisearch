@@ -31,20 +31,21 @@ The package does this:
 - `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles two consumers with `--aot`: [`consumer.ts`](../aot/consumer.ts) (typed ESM) and [`consumer.cjs`](../aot/consumer.cjs) (untyped CommonJS with `require`, shaped like `fr.gouv.medicaments.rest`: `fromAsyncIterable`, the builder, `AND`, `matchIds`, function-valued `prefix`/`fuzzy`, custom `tokenize`/`processTerm`, `filter`, `limit`, `matchInfo: false`). It fails:
   - if Bun reports a type error in `index.aot.ts`, or compiles it without its types;
   - if an `--aot` build, ESM or CJS, did not resolve the `"aot"` condition;
-  - if `bun build --compile --no-aot`, plain `bun build --target=bun` or the Bun runtime (`import.meta.resolve`, `require.resolve`) resolves anything but `dist/es` and `dist/cjs`;
+  - if `bun build --compile --no-aot`, plain `bun build --target=bun` or the Bun runtime (`import.meta.resolve`, `require.resolve`) resolves anything but `dist/es` and `dist/cjs`, or if `bun --aot` resolves anything but `index.aot.ts`;
   - if an executable's results differ from the same consumer under Bun JIT, bit for bit, across `fromDocuments`, the builder, `fromAsyncIterable`, `fromJSON` and every binary compression.
 
-  On a Bun without `--aot` it prints that it skipped and succeeds (a warning annotation in GitHub Actions), unless `REQUIRE_AOT=1`, which `prepublishOnly` sets so that a release cannot skip it. CI runs it on Bun `latest` and `canary`; a failure on `canary` is reported without blocking the merge. `prepublishOnly` runs it before every release.
+  On a Bun without `--aot` it skips the AOT builds with a warning (an annotation in GitHub Actions), but still checks the JIT resolution and compares the plain `--compile` consumers with Bun JIT. `REQUIRE_AOT=1`, which `prepublishOnly` sets, turns that case into a failure so that a release cannot skip the AOT checks. CI runs it on Bun `latest` and `canary`; a failure on `canary` is reported without blocking the merge. `prepublishOnly` runs it before every release.
 - `make build` needs Bun on `PATH` (as `make lint` already does) and fails with a message otherwise. `scripts/verify-npm-pack.cjs` also checks that the `"aot"` target carries the generated header, so a release cannot ship without it or with a hand-edited file. The header records the Bun that generated it: the CI `test` job uses `canary` until `bun lint` is in a stable release, then that release should be pinned, which also pins the AOT source.
 
 ### Using the library from another project
 
-Install the package as usual. Nothing in the consumer selects the AOT source except `bun build --compile --aot` (or its short form `bun compile`). Bun `1.4.5`, the latest stable release on November 27, has no `--aot` (CI's `latest` leg skips with a warning); a consumer needs a canary or the first stable release that ships it.
+Install the package as usual. Only Bun's `--aot` modes select the AOT source: `bun build --compile --aot` (or its short form `bun compile`), and also `bun --aot <script>` and `bun test --aot`. Bun `1.4.5`, the latest stable release on November 27, has no `--aot` (CI's `latest` leg then checks only JIT resolution, with a warning); a consumer needs a canary or the first stable release that ships it.
 
 
 | Consumer | Resolves |
 |----------|----------|
-| `bun build --compile --aot`, `import` or `require` | `dist/aot/index.aot.ts` |
+| `bun build --compile --aot` / `bun compile`, `import` or `require` | `dist/aot/index.aot.ts` |
+| `bun --aot <script>`, `bun test --aot` | `dist/aot/index.aot.ts` (run from source; no speed-up, see [Commands](#commands)) |
 | `bun build --compile --no-aot`, `bun build`, the Bun runtime (`bun run`) | `dist/es` (`import`) or `dist/cjs` (`require`) |
 | Node, browsers, bundlers | `dist/es`, `dist/cjs`, `dist/browser`, as before |
 | TypeScript (`nodenext`, `node16`, `bundler`) | `dist/es/index.d.ts` |

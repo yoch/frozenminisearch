@@ -16,8 +16,10 @@
  * 5. Builds without --aot (`--compile --no-aot`, plain `bun build`) must keep resolving
  *    dist/es and dist/cjs: the "aot" condition must not reach Bun JIT.
  *
- * Skipped, with a message, when the Bun on PATH has no `--aot` (stable releases before it),
- * unless REQUIRE_AOT=1 (set by prepublish-only), which turns the skip into a failure.
+ * On a Bun without `--aot` (stable releases before it), only steps 1-4 that compile with
+ * --aot are skipped, with a warning: the JIT resolution checks (5) still run, and the
+ * consumers compiled with plain --compile must match Bun JIT. REQUIRE_AOT=1 (set by
+ * prepublish-only) turns that case into a failure.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -54,18 +56,20 @@ function preflight () {
   if (/^\s*--aot(?![\w-])/m.test(buildHelp.stdout)) return true
   const revision = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
   if (process.env.REQUIRE_AOT === '1') fail(`Bun ${revision} has no --aot, and REQUIRE_AOT=1`)
-  const message = `test-aot: skipped (Bun ${revision} has no --aot)`
+  const message = `test-aot: Bun ${revision} has no --aot; AOT builds skipped, JIT resolution still checked`
   console.log(process.env.GITHUB_ACTIONS ? `::warning::${message}` : message)
   return false
 }
 
-let canRun = false
+let hasAot
 try {
-  canRun = preflight()
+  hasAot = preflight()
 } catch (error) {
   exitOnFailure(error)
+  process.exit()
 }
-if (!canRun) process.exit()
+// Explicit --no-aot where it exists, in case a later Bun makes AOT the --compile default.
+const jitCompile = hasAot ? ['--compile', '--no-aot'] : ['--compile']
 
 const work = mkdtempSync(join(tmpdir(), 'fms-aot-consumer-'))
 
@@ -98,13 +102,13 @@ function expectInputs (args, expected) {
   return output
 }
 
-function compareReports (label, aot, jit, sameAcrossPaths) {
-  for (const [key, value] of Object.entries(aot)) {
-    if (jit[key] !== value) fail(`${label}: ${key} differs between the AOT executable and Bun JIT`)
-    if (sameAcrossPaths(key) && value !== Object.values(aot)[0]) fail(`${label}: ${key} differs from the first path in the AOT executable`)
+function compareReports (label, compiled, jit, sameAcrossPaths) {
+  for (const [key, value] of Object.entries(compiled)) {
+    if (jit[key] !== value) fail(`${label}: ${key} differs between the executable and Bun JIT`)
+    if (sameAcrossPaths(key) && value !== Object.values(compiled)[0]) fail(`${label}: ${key} differs from the first path in the executable`)
   }
-  if (Object.keys(jit).length !== Object.keys(aot).length) fail(`${label}: the AOT executable and Bun JIT report different checks`)
-  return Object.keys(aot).length
+  if (Object.keys(jit).length !== Object.keys(compiled).length) fail(`${label}: the executable and Bun JIT report different checks`)
+  return Object.keys(compiled).length
 }
 
 try {
@@ -123,23 +127,25 @@ try {
     "import * as library from '@yoch/frozenminisearch'\nconst probe: number = 'not a number'\nconsole.log(library, probe)\n",
   )
 
-  const probe = bun(['build', '--compile', '--aot', 'probe.ts', '--outfile', 'probe'])
-  if (probe.status === 0 || !probe.output.includes('TS2322')) {
-    fail('the probe build did not report its deliberate type error', probe.output)
-  }
-  if (untypedInProbe.test(probe.output)) fail(`Bun reports type errors in ${aotSource}`, probe.output)
-
   const esm = [`${aotSource}`]
   const jsEsm = ['dist/es/index.js']
   const jsCjs = ['dist/cjs/index.require.cjs', 'dist/cjs/index.cjs']
 
-  const build = expectInputs(['build', '--compile', '--aot', 'consumer.ts', '--outfile', 'consumer'], esm)
-  if (untypedInBuild.test(build)) fail(`Bun compiles ${aotSource} without its types`, build)
-  const buildCjs = expectInputs(['build', '--compile', '--aot', 'consumer.cjs', '--outfile', 'consumer-cjs'], esm)
-  if (untypedInBuild.test(buildCjs)) fail(`Bun compiles ${aotSource} without its types for require()`, buildCjs)
+  if (hasAot) {
+    const probe = bun(['build', '--compile', '--aot', 'probe.ts', '--outfile', 'probe'])
+    if (probe.status === 0 || !probe.output.includes('TS2322')) {
+      fail('the probe build did not report its deliberate type error', probe.output)
+    }
+    if (untypedInProbe.test(probe.output)) fail(`Bun reports type errors in ${aotSource}`, probe.output)
 
-  expectInputs(['build', '--compile', '--no-aot', 'consumer.ts', '--outfile', 'consumer-jit'], jsEsm)
-  expectInputs(['build', '--compile', '--no-aot', 'consumer.cjs', '--outfile', 'consumer-cjs-jit'], jsCjs)
+    const build = expectInputs(['build', '--compile', '--aot', 'consumer.ts', '--outfile', 'consumer'], esm)
+    if (untypedInBuild.test(build)) fail(`Bun compiles ${aotSource} without its types`, build)
+    const buildCjs = expectInputs(['build', '--compile', '--aot', 'consumer.cjs', '--outfile', 'consumer-cjs'], esm)
+    if (untypedInBuild.test(buildCjs)) fail(`Bun compiles ${aotSource} without its types for require()`, buildCjs)
+  }
+
+  expectInputs(['build', ...jitCompile, 'consumer.ts', '--outfile', 'consumer-jit'], jsEsm)
+  expectInputs(['build', ...jitCompile, 'consumer.cjs', '--outfile', 'consumer-cjs-jit'], jsCjs)
   expectInputs(['build', '--target=bun', 'consumer.ts', '--outdir', 'bundle-esm'], jsEsm)
   expectInputs(['build', '--target=bun', 'consumer.cjs', '--outdir', 'bundle-cjs'], jsCjs)
   writeFileSync(
@@ -150,21 +156,32 @@ try {
   if (!runtimeImport.endsWith(jsEsm[0]) || !runtimeRequire.endsWith(jsCjs[0])) {
     fail(`Bun JIT resolved ${runtimeImport} and ${runtimeRequire}, expected dist/es and dist/cjs`)
   }
+  if (hasAot) {
+    // `bun --aot` (script mode) is an AOT mode too, and must select the typed source.
+    const [aotImport, aotRequire] = runReport('bun', ['--aot', 'resolve.mjs'])
+    if (!aotImport.endsWith(aotSource) || !aotRequire.endsWith(aotSource)) {
+      fail(`bun --aot resolved ${aotImport} and ${aotRequire}, expected ${aotSource}`)
+    }
+  }
 
+  // With --aot, the AOT executables; without, the plain --compile ones.
+  const [esmExe, cjsExe] = hasAot ? ['consumer', 'consumer-cjs'] : ['consumer-jit', 'consumer-cjs-jit']
   const checks = compareReports(
     'consumer.ts',
-    runReport(join(work, 'consumer'), ['corpus.json']),
+    runReport(join(work, esmExe), ['corpus.json']),
     runReport('bun', ['consumer.ts', 'corpus.json']),
     (key) => key !== 'storedFields',
   ) + compareReports(
     'consumer.cjs',
-    runReport(join(work, 'consumer-cjs'), ['corpus.json']),
+    runReport(join(work, cjsExe), ['corpus.json']),
     runReport('bun', ['consumer.cjs', 'corpus.json']),
     () => true,
   )
 
   const bunVersion = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
-  console.log(`test-aot: ok (Bun ${bunVersion}, ${checks} checks identical to Bun JIT, "aot" condition only under --aot)`)
+  console.log(hasAot
+    ? `test-aot: ok (Bun ${bunVersion}, ${checks} checks identical to Bun JIT, "aot" condition only under --aot)`
+    : `test-aot: ok without --aot (Bun ${bunVersion}, JIT resolution checked, ${checks} checks of --compile executables identical to Bun JIT)`)
 } catch (error) {
   exitOnFailure(error)
 } finally {

@@ -2,7 +2,7 @@
 
 Bun can compile TypeScript/JavaScript to machine code at build time. This note explains how to try it with FrozenMiniSearch and what we measured. It applies to **standalone Bun executables** only: Node, browsers and Bun without `--aot` keep using the Rollup bundles.
 
-The latest measurements use `1.4.6-canary.1+25c4fca9e` on the `docs/bun-aot` branch after the `1.13.0` merge. The historical runs cover the [compiler rewrite in oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which first landed in `1.4.4-canary.1+2596ac5d3`. Canaries `8aa496e1d` and `ed4363334` recovered much of the query throughput and executable size. The last pre-rewrite run used `7ca0042d3`. See [Measurements](#measurements).
+The latest measurements use `1.4.6-canary.1+25c4fca9e` on the `docs/bun-aot` branch after the `1.13.0` merge. On `1.4.6-canary.1+736fe1187` the static checks, the tests and the issue repros were re-run, without timings (the host was under load); `bun compile --library` emits the same `index.aot.ts`, byte for byte, as on `25c4fca9e`. The historical runs cover the [compiler rewrite in oven-sh/bun#47942](https://github.com/oven-sh/bun/pull/47942), which first landed in `1.4.4-canary.1+2596ac5d3`. Canaries `8aa496e1d` and `ed4363334` recovered much of the query throughput and executable size. The last pre-rewrite run used `7ca0042d3`. See [Measurements](#measurements).
 
 ## Commands
 
@@ -18,7 +18,7 @@ The latest measurements use `1.4.6-canary.1+25c4fca9e` on the `docs/bun-aot` bra
 
 `bun --aot-log-type-mismatches` and `--explain=missed-optimizations` no longer exist since the rewrite. Before it, the first one found two declared-type mismatches in this repo (fixed in `src/frozenBuild.ts` and `src/scoring.ts`). `25c4fca9e` accepts `--explain=forms` for machine-code forms and sizes and `--explain=statistics` for compiler counters. See the [Bun explain guide](https://bun.com/docs/compiler/explain).
 
-On `25c4fca9e`, `bun test --aot --timeout=30000 ./src ./dev/parity` passed all 880 tests across 49 files. The preceding `9990f3d48` run also passed 880 tests with `--parallel`. On `8aa496e1d` (pre-`1.13.0`), all 845 tests across 47 files passed.
+On `736fe1187` and `25c4fca9e`, `bun test --aot --timeout=30000 ./src ./dev/parity` passed all 880 tests across 49 files. The preceding `9990f3d48` run also passed 880 tests with `--parallel`. On `8aa496e1d` (pre-`1.13.0`), all 845 tests across 47 files passed.
 
 ## Distributing the library
 
@@ -28,7 +28,33 @@ The package does this:
 
 - `make build` runs `scripts/build-aot-source.cjs`, which calls `bun compile --library src/index.ts` and keeps only its `index.aot.ts`, written to `dist/aot/index.aot.ts` (about 250 KB) with the Bun version in its header. The `index.js`, `.d.ts` files and `package.json` that `--library` also emits are dropped: Rollup and the root `package.json` already provide them. Only the Node entry has an AOT source; `./browser` has none.
 - `package.json` lists `"aot": "./dist/aot/index.aot.ts"` first in the `.` export, because resolvers take the first matching condition. `scripts/verify-npm-pack.cjs` checks this order and that every export target is in the tarball; `scripts/assert-public-bundles.cjs` scans the file like the other bundles.
-- `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles `dev/aot/consumer.ts` with `--aot`. It fails if Bun reports a type error in `index.aot.ts`, if the build did not resolve the `"aot"` condition, or if the executable's results differ from the same consumer under Bun JIT (`dist/es`), bit for bit, across `fromDocuments`, the builder, `fromJSON` and every binary compression. CI runs it on Bun `latest` and `canary`, and `prepublishOnly` runs it before every release.
+- `make test-aot` (`dev/aot/run.mjs`) packs the build, installs it outside the repository and compiles two consumers with `--aot`: [`consumer.ts`](../aot/consumer.ts) (typed ESM) and [`consumer.cjs`](../aot/consumer.cjs) (untyped CommonJS with `require`, shaped like `fr.gouv.medicaments.rest`: `fromAsyncIterable`, the builder, `AND`, `matchIds`, function-valued `prefix`/`fuzzy`, custom `tokenize`/`processTerm`, `filter`, `limit`, `matchInfo: false`). It fails:
+  - if Bun reports a type error in `index.aot.ts`, or compiles it without its types;
+  - if an `--aot` build, ESM or CJS, did not resolve the `"aot"` condition;
+  - if `bun build --compile --no-aot`, plain `bun build --target=bun` or the Bun runtime (`import.meta.resolve`, `require.resolve`) resolves anything but `dist/es` and `dist/cjs`;
+  - if an executable's results differ from the same consumer under Bun JIT, bit for bit, across `fromDocuments`, the builder, `fromAsyncIterable`, `fromJSON` and every binary compression.
+
+  On a Bun without `--aot` it prints that it skipped and succeeds (a warning annotation in GitHub Actions), unless `REQUIRE_AOT=1`, which `prepublishOnly` sets so that a release cannot skip it. CI runs it on Bun `latest` and `canary`; a failure on `canary` is reported without blocking the merge. `prepublishOnly` runs it before every release.
+- `make build` needs Bun on `PATH` (as `make lint` already does) and fails with a message otherwise. `scripts/verify-npm-pack.cjs` also checks that the `"aot"` target carries the generated header, so a release cannot ship without it or with a hand-edited file. The header records the Bun that generated it: the CI `test` job uses `canary` until `bun lint` is in a stable release, then that release should be pinned, which also pins the AOT source.
+
+### Using the library from another project
+
+Install the package as usual. Nothing in the consumer selects the AOT source except `bun build --compile --aot` (or its short form `bun compile`):
+
+| Consumer | Resolves |
+|----------|----------|
+| `bun build --compile --aot`, `import` or `require` | `dist/aot/index.aot.ts` |
+| `bun build --compile --no-aot`, `bun build`, the Bun runtime (`bun run`) | `dist/es` (`import`) or `dist/cjs` (`require`) |
+| Node, browsers, bundlers | `dist/es`, `dist/cjs`, `dist/browser`, as before |
+| TypeScript (`nodenext`, `node16`, `bundler`) | `dist/es/index.d.ts` |
+
+These were checked on `736fe1187`. The consumer does not need `--conditions=aot`, `@types/node` or typed code of its own: an untyped CommonJS service still gets the typed library (in `consumer.cjs`, 50.1 % of dependency accesses compile to one load, against 50 % for the typed consumer).
+
+- **Opting out.** `--conditions` adds conditions but cannot remove `"aot"` (`--conditions=node` and `--conditions=import` still resolve `index.aot.ts`). If a Bun release miscompiles the library, build with `--no-aot`: the executable then embeds `dist/es` or `dist/cjs` and runs under the JIT.
+- **Hot path.** Pass `matchInfo: false` to `search` when results are shown without `terms` and `match`. It was the largest single gain measured under AOT (see the table below).
+- **`--trim`.** Use `--trim` and `--trim-locales=<list>` rather than `--trim-without`, whose names differ from those printed by `--explain=trim` ([#47919](https://github.com/oven-sh/bun/issues/47919)). The library imports `node:zlib` (binary snapshot compression), which keeps about 14 MiB more than a hello world after trimming ([#47920](https://github.com/oven-sh/bun/issues/47920)). On `736fe1187`, `--explain=trim` no longer attributes `Intl` to the library: only `Intl.Locale`, `PluralRules` and `RelativeTimeFormat` are removed, and a consumer that needs `Intl.Collator` keeps it with `--trim-locales`.
+
+### Type errors in the AOT source
 
 Bun reports type errors inside a dependency only when a build has other diagnostics, and then compiles the whole package without its types, which still works but runs slower. `make test-aot` therefore also compiles a probe with a deliberate type error. Earlier, inside `node_modules`, Bun's checker rejected `node:stream` classes such as `Transform` as types (TS2709) while `bun check` in the repository accepted them, so stream types in `src/msv5/binaryMsv5Compression.ts` are derived from `node:zlib` instead; on `8aa496e1d`, `import type { Transform } from 'node:stream'` inside `node_modules` no longer triggers TS2709 (with or without `@types/node`), though keeping the `node:zlib`-derived type avoids the dependency altogether. Bun checks the AOT source under the `compilerOptions` of the package's `package.json`, or as `strict` when there are none (our case, and `tsconfig.json` is strict too).
 
@@ -83,6 +109,8 @@ RSS in MiB over two runs per mode, with 200,000 exact, prefix and fuzzy searches
 
 #### `--explain` and optimization candidates
 
+**Last pass, `736fe1187`.** The parity consumer reports **592 causes** and the same dependency accesses as on `25c4fca9e` (1,344 free, 895 tested, 446 by name, 50 %); the ranking of library causes is unchanged (`Object.assign` in the OR merge first, then `JSON.parse`, the options spread and `collectDocIdsForQueryInternal`). `guards-json` still emits 1,197 records. The CommonJS consumer reports 585 causes with 1,340 free, 889 tested and 443 by-name dependency accesses (50.1 %), so `require` loses nothing. `inspect-index-typing.cjs --suspect-only` still finds zero suspect components (488 numeric, 35 string/symbol-keyed). With nothing new to act on and no timings possible, no code change came out of this pass; the candidates below stand.
+
 Before the scoring-weight hoist, [the parity consumer](../aot/consumer.ts) had **591 causes** and **50.0% fixed-offset dependency accesses** (1,344 free, 895 tested, 446 by name) in an external project with the packed dependency installed. These counts match `9990f3d48`. Building the same consumer from the checkout's scratch directory gave 588 causes and 893 tested accesses. The external-project counts are the historical comparison.
 
 `guards-json` emitted 1,197 guard records, of which 86 lead to the function's slow version if the guard fails. `allocations` emitted 841 records, of which 217 were marked as removed. `forms` counted 5,182 `TypeTest` sites and 1,020 `GetTypedArrayElement` sites in the generated code. These are static compiler records. Use profiles to establish which paths run frequently. The source index audit (`node dev/scripts/inspect-index-typing.cjs --suspect-only`) found zero suspect components across 488 numeric accesses and 35 string/symbol-keyed accesses.
@@ -122,9 +150,9 @@ The focused checks used the same snapshot and five rotating process runs on one 
 | Select a stride-one field-length closure for single-field indexes | 496 / 342 | Full `come` slowed 6.7% and top-k slowed 10.1%. This variant changes both address arithmetic and call dispatch. |
 | Cache the edge and leaf columns in the fuzzy walk and suffix test | 494 / 340 | The six-term fuzzy workload slowed 8.5%, with a slowdown in all five pairs. The two path-array element checks remain. |
 
-The rebuilt typed export matches the selected trial source byte for byte. The external parity consumer reports 592 causes and the original dependency access counts. All 12 packaged checks and 48 queries with fractional term, field and document boosts matched the baseline in AOT and Bun JIT. The 48 queries also matched the preceding revision under Node. The validation runs are under `tmp/aot-25c4fca9e/commit-validation/`. Callers can pass `matchInfo: false` when presenting results without match details.
+The rebuilt typed export matches the selected trial source byte for byte. The external parity consumer reports 592 causes and the original dependency access counts. All 12 packaged checks and 48 queries with fractional term, field and document boosts matched the baseline in AOT and Bun JIT. The 48 queries also matched the preceding revision under Node. Callers can pass `matchInfo: false` when presenting results without match details.
 
-The local run directory is `tmp/aot-25c4fca9e/`, with the focused experiments in `quick/`. It contains the entry points, timing runs, CPU profiles, and `explain` reports. To collect comparable diagnostics, install the packed package outside the checkout and run `bun build --compile --aot --explain=json consumer.ts --outfile consumer` with [the parity consumer](../aot/consumer.ts). Repeat with `--explain=guards-json` and `--explain=allocations`. To profile the standalone search loop, set `BUN_OPTIONS="--cpu-prof"` when launching it.
+The run directories of that round were local scratch and are not kept. To collect comparable diagnostics, run `KEEP_AOT_CONSUMER=1 make test-aot`, which keeps the installed consumer outside the checkout, and run `bun build --compile --aot --explain=json consumer.ts --outfile consumer` there with [the parity consumer](../aot/consumer.ts). Repeat with `--explain=guards-json` and `--explain=allocations`. To profile the standalone search loop, set `BUN_OPTIONS="--cpu-prof"` when launching it.
 
 ### Speed with `1.4.5-canary.1+ed4363334` (µs/op unless noted)
 
@@ -320,6 +348,20 @@ Only changes that are neutral or better under Node and Bun JIT are kept:
 Workarounds for compiler limits that the rewrite already changed (spreads replaced by hand-written fixed-shape objects, callbacks grouped into objects to stay under 8 arguments, `map`/`reduce` replaced by loops, union types for `Set` gates) were dropped. The fixed-shape option merge also changed behaviour: an option passed explicitly as `undefined` or `null` no longer overrode the index-level `searchOptions`, unlike MiniSearch (`dev/parity/functional-parity.test.js` now covers it).
 
 ## Bun issues found along the way
+
+All seven issues are still open on GitHub. Statuses below come from re-running each issue's own repro on `1.4.6-canary.1+736fe1187` (static reports and sizes; #48283 needs timings and keeps its last measured status). The last column says what to do if the issue is still open when the library is released.
+
+| Issue | Status on `736fe1187` | Effect on this library | Mitigation at release |
+|-------|-----------------------|------------------------|-----------------------|
+| [#47764](https://github.com/oven-sh/bun/issues/47764) arguments past the 8th not tracked | No longer reproduces: `args8` and `args9` give the same report (`2 direct, 1 indirect`). | None: the library no longer relies on staying under eight arguments. | None needed. |
+| [#47919](https://github.com/oven-sh/bun/issues/47919) `--trim-without=<name>` rejects names | Partly fixed: PascalCase names (`Profilers`, `Fetch`) work; the lowercase tags printed by `--explain=trim` still fail; the flag is still missing from `--help`. | None (consumer build flag). | Document `--trim` / `--trim-locales` (above). |
+| [#47920](https://github.com/oven-sh/bun/issues/47920) `node:zlib` blocks `--trim` | Still reproduces on size: trimmed hello world 24.18 MiB, `Bun.hash.crc32` 24.23 MiB, `node:zlib` `crc32` 38.56 MiB, with `locales: all`. `--explain=trim` now sees every API. | Size only: about +14 MiB for any trimmed consumer, since the Node entry imports `node:zlib` statically. | Accept and document. Moving compression behind a dynamic import would break the sync API and make the AOT source differ from the Node one. |
+| [#48144](https://github.com/oven-sh/bun/issues/48144) false `property-added` with `extends` | No longer reproduces: `Every property access is typed`. | None. | None needed. |
+| [#48145](https://github.com/oven-sh/bun/issues/48145) `node:zlib` `crc32` not a direct call | Still reproduces (`unknown-callee`). | Binary I/O only: one indirect call per checksummed section. | Accept. No `Bun.hash` in `src/`, so Node and AOT share one source. |
+| [#48239](https://github.com/oven-sh/bun/issues/48239) index that may be `undefined` labelled `loose-type` | Fixed: `from-array.ts` is fully typed; `total-items.ts` says the element may be missing. | Report wording only. | None needed. |
+| [#48283](https://github.com/oven-sh/bun/issues/48283) `Map`/`Set` iteration, `Map.get` and array reads slower since the rewrite | Last measured on `ed4363334`: recovered in microbenchmarks, `map.get` with an `Int32Array` key at parity. Not re-timed. | Hot path (result finalization, scoring). | `matchInfo: false` where match details are not needed; `--no-aot` as a fallback. On the `25c4fca9e` suite, typed AOT beat `--no-aot` or stayed within 4 % of it at every median. |
+
+Earlier re-tests:
 
 | Issue | Status with `2596ac5d3` | Status with `8aa496e1d` | Status with `1.4.5-canary.1` |
 |-------|-------------------------|-------------------------|------------------------------|

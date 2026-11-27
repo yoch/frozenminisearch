@@ -342,7 +342,7 @@ prepublish-only:
 	$(MAKE) build
 	node scripts/assert-public-bundles.cjs
 	node scripts/verify-npm-pack.cjs
-	$(MAKE) test-aot
+	REQUIRE_AOT=1 $(MAKE) test-aot
 
 release-beta:
 	node scripts/publish-beta.cjs

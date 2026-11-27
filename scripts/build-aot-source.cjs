@@ -16,7 +16,15 @@ const outFile = join(root, 'dist', 'aot', 'index.aot.ts')
 const libraryDir = mkdtempSync(join(tmpdir(), 'fms-aot-library-'))
 
 try {
-  const bunVersion = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
+  let bunVersion
+  try {
+    bunVersion = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+    console.error('build-aot-source: bun not found on PATH. The build needs Bun to emit dist/aot/index.aot.ts (the "aot" export target), as make lint needs it for bun check: https://bun.com/docs/installation')
+    process.exitCode = 1
+    return
+  }
   try {
     execFileSync('bun', ['compile', '--no-script', '--library', 'src/index.ts', '--outdir', libraryDir], {
       cwd: root,
@@ -26,7 +34,8 @@ try {
   } catch (error) {
     process.stderr.write(`${error.stdout ?? ''}${error.stderr ?? ''}`)
     console.error('build-aot-source: bun compile --library failed')
-    process.exit(1)
+    process.exitCode = 1
+    return
   }
   const source = readFileSync(join(libraryDir, 'index.aot.ts'), 'utf8')
   mkdirSync(join(root, 'dist', 'aot'), { recursive: true })

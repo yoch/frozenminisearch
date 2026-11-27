@@ -11,6 +11,13 @@
  *    dist/aot/index.aot.ts and compile it with its types.
  * 3. The AOT executable and the same consumer under Bun JIT (dist/es) must produce
  *    identical results, bit for bit, through every acquisition path.
+ * 4. The same for an untyped CommonJS consumer (`require`), shaped like
+ *    fr.gouv.medicaments.rest.
+ * 5. Builds without --aot (`--compile --no-aot`, plain `bun build`) must keep resolving
+ *    dist/es and dist/cjs: the "aot" condition must not reach Bun JIT.
+ *
+ * Skipped, with a message, when the Bun on PATH has no `--aot` (stable releases before it),
+ * unless REQUIRE_AOT=1 (set by prepublish-only), which turns the skip into a failure.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -22,15 +29,43 @@ import { loadDivinaLines } from '../../benchmarks/loadDivinaLines.js'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const aotSource = 'dist/aot/index.aot.ts'
-const untypedLibrary = /compiled without (its|their) types|index\.aot\.ts/
+// The probe build fails on purpose: any mention of the AOT source there is a type error in it.
+const untypedInProbe = /compiled without (its|their) types|index\.aot\.ts/
+// Successful builds may name the resolved file; a diagnostic located in it is the signal.
+const untypedInBuild = /compiled without (its|their) types|index\.aot\.ts:\d+:\d+/
+
+class TestFailure extends Error {}
 
 function fail (message, output = '') {
   if (output) process.stderr.write(`${output}\n`)
-  console.error(`test-aot: ${message}`)
-  process.exit(1)
+  throw new TestFailure(`test-aot: ${message}`)
 }
 
-if (!existsSync(join(root, aotSource))) fail(`missing ${aotSource}, run make build first`)
+function exitOnFailure (error) {
+  if (!(error instanceof TestFailure)) throw error
+  console.error(error.message)
+  process.exitCode = 1
+}
+
+function preflight () {
+  if (!existsSync(join(root, aotSource))) fail(`missing ${aotSource}, run make build first`)
+  const buildHelp = spawnSync('bun', ['build', '--help'], { encoding: 'utf8' })
+  if (buildHelp.error) fail(`cannot run bun: ${buildHelp.error.message}`)
+  if (/^\s*--aot(?![\w-])/m.test(buildHelp.stdout)) return true
+  const revision = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
+  if (process.env.REQUIRE_AOT === '1') fail(`Bun ${revision} has no --aot, and REQUIRE_AOT=1`)
+  const message = `test-aot: skipped (Bun ${revision} has no --aot)`
+  console.log(process.env.GITHUB_ACTIONS ? `::warning::${message}` : message)
+  return false
+}
+
+let canRun = false
+try {
+  canRun = preflight()
+} catch (error) {
+  exitOnFailure(error)
+}
+if (!canRun) process.exit()
 
 const work = mkdtempSync(join(tmpdir(), 'fms-aot-consumer-'))
 
@@ -46,6 +81,32 @@ function runReport (command, args) {
   return JSON.parse(result.stdout)
 }
 
+function packageInputs (args) {
+  const meta = join(work, 'meta.json')
+  rmSync(meta, { force: true })
+  const result = bun([...args, '--metafile=meta.json'])
+  if (result.status !== 0) fail(`bun ${args.join(' ')} failed`, result.output)
+  const inputs = Object.keys(JSON.parse(readFileSync(meta, 'utf8')).inputs)
+  return { output: result.output, inputs: inputs.filter((input) => input.includes('@yoch/frozenminisearch/')) }
+}
+
+function expectInputs (args, expected) {
+  const { output, inputs } = packageInputs(args)
+  if (inputs.length === 0 || inputs.some((input) => !expected.some((path) => input.endsWith(`@yoch/frozenminisearch/${path}`)))) {
+    fail(`bun ${args.join(' ')} resolved ${inputs.join(', ') || 'nothing'}, expected ${expected.join(' or ')}`)
+  }
+  return output
+}
+
+function compareReports (label, aot, jit, sameAcrossPaths) {
+  for (const [key, value] of Object.entries(aot)) {
+    if (jit[key] !== value) fail(`${label}: ${key} differs between the AOT executable and Bun JIT`)
+    if (sameAcrossPaths(key) && value !== Object.values(aot)[0]) fail(`${label}: ${key} differs from the first path in the AOT executable`)
+  }
+  if (Object.keys(jit).length !== Object.keys(aot).length) fail(`${label}: the AOT executable and Bun JIT report different checks`)
+  return Object.keys(aot).length
+}
+
 try {
   const packed = execFileSync('npm', ['pack', '--silent', '--pack-destination', work], { cwd: root, encoding: 'utf8' })
   const tarball = packed.trim().split('\n').pop()
@@ -55,6 +116,7 @@ try {
 
   writeFileSync(join(work, 'package.json'), JSON.stringify({ private: true, type: 'module' }))
   copyFileSync(join(here, 'consumer.ts'), join(work, 'consumer.ts'))
+  copyFileSync(join(here, 'consumer.cjs'), join(work, 'consumer.cjs'))
   writeFileSync(join(work, 'corpus.json'), JSON.stringify(loadDivinaLines().map((line, id) => ({ id, txt: line.txt }))))
   writeFileSync(
     join(work, 'probe.ts'),
@@ -65,27 +127,46 @@ try {
   if (probe.status === 0 || !probe.output.includes('TS2322')) {
     fail('the probe build did not report its deliberate type error', probe.output)
   }
-  if (untypedLibrary.test(probe.output)) fail(`Bun reports type errors in ${aotSource}`, probe.output)
+  if (untypedInProbe.test(probe.output)) fail(`Bun reports type errors in ${aotSource}`, probe.output)
 
-  const build = bun(['build', '--compile', '--aot', 'consumer.ts', '--outfile', 'consumer', '--metafile=meta.json'])
-  if (build.status !== 0) fail('the AOT consumer build failed', build.output)
-  if (untypedLibrary.test(build.output)) fail(`Bun compiles ${aotSource} without its types`, build.output)
-  const inputs = Object.keys(JSON.parse(readFileSync(join(work, 'meta.json'), 'utf8')).inputs)
-  if (!inputs.some((input) => input.endsWith(`@yoch/frozenminisearch/${aotSource}`))) {
-    fail(`the AOT build did not resolve the "aot" condition; inputs: ${inputs.join(', ')}`)
+  const esm = [`${aotSource}`]
+  const jsEsm = ['dist/es/index.js']
+  const jsCjs = ['dist/cjs/index.require.cjs', 'dist/cjs/index.cjs']
+
+  const build = expectInputs(['build', '--compile', '--aot', 'consumer.ts', '--outfile', 'consumer'], esm)
+  if (untypedInBuild.test(build)) fail(`Bun compiles ${aotSource} without its types`, build)
+  const buildCjs = expectInputs(['build', '--compile', '--aot', 'consumer.cjs', '--outfile', 'consumer-cjs'], esm)
+  if (untypedInBuild.test(buildCjs)) fail(`Bun compiles ${aotSource} without its types for require()`, buildCjs)
+
+  expectInputs(['build', '--compile', '--no-aot', 'consumer.ts', '--outfile', 'consumer-jit'], jsEsm)
+  expectInputs(['build', '--compile', '--no-aot', 'consumer.cjs', '--outfile', 'consumer-cjs-jit'], jsCjs)
+  expectInputs(['build', '--target=bun', 'consumer.ts', '--outdir', 'bundle-esm'], jsEsm)
+  expectInputs(['build', '--target=bun', 'consumer.cjs', '--outdir', 'bundle-cjs'], jsCjs)
+  writeFileSync(
+    join(work, 'resolve.mjs'),
+    "import { createRequire } from 'node:module'\nconst name = '@yoch/frozenminisearch'\nconsole.log(JSON.stringify([import.meta.resolve(name), createRequire(import.meta.url).resolve(name)]))\n",
+  )
+  const [runtimeImport, runtimeRequire] = runReport('bun', ['resolve.mjs'])
+  if (!runtimeImport.endsWith(jsEsm[0]) || !runtimeRequire.endsWith(jsCjs[0])) {
+    fail(`Bun JIT resolved ${runtimeImport} and ${runtimeRequire}, expected dist/es and dist/cjs`)
   }
 
-  const aot = runReport(join(work, 'consumer'), ['corpus.json'])
-  const jit = runReport('bun', ['consumer.ts', 'corpus.json'])
-
-  for (const [key, value] of Object.entries(aot)) {
-    if (jit[key] !== value) fail(`${key} differs between the AOT executable and Bun JIT`)
-    if (key !== 'storedFields' && value !== aot.search) fail(`${key} differs from fromDocuments in the AOT executable`)
-  }
-  if (Object.keys(jit).length !== Object.keys(aot).length) fail('the AOT executable and Bun JIT report different checks')
+  const checks = compareReports(
+    'consumer.ts',
+    runReport(join(work, 'consumer'), ['corpus.json']),
+    runReport('bun', ['consumer.ts', 'corpus.json']),
+    (key) => key !== 'storedFields',
+  ) + compareReports(
+    'consumer.cjs',
+    runReport(join(work, 'consumer-cjs'), ['corpus.json']),
+    runReport('bun', ['consumer.cjs', 'corpus.json']),
+    () => true,
+  )
 
   const bunVersion = execFileSync('bun', ['--revision'], { encoding: 'utf8' }).trim()
-  console.log(`test-aot: ok (Bun ${bunVersion}, ${Object.keys(aot).length} checks identical to Bun JIT)`)
+  console.log(`test-aot: ok (Bun ${bunVersion}, ${checks} checks identical to Bun JIT, "aot" condition only under --aot)`)
+} catch (error) {
+  exitOnFailure(error)
 } finally {
   if (process.env.KEEP_AOT_CONSUMER) console.log(`test-aot: kept ${work}`)
   else rmSync(work, { recursive: true, force: true })

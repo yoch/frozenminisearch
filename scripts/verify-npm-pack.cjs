@@ -46,8 +46,13 @@ for (const p of paths) {
 }
 
 const { exports: packageExports } = require(join(root, 'package.json'))
+function exportTargets (conditions) {
+  if (typeof conditions === 'string') return [conditions]
+  return Object.values(conditions).flatMap(exportTargets)
+}
+
 for (const [subpath, conditions] of Object.entries(packageExports)) {
-  for (const target of typeof conditions === 'string' ? [conditions] : Object.values(conditions)) {
+  for (const target of exportTargets(conditions)) {
     if (!paths.includes(target.replace(/^\.\//, ''))) {
       console.error(`verify-npm-pack: export ${subpath} points to ${target}, which is not in the tarball`)
       process.exit(1)
@@ -61,10 +66,18 @@ if (Object.keys(packageExports['.'])[0] !== 'aot') {
   process.exit(1)
 }
 
+// "aot" holds its own require/default pair: require must keep the class-shaped entry.
+const aot = packageExports['.'].aot
+if (typeof aot !== 'object' || Object.keys(aot).join() !== 'require,default' ||
+    aot.require !== './dist/aot/index.require.cjs') {
+  console.error('verify-npm-pack: "aot" must be { "require": "./dist/aot/index.require.cjs", "default": <typed source> }')
+  process.exit(1)
+}
+
 // The "aot" target must be the generated typed source, not a stub or a hand edit.
-const aotHeader = readFileSync(join(root, packageExports['.'].aot), 'utf8').split('\n', 1)[0]
+const aotHeader = readFileSync(join(root, aot.default), 'utf8').split('\n', 1)[0]
 if (!/^\/\/ Generated from src\/index\.ts by `bun compile --library` \(Bun \d+\.\d+\.\d+[^)]*\)\. Do not edit\.$/.test(aotHeader)) {
-  console.error(`verify-npm-pack: ${packageExports['.'].aot} does not start with the build-aot-source header`)
+  console.error(`verify-npm-pack: ${aot.default} does not start with the build-aot-source header`)
   process.exit(1)
 }
 

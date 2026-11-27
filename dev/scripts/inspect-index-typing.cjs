@@ -28,7 +28,9 @@ const suspectOnly = args.includes('--suspect-only')
 const filters = args.filter((a) => !a.startsWith('--'))
 
 const FLAGS = ts.TypeFlags
-const NUMERIC_FLAGS = FLAGS.Number | FLAGS.NumberLiteral | FLAGS.EnumLiteral
+// Numeric enum members carry NumberLiteral (or Enum when computed); string enum members
+// carry EnumLiteral | StringLiteral and must not count as numbers.
+const NUMERIC_FLAGS = FLAGS.Number | FLAGS.NumberLiteral | FLAGS.Enum
 const STRINGISH_FLAGS =
   FLAGS.String | FLAGS.StringLiteral | FLAGS.TemplateLiteral |
   FLAGS.ESSymbol | FLAGS.UniqueESSymbol
@@ -40,10 +42,6 @@ function isDefinitelyNumber(type) {
   }
   if (type.isUnion()) return type.types.every(isDefinitelyNumber)
   if (type.isIntersection()) return type.types.some(isDefinitelyNumber)
-  if (type.flags & FLAGS.EnumLike) {
-    const values = type.isUnion() ? type.types : [type]
-    return values.every((v) => v.flags & NUMERIC_FLAGS || v.flags & FLAGS.EnumLiteral)
-  }
   return (type.flags & NUMERIC_FLAGS) !== 0
 }
 

@@ -12,6 +12,7 @@ const bundlePaths = [
   join(root, 'dist', 'cjs', 'index.cjs'),
   join(root, 'dist', 'browser', 'index.js'),
   join(root, 'dist', 'aot', 'index.aot.ts'),
+  join(root, 'dist', 'aot', 'index.require.cjs'),
 ]
 
 const forbiddenPatterns = [

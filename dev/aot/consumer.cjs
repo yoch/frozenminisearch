@@ -1,21 +1,31 @@
 'use strict'
 // Untyped CommonJS consumer, shaped like fr.gouv.medicaments.rest: `require` of the
 // package, async-iterable and builder indexing, function-valued prefix/fuzzy, custom
-// tokenize/processTerm, AND, matchIds, filter, limit and matchInfo: false.
+// tokenize/processTerm, AND, matchIds, filter, limit and matchInfo: false, and the
+// default `require` shape documented in the README.
 // `bun build --compile --aot` must resolve the "aot" condition for `require` too.
 const { createHash } = require('node:crypto')
 const { readFileSync } = require('node:fs')
+const library = require('@yoch/frozenminisearch')
 const {
   AND,
   FrozenMiniSearch,
   createFrozenIndexBuilder,
   freezeFrozenIndexBuilder,
-} = require('@yoch/frozenminisearch')
+} = library
+
+// README form: `require` returns the class itself, with the named exports attached
+// (dist/cjs/index.require.cjs, and dist/aot/index.require.cjs under --aot).
+if (typeof library !== 'function' || library !== FrozenMiniSearch || library.default !== FrozenMiniSearch ||
+    library.AND !== AND || library.createFrozenIndexBuilder !== createFrozenIndexBuilder) {
+  console.error(`require('@yoch/frozenminisearch') is not the FrozenMiniSearch class (typeof ${typeof library})`)
+  process.exit(1)
+}
 
 const docs = JSON.parse(readFileSync(process.argv[2], 'utf8'))
 
 function normalize (text) {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 function tokenize (text) {
@@ -81,6 +91,7 @@ async function main () {
   const frozen = freezeFrozenIndexBuilder(builder)
   report.builder = runQueries(frozen)
   report.binary = runQueries(FrozenMiniSearch.loadBinarySync(frozen.saveBinarySync(), options))
+  report.defaultRequire = runQueries(library.fromDocuments(docs, options))
 
   console.log(JSON.stringify(report))
 }

@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const { cjsWrapper } = require('./cjsWrapper.cjs')
 
 const distDir = path.join(__dirname, '..', 'dist', 'cjs')
 const entryFile = path.join(distDir, 'index.cjs')
@@ -9,20 +10,6 @@ if (!fs.existsSync(entryFile)) {
   process.exit(0)
 }
 
-const wrapper = `'use strict'
-
-const mod = require('./index.cjs')
-const main = mod.default || mod
-
-module.exports = main
-module.exports.default = main
-module.exports.FrozenMiniSearch = main
-
-for (const key of Object.keys(mod)) {
-  if (key !== 'default') {
-    module.exports[key] = mod[key]
-  }
-}
-`
+const wrapper = cjsWrapper('./index.cjs')
 
 fs.writeFileSync(wrapperFile, wrapper)

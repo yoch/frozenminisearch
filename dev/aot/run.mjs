@@ -140,7 +140,7 @@ try {
 
     const build = expectInputs(['build', '--compile', '--aot', 'consumer.ts', '--outfile', 'consumer'], esm)
     if (untypedInBuild.test(build)) fail(`Bun compiles ${aotSource} without its types`, build)
-    const buildCjs = expectInputs(['build', '--compile', '--aot', 'consumer.cjs', '--outfile', 'consumer-cjs'], esm)
+    const buildCjs = expectInputs(['build', '--compile', '--aot', 'consumer.cjs', '--outfile', 'consumer-cjs'], [aotSource, 'dist/aot/index.require.cjs'])
     if (untypedInBuild.test(buildCjs)) fail(`Bun compiles ${aotSource} without its types for require()`, buildCjs)
   }
 
@@ -159,8 +159,8 @@ try {
   if (hasAot) {
     // `bun --aot` (script mode) is an AOT mode too, and must select the typed source.
     const [aotImport, aotRequire] = runReport('bun', ['--aot', 'resolve.mjs'])
-    if (!aotImport.endsWith(aotSource) || !aotRequire.endsWith(aotSource)) {
-      fail(`bun --aot resolved ${aotImport} and ${aotRequire}, expected ${aotSource}`)
+    if (!aotImport.endsWith(aotSource) || !aotRequire.endsWith('dist/aot/index.require.cjs')) {
+      fail(`bun --aot resolved ${aotImport} and ${aotRequire}, expected ${aotSource} and dist/aot/index.require.cjs`)
     }
   }
 

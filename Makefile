@@ -31,11 +31,16 @@ BENCH_TIMING_ARGS := $(if $(RUNS),--runs=$(RUNS)) $(if $(BENCH_WARMUP),--warmup=
 # Benchmark targets that consume dist/ use the phony `build` target instead:
 # dist/ is untracked, so a clean git tree can still benchmark stale bundles
 # after a checkout or branch switch when mtimes make the marker look "fresh".
+
+# A failed recipe (for example build-aot-source after Rollup wrote the marker) must not
+# leave a target that looks up to date.
+.DELETE_ON_ERROR:
+
 DIST_MARKER := dist/es/index.js
 
 # Sources consumed by rollup when building dist/ (see rollup.config.js:
 # entries src/index.ts and src/browser.ts, plus their transitive imports).
-BUILD_SOURCES := $(wildcard src/*.ts src/*.js src/**/*.ts src/**/*.js) rollup.config.js tsconfig.json package.json
+BUILD_SOURCES := $(wildcard src/*.ts src/*.js src/**/*.ts src/**/*.js) rollup.config.js tsconfig.json package.json scripts/postbuild-cjs.cjs scripts/build-aot-source.cjs scripts/cjsWrapper.cjs
 
 # Sources consumed by the packed-radix bench build (entries under benchmarks/,
 # plus src/**/*.ts via plugin-typescript include).

@@ -43,4 +43,6 @@ FrozenMiniSearch-v2 (1).png
 # Local agent instructions (not versioned)
 /AGENTS.md
 /CLAUDE.md
-bun.lock
+
+# Bun lockfile at the root (the repository uses pnpm; a stray `bun install` writes one)
+/bun.lock

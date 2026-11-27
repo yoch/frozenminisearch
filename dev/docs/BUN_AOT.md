@@ -39,7 +39,8 @@ The package does this:
 
 ### Using the library from another project
 
-Install the package as usual. Nothing in the consumer selects the AOT source except `bun build --compile --aot` (or its short form `bun compile`):
+Install the package as usual. Nothing in the consumer selects the AOT source except `bun build --compile --aot` (or its short form `bun compile`). Bun `1.4.5`, the latest stable release on November 27, has no `--aot` (CI's `latest` leg skips with a warning); a consumer needs a canary or the first stable release that ships it.
+
 
 | Consumer | Resolves |
 |----------|----------|
